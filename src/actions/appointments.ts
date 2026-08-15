@@ -4,8 +4,11 @@ import { prisma } from "@/lib/prisma";
 
 export async function listUpcomingAppointments(clinicId: string) {
   return prisma.appointment.findMany({
-    where: { clinicId, scheduledAt: { gte: new Date() } },
-    orderBy: { scheduledAt: "asc" },
-    include: { patient: true, doctor: true, service: true },
+    where: {
+      clinicProcedure: { clinicId },
+      date: { gte: new Date() },
+    },
+    orderBy: { date: "asc" },
+    include: { clinicProcedure: { include: { clinic: true, procedure: true } } },
   });
 }

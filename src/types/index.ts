@@ -1,1 +1,6 @@
-export type { UserRole, ServiceCategory, AppointmentStatus } from "@prisma/client";
+export type {
+  UserRole,
+  ProcedureCategory,
+  AppointmentType,
+  AppointmentStatus,
+} from "@prisma/client";
