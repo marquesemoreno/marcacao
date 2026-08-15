@@ -1,0 +1,129 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  STAFF
+  DOCTOR
+  PATIENT
+
+  @@map("user_role")
+}
+
+enum ServiceCategory {
+  CONSULTATION
+  LAB_EXAM
+  IMAGING_EXAM
+  OTHER
+
+  @@map("service_category")
+}
+
+enum AppointmentStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+  NO_SHOW
+
+  @@map("appointment_status")
+}
+
+model Clinic {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  phone     String?
+  address   String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  users        User[]
+  services     Service[]
+  appointments Appointment[]
+
+  @@map("clinics")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  role         UserRole @default(PATIENT)
+  clinicId     String?  @map("clinic_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  clinic         Clinic?  @relation(fields: [clinicId], references: [id])
+  doctorProfile  Doctor?
+  patientProfile Patient?
+
+  @@map("users")
+}
+
+model Doctor {
+  id            String @id @default(cuid())
+  userId        String @unique @map("user_id")
+  specialty     String
+  licenseNumber String @map("license_number")
+
+  user         User          @relation(fields: [userId], references: [id])
+  appointments Appointment[]
+
+  @@map("doctors")
+}
+
+model Patient {
+  id        String   @id @default(cuid())
+  userId    String   @unique @map("user_id")
+  cpf       String   @unique
+  birthDate DateTime @map("birth_date")
+  phone     String?
+
+  user         User          @relation(fields: [userId], references: [id])
+  appointments Appointment[]
+
+  @@map("patients")
+}
+
+model Service {
+  id              String          @id @default(cuid())
+  clinicId        String          @map("clinic_id")
+  name            String
+  category        ServiceCategory
+  durationMinutes Int             @map("duration_minutes")
+  price           Decimal         @db.Decimal(10, 2)
+
+  clinic       Clinic        @relation(fields: [clinicId], references: [id])
+  appointments Appointment[]
+
+  @@map("services")
+}
+
+model Appointment {
+  id          String            @id @default(cuid())
+  clinicId    String            @map("clinic_id")
+  patientId   String            @map("patient_id")
+  doctorId    String?           @map("doctor_id")
+  serviceId   String            @map("service_id")
+  scheduledAt DateTime          @map("scheduled_at")
+  status      AppointmentStatus @default(PENDING)
+  notes       String?
+  createdAt   DateTime          @default(now()) @map("created_at")
+  updatedAt   DateTime          @updatedAt @map("updated_at")
+
+  clinic  Clinic  @relation(fields: [clinicId], references: [id])
+  patient Patient @relation(fields: [patientId], references: [id])
+  doctor  Doctor? @relation(fields: [doctorId], references: [id])
+  service Service @relation(fields: [serviceId], references: [id])
+
+  @@index([clinicId, scheduledAt])
+  @@map("appointments")
+}

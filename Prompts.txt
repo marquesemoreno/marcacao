@@ -1,0 +1,50 @@
+# Diretrizes do Projeto: Plataforma de Agendamento de Consultas e Exames
+
+## Stack Tecnológica
+- **Framework:** Next.js (App Router, React 18/19, TypeScript)
+- **Estilização:** Tailwind CSS + shadcn/ui
+- **Banco de Dados:** PostgreSQL com Prisma ORM
+- **Validação:** Zod + React Hook Form
+- **Autenticação:** NextAuth (JWT / Credentials)
+
+## Padrões de Código
+- Código modular e tipado rigorosamente (sem `any`).
+- Componentes de UI sempre reutilizáveis via `@/components/ui`.
+- Server Actions e Route Handlers para mutações e APIs.
+- Tratamento explícito de erros com mensagens claras em português.
+- Nomes de tabelas em inglês no banco, interface 100% em Português (pt-BR).
+
+## Comandos Principais
+- Instalação: `npm install`
+- Desenvolvimento: `npm run dev`
+- Migração de Banco: `npx prisma migrate dev`
+- Seed de Dados: `npx prisma db seed`
+- Build: `npm run build`
+- Testes: `npm test`
+
+
+
+
+Crie a estrutura inicial de um SaaS/Plataforma web para agendamento de consultas médicas e exames laboratoriais/imagem.
+Requisitos técnicos:
+1. Next.js 14+ com TypeScript, App Router e Tailwind CSS.
+2. Configure o shadcn/ui com componentes base (button, input, card, dialog, select, table, badge, toast, calendar).
+3. Configure o Prisma ORM apontando para PostgreSQL.
+4. Crie uma estrutura de pastas modular em /src (components, lib, actions, types, app/(public), app/(admin), app/(clinic)).
+5. Configure um arquivo Dockerfile e docker-compose.yml para subir o PostgreSQL localmente.
+Após criar os arquivos, rode a instalação das dependências e verifique se o build passa.
+
+
+
+Implemente o schema completo no Prisma (schema.prisma) para a plataforma de saúde com as seguintes entidades:
+1. User (id, name, email, phone, role: ADMIN | CLINIC | PATIENT, passwordHash).
+2. Clinic (id, name, tradeName, cnpj, phone, whatsapp, address, neighborhood, city, active, commissionRate).
+3. Specialty & Procedure (id, name, category: CONSULTATION | EXAM | SURGERY, description, preparationInstructions).
+4. ClinicProcedure (clinicId, procedureId, price, promotionalPrice, requiresAppointment, appointmentType: SCHEDULED | ARRIVAL_ORDER).
+5. Appointment (id, patientName, patientPhone, patientCpf, clinicProcedureId, date, timeSlot, status: PENDING | CONFIRMED | COMPLETED | CANCELLED, paymentMethod, notes).
+6. WebhookLog (id, event, payload, status, responseCode, createdAt).
+
+Crie também um script de seed (prisma/seed.ts) populando com dados realistas de clínicas parceiras, especialidades (Clínica Geral, Cardiologia, Oftalmologia, Dermatologia) e exames (Ultrassom, Hemograma, Tomografia, ECG, Colonoscopia). Rode a migração e o seed.
+
+
+
