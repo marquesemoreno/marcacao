@@ -1,0 +1,90 @@
+# Compose de deploy: App Next.js + PostgreSQL + Nginx (reverse proxy).
+#
+# Diferente do docker-compose.yml (só Postgres, para desenvolvimento local
+# contra o Dockerfile em modo dev), este arquivo sobe a stack completa em
+# modo produção. Ver docs/obsidian/01 - Setup e Infraestrutura.md para o
+# passo a passo completo.
+#
+# Uso:
+#   docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-marcacao}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD no .env.prod}
+      POSTGRES_DB: ${POSTGRES_DB:-marcacao}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-marcacao}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - internal
+    # Não expõe porta ao host de propósito — só a rede interna do compose
+    # precisa alcançar o Postgres. Descomente para depurar com um client local:
+    # ports:
+    #   - "5432:5432"
+
+  # Roda `prisma migrate deploy` uma vez, contra o `builder` do Dockerfile
+  # (que já tem o CLI do Prisma e a pasta prisma/ — o estágio final `runner`
+  # não tem, é um bundle standalone só com o necessário pra rodar o server).
+  # Não roda seed automaticamente: dados de demonstração (e as senhas de
+  # teste do prisma/seed.ts) não devem ir para produção — ver
+  # docs/obsidian/04 - Manual de Edição Manual e Manutenção.md.
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: builder
+    command: npx prisma migrate deploy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-marcacao}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-marcacao}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - internal
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-marcacao}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-marcacao}
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:?defina NEXTAUTH_SECRET no .env.prod}
+      NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost}
+      WHATSAPP_PROVIDER: ${WHATSAPP_PROVIDER:-evolution}
+      WHATSAPP_API_URL: ${WHATSAPP_API_URL:-}
+      WHATSAPP_API_KEY: ${WHATSAPP_API_KEY:-}
+      WHATSAPP_INSTANCE_NAME: ${WHATSAPP_INSTANCE_NAME:-}
+      WHATSAPP_WEBHOOK_SECRET: ${WHATSAPP_WEBHOOK_SECRET:-}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    networks:
+      - internal
+    # Sem porta publicada — só o Nginx fala com o app, pela rede interna.
+
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./deploy/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - app
+    networks:
+      - internal
+
+networks:
+  internal:
+
+volumes:
+  postgres_data:
