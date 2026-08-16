@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Logo } from "@/components/brand/logo";
 import { loginSchema, type LoginInput } from "@/lib/schemas/auth";
 
 function LoginForm() {
@@ -88,7 +89,10 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <main className="mx-auto flex min-h-[80vh] max-w-sm flex-col justify-center px-4 py-8">
+    <main className="mx-auto flex min-h-[80vh] max-w-sm flex-col justify-center gap-6 px-4 py-8">
+      <div className="flex justify-center">
+        <Logo variant="full" size="lg" />
+      </div>
       <Suspense fallback={null}>
         <LoginForm />
       </Suspense>

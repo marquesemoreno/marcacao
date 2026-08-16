@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { HeartPulse, Mail, ShieldCheck } from "lucide-react";
+import { Mail, ShieldCheck } from "lucide-react";
+import { Logo } from "@/components/brand/logo";
 
 const patientLinks = [
   { label: "Buscar clínicas", href: "/buscar" },
@@ -11,11 +12,11 @@ const partnerLinks = [
   { label: "Para Clínicas e Médicos", href: "/seja-parceiro" },
   { label: "Proposta Comercial (PDF)", href: "/proposta-comercial" },
   { label: "Área da clínica", href: "/entrar" },
-  { label: "Fale com o time comercial", href: "mailto:parcerias@marcacao.com.br" },
+  { label: "Fale com o time comercial", href: "mailto:parcerias@conectasaudevdc.com.br" },
 ];
 
 const supportLinks = [
-  { label: "Fale conosco", href: "mailto:suporte@marcacao.com.br" },
+  { label: "Fale conosco", href: "mailto:contato@conectasaudevdc.com.br" },
   { label: "Termos de Uso", href: "/termos" },
   { label: "Política de Privacidade", href: "/privacidade" },
 ];
@@ -28,12 +29,7 @@ export function SiteFooter() {
       <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 gap-10 sm:grid-cols-2 lg:grid-cols-4">
           <div className="flex flex-col gap-3">
-            <span className="inline-flex items-center gap-2 text-lg font-semibold text-slate-900">
-              <span className="flex size-8 items-center justify-center rounded-lg bg-gradient-to-br from-sky-600 to-teal-600 text-white">
-                <HeartPulse className="h-4 w-4" />
-              </span>
-              Conecta Saúde
-            </span>
+            <Logo variant="full" size="md" />
             <p className="text-sm text-slate-600">
               Marcação de consultas e exames em clínicas parceiras, com confirmação e
               acompanhamento pelo WhatsApp.

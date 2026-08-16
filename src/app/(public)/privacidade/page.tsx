@@ -33,8 +33,8 @@ export default function PrivacyPage() {
             Nos termos da Lei Geral de Proteção de Dados (Lei nº 13.709/2018), você pode solicitar
             a qualquer momento a confirmação, correção ou exclusão dos seus dados, entrando em
             contato pelo e-mail{" "}
-            <a href="mailto:suporte@marcacao.com.br" className="underline">
-              suporte@marcacao.com.br
+            <a href="mailto:contato@conectasaudevdc.com.br" className="underline">
+              contato@conectasaudevdc.com.br
             </a>
             .
           </p>

@@ -26,7 +26,7 @@ Plataforma de agendamento de consultas médicas e exames (laboratoriais, de imag
 | Automação/Notificações | WhatsApp direto (Evolution API/UAZAPI/Z-API) | ✅ Implementado, sem n8n — ver [[03 - APIs e Webhooks n8n]] |
 | Chat/Inbox em tempo real | Supabase Realtime (`@supabase/supabase-js`) + polling | 🚧 Polling funcional hoje; Realtime pronto no código, falta credencial — ver [[05 - Módulo de Atendimento e Chat Realtime]] |
 | Testes | Vitest (unitários + integração) | ✅ Implementado — ver [[04 - Manual de Edição Manual e Manutenção]] |
-| Hospedagem | Vercel, ou Docker Compose auto-hospedado | 🚧 Vercel não configurado · ✅ `docker-compose.prod.yml` (App + Postgres + Nginx) pronto, não testado com Docker de verdade — ver [[01 - Setup e Infraestrutura]] |
+| Hospedagem | Vercel, ou Docker Compose auto-hospedado | ✅ Vercel configurado, domínio oficial `https://conectasaudevdc.com.br` — ver [[10 - Central de Testes e Acessos]] · ✅ `docker-compose.prod.yml` (App + Postgres + Nginx) pronto, não testado com Docker de verdade — ver [[01 - Setup e Infraestrutura]] |
 | Infra local | Docker + docker-compose (Postgres) | ✅ Implementado (dev atual usa Supabase — ver [[01 - Setup e Infraestrutura]]) |
 
 Next.js foi fixado na major 15 (não a 14, que tem CVEs de segurança altas sem correção retroativa; nem a 16, que trouxe breaking changes grandes). Prisma foi fixado na major 5 pelo mesmo motivo de estabilidade — a 6/7 mudam a forma de gerar o client e carregar variáveis de ambiente. Pelo mesmo raciocínio, a autenticação usa **NextAuth v4** (estável), não a v5/Auth.js — que segue em beta (`5.0.0-beta.32` era a versão mais recente disponível) sem nunca ter chegado a uma versão estável.

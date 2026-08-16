@@ -4,6 +4,7 @@ import { QRCodeSVG } from "qrcode.react";
 import { CheckCircle2, MapPin, Phone, Printer, MessageCircle, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Logo } from "@/components/brand/logo";
 import {
   formatCurrency,
   formatDate,
@@ -60,8 +61,9 @@ export function VoucherCard({
 
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
-            Conecta Saúde — Guia Oficial de Encaminhamento
+          <Logo variant="full" size="sm" />
+          <p className="mt-1.5 text-xs font-medium uppercase tracking-wide text-slate-400">
+            Guia Oficial de Encaminhamento
           </p>
           <p className="font-mono text-lg font-bold text-sky-700">#{guideCode(appointment)}</p>
         </div>

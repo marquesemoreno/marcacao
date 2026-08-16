@@ -40,6 +40,9 @@ export function maskCpf(value: string) {
   return `${digits.slice(0, 3)}.***.**${digits[8]}-${digits.slice(9)}`;
 }
 
+/** Domínio oficial de produção — usado nos links absolutos (QR Code, WhatsApp, metadata). */
+const PRODUCTION_URL = "https://conectasaudevdc.com.br";
+
 /**
  * URL base da aplicação, para montar links absolutos (QR Code, WhatsApp,
  * link de acompanhamento, etc.). Nunca usa `new URL(...)` — só concatenação
@@ -47,9 +50,19 @@ export function maskCpf(value: string) {
  * esquema em builds da Vercel, e um `new URL()` mal formado derruba o build
  * inteiro (`ERR_INVALID_URL`) quando essa função roda durante a geração
  * estática de uma rota que não devia ter sido pré-renderizada.
+ *
+ * Em produção (`VERCEL_ENV === "production"`) o domínio oficial tem
+ * prioridade sobre `VERCEL_URL` de propósito: `VERCEL_URL` é sempre a URL
+ * de deploy gerada automaticamente (ex. `marcacao-six.vercel.app`), não o
+ * domínio customizado — se `VERCEL_URL` viesse primeiro, os links de QR
+ * Code/WhatsApp nunca mostrariam o domínio oficial mesmo depois de
+ * configurado na Vercel. Em preview deployments (`VERCEL_ENV === "preview"`)
+ * mantém `VERCEL_URL`, para que cada branch/PR aponte pra sua própria URL.
  */
 export function getBaseUrl() {
   if (typeof window !== "undefined") return "";
+
+  if (process.env.VERCEL_ENV === "production") return PRODUCTION_URL;
 
   let url: string;
   if (process.env.VERCEL_URL) {

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { SignOutButton } from "@/components/sign-out-button";
+import { Logo } from "@/components/brand/logo";
 import { getClinicInfo } from "@/actions/clinic";
 
 // Evita que o Next tente pré-renderizar estaticamente rotas protegidas
@@ -18,9 +19,12 @@ export default async function ClinicLayout({
   return (
     <div className="flex h-screen flex-col overflow-hidden">
       <header className="flex items-center justify-between border-b px-4 py-3">
-        <div>
-          <p className="text-lg font-semibold">Painel da Clínica</p>
-          <p className="text-sm text-muted-foreground">{clinic.tradeName}</p>
+        <div className="flex items-center gap-3">
+          <Logo variant="icon-only" size="sm" />
+          <div>
+            <p className="text-lg font-semibold">Painel da Clínica</p>
+            <p className="text-sm text-muted-foreground">{clinic.tradeName}</p>
+          </div>
         </div>
         <SignOutButton />
       </header>

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { SignOutButton } from "@/components/sign-out-button";
+import { Logo } from "@/components/brand/logo";
 
 // Evita que o Next tente pré-renderizar estaticamente rotas protegidas
 // (getServerSession não tem request de verdade em build-time e pode
@@ -15,7 +16,10 @@ export default function AdminLayout({
   return (
     <div className="flex min-h-screen flex-col">
       <header className="flex items-center justify-between border-b px-4 py-3">
-        <p className="text-lg font-semibold">Painel Administrativo</p>
+        <div className="flex items-center gap-3">
+          <Logo variant="icon-only" size="sm" />
+          <p className="text-lg font-semibold">Painel Administrativo</p>
+        </div>
         <SignOutButton />
       </header>
       <nav className="flex gap-1 overflow-x-auto border-b px-4 py-2">

@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { HeartPulse } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Logo } from "@/components/brand/logo";
 import { SiteFooter } from "@/components/public/landing/site-footer";
 
 const navLinks = [
@@ -18,11 +18,8 @@ export default function PublicLayout({
     <div className="flex min-h-screen flex-col">
       <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/90 px-4 py-3 backdrop-blur print:hidden">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4">
-          <Link href="/" className="flex items-center gap-2 text-lg font-semibold text-slate-900">
-            <span className="flex size-8 items-center justify-center rounded-lg bg-gradient-to-br from-sky-600 to-teal-600 text-white">
-              <HeartPulse className="h-4 w-4" />
-            </span>
-            Conecta Saúde
+          <Link href="/">
+            <Logo variant="full" size="md" />
           </Link>
 
           <nav className="hidden items-center gap-6 text-sm font-medium text-slate-600 sm:flex">

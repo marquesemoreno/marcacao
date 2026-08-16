@@ -17,6 +17,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://conectasaudevdc.com.br"),
   title: "Conecta Saúde | Consultas e Exames em Vitória da Conquista",
   description:
     "A forma mais rápida e acessível de agendar consultas médicas, exames e procedimentos em clínicas parceiras de Vitória da Conquista.",
@@ -24,6 +25,7 @@ export const metadata: Metadata = {
     title: "Conecta Saúde | Consultas e Exames em Vitória da Conquista",
     description:
       "A forma mais rápida e acessível de agendar consultas médicas, exames e procedimentos em clínicas parceiras de Vitória da Conquista.",
+    url: "https://conectasaudevdc.com.br",
     siteName: "Conecta Saúde",
     locale: "pt_BR",
     type: "website",
