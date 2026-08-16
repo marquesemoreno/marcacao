@@ -5,6 +5,7 @@ import { AppointmentType, Prisma, ProcedureCategory } from "@prisma/client";
 
 export type SearchFilters = {
   query?: string;
+  neighborhood?: string;
   category?: ProcedureCategory;
   appointmentType?: AppointmentType;
   maxPrice?: number;
@@ -13,12 +14,13 @@ export type SearchFilters = {
 };
 
 export async function searchClinicProcedures(filters: SearchFilters) {
-  const { query, category, appointmentType, maxPrice, minRating, sort } = filters;
+  const { query, neighborhood, category, appointmentType, maxPrice, minRating, sort } = filters;
 
   const where: Prisma.ClinicProcedureWhereInput = {
     clinic: {
       active: true,
       ...(minRating ? { rating: { gte: minRating } } : {}),
+      ...(neighborhood ? { neighborhood: { contains: neighborhood, mode: "insensitive" } } : {}),
     },
     ...(category ? { procedure: { category } } : {}),
     ...(appointmentType ? { appointmentType } : {}),
@@ -51,5 +53,26 @@ export async function getClinicProcedureDetail(id: string) {
   return prisma.clinicProcedure.findUnique({
     where: { id },
     include: { clinic: true, procedure: { include: { specialty: true } } },
+  });
+}
+
+export async function getFeaturedClinics(limit = 6) {
+  return prisma.clinic.findMany({
+    where: { active: true },
+    orderBy: { rating: "desc" },
+    take: limit,
+    select: {
+      id: true,
+      tradeName: true,
+      neighborhood: true,
+      city: true,
+      rating: true,
+      reviewCount: true,
+      clinicProcedures: {
+        take: 4,
+        orderBy: { procedure: { name: "asc" } },
+        select: { procedure: { select: { name: true } } },
+      },
+    },
   });
 }
