@@ -9,6 +9,7 @@ const patientLinks = [
 
 const partnerLinks = [
   { label: "Para Clínicas e Médicos", href: "/seja-parceiro" },
+  { label: "Proposta Comercial (PDF)", href: "/proposta-comercial" },
   { label: "Área da clínica", href: "/entrar" },
   { label: "Fale com o time comercial", href: "mailto:parcerias@marcacao.com.br" },
 ];

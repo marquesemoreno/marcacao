@@ -152,3 +152,4 @@ flowchart LR
 - [[04 - Manual de Edição Manual e Manutenção]] — guia de operação do dia a dia
 - [[05 - Módulo de Atendimento e Chat Realtime]] — inbox de chat/CRM, Supabase Realtime e respostas rápidas
 - [[07 - Guia de Encaminhamento e Captação B2B]] — captação de clínicas parceiras e a guia/voucher com QR Code do paciente
+- [[08 - Playbook Comercial e Proposta B2B]] — proposta comercial (`/proposta-comercial`) e o roteiro de vendas para fechar parcerias

@@ -1,24 +1,43 @@
-import { MessageCircle, Mail } from "lucide-react";
+import { MessageCircle, Mail, FileText } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { listPartnerLeads } from "@/actions/partner-leads";
 import { PartnerLeadStatusForm } from "@/components/admin/partner-lead-status-form";
-import { partnerLeadStatusLabels, partnerLeadStatusVariant, formatPhone, buildWhatsAppLink } from "@/lib/format";
+import {
+  partnerLeadStatusLabels,
+  partnerLeadStatusVariant,
+  formatPhone,
+  buildWhatsAppLink,
+  getBaseUrl,
+} from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export default async function AdminLeadsPage() {
   const leads = await listPartnerLeads();
+  const proposalUrl = `${getBaseUrl()}/proposta-comercial`;
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Leads de Clínicas Parceiras</h1>
-        <p className="text-sm text-muted-foreground">
-          Contatos recebidos pelo formulário público em <code>/seja-parceiro</code>.
-        </p>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold">Leads de Clínicas Parceiras</h1>
+          <p className="text-sm text-muted-foreground">
+            Contatos recebidos pelo formulário público em <code>/seja-parceiro</code>.
+          </p>
+        </div>
+        <Button
+          render={<a href="/proposta-comercial" target="_blank" rel="noopener noreferrer" />}
+          nativeButton={false}
+          variant="outline"
+          size="sm"
+          className="gap-1.5"
+        >
+          <FileText className="h-4 w-4" />
+          Ver Proposta Comercial (PDF)
+        </Button>
       </div>
 
       {leads.length === 0 ? (
@@ -89,6 +108,25 @@ export default async function AdminLeadsPage() {
                     >
                       <Mail className="h-4 w-4" />
                       E-mail
+                    </Button>
+                    <Button
+                      render={
+                        <a
+                          href={buildWhatsAppLink(
+                            lead.phone,
+                            `Olá, ${lead.contactName}! Segue a proposta comercial da Conecta Saúde para a ${lead.clinicName}: ${proposalUrl}`
+                          )}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        />
+                      }
+                      nativeButton={false}
+                      variant="outline"
+                      size="sm"
+                      className="gap-1.5"
+                    >
+                      <FileText className="h-4 w-4" />
+                      Enviar Proposta
                     </Button>
                   </div>
                   <PartnerLeadStatusForm leadId={lead.id} status={lead.status} />
