@@ -4,7 +4,6 @@ import { useState } from "react";
 import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,10 +22,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { VoucherCard } from "@/components/public/voucher-card";
 import { createAppointment } from "@/actions/appointments";
 import { createAppointmentSchema, type CreateAppointmentInput } from "@/lib/schemas/appointment";
 import { formatCpf, formatPhone } from "@/lib/format";
-import type { PlainClinicProcedure } from "@/lib/serialize";
+import type { PlainClinicProcedure, PlainAppointment } from "@/lib/serialize";
 
 const timeSlots = Array.from({ length: 21 }, (_, index) => {
   const totalMinutes = 8 * 60 + index * 30;
@@ -35,15 +35,9 @@ const timeSlots = Array.from({ length: 21 }, (_, index) => {
   return `${hours}:${minutes}`;
 });
 
-type ConfirmedAppointment = {
-  id: string;
-  date: string;
-  timeSlot: string | null;
-};
-
 export function BookingDialog({ clinicProcedure }: { clinicProcedure: PlainClinicProcedure }) {
   const [open, setOpen] = useState(false);
-  const [confirmed, setConfirmed] = useState<ConfirmedAppointment | null>(null);
+  const [confirmed, setConfirmed] = useState<PlainAppointment | null>(null);
   const isScheduled = clinicProcedure.appointmentType === "SCHEDULED";
   const today = new Date().toISOString().slice(0, 10);
 
@@ -62,11 +56,7 @@ export function BookingDialog({ clinicProcedure }: { clinicProcedure: PlainClini
   async function onSubmit(values: CreateAppointmentInput) {
     try {
       const appointment = await createAppointment(values);
-      setConfirmed({
-        id: appointment.id,
-        date: appointment.date.toString(),
-        timeSlot: appointment.timeSlot,
-      });
+      setConfirmed(appointment);
     } catch {
       toast.error("Não foi possível enviar sua solicitação. Tente novamente.");
     }
@@ -85,29 +75,27 @@ export function BookingDialog({ clinicProcedure }: { clinicProcedure: PlainClini
       <DialogTrigger render={<Button size="lg" className="h-12 w-full text-base" />}>
         Solicitar Agendamento
       </DialogTrigger>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-md">
+      <DialogContent className={confirmed ? "max-h-[90vh] overflow-y-auto sm:max-w-lg" : "max-h-[90vh] overflow-y-auto sm:max-w-md"}>
         {confirmed ? (
-          <div className="flex flex-col items-center gap-4 py-4 text-center">
-            <CheckCircle2 className="h-14 w-14 text-green-600" />
+          <div className="flex flex-col items-center gap-4 py-2 text-center">
             <DialogHeader>
               <DialogTitle className="text-xl">Solicitação enviada!</DialogTitle>
             </DialogHeader>
             <p className="text-sm text-muted-foreground">
-              Você solicitou <strong>{clinicProcedure.procedure.name}</strong> em{" "}
-              <strong>{clinicProcedure.clinic.tradeName}</strong>. A clínica vai confirmar seu
-              agendamento em breve.
+              A clínica ainda vai confirmar seu horário — aqui está sua guia de encaminhamento.
             </p>
-            {clinicProcedure.procedure.preparationInstructions && (
-              <div className="w-full rounded-lg border bg-muted/50 p-3 text-left text-sm">
-                <p className="font-medium">Instruções de preparo</p>
-                <p className="text-muted-foreground">
-                  {clinicProcedure.procedure.preparationInstructions}
-                </p>
-              </div>
-            )}
+            <VoucherCard
+              appointment={confirmed}
+              comprovanteUrl={
+                typeof window !== "undefined"
+                  ? `${window.location.origin}/comprovante/${confirmed.id}`
+                  : `/comprovante/${confirmed.id}`
+              }
+            />
             <div className="flex w-full flex-col gap-2 pt-2">
               <Button
                 render={<Link href={`/acompanhar/${confirmed.id}`} />}
+                nativeButton={false}
                 size="lg"
                 className="h-12"
               >

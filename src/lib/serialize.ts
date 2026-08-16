@@ -34,3 +34,25 @@ export function toPlainClinic(clinic: Prisma.ClinicGetPayload<Record<string, nev
 }
 
 export type PlainClinic = ReturnType<typeof toPlainClinic>;
+
+type AppointmentWithRelations = Prisma.AppointmentGetPayload<{
+  include: { clinicProcedure: { include: { clinic: true; procedure: true } } };
+}>;
+
+/** Decimal (price/commissionRate) não pode cruzar a fronteira Server→Client como está — mesma razão de toPlainClinicProcedure. */
+export function toPlainAppointment(appointment: AppointmentWithRelations) {
+  const { clinicProcedure, ...rest } = appointment;
+  const { clinic, procedure, price, promotionalPrice, ...clinicProcedureRest } = clinicProcedure;
+  return {
+    ...rest,
+    clinicProcedure: {
+      ...clinicProcedureRest,
+      price: Number(price),
+      promotionalPrice: promotionalPrice !== null ? Number(promotionalPrice) : null,
+      clinic: { ...clinic, commissionRate: Number(clinic.commissionRate) },
+      procedure,
+    },
+  };
+}
+
+export type PlainAppointment = ReturnType<typeof toPlainAppointment>;

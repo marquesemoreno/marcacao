@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { createAppointmentSchema, type CreateAppointmentInput } from "@/lib/schemas/appointment";
 import { notifyAppointmentStatus } from "@/lib/whatsapp";
+import { toPlainAppointment } from "@/lib/serialize";
 
 export async function listUpcomingAppointments(clinicId: string) {
   const today = new Date();
@@ -42,7 +43,11 @@ export async function createAppointment(input: CreateAppointmentInput) {
     console.error("Falha ao notificar novo agendamento via WhatsApp:", error);
   });
 
-  return appointment;
+  // Serializado (Decimal -> number) porque esta action é chamada direto de
+  // Client Components (BookingDialog, CreateAppointmentShortcut do inbox) —
+  // o valor de retorno cruza a fronteira Server->Client igual a props de
+  // Server Component, e Decimal não é um tipo serializável nela.
+  return toPlainAppointment(appointment);
 }
 
 export async function getAppointmentById(id: string) {
