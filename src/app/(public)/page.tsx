@@ -1,47 +1,39 @@
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { SearchBar } from "@/components/public/search-bar";
+import { CategoryChips } from "@/components/public/category-chips";
+import { ProcedureResultCard } from "@/components/public/procedure-result-card";
+import { searchClinicProcedures } from "@/actions/search";
 
-const servicos = [
-  {
-    titulo: "Consultas Médicas",
-    descricao: "Agende consultas com especialistas de diversas áreas.",
-  },
-  {
-    titulo: "Exames Laboratoriais",
-    descricao: "Marque exames de sangue, urina e outros testes de laboratório.",
-  },
-  {
-    titulo: "Exames de Imagem",
-    descricao: "Agende raio-x, ultrassonografia, ressonância e tomografia.",
-  },
-];
+// Preços/avaliações mudam a qualquer momento — evita que a home fique
+// congelada com dados do instante do build (e evita build do Docker
+// depender de um banco acessível/populado nesse momento, ver Dockerfile).
+export const dynamic = "force-dynamic";
 
-export default function HomePage() {
+export default async function HomePage() {
+  const featured = await searchClinicProcedures({ sort: "rating_desc" });
+
   return (
-    <main className="mx-auto flex min-h-screen max-w-5xl flex-col items-center justify-center gap-10 px-6 py-20">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold tracking-tight">
-          Agende sua consulta ou exame
+    <main className="mx-auto flex max-w-2xl flex-col gap-8 px-4 py-8">
+      <section className="flex flex-col gap-4 text-center">
+        <h1 className="text-2xl font-bold leading-tight sm:text-3xl">
+          Agende sua consulta ou exame em minutos
         </h1>
-        <p className="mt-4 text-lg text-muted-foreground">
-          Marcação rápida e simples de consultas e exames com as melhores clínicas.
+        <p className="text-muted-foreground">
+          Compare preços e horários nas melhores clínicas parceiras perto de você.
         </p>
-        <Button className="mt-6" size="lg">
-          Agendar agora
-        </Button>
-      </div>
+        <SearchBar />
+        <CategoryChips />
+      </section>
 
-      <div className="grid w-full gap-4 sm:grid-cols-3">
-        {servicos.map((servico) => (
-          <Card key={servico.titulo}>
-            <CardHeader>
-              <CardTitle>{servico.titulo}</CardTitle>
-              <CardDescription>{servico.descricao}</CardDescription>
-            </CardHeader>
-            <CardContent />
-          </Card>
-        ))}
-      </div>
+      {featured.length > 0 && (
+        <section className="flex flex-col gap-3">
+          <h2 className="text-lg font-semibold">Bem avaliados perto de você</h2>
+          <div className="flex flex-col gap-3">
+            {featured.slice(0, 6).map((result) => (
+              <ProcedureResultCard key={result.id} result={result} />
+            ))}
+          </div>
+        </section>
+      )}
     </main>
   );
 }
