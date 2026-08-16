@@ -1,5 +1,5 @@
 export const metadata = {
-  title: "Política de Privacidade | Marcação",
+  title: "Política de Privacidade | Conecta Saúde",
 };
 
 export default function PrivacyPage() {

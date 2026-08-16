@@ -53,7 +53,7 @@ export function VoucherCard({
           <CheckCircle2 className="h-5 w-5 shrink-0" />
           <div>
             <p className="text-sm font-semibold">Guia autêntica</p>
-            <p className="text-xs">Emitida pela plataforma Marcação — encaminhamento válido.</p>
+            <p className="text-xs">Emitida pela plataforma Conecta Saúde — encaminhamento válido.</p>
           </div>
         </div>
       )}
@@ -61,7 +61,7 @@ export function VoucherCard({
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
-            Guia de Encaminhamento
+            Conecta Saúde — Guia Oficial de Encaminhamento
           </p>
           <p className="font-mono text-lg font-bold text-sky-700">#{guideCode(appointment)}</p>
         </div>

@@ -1,5 +1,5 @@
 export const metadata = {
-  title: "Termos de Uso | Marcação",
+  title: "Termos de Uso | Conecta Saúde",
 };
 
 export default function TermsPage() {
@@ -12,7 +12,7 @@ export default function TermsPage() {
         <section>
           <h2 className="text-lg font-semibold text-slate-900">1. Sobre a plataforma</h2>
           <p className="mt-2">
-            O Marcação é uma plataforma de agendamento que conecta pacientes a clínicas parceiras
+            A Conecta Saúde é uma plataforma de agendamento que conecta pacientes a clínicas parceiras
             para consultas e exames. Não somos um prestador de serviços de saúde: a
             responsabilidade pelo atendimento, diagnóstico e tratamento é sempre da clínica
             escolhida.
@@ -24,7 +24,7 @@ export default function TermsPage() {
           <p className="mt-2">
             A solicitação de agendamento feita pelo site é uma reserva de horário, sujeita à
             confirmação da clínica. O pagamento do procedimento é feito diretamente à clínica, na
-            forma combinada com ela — o Marcação não processa nem intermedia pagamentos.
+            forma combinada com ela — a Conecta Saúde não processa nem intermedia pagamentos.
           </p>
         </section>
 

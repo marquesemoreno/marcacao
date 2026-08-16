@@ -25,11 +25,11 @@ export function HeroSection() {
         </span>
 
         <h1 className="text-4xl font-bold tracking-tight text-slate-900 sm:text-5xl lg:text-6xl">
-          Cuidado com a sua saúde{" "}
           <span className="bg-gradient-to-r from-sky-600 to-teal-600 bg-clip-text text-transparent">
-            sem complicação
+            Conecta Saúde
           </span>{" "}
-          e com preços acessíveis
+          — Cuidado com a sua saúde sem complicação e com preços acessíveis em Vitória da
+          Conquista
         </h1>
 
         <p className="max-w-2xl text-balance text-lg text-slate-600">

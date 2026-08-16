@@ -31,7 +31,7 @@ export function SiteFooter() {
               <span className="flex size-8 items-center justify-center rounded-lg bg-gradient-to-br from-sky-600 to-teal-600 text-white">
                 <HeartPulse className="h-4 w-4" />
               </span>
-              Marcação
+              Conecta Saúde
             </span>
             <p className="text-sm text-slate-600">
               Marcação de consultas e exames em clínicas parceiras, com confirmação e
@@ -85,7 +85,7 @@ export function SiteFooter() {
         </div>
 
         <div className="mt-10 border-t border-slate-200 pt-6 text-center text-xs text-slate-500">
-          © {year} Marcação — Todos os direitos reservados.
+          © {year} Conecta Saúde. Todos os direitos reservados. Uma solução desenvolvida pela TIVDC.
         </div>
       </div>
     </footer>

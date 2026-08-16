@@ -22,7 +22,7 @@ export default function PublicLayout({
             <span className="flex size-8 items-center justify-center rounded-lg bg-gradient-to-br from-sky-600 to-teal-600 text-white">
               <HeartPulse className="h-4 w-4" />
             </span>
-            Marcação
+            Conecta Saúde
           </Link>
 
           <nav className="hidden items-center gap-6 text-sm font-medium text-slate-600 sm:flex">

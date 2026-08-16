@@ -67,7 +67,7 @@ export default async function AdminLeadsPage() {
                         <a
                           href={buildWhatsAppLink(
                             lead.phone,
-                            `Olá, ${lead.contactName}! Vi seu cadastro de interesse em ser parceiro da Marcação. Podemos conversar?`
+                            `Olá, ${lead.contactName}! Vi seu cadastro de interesse em ser parceiro da Conecta Saúde. Podemos conversar?`
                           )}
                           target="_blank"
                           rel="noopener noreferrer"

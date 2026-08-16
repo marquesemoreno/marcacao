@@ -5,7 +5,7 @@ import { toPlainAppointment } from "@/lib/serialize";
 import { getBaseUrl } from "@/lib/format";
 
 export const metadata = {
-  title: "Validar guia | Marcação",
+  title: "Validar guia | Conecta Saúde",
 };
 
 type ComprovantePageProps = {

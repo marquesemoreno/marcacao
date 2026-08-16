@@ -17,9 +17,23 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Marcação | Agendamento de Consultas e Exames",
+  title: "Conecta Saúde | Consultas e Exames em Vitória da Conquista",
   description:
-    "Plataforma de agendamento de consultas médicas e exames laboratoriais, de imagem e outros.",
+    "A forma mais rápida e acessível de agendar consultas médicas, exames e procedimentos em clínicas parceiras de Vitória da Conquista.",
+  openGraph: {
+    title: "Conecta Saúde | Consultas e Exames em Vitória da Conquista",
+    description:
+      "A forma mais rápida e acessível de agendar consultas médicas, exames e procedimentos em clínicas parceiras de Vitória da Conquista.",
+    siteName: "Conecta Saúde",
+    locale: "pt_BR",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Conecta Saúde | Consultas e Exames em Vitória da Conquista",
+    description:
+      "A forma mais rápida e acessível de agendar consultas médicas, exames e procedimentos em clínicas parceiras de Vitória da Conquista.",
+  },
 };
 
 export default function RootLayout({

@@ -1,7 +1,7 @@
 #arquitetura #visao-geral
 
 > [!info] Sobre esta nota
-> Ponto de entrada da documentação técnica do **Marcação** (plataforma de agendamento de consultas e exames). Ligada a: [[01 - Setup e Infraestrutura]] · [[02 - Dicionário de Dados e Banco]] · [[03 - APIs e Webhooks n8n]] · [[04 - Manual de Edição Manual e Manutenção]] · [[05 - Módulo de Atendimento e Chat Realtime]]
+> Ponto de entrada da documentação técnica da **Conecta Saúde** (nome oficial da plataforma; nome técnico interno do repositório/projeto: `marcacao`), plataforma de agendamento de consultas e exames. Ligada a: [[01 - Setup e Infraestrutura]] · [[02 - Dicionário de Dados e Banco]] · [[03 - APIs e Webhooks n8n]] · [[04 - Manual de Edição Manual e Manutenção]] · [[05 - Módulo de Atendimento e Chat Realtime]]
 
 ## O que é
 

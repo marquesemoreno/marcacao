@@ -2,7 +2,7 @@ import { CalendarClock, MessageCircle, LayoutDashboard, Wallet } from "lucide-re
 import { PartnerLeadForm } from "@/components/public/partner-lead-form";
 
 export const metadata = {
-  title: "Seja um Parceiro | Marcação",
+  title: "Seja um Parceiro | Conecta Saúde",
   description:
     "Aumente o fluxo de pacientes particulares na sua clínica em Vitória da Conquista, sem mensalidade.",
 };
