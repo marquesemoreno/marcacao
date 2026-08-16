@@ -9,7 +9,7 @@
 
 | Ambiente | URL |
 |---|---|
-| Produção (domínio oficial) | `https://conectasaudevdc.com.br` — hardcoded como fallback de `getBaseUrl()` (`src/lib/format.ts`) e como `metadataBase`/`og:url` em `src/app/layout.tsx`; usado sempre que `VERCEL_ENV === "production"`, independente do que `VERCEL_URL` disser |
+| Produção (domínio oficial) | `https://conectasaudevc.com.br` — hardcoded como fallback de `getBaseUrl()` (`src/lib/format.ts`) e como `metadataBase`/`og:url` em `src/app/layout.tsx`; usado sempre que `VERCEL_ENV === "production"`, independente do que `VERCEL_URL` disser |
 | Produção (URL de deploy da Vercel) | `https://marcacao-six.vercel.app` — a URL de deploy gerada automaticamente por trás do domínio; ainda funciona para acessar o app, mas não é mais o que aparece nos links de QR Code/WhatsApp |
 | Desenvolvimento local | `http://localhost:3000` (`npm run dev`, ver [[01 - Setup e Infraestrutura]]) |
 

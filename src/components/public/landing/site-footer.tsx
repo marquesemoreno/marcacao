@@ -12,11 +12,11 @@ const partnerLinks = [
   { label: "Para Clínicas e Médicos", href: "/seja-parceiro" },
   { label: "Proposta Comercial (PDF)", href: "/proposta-comercial" },
   { label: "Área da clínica", href: "/entrar" },
-  { label: "Fale com o time comercial", href: "mailto:parcerias@conectasaudevdc.com.br" },
+  { label: "Fale com o time comercial", href: "mailto:parcerias@conectasaudevc.com.br" },
 ];
 
 const supportLinks = [
-  { label: "Fale conosco", href: "mailto:contato@conectasaudevdc.com.br" },
+  { label: "Fale conosco", href: "mailto:contato@conectasaudevc.com.br" },
   { label: "Termos de Uso", href: "/termos" },
   { label: "Política de Privacidade", href: "/privacidade" },
 ];

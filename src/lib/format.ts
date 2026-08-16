@@ -41,7 +41,7 @@ export function maskCpf(value: string) {
 }
 
 /** Domínio oficial de produção — usado nos links absolutos (QR Code, WhatsApp, metadata). */
-const PRODUCTION_URL = "https://conectasaudevdc.com.br";
+const PRODUCTION_URL = "https://conectasaudevc.com.br";
 
 /**
  * URL base da aplicação, para montar links absolutos (QR Code, WhatsApp,
