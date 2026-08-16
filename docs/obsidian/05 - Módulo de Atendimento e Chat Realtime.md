@@ -150,7 +150,7 @@ Para isso funcionar dentro do shell compartilhado do painel da clínica, `src/ap
 
 ## Testado no navegador
 
-Fluxo validado manualmente, logado como `contato@clinicasaolucas.com.br`:
+Fluxo validado manualmente, logado como uma conta `CLINIC` (ver credenciais atuais em [[01 - Setup e Infraestrutura]]):
 - Filtros trocando corretamente entre "Minhas"/"Não Atribuídas"/"Todas"/"Finalizadas", com contagem de não lidas certa.
 - Abrir conversa, ver histórico com separador de data, enviar mensagem nova (aparece na hora, some do campo de texto).
 - Atalho `/jejum` abrindo o menu de respostas rápidas e substituindo o texto ao escolher.

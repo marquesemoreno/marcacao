@@ -145,7 +145,10 @@ O `.env` está no `.gitignore` (nunca deve ser commitado); use `.env.example` co
 | `npx prisma db seed` | Roda `prisma/seed.ts` (clínicas, especialidades, procedimentos e preços de exemplo) |
 
 > [!success] Seed implementado e já executado
-> `prisma/seed.ts` existe, é rodado via `npx prisma db seed` (configurado em `package.json` → `"prisma": { "seed": "tsx prisma/seed.ts" }`) e já populou o banco atual (Supabase) com: 3 clínicas parceiras (com horário de atendimento padrão), 4 especialidades (Clínica Geral, Cardiologia, Oftalmologia, Dermatologia), 9 procedimentos (4 consultas + 5 exames: Ultrassom, Hemograma, Tomografia, ECG, Colonoscopia), 12 vínculos clínica×procedimento com preços, e 4 usuários de login (1 admin + 1 por clínica) — credenciais em [[04 - Manual de Edição Manual e Manutenção]]. O script usa `upsert`, então é seguro rodar de novo — não duplica dados.
+> `prisma/seed.ts` existe, é rodado via `npx prisma db seed` (configurado em `package.json` → `"prisma": { "seed": "tsx prisma/seed.ts" }`) e já populou o banco atual (Supabase) com: 11 clínicas parceiras de Vitória da Conquista (com horário de atendimento padrão), 6 especialidades (Clínica Geral, Cardiologia, Urologia, Cirurgia Geral, Ginecologia, Ortopedia), 12 procedimentos (6 consultas + 6 exames/terapias/procedimentos: Ultrassonografia, Tomografia, Hemograma, ECG, Pilates, Procedimento Urológico a Laser), 23 vínculos clínica×procedimento com preços, 8 agendamentos de exemplo (status `PENDING`/`CONFIRMED`/`COMPLETED`) e 5 usuários de login — credenciais completas na seção [[#Acessos (credenciais de desenvolvimento)]] abaixo.
+
+> [!warning] Este seed apaga os dados antes de recriar — não é mais só `upsert`
+> Diferente da versão anterior, `prisma/seed.ts` agora começa apagando `messages`, `conversations`, `contacts`, `canned_responses`, `appointments`, `clinic_procedures`, `procedures`, `specialties`, `users` e `clinics` (nessa ordem, respeitando as chaves estrangeiras) antes de popular de novo — é assim que a lista antiga de clínicas de teste (São Paulo/Rio de Janeiro) foi substituída pela lista oficial de Vitória da Conquista. Rodar `npx prisma db seed` de novo é seguro em desenvolvimento (sempre volta para o mesmo estado consistente), mas **nunca rode isso contra um banco com dados reais de pacientes** — não há confirmação nem dry-run.
 
 ## Histórico de migrações
 
@@ -155,6 +158,27 @@ Em ordem de aplicação, todas contra o Supabase (ver seção acima):
 2. `20260815235715_add_clinic_rating` — `Clinic.rating` e `Clinic.reviewCount`, para o portal público (ver [[00 - Visão Geral]]).
 3. `20260816003001_add_auth_and_clinic_settings` — `User.clinicId`, status `AppointmentStatus.NO_SHOW`, `Clinic.businessHours` — suporte à autenticação e aos painéis (ver [[03 - APIs e Webhooks n8n]]).
 4. `20260816022709_add_inbox_module` — `Contact`, `Conversation`, `Message`, `CannedResponse` + RLS (deny-by-default) e publicação condicional `supabase_realtime` nas tabelas novas — suporte ao inbox de chat (ver [[05 - Módulo de Atendimento e Chat Realtime]]).
+
+## Acessos (credenciais de desenvolvimento)
+
+Todas criadas por `prisma/seed.ts`, com senha já hasheada (bcrypt). Login em `/entrar` — o middleware (`src/middleware.ts`) redireciona automaticamente por `role`.
+
+| Papel | Painel | E-mail | Senha |
+|---|---|---|---|
+| `ADMIN` | `/admin` | `admin@tivdc.com.br` | `Admin@123` |
+| `CLINIC` — Clinica Cirurgica Santa Clara | `/clinic` | `santaclara@clinica.com.br` | `Clinica@123` |
+| `CLINIC` — Imad Diagnóstico Por Imagem | `/clinic` | `imad@clinica.com.br` | `Clinica@123` |
+| `CLINIC` — atendente da Santa Clara | `/clinic` (incl. `/clinic/inbox`) | `atendente@tivdc.com.br` | `Atendente@123` |
+| `PATIENT` | nenhum (ver nota abaixo) | `paciente@teste.com.br` | `Paciente@123` |
+
+> [!warning] Não existe papel `AGENT` separado no schema
+> O pedido original era por uma conta de "atendente" dedicada ao inbox. O `UserRole` do banco só tem `ADMIN`, `CLINIC` e `PATIENT` — criar um papel novo exigiria migração e mudar o middleware/`requireClinicSession()` para restringir esse papel só a `/clinic/inbox`. Em vez disso, `atendente@tivdc.com.br` foi criado como um segundo usuário `CLINIC` **da mesma clínica** (Santa Clara) — hoje ele tem acesso ao painel inteiro da clínica, igual a `santaclara@clinica.com.br`, não só ao inbox. Útil de qualquer forma para testar cenários de "duas pessoas da equipe" no inbox (atribuição de conversa, por exemplo). Se um papel restrito de verdade for necessário no futuro, é uma migração nova em [[02 - Dicionário de Dados e Banco]], não um ajuste de seed.
+
+> [!note] Login de paciente não abre nenhuma área própria
+> `paciente@teste.com.br` autentica normalmente (a role `PATIENT` não é bloqueada em lugar nenhum), mas `/entrar` só tem redirecionamento dedicado para `ADMIN` (`/admin/dashboard`) e `CLINIC` (`/clinic/dashboard`) — qualquer outro papel cai em `/`. O agendamento público continua sendo guest-checkout (sem exigir login), então essa conta existe só porque foi pedida explicitamente; não há hoje uma "área do paciente" que ela desbloqueie.
+
+> [!warning] Troque essas senhas antes de qualquer uso real
+> São senhas de desenvolvimento, previsíveis, comitadas no `prisma/seed.ts`. Nunca as reaproveite em um ambiente com dados de pacientes de verdade.
 
 ## Dependência nova: `@supabase/supabase-js`
 

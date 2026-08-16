@@ -11,14 +11,14 @@
 
 ## Credenciais de teste
 
-Criadas pelo seed (`prisma/seed.ts`), com senha já hasheada (bcrypt):
+Tabela completa e atualizada em [[01 - Setup e Infraestrutura#Acessos (credenciais de desenvolvimento)]] — resumo rápido:
 
 | Painel | E-mail | Senha |
 |---|---|---|
-| Admin (`/admin`) | `admin@marcacao.com.br` | `Admin@123` |
-| Clínica São Lucas (`/clinic`) | `contato@clinicasaolucas.com.br` | `Clinica@123` |
-| Instituto Vida (`/clinic`) | `contato@institutovida.com.br` | `Clinica@123` |
-| Clínica Bem Estar (`/clinic`) | `contato@clinicabemestar.com.br` | `Clinica@123` |
+| Admin (`/admin`) | `admin@tivdc.com.br` | `Admin@123` |
+| Clínica — Santa Clara (`/clinic`) | `santaclara@clinica.com.br` | `Clinica@123` |
+| Clínica — Imad (`/clinic`) | `imad@clinica.com.br` | `Clinica@123` |
+| Atendente — Santa Clara (`/clinic`, incl. inbox) | `atendente@tivdc.com.br` | `Atendente@123` |
 
 Login em `/entrar`. O middleware (`src/middleware.ts`) redireciona automaticamente por `role` — uma conta `CLINIC` não consegue abrir `/admin`, e vice-versa.
 
@@ -41,7 +41,7 @@ Login em `/entrar`. O middleware (`src/middleware.ts`) redireciona automaticamen
 
 ```sql
 INSERT INTO clinics (id, name, trade_name, cnpj, phone, whatsapp, address, neighborhood, city, active, commission_rate, created_at, updated_at)
-VALUES (gen_random_uuid()::text, 'Clínica Exemplo Ltda', 'Clínica Exemplo', '11.222.333/0001-44', '+55 11 90000-0000', '+55 11 90000-0000', 'Rua Exemplo, 123', 'Centro', 'São Paulo', true, 15.00, now(), now());
+VALUES (gen_random_uuid()::text, 'Clínica Exemplo Ltda', 'Clínica Exemplo', '11.222.333/0001-44', '+55 77 3000-0000', '+55 77 90000-0000', 'Rua Exemplo, 123', 'Centro', 'Vitória da Conquista', true, 15.00, now(), now());
 ```
 
 ## Como adicionar novos exames/consultas, regras de jejum e preços
@@ -94,7 +94,7 @@ Login como admin → `/admin/clinicas` → cada clínica tem um campo "Comissão
 
 **Alternativa via SQL:**
 ```sql
-UPDATE clinics SET commission_rate = 15.00 WHERE trade_name = 'Clínica São Lucas';
+UPDATE clinics SET commission_rate = 15.00 WHERE trade_name = 'Clinica Cirurgica Santa Clara';
 ```
 
 > [!note] Só existe comissão por clínica hoje
@@ -177,7 +177,7 @@ Passos para validar que o projeto está saudável antes de um deploy (ou de dar 
 1. `npm test` — suíte de testes (schemas + integração de agendamento).
 2. `npx tsc --noEmit` — sem erros de TypeScript no projeto inteiro (inclui os arquivos de teste).
 3. `npm run lint` — sem warnings/erros do ESLint.
-4. `npm run build` — build de produção completo (`prisma generate && next build`) sem erros. Gera 15 rotas (incluindo `/clinic/inbox`); confira que nenhuma vira erro de prerender (ex: uso de `useSearchParams()` sem `<Suspense>` — já aconteceu em `/entrar`, foi corrigido).
+4. `npm run build` — build de produção completo (`prisma generate && next build`) sem erros. Gera 17 rotas (incluindo `/clinic/inbox`, `/termos` e `/privacidade`); confira que nenhuma vira erro de prerender (ex: uso de `useSearchParams()` sem `<Suspense>` — já aconteceu em `/entrar`, foi corrigido).
 5. Formulários novos: têm estado de carregamento (botão desabilitado/texto muda) **e** toast de sucesso/erro? Ver `src/hooks/use-action-feedback.ts` — é o hook padrão para isso nos painéis `/admin` e `/clinic`.
 
 ## Como resolver problemas e ler logs de erro
