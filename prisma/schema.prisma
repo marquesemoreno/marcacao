@@ -65,6 +65,15 @@ enum MessageStatus {
   @@map("message_status")
 }
 
+enum PartnerLeadStatus {
+  NEW
+  CONTACTED
+  PARTNER
+  REJECTED
+
+  @@map("partner_lead_status")
+}
+
 model User {
   id           String   @id @default(cuid())
   name         String
@@ -234,6 +243,22 @@ model CannedResponse {
 
   @@unique([clinicId, shortcut])
   @@map("canned_responses")
+}
+
+model PartnerLead {
+  id           String            @id @default(cuid())
+  clinicName   String            @map("clinic_name")
+  contactName  String            @map("contact_name")
+  phone        String
+  email        String
+  neighborhood String
+  specialties  String
+  notes        String?
+  status       PartnerLeadStatus @default(NEW)
+  createdAt    DateTime          @default(now()) @map("created_at")
+  updatedAt    DateTime          @updatedAt @map("updated_at")
+
+  @@map("partner_leads")
 }
 
 model WebhookLog {

@@ -31,6 +31,12 @@ export default function AdminLayout({
         >
           Relatório Financeiro
         </Link>
+        <Link
+          href="/admin/leads"
+          className="shrink-0 rounded-md px-3 py-1.5 text-sm font-medium hover:bg-accent"
+        >
+          Leads
+        </Link>
       </nav>
       <main className="flex-1 p-4">{children}</main>
     </div>

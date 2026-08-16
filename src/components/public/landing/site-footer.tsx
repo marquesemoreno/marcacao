@@ -8,6 +8,7 @@ const patientLinks = [
 ];
 
 const partnerLinks = [
+  { label: "Para Clínicas e Médicos", href: "/seja-parceiro" },
   { label: "Área da clínica", href: "/entrar" },
   { label: "Fale com o time comercial", href: "mailto:parcerias@marcacao.com.br" },
 ];
@@ -22,7 +23,7 @@ export function SiteFooter() {
   const year = new Date().getFullYear();
 
   return (
-    <footer className="border-t border-slate-200 bg-slate-50">
+    <footer className="border-t border-slate-200 bg-slate-50 print:hidden">
       <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 gap-10 sm:grid-cols-2 lg:grid-cols-4">
           <div className="flex flex-col gap-3">

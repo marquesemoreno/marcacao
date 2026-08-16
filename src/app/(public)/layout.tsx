@@ -6,6 +6,7 @@ import { SiteFooter } from "@/components/public/landing/site-footer";
 const navLinks = [
   { label: "Buscar clínicas", href: "/buscar" },
   { label: "Como funciona", href: "/#como-funciona" },
+  { label: "Para Clínicas e Médicos", href: "/seja-parceiro" },
 ];
 
 export default function PublicLayout({
@@ -15,7 +16,7 @@ export default function PublicLayout({
 }>) {
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/90 px-4 py-3 backdrop-blur">
+      <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/90 px-4 py-3 backdrop-blur print:hidden">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4">
           <Link href="/" className="flex items-center gap-2 text-lg font-semibold text-slate-900">
             <span className="flex size-8 items-center justify-center rounded-lg bg-gradient-to-br from-sky-600 to-teal-600 text-white">
