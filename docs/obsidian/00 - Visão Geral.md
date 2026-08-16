@@ -153,3 +153,4 @@ flowchart LR
 - [[05 - Módulo de Atendimento e Chat Realtime]] — inbox de chat/CRM, Supabase Realtime e respostas rápidas
 - [[07 - Guia de Encaminhamento e Captação B2B]] — captação de clínicas parceiras e a guia/voucher com QR Code do paciente
 - [[08 - Playbook Comercial e Proposta B2B]] — proposta comercial (`/proposta-comercial`) e o roteiro de vendas para fechar parcerias
+- [[09 - Roadmap e Planejamento Estratégico]] — roadmap em 4 fases (go-to-market, automação WhatsApp, fintech/split de pagamentos, vertical SaaS/IA) e os KPIs de validação de cada uma
