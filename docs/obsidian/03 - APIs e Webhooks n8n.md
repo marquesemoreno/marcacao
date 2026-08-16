@@ -31,8 +31,8 @@ Localizadas em `src/actions/`. São funções `"use server"` chamadas diretament
 **`src/actions/appointments.ts`** (portal público + painel da clínica):
 | Função | O que faz |
 |---|---|
-| `createAppointment(input)` | Valida com `createAppointmentSchema` (Zod, em `src/lib/schemas/appointment.ts`) e cria o `Appointment` — fluxo público, sem autenticação (é assim que o paciente agenda) |
-| `getAppointmentById(id)` | Busca um agendamento pelo `id` — usado pela página `/acompanhar/[id]`. O `id` (um cuid longo, não adivinhável) funciona como "código de acesso" informal; não há verificação adicional de identidade |
+| `createAppointment(input)` | Valida com `createAppointmentSchema` (Zod, em `src/lib/schemas/appointment.ts`) e cria o `Appointment` — fluxo público, sem autenticação (é assim que o paciente agenda). Retorna já serializado via `toPlainAppointment` (ver [[02 - Dicionário de Dados e Banco]]), porque é chamada direto de Client Components (`BookingDialog`, atalho de agendamento do inbox) e `Decimal` não cruza essa fronteira |
+| `getAppointmentById(id)` | Busca um agendamento pelo `id` — usado por `/acompanhar/[id]` e por `/comprovante/[id]` (ver [[07 - Guia de Encaminhamento e Captação B2B]]). O `id` (um cuid longo, não adivinhável) funciona como "código de acesso" informal; não há verificação adicional de identidade |
 | `listUpcomingAppointments(clinicId)` | Agendamentos futuros de uma clínica — usada internamente pelo painel da clínica |
 
 **`src/actions/clinic.ts`** (exige `requireClinicSession()` — só quem logou como `CLINIC` acessa, e sempre para a própria `clinicId` da sessão):
@@ -54,6 +54,13 @@ Localizadas em `src/actions/`. São funções `"use server"` chamadas diretament
 | `createClinic(formData)` | Cadastra uma nova clínica parceira |
 | `getFinancialReport()` | Por clínica: total de agendamentos, concluídos, receita (soma do preço vigente dos concluídos) e comissão (`receita × commissionRate`) |
 | `getKpis()` | Total de pedidos, taxa de conversão (`(CONFIRMED + COMPLETED) ÷ total`) e top 5 procedimentos mais agendados |
+
+**`src/actions/partner-leads.ts`** (ver [[07 - Guia de Encaminhamento e Captação B2B]] para o desenho completo):
+| Função | O que faz |
+|---|---|
+| `submitPartnerLead(input)` | Valida com `submitPartnerLeadSchema` e cria um `PartnerLead` — fluxo público, sem autenticação, chamado direto de `/seja-parceiro` |
+| `listPartnerLeads()` | Exige `requireAdminSession()` — todos os leads, mais recentes primeiro, para `/admin/leads` |
+| `updatePartnerLeadStatus(id, status)` | Exige `requireAdminSession()` — muda `NEW`/`CONTACTED`/`PARTNER`/`REJECTED` |
 
 **`src/actions/inbox.ts`** (exige `requireClinicSession()`, sempre para a própria `clinicId` — ver [[05 - Módulo de Atendimento e Chat Realtime]] para o desenho completo):
 | Função | O que faz |
@@ -168,3 +175,4 @@ Toda tentativa de envio (`WhatsAppService.sendMessage`) e toda mensagem recebida
 - [[02 - Dicionário de Dados e Banco]]
 - [[04 - Manual de Edição Manual e Manutenção]]
 - [[05 - Módulo de Atendimento e Chat Realtime]]
+- [[07 - Guia de Encaminhamento e Captação B2B]]

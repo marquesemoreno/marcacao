@@ -121,6 +121,13 @@ Troque `phone` pelo `patientPhone` (só dígitos, sem DDI) de um agendamento `PE
 > [!warning] Ative um provedor real com cuidado
 > Definir `WHATSAPP_API_URL`/`WHATSAPP_API_KEY`/`WHATSAPP_INSTANCE_NAME` de verdade faz o app **tentar enviar mensagens reais** para os números cadastrados nos agendamentos. Não aponte para uma instância de produção usando dados de teste do seed.
 
+## Como gerenciar leads de clínicas parceiras (`/admin/leads`)
+
+Login como admin → `/admin/leads` — lista todo cadastro de interesse recebido pelo formulário público `/seja-parceiro`. Cada card tem botão "Chamar no WhatsApp" (abre conversa direto com o telefone informado) e um seletor de status (`Novo` → `Em contato` → `Parceiro`/`Recusado`). Arquitetura completa em [[07 - Guia de Encaminhamento e Captação B2B]].
+
+> [!warning] Marcar como "Parceiro" não cadastra a clínica
+> Mudar o status pra `PARTNER` é só uma anotação no lead — para a clínica aparecer de verdade na busca pública, ainda é preciso cadastrá-la em `/admin/clinicas` (ver seção acima) e criar o login da equipe manualmente.
+
 ## Como usar o Inbox de atendimento (`/clinic/inbox`)
 
 Login como a clínica → link "Inbox" na navegação → 3 colunas: lista de conversas, chat, dados do contato (a terceira só aparece em telas ≥1024px de largura). Arquitetura completa e o que é real vs. proposta em [[05 - Módulo de Atendimento e Chat Realtime]].
@@ -177,7 +184,7 @@ Passos para validar que o projeto está saudável antes de um deploy (ou de dar 
 1. `npm test` — suíte de testes (schemas + integração de agendamento).
 2. `npx tsc --noEmit` — sem erros de TypeScript no projeto inteiro (inclui os arquivos de teste).
 3. `npm run lint` — sem warnings/erros do ESLint.
-4. `npm run build` — build de produção completo (`prisma generate && next build`) sem erros. Gera 17 rotas (incluindo `/clinic/inbox`, `/termos` e `/privacidade`); confira que nenhuma vira erro de prerender (ex: uso de `useSearchParams()` sem `<Suspense>` — já aconteceu em `/entrar`, foi corrigido).
+4. `npm run build` — build de produção completo (`prisma generate && next build`) sem erros. Gera 20 rotas (incluindo `/clinic/inbox`, `/termos`, `/privacidade`, `/seja-parceiro`, `/admin/leads` e `/comprovante/[id]`); confira que nenhuma vira erro de prerender (ex: uso de `useSearchParams()` sem `<Suspense>` — já aconteceu em `/entrar`, foi corrigido).
 5. Formulários novos: têm estado de carregamento (botão desabilitado/texto muda) **e** toast de sucesso/erro? Ver `src/hooks/use-action-feedback.ts` — é o hook padrão para isso nos painéis `/admin` e `/clinic`.
 
 ## Como resolver problemas e ler logs de erro
@@ -231,3 +238,4 @@ O script roda `prisma generate && next build`. Erros de tipo (`tsc`) e de lint a
 - [[02 - Dicionário de Dados e Banco]]
 - [[03 - APIs e Webhooks n8n]]
 - [[05 - Módulo de Atendimento e Chat Realtime]]
+- [[07 - Guia de Encaminhamento e Captação B2B]]

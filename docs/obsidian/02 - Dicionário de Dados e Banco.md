@@ -1,10 +1,10 @@
 #banco-de-dados #arquitetura
 
 > [!info] Sobre esta nota
-> Reflete exatamente o `prisma/schema.prisma` atual. Parte de [[00 - Visão Geral]]. Para os comandos de migração, ver [[01 - Setup e Infraestrutura]]. Para como editar esses dados manualmente, ver [[04 - Manual de Edição Manual e Manutenção]]. As tabelas do inbox de chat (`Contact`/`Conversation`/`Message`/`CannedResponse`) têm contexto de arquitetura próprio em [[05 - Módulo de Atendimento e Chat Realtime]].
+> Reflete exatamente o `prisma/schema.prisma` atual. Parte de [[00 - Visão Geral]]. Para os comandos de migração, ver [[01 - Setup e Infraestrutura]]. Para como editar esses dados manualmente, ver [[04 - Manual de Edição Manual e Manutenção]]. As tabelas do inbox de chat (`Contact`/`Conversation`/`Message`/`CannedResponse`) têm contexto de arquitetura próprio em [[05 - Módulo de Atendimento e Chat Realtime]]; `PartnerLead` tem o dela em [[07 - Guia de Encaminhamento e Captação B2B]].
 
 > [!success] Migrado e populado
-> Quatro migrações aplicadas contra o Postgres do Supabase, em ordem: `20260815230834_init_healthcare_schema` (schema inicial), `20260815235715_add_clinic_rating` (avaliação da clínica, para o portal público — ver [[00 - Visão Geral]]), `20260816003001_add_auth_and_clinic_settings` (login, `User.clinicId`, status `NO_SHOW`, horário de atendimento) e `20260816022709_add_inbox_module` (`Contact`/`Conversation`/`Message`/`CannedResponse`, RLS deny-by-default — ver [[05 - Módulo de Atendimento e Chat Realtime]]). O seed (`prisma/seed.ts`) populou: 3 clínicas, 4 especialidades, 9 procedimentos, 12 vínculos clínica×procedimento, 4 usuários de teste e 7 respostas rápidas (`CannedResponse`) — credenciais em [[04 - Manual de Edição Manual e Manutenção]].
+> Cinco migrações aplicadas contra o Postgres do Supabase, em ordem: `20260815230834_init_healthcare_schema` (schema inicial), `20260815235715_add_clinic_rating` (avaliação da clínica, para o portal público — ver [[00 - Visão Geral]]), `20260816003001_add_auth_and_clinic_settings` (login, `User.clinicId`, status `NO_SHOW`, horário de atendimento), `20260816022709_add_inbox_module` (`Contact`/`Conversation`/`Message`/`CannedResponse`, RLS deny-by-default — ver [[05 - Módulo de Atendimento e Chat Realtime]]) e `20260816153445_add_partner_leads` (`PartnerLead`, captação B2B — ver [[07 - Guia de Encaminhamento e Captação B2B]]). O seed (`prisma/seed.ts`) hoje popula 11 clínicas parceiras de Vitória da Conquista, 6 especialidades, 12 procedimentos, 23 vínculos clínica×procedimento, 8 agendamentos de exemplo e 5 usuários — credenciais em [[01 - Setup e Infraestrutura#Acessos (credenciais de desenvolvimento)]]. `PartnerLead` não é populado pelo seed — só cresce com envios reais do formulário `/seja-parceiro`.
 
 > [!warning] Segunda versão do schema — domínio de saúde
 > Este schema **substituiu** um desenho anterior (que tinha `Doctor`/`Patient` como entidades e vínculo direto `Appointment → Clinic`). O modelo atual não tem contas de paciente: dados do paciente ficam embutidos no próprio `Appointment` (`patientName`, `patientPhone`, `patientCpf`), e o preço/tipo de agendamento vivem em `ClinicProcedure`, não em `Appointment` nem em `Procedure` diretamente.
@@ -197,6 +197,14 @@ erDiagram
 | `READ` | Reservado no schema; não é escrito por nenhum código hoje — se a mensagem foi lida pela equipe é rastreado por `Message.readAt` (campo separado, ver `markConversationRead` em [[05 - Módulo de Atendimento e Chat Realtime]]), não por este enum |
 | `FAILED` | Todas as tentativas de envio falharam (ver retry em [[03 - APIs e Webhooks n8n]]) |
 
+### `PartnerLeadStatus` (tabela `partner_lead_status`)
+| Valor | Significado |
+|---|---|
+| `NEW` | Recebido pelo formulário `/seja-parceiro`, ainda sem contato (padrão ao criar) |
+| `CONTACTED` | Equipe comercial já entrou em contato |
+| `PARTNER` | Virou clínica parceira de fato (não cria a `Clinic` automaticamente — ver [[07 - Guia de Encaminhamento e Captação B2B]]) |
+| `REJECTED` | Não seguiu adiante |
+
 ## Tabelas
 
 ### `users` (model `User`)
@@ -387,6 +395,25 @@ Constraint: `@@unique([clinicId, shortcut])` — o mesmo atalho pode existir uma
 > [!warning] Sem tela de gestão — só seed/Prisma Studio
 > Não existe formulário em `/clinic` para criar/editar `CannedResponse` — ver [[04 - Manual de Edição Manual e Manutenção]] e [[05 - Módulo de Atendimento e Chat Realtime]].
 
+### `partner_leads` (model `PartnerLead`)
+Cadastro de interesse de clínicas/consultórios que querem virar parceiras — captado pelo formulário público `/seja-parceiro`. Tabela isolada, sem FK para `Clinic`: virar parceiro de fato ainda é um passo manual. Arquitetura completa em [[07 - Guia de Encaminhamento e Captação B2B]].
+
+| Campo | Tipo | Constraints | Descrição |
+|---|---|---|---|
+| `id` | `String` | PK | — |
+| `clinicName` | `String` | — | Nome da clínica/consultório informado no formulário |
+| `contactName` | `String` | — | Nome do responsável |
+| `phone` | `String` | — | Telefone/WhatsApp, sem normalização/único (texto livre validado só no formato via Zod) |
+| `email` | `String` | — | E-mail de contato |
+| `neighborhood` | `String` | — | Bairro em Vitória da Conquista |
+| `specialties` | `String` | — | Texto livre — quais especialidades/exames a clínica realiza |
+| `notes` | `String?` | opcional | Observações adicionais |
+| `status` | `PartnerLeadStatus` | default `NEW` | Ver enum acima |
+| `createdAt` / `updatedAt` | `DateTime` | auto | — |
+
+> [!note] Virar `PARTNER` não cria a `Clinic` automaticamente
+> Mudar o status para `PARTNER` em `/admin/leads` é só uma anotação — cadastrar a clínica de verdade (com CNPJ, preços, usuário de login) continua sendo o fluxo manual já existente em `/admin/clinicas` (ver [[04 - Manual de Edição Manual e Manutenção]]). Os dois fluxos não estão conectados hoje.
+
 ## Notas relacionadas
 
 - [[00 - Visão Geral]]
@@ -394,3 +421,4 @@ Constraint: `@@unique([clinicId, shortcut])` — o mesmo atalho pode existir uma
 - [[03 - APIs e Webhooks n8n]]
 - [[04 - Manual de Edição Manual e Manutenção]]
 - [[05 - Módulo de Atendimento e Chat Realtime]]
+- [[07 - Guia de Encaminhamento e Captação B2B]]

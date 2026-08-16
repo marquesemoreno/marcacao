@@ -7,9 +7,9 @@
 
 Plataforma de agendamento de consultas médicas e exames (laboratoriais, de imagem e outros), com três áreas distintas na mesma aplicação:
 
-- **Pública** (`/`, `/buscar`, `/procedimentos/[id]`, `/acompanhar/[id]`) — o paciente busca, compara preços/avaliações, agenda (sem precisar de conta) e acompanha o status pelo link recebido na confirmação.
+- **Pública** (`/`, `/buscar`, `/procedimentos/[id]`, `/acompanhar/[id]`) — o paciente busca, compara preços/avaliações, agenda (sem precisar de conta) e acompanha o status pelo link recebido na confirmação, com uma guia de encaminhamento em formato de voucher (QR Code incluso) — ver [[07 - Guia de Encaminhamento e Captação B2B]]. Também tem `/seja-parceiro`, a página de captação de novas clínicas parceiras.
 - **Clínica** (`/clinic`, login obrigatório) — agenda do dia/semana, lista de agendamentos com filtro por status e ações rápidas de confirmação/conclusão/falta, tabela de preços e horário de atendimento, e um inbox de atendimento (`/clinic/inbox`) para conversar com pacientes pelo WhatsApp direto do painel — ver [[05 - Módulo de Atendimento e Chat Realtime]].
-- **Admin** (`/admin`, login obrigatório) — gestão de clínicas parceiras e comissionamento, relatório financeiro, KPIs (pedidos, conversão, procedimentos mais buscados).
+- **Admin** (`/admin`, login obrigatório) — gestão de clínicas parceiras e comissionamento, relatório financeiro, KPIs (pedidos, conversão, procedimentos mais buscados) e os leads de captação B2B recebidos em `/admin/leads`.
 
 > [!success] Estado atual do projeto
 > O fluxo principal está funcional de ponta a ponta, incluindo notificação: busca pública → agendamento sem conta → WhatsApp automático → login da clínica → confirmação/gestão do agendamento → WhatsApp automático de novo → paciente responde pelo WhatsApp → relatório no admin. A equipe da clínica também pode conversar com o paciente pelo mesmo número, direto do inbox (`/clinic/inbox`), com respostas rápidas, tags e um atalho para criar agendamento sem sair da conversa — ver [[05 - Módulo de Atendimento e Chat Realtime]]. O que **ainda não existe** é o cadastro de novos procedimentos no catálogo global pela UI (ainda depende do Prisma Studio), o envio de WhatsApp de fato sair da caixa (funciona sem provedor configurado, só loga o que seria enviado — ver [[03 - APIs e Webhooks n8n]]) e a sincronização do inbox em tempo real via Supabase Realtime (código pronto, rodando por polling enquanto as credenciais não existem — ver [[05 - Módulo de Atendimento e Chat Realtime]]). Cada nota marca explicitamente o que é real versus proposta.
@@ -151,3 +151,4 @@ flowchart LR
 - [[03 - APIs e Webhooks n8n]] — rotas, Server Actions e integração direta de WhatsApp
 - [[04 - Manual de Edição Manual e Manutenção]] — guia de operação do dia a dia
 - [[05 - Módulo de Atendimento e Chat Realtime]] — inbox de chat/CRM, Supabase Realtime e respostas rápidas
+- [[07 - Guia de Encaminhamento e Captação B2B]] — captação de clínicas parceiras e a guia/voucher com QR Code do paciente
