@@ -35,8 +35,34 @@ enum AppointmentStatus {
   CONFIRMED
   COMPLETED
   CANCELLED
+  NO_SHOW
 
   @@map("appointment_status")
+}
+
+enum ConversationStatus {
+  OPEN
+  PENDING
+  RESOLVED
+
+  @@map("conversation_status")
+}
+
+enum MessageDirection {
+  INBOUND
+  OUTBOUND
+
+  @@map("message_direction")
+}
+
+enum MessageStatus {
+  PENDING
+  SENT
+  DELIVERED
+  READ
+  FAILED
+
+  @@map("message_status")
 }
 
 model User {
@@ -46,8 +72,14 @@ model User {
   phone        String?
   role         UserRole @default(PATIENT)
   passwordHash String   @map("password_hash")
+  clinicId     String?  @map("clinic_id")
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
+
+  clinic Clinic? @relation(fields: [clinicId], references: [id])
+
+  assignedConversations Conversation[] @relation("ConversationAssignee")
+  sentMessages          Message[]
 
   @@map("users")
 }
@@ -64,10 +96,16 @@ model Clinic {
   city            String
   active          Boolean  @default(true)
   commissionRate  Decimal  @map("commission_rate") @db.Decimal(5, 2)
+  rating          Float    @default(0)
+  reviewCount     Int      @default(0) @map("review_count")
+  businessHours   Json?    @map("business_hours")
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")
 
+  users            User[]
   clinicProcedures ClinicProcedure[]
+  conversations    Conversation[]
+  cannedResponses  CannedResponse[]
 
   @@map("clinics")
 }
@@ -132,6 +170,70 @@ model Appointment {
 
   @@index([clinicProcedureId, date])
   @@map("appointments")
+}
+
+model Contact {
+  id        String   @id @default(cuid())
+  name      String
+  phone     String   @unique
+  cpf       String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  conversations Conversation[]
+
+  @@map("contacts")
+}
+
+model Conversation {
+  id             String             @id @default(cuid())
+  clinicId       String             @map("clinic_id")
+  contactId      String             @map("contact_id")
+  assignedUserId String?            @map("assigned_user_id")
+  status         ConversationStatus @default(OPEN)
+  tags           String[]           @default([])
+  lastMessageAt  DateTime?          @map("last_message_at")
+  createdAt      DateTime           @default(now()) @map("created_at")
+  updatedAt      DateTime           @updatedAt @map("updated_at")
+
+  clinic       Clinic    @relation(fields: [clinicId], references: [id])
+  contact      Contact   @relation(fields: [contactId], references: [id])
+  assignedUser User?     @relation("ConversationAssignee", fields: [assignedUserId], references: [id])
+  messages     Message[]
+
+  @@index([clinicId, status])
+  @@index([contactId])
+  @@map("conversations")
+}
+
+model Message {
+  id             String           @id @default(cuid())
+  conversationId String           @map("conversation_id")
+  direction      MessageDirection
+  content        String
+  status         MessageStatus    @default(PENDING)
+  senderUserId   String?          @map("sender_user_id")
+  readAt         DateTime?        @map("read_at")
+  createdAt      DateTime         @default(now()) @map("created_at")
+
+  conversation Conversation @relation(fields: [conversationId], references: [id])
+  senderUser   User?        @relation(fields: [senderUserId], references: [id])
+
+  @@index([conversationId, createdAt])
+  @@map("messages")
+}
+
+model CannedResponse {
+  id        String   @id @default(cuid())
+  clinicId  String?  @map("clinic_id")
+  shortcut  String
+  content   String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  clinic Clinic? @relation(fields: [clinicId], references: [id])
+
+  @@unique([clinicId, shortcut])
+  @@map("canned_responses")
 }
 
 model WebhookLog {

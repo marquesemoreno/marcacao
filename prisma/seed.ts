@@ -1,6 +1,20 @@
-import { PrismaClient, ProcedureCategory, AppointmentType } from "@prisma/client";
+import { PrismaClient, ProcedureCategory, AppointmentType, UserRole } from "@prisma/client";
+import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
+
+const defaultBusinessHours = {
+  seg: { open: "08:00", close: "18:00" },
+  ter: { open: "08:00", close: "18:00" },
+  qua: { open: "08:00", close: "18:00" },
+  qui: { open: "08:00", close: "18:00" },
+  sex: { open: "08:00", close: "18:00" },
+  sab: { open: "08:00", close: "12:00" },
+  dom: { closed: true },
+};
+
+const ADMIN_PASSWORD = "Admin@123";
+const CLINIC_PASSWORD = "Clinica@123";
 
 const specialtiesData = [
   { name: "Clínica Geral" },
@@ -77,6 +91,10 @@ const clinicsData = [
     city: "São Paulo",
     active: true,
     commissionRate: "15.00",
+    rating: 4.7,
+    reviewCount: 312,
+    businessHours: defaultBusinessHours,
+    staffEmail: "contato@clinicasaolucas.com.br",
   },
   {
     name: "Instituto Vida Diagnósticos S.A.",
@@ -89,6 +107,10 @@ const clinicsData = [
     city: "São Paulo",
     active: true,
     commissionRate: "12.50",
+    rating: 4.4,
+    reviewCount: 158,
+    businessHours: defaultBusinessHours,
+    staffEmail: "contato@institutovida.com.br",
   },
   {
     name: "Bem Estar Centro Médico Ltda",
@@ -101,6 +123,10 @@ const clinicsData = [
     city: "Rio de Janeiro",
     active: true,
     commissionRate: "18.00",
+    rating: 4.9,
+    reviewCount: 94,
+    businessHours: defaultBusinessHours,
+    staffEmail: "contato@clinicabemestar.com.br",
   },
 ] as const;
 
@@ -150,13 +176,48 @@ async function main() {
 
   console.log("Seeding clínicas parceiras...");
   const clinics = new Map<string, string>();
-  for (const clinic of clinicsData) {
+  for (const { staffEmail, ...clinic } of clinicsData) {
     const record = await prisma.clinic.upsert({
       where: { cnpj: clinic.cnpj },
-      update: {},
+      update: {
+        rating: clinic.rating,
+        reviewCount: clinic.reviewCount,
+        businessHours: clinic.businessHours,
+      },
       create: clinic,
     });
     clinics.set(record.tradeName, record.id);
+  }
+
+  console.log("Seeding usuários (admin e equipes das clínicas)...");
+  const adminPasswordHash = await bcrypt.hash(ADMIN_PASSWORD, 10);
+  await prisma.user.upsert({
+    where: { email: "admin@marcacao.com.br" },
+    update: {},
+    create: {
+      name: "Administrador Marcação",
+      email: "admin@marcacao.com.br",
+      role: UserRole.ADMIN,
+      passwordHash: adminPasswordHash,
+    },
+  });
+
+  const clinicPasswordHash = await bcrypt.hash(CLINIC_PASSWORD, 10);
+  for (const { staffEmail, tradeName } of clinicsData) {
+    const clinicId = clinics.get(tradeName);
+    if (!clinicId) throw new Error(`Clínica não encontrada: ${tradeName}`);
+
+    await prisma.user.upsert({
+      where: { email: staffEmail },
+      update: { clinicId },
+      create: {
+        name: `Equipe ${tradeName}`,
+        email: staffEmail,
+        role: UserRole.CLINIC,
+        passwordHash: clinicPasswordHash,
+        clinicId,
+      },
+    });
   }
 
   console.log("Seeding vínculos clínica x procedimento (preços)...");
@@ -286,7 +347,68 @@ async function main() {
     });
   }
 
+  console.log("Seeding respostas rápidas...");
+  const globalCannedResponses: { shortcut: string; content: string }[] = [
+    {
+      shortcut: "/confirmacao",
+      content:
+        "Você confirma sua presença? Responda *1* ou *SIM* para confirmar, ou *2* ou *CANCELAR* para cancelar.",
+    },
+    {
+      shortcut: "/jejum",
+      content:
+        "Lembrando que esse exame exige jejum de 8 horas. Pode beber água normalmente durante o período.",
+    },
+    {
+      shortcut: "/pix",
+      content:
+        "O pagamento pode ser feito via Pix na hora do atendimento. Qualquer dúvida, é só chamar por aqui.",
+    },
+    {
+      shortcut: "/atraso",
+      content:
+        "Sem problemas! Só avise com quanto tempo de atraso você chega que a gente vê a melhor forma de te encaixar.",
+    },
+  ];
+  for (const canned of globalCannedResponses) {
+    const existing = await prisma.cannedResponse.findFirst({
+      where: { clinicId: null, shortcut: canned.shortcut },
+    });
+    if (existing) {
+      await prisma.cannedResponse.update({
+        where: { id: existing.id },
+        data: { content: canned.content },
+      });
+    } else {
+      await prisma.cannedResponse.create({
+        data: { clinicId: null, shortcut: canned.shortcut, content: canned.content },
+      });
+    }
+  }
+
+  const addressShortcuts: { clinic: string; shortcut: string }[] = [
+    { clinic: "Clínica São Lucas", shortcut: "/endereco-saolucas" },
+    { clinic: "Instituto Vida", shortcut: "/endereco-institutovida" },
+    { clinic: "Clínica Bem Estar", shortcut: "/endereco-bemestar" },
+  ];
+  for (const { clinic: clinicTradeName, shortcut } of addressShortcuts) {
+    const clinicData = clinicsData.find((c) => c.tradeName === clinicTradeName);
+    const clinicId = clinics.get(clinicTradeName);
+    if (!clinicData || !clinicId) continue;
+    const content = `Nosso endereço: ${clinicData.address}, ${clinicData.neighborhood}, ${clinicData.city}.`;
+    await prisma.cannedResponse.upsert({
+      where: { clinicId_shortcut: { clinicId, shortcut } },
+      update: { content },
+      create: { clinicId, shortcut, content },
+    });
+  }
+
   console.log("Seed concluído.");
+  console.log("\nCredenciais de teste:");
+  console.log(`  Admin:  admin@marcacao.com.br / ${ADMIN_PASSWORD}`);
+  for (const { staffEmail, tradeName } of clinicsData) {
+    console.log(`  ${tradeName}: ${staffEmail} / ${CLINIC_PASSWORD}`);
+  }
 }
 
 main()
