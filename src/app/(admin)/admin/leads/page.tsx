@@ -6,6 +6,9 @@ import { listPartnerLeads } from "@/actions/partner-leads";
 import { PartnerLeadStatusForm } from "@/components/admin/partner-lead-status-form";
 import { partnerLeadStatusLabels, partnerLeadStatusVariant, formatPhone, buildWhatsAppLink } from "@/lib/format";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export default async function AdminLeadsPage() {
   const leads = await listPartnerLeads();
 

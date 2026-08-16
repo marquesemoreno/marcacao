@@ -6,6 +6,9 @@ import { AppointmentActions } from "@/components/clinic/appointment-actions";
 import { appointmentStatusLabels, appointmentStatusVariant } from "@/lib/format";
 import { startOfUTCDay } from "@/lib/date";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export default async function ClinicDashboardPage() {
   const [overview, appointments] = await Promise.all([
     getClinicOverview(),

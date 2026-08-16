@@ -2,6 +2,12 @@ import Link from "next/link";
 import { SignOutButton } from "@/components/sign-out-button";
 import { getClinicInfo } from "@/actions/clinic";
 
+// Evita que o Next tente pré-renderizar estaticamente rotas protegidas
+// (getServerSession não tem request de verdade em build-time e pode
+// quebrar a montagem de URL — ver docs/obsidian/01, seção de deploy).
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export default async function ClinicLayout({
   children,
 }: Readonly<{

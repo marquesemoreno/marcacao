@@ -6,6 +6,9 @@ import { AppointmentActions } from "@/components/clinic/appointment-actions";
 import { listClinicAppointments } from "@/actions/clinic";
 import { appointmentStatusLabels, appointmentStatusVariant, formatDate } from "@/lib/format";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 type AgendamentosPageProps = {
   searchParams: Promise<{ status?: string }>;
 };

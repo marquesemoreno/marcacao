@@ -1,5 +1,5 @@
 import type { AppointmentStatus } from "@prisma/client";
-import { formatDate } from "@/lib/format";
+import { formatDate, getBaseUrl } from "@/lib/format";
 
 export type AppointmentNotificationData = {
   id: string;
@@ -31,8 +31,7 @@ function summaryLines(data: AppointmentNotificationData) {
 }
 
 function trackingLine(data: AppointmentNotificationData) {
-  const baseUrl = (process.env.NEXTAUTH_URL ?? "http://localhost:3000").replace(/\/$/, "");
-  return `Acompanhe pelo link: ${baseUrl}/acompanhar/${data.id}`;
+  return `Acompanhe pelo link: ${getBaseUrl()}/acompanhar/${data.id}`;
 }
 
 function newAppointmentMessage(data: AppointmentNotificationData) {

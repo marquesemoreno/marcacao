@@ -9,6 +9,9 @@ import { AddProcedureForm } from "@/components/clinic/add-procedure-form";
 import { toPlainClinicProcedureItem } from "@/lib/serialize";
 import type { BusinessHours } from "@/lib/schemas/clinic";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export default async function ClinicSettingsPage() {
   const [clinic, clinicProcedures, availableProcedures] = await Promise.all([
     getClinicInfo(),

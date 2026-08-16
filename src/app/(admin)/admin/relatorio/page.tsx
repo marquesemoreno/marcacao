@@ -2,6 +2,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { getFinancialReport } from "@/actions/admin";
 import { formatCurrency } from "@/lib/format";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export default async function AdminFinancialReportPage() {
   const report = await getFinancialReport();
 

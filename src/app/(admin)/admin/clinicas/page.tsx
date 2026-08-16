@@ -5,6 +5,9 @@ import { UpdateClinicForm } from "@/components/admin/update-clinic-form";
 import { CreateClinicForm } from "@/components/admin/create-clinic-form";
 import { toPlainClinic } from "@/lib/serialize";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export default async function AdminClinicsPage() {
   const clinics = await listClinics();
 

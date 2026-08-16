@@ -40,9 +40,27 @@ export function maskCpf(value: string) {
   return `${digits.slice(0, 3)}.***.**${digits[8]}-${digits.slice(9)}`;
 }
 
-/** URL base da aplicação, para montar links absolutos (QR Code, WhatsApp, etc.). */
+/**
+ * URL base da aplicação, para montar links absolutos (QR Code, WhatsApp,
+ * link de acompanhamento, etc.). Nunca usa `new URL(...)` — só concatenação
+ * de string — porque `NEXTAUTH_URL` pode chegar ausente, com aspas ou sem
+ * esquema em builds da Vercel, e um `new URL()` mal formado derruba o build
+ * inteiro (`ERR_INVALID_URL`) quando essa função roda durante a geração
+ * estática de uma rota que não devia ter sido pré-renderizada.
+ */
 export function getBaseUrl() {
-  return (process.env.NEXTAUTH_URL ?? "http://localhost:3000").replace(/\/$/, "");
+  if (typeof window !== "undefined") return "";
+
+  let url: string;
+  if (process.env.VERCEL_URL) {
+    url = `https://${process.env.VERCEL_URL}`;
+  } else if (process.env.NEXTAUTH_URL) {
+    const raw = process.env.NEXTAUTH_URL.replace(/["']/g, "").trim();
+    url = raw.startsWith("http://") || raw.startsWith("https://") ? raw : `https://${raw}`;
+  } else {
+    url = "http://localhost:3000";
+  }
+  return url.replace(/\/+$/, "");
 }
 
 /** Link `wa.me` a partir de um telefone brasileiro (com ou sem DDI 55) e uma mensagem opcional. */

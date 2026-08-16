@@ -2,6 +2,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getKpis } from "@/actions/admin";
 import { listClinics } from "@/actions/admin";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export default async function AdminDashboardPage() {
   const [kpis, clinics] = await Promise.all([getKpis(), listClinics()]);
   const activeClinics = clinics.filter((clinic) => clinic.active).length;
