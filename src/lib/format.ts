@@ -3,6 +3,8 @@ import type {
   AppointmentType,
   PartnerLeadStatus,
   ProcedureCategory,
+  PixKeyType,
+  AffiliateStatus,
 } from "@prisma/client";
 
 export function formatCurrency(value: number | string) {
@@ -129,4 +131,26 @@ export const partnerLeadStatusVariant: Record<
   CONTACTED: "outline",
   PARTNER: "default",
   REJECTED: "destructive",
+};
+
+export const pixKeyTypeLabels: Record<PixKeyType, string> = {
+  CPF: "CPF",
+  EMAIL: "E-mail",
+  PHONE: "Telefone",
+  RANDOM: "Chave aleatória",
+};
+
+export const affiliateStatusLabels: Record<AffiliateStatus, string> = {
+  ACTIVE: "Ativo",
+  PENDING: "Aguardando aprovação",
+  SUSPENDED: "Suspenso",
+};
+
+export const affiliateStatusVariant: Record<
+  AffiliateStatus,
+  "default" | "secondary" | "destructive" | "outline"
+> = {
+  ACTIVE: "default",
+  PENDING: "secondary",
+  SUSPENDED: "destructive",
 };

@@ -9,6 +9,7 @@ const navItems: { href: string; label: string; exact?: boolean }[] = [
   { href: "/admin/crm", label: "📋 CRM (Funil de Leads)" },
   { href: "/admin/clinicas", label: "🏥 Clínicas" },
   { href: "/admin/leads", label: "📈 Leads B2B" },
+  { href: "/admin/afiliados", label: "👥 Marcadores / Afiliados" },
   { href: "/admin/relatorio", label: "💲 Relatórios" },
 ];
 

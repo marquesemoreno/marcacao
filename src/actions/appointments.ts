@@ -1,9 +1,28 @@
 "use server";
 
+import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { createAppointmentSchema, type CreateAppointmentInput } from "@/lib/schemas/appointment";
 import { notifyAppointmentStatus } from "@/lib/whatsapp";
 import { toPlainAppointment } from "@/lib/serialize";
+import { AFFILIATE_REF_COOKIE, AFFILIATE_COMMISSION_FLAT } from "@/lib/affiliate";
+
+/**
+ * `cookies()` só funciona dentro do ciclo de request do Next (Server Action
+ * chamada via form/fetch do client, render de página). O teste de integração
+ * em appointments.test.ts chama `createAppointment` direto, fora desse
+ * contexto, e isso derruba `cookies()` com "outside a request scope" — por
+ * isso o catch: fora de um request de verdade, simplesmente não há afiliado
+ * pra atribuir.
+ */
+async function getAffiliateRefCode() {
+  try {
+    const cookieStore = await cookies();
+    return cookieStore.get(AFFILIATE_REF_COOKIE)?.value ?? null;
+  } catch {
+    return null;
+  }
+}
 
 export async function listUpcomingAppointments(clinicId: string) {
   const today = new Date();
@@ -24,6 +43,11 @@ export async function listUpcomingAppointments(clinicId: string) {
 export async function createAppointment(input: CreateAppointmentInput) {
   const data = createAppointmentSchema.parse(input);
 
+  const affiliateCode = await getAffiliateRefCode();
+  const affiliate = affiliateCode
+    ? await prisma.affiliate.findUnique({ where: { code: affiliateCode.toUpperCase() } })
+    : null;
+
   const appointment = await prisma.appointment.create({
     data: {
       patientName: data.patientName,
@@ -33,9 +57,18 @@ export async function createAppointment(input: CreateAppointmentInput) {
       date: new Date(`${data.date}T00:00:00Z`),
       timeSlot: data.timeSlot || null,
       notes: data.notes || null,
+      affiliateId: affiliate?.id ?? null,
+      affiliateCommission: affiliate ? AFFILIATE_COMMISSION_FLAT : null,
     },
     include: { clinicProcedure: { include: { clinic: true, procedure: true } } },
   });
+
+  if (affiliate) {
+    await prisma.affiliate.update({
+      where: { id: affiliate.id },
+      data: { totalEarned: { increment: AFFILIATE_COMMISSION_FLAT } },
+    });
+  }
 
   // Dispara sem `await`: não faz sentido segurar a confirmação de agendamento
   // (fluxo público, de alta conversão) esperando o WhatsApp responder.

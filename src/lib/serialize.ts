@@ -41,10 +41,11 @@ type AppointmentWithRelations = Prisma.AppointmentGetPayload<{
 
 /** Decimal (price/commissionRate) não pode cruzar a fronteira Server→Client como está — mesma razão de toPlainClinicProcedure. */
 export function toPlainAppointment(appointment: AppointmentWithRelations) {
-  const { clinicProcedure, ...rest } = appointment;
+  const { clinicProcedure, affiliateCommission, ...rest } = appointment;
   const { clinic, procedure, price, promotionalPrice, ...clinicProcedureRest } = clinicProcedure;
   return {
     ...rest,
+    affiliateCommission: affiliateCommission !== null ? Number(affiliateCommission) : null,
     clinicProcedure: {
       ...clinicProcedureRest,
       price: Number(price),

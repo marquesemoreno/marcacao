@@ -74,6 +74,23 @@ enum PartnerLeadStatus {
   @@map("partner_lead_status")
 }
 
+enum PixKeyType {
+  CPF
+  EMAIL
+  PHONE
+  RANDOM
+
+  @@map("pix_key_type")
+}
+
+enum AffiliateStatus {
+  ACTIVE
+  PENDING
+  SUSPENDED
+
+  @@map("affiliate_status")
+}
+
 enum ConversationChannel {
   WHATSAPP
   INSTAGRAM
@@ -128,22 +145,22 @@ model User {
 }
 
 model Clinic {
-  id              String   @id @default(cuid())
-  name            String
-  tradeName       String   @map("trade_name")
-  cnpj            String   @unique
-  phone           String?
-  whatsapp        String?
-  address         String
-  neighborhood    String
-  city            String
-  active          Boolean  @default(true)
-  commissionRate  Decimal  @map("commission_rate") @db.Decimal(5, 2)
-  rating          Float    @default(0)
-  reviewCount     Int      @default(0) @map("review_count")
-  businessHours   Json?    @map("business_hours")
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
+  id             String   @id @default(cuid())
+  name           String
+  tradeName      String   @map("trade_name")
+  cnpj           String   @unique
+  phone          String?
+  whatsapp       String?
+  address        String
+  neighborhood   String
+  city           String
+  active         Boolean  @default(true)
+  commissionRate Decimal  @map("commission_rate") @db.Decimal(5, 2)
+  rating         Float    @default(0)
+  reviewCount    Int      @default(0) @map("review_count")
+  businessHours  Json?    @map("business_hours")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
 
   users            User[]
   clinicProcedures ClinicProcedure[]
@@ -197,23 +214,46 @@ model ClinicProcedure {
 }
 
 model Appointment {
-  id                String            @id @default(cuid())
-  patientName       String            @map("patient_name")
-  patientPhone      String            @map("patient_phone")
-  patientCpf        String            @map("patient_cpf")
-  clinicProcedureId String            @map("clinic_procedure_id")
-  date              DateTime          @db.Date
-  timeSlot          String?           @map("time_slot")
-  status            AppointmentStatus @default(PENDING)
-  paymentMethod     String?           @map("payment_method")
-  notes             String?
-  createdAt         DateTime          @default(now()) @map("created_at")
-  updatedAt         DateTime          @updatedAt @map("updated_at")
+  id                  String            @id @default(cuid())
+  patientName         String            @map("patient_name")
+  patientPhone        String            @map("patient_phone")
+  patientCpf          String            @map("patient_cpf")
+  clinicProcedureId   String            @map("clinic_procedure_id")
+  date                DateTime          @db.Date
+  timeSlot            String?           @map("time_slot")
+  status              AppointmentStatus @default(PENDING)
+  paymentMethod       String?           @map("payment_method")
+  notes               String?
+  affiliateId         String?           @map("affiliate_id")
+  affiliateCommission Decimal?          @map("affiliate_commission") @db.Decimal(10, 2)
+  createdAt           DateTime          @default(now()) @map("created_at")
+  updatedAt           DateTime          @updatedAt @map("updated_at")
 
   clinicProcedure ClinicProcedure @relation(fields: [clinicProcedureId], references: [id])
+  affiliate       Affiliate?      @relation(fields: [affiliateId], references: [id])
 
   @@index([clinicProcedureId, date])
+  @@index([affiliateId])
   @@map("appointments")
+}
+
+model Affiliate {
+  id          String          @id @default(cuid())
+  name        String
+  email       String?
+  phone       String          @unique
+  pixKey      String          @map("pix_key")
+  pixType     PixKeyType      @map("pix_type")
+  city        String
+  code        String          @unique
+  status      AffiliateStatus @default(PENDING)
+  totalEarned Decimal         @default(0) @map("total_earned") @db.Decimal(10, 2)
+  createdAt   DateTime        @default(now()) @map("created_at")
+  updatedAt   DateTime        @updatedAt @map("updated_at")
+
+  appointments Appointment[]
+
+  @@map("affiliates")
 }
 
 model Contact {
@@ -255,18 +295,18 @@ model Conversation {
 }
 
 model Message {
-  id              String           @id @default(cuid())
-  conversationId  String           @map("conversation_id")
-  direction       MessageDirection
-  content         String
-  status          MessageStatus    @default(PENDING)
-  type            MessageType      @default(TEXT)
-  senderUserId    String?          @map("sender_user_id")
-  attachmentName  String?          @map("attachment_name")
-  attachmentSize  String?          @map("attachment_size")
-  audioDuration   String?          @map("audio_duration")
-  readAt          DateTime?        @map("read_at")
-  createdAt       DateTime         @default(now()) @map("created_at")
+  id             String           @id @default(cuid())
+  conversationId String           @map("conversation_id")
+  direction      MessageDirection
+  content        String
+  status         MessageStatus    @default(PENDING)
+  type           MessageType      @default(TEXT)
+  senderUserId   String?          @map("sender_user_id")
+  attachmentName String?          @map("attachment_name")
+  attachmentSize String?          @map("attachment_size")
+  audioDuration  String?          @map("audio_duration")
+  readAt         DateTime?        @map("read_at")
+  createdAt      DateTime         @default(now()) @map("created_at")
 
   conversation Conversation @relation(fields: [conversationId], references: [id])
   senderUser   User?        @relation(fields: [senderUserId], references: [id])
