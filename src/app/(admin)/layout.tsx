@@ -18,7 +18,7 @@ export default async function AdminLayout({
   const session = await getServerSession(authOptions);
 
   return (
-    <div className="flex min-h-screen flex-col bg-slate-50">
+    <div className="flex h-screen flex-col overflow-hidden bg-slate-50">
       <header className="flex items-center justify-between gap-4 border-b border-slate-200 bg-white px-4 py-3 sm:px-6">
         <div className="flex min-w-0 items-center gap-3">
           <Logo variant="icon-only" size="sm" />
@@ -47,7 +47,7 @@ export default async function AdminLayout({
         <AdminNav />
       </div>
 
-      <main className="flex-1 p-4 sm:p-6">{children}</main>
+      <main className="flex-1 overflow-y-auto p-4 sm:p-6">{children}</main>
     </div>
   );
 }

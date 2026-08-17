@@ -4,11 +4,11 @@ import { ChatCrmApp } from "@/components/chat/chat-crm-app";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-export default function InboxPage() {
+export default function AdminInboxPage() {
   return (
     <div className="h-full">
       <Suspense fallback={null}>
-        <ChatCrmApp scope="clinic" basePath="/clinic" view="inbox" />
+        <ChatCrmApp scope="admin" basePath="/admin" view="inbox" />
       </Suspense>
     </div>
   );

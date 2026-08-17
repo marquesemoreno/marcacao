@@ -78,6 +78,7 @@ type ConversationWithRelations = Conversation & {
   assignedUser: Pick<User, "id" | "name"> | null;
   messages: PrismaMessage[];
   unreadCount?: number;
+  clinic?: { id: string; tradeName: string };
 };
 
 /**
@@ -97,6 +98,8 @@ export function toChatContact(conversation: ConversationWithRelations): Contact 
     cpf: conversation.contact.cpf ?? "",
     neighborhood: "",
     avatar: "",
+    clinicId: conversation.clinic?.id,
+    clinicName: conversation.clinic?.tradeName,
     responsibleAgent: conversation.assignedUser?.name ?? "Não Atribuído",
     department: departmentFromDb[conversation.department],
     channel: channelFromDb[conversation.channel],

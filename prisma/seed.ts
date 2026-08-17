@@ -758,7 +758,7 @@ async function main() {
         "Você confirma sua presença? Responda *1* ou *SIM* para confirmar, ou *2* ou *CANCELAR* para cancelar.",
     },
     {
-      shortcut: "/jejum",
+      shortcut: "/preparo-jejum",
       content:
         "Lembrando que esse exame exige jejum de 8 horas. Pode beber água normalmente durante o período.",
     },
@@ -766,6 +766,11 @@ async function main() {
       shortcut: "/pix",
       content:
         "O pagamento pode ser feito via Pix na hora do atendimento. Qualquer dúvida, é só chamar por aqui.",
+    },
+    {
+      shortcut: "/horarios",
+      content:
+        "Atendemos de segunda a sexta, das 08h às 18h, e aos sábados das 08h às 12h. Qualquer alteração de horário avisamos por aqui.",
     },
     {
       shortcut: "/atraso",
@@ -780,8 +785,8 @@ async function main() {
   }
 
   const addressShortcuts: { clinic: string; shortcut: string }[] = [
-    { clinic: "Clinica Cirurgica Santa Clara", shortcut: "/endereco-santaclara" },
-    { clinic: "Imad Diagnóstico Por Imagem", shortcut: "/endereco-imad" },
+    { clinic: "Clinica Cirurgica Santa Clara", shortcut: "/endereco" },
+    { clinic: "Imad Diagnóstico Por Imagem", shortcut: "/endereco" },
   ];
   for (const { clinic: clinicTradeName, shortcut } of addressShortcuts) {
     const clinicData = clinicsData.find((c) => c.tradeName === clinicTradeName);

@@ -4,7 +4,6 @@ import React, { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { Contact } from '@/types/chat-crm';
 import { X, Calendar, Clock, Stethoscope, DollarSign, CheckCircle2 } from 'lucide-react';
-import { listClinicProceduresForAppointment } from '@/actions/inbox';
 import { createAppointment } from '@/actions/appointments';
 import { formatCurrency, appointmentTypeLabels } from '@/lib/format';
 import type { PlainClinicProcedureItem } from '@/lib/serialize';
@@ -13,7 +12,10 @@ interface ScheduleModalProps {
   contact: Contact;
   isOpen: boolean;
   onClose: () => void;
+  /** Clínica-scoped usa a clínica da sessão; Admin passa o clinicId da conversa selecionada. */
+  fetchProcedures: () => Promise<PlainClinicProcedureItem[]>;
   onConfirmSchedule: (scheduleData: {
+    appointmentId: string;
     specialty: string;
     doctor: string;
     date: string;
@@ -26,6 +28,7 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
   contact,
   isOpen,
   onClose,
+  fetchProcedures,
   onConfirmSchedule,
 }) => {
   const [procedures, setProcedures] = useState<PlainClinicProcedureItem[]>([]);
@@ -45,9 +48,11 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
     setTime('');
     setIsSuccess(false);
     setLoadingProcedures(true);
-    listClinicProceduresForAppointment()
+    fetchProcedures()
       .then(setProcedures)
       .finally(() => setLoadingProcedures(false));
+    // fetchProcedures é recriada a cada render do pai — só precisamos rodar quando o modal abre.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, contact.cpf]);
 
   if (!isOpen) return null;
@@ -60,7 +65,7 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
 
     setSubmitting(true);
     try {
-      await createAppointment({
+      const appointment = await createAppointment({
         patientName: contact.name,
         patientCpf: cpf,
         patientPhone: contact.phone,
@@ -73,6 +78,7 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
       const price = formatCurrency(selectedProcedure.promotionalPrice ?? selectedProcedure.price);
       setTimeout(() => {
         onConfirmSchedule({
+          appointmentId: appointment.id,
           specialty: selectedProcedure.procedure.name,
           doctor: 'Clínica Conecta Saúde',
           date,

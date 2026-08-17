@@ -39,6 +39,9 @@ export interface Contact {
   responsibleAgent: string;
   department: Department;
   channel: Channel;
+  /** Só preenchido na visão do Admin (que enxerga conversas de todas as clínicas) */
+  clinicId?: string;
+  clinicName?: string;
   unreadCount: number;
   lastMessage: string;
   lastMessageTime: string;

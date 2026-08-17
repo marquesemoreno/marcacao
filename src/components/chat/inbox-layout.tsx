@@ -12,6 +12,7 @@ import {
 import { MessageBubble } from './message-bubble';
 import { ScheduleModal } from './schedule-modal';
 import { AvatarBadge } from './avatar-badge';
+import type { PlainClinicProcedureItem } from '@/lib/serialize';
 import {
   Search,
   Send,
@@ -32,6 +33,16 @@ import {
   Filter,
 } from 'lucide-react';
 
+const PRESET_TAGS: { label: string; classes: string }[] = [
+  { label: '⚡ Prioritário', classes: 'bg-amber-100 text-amber-800 border-amber-200' },
+  { label: '🔬 Jejum', classes: 'bg-blue-100 text-blue-800 border-blue-200' },
+  { label: '✅ Confirmado', classes: 'bg-emerald-100 text-emerald-800 border-emerald-200' },
+];
+
+function tagClasses(tag: string) {
+  return PRESET_TAGS.find((preset) => preset.label === tag)?.classes ?? 'bg-slate-100 text-slate-700 border-slate-200';
+}
+
 interface InboxLayoutProps {
   contacts: Contact[];
   agents: Agent[];
@@ -49,7 +60,8 @@ interface InboxLayoutProps {
   onUpdateFunnelStage: (stage: FunnelStage) => Promise<void> | void;
   onTransferAgent: (agentId: string, agentName: string) => Promise<void> | void;
   onFinishAttendance: () => Promise<void> | void;
-  onScheduleConfirmed: (data: { specialty: string; doctor: string; date: string; time: string; price: string }) => void;
+  fetchProcedures: () => Promise<PlainClinicProcedureItem[]>;
+  onScheduleConfirmed: (data: { appointmentId: string; specialty: string; doctor: string; date: string; time: string; price: string }) => void;
 }
 
 export const InboxLayout: React.FC<InboxLayoutProps> = ({
@@ -69,6 +81,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
   onUpdateFunnelStage,
   onTransferAgent,
   onFinishAttendance,
+  fetchProcedures,
   onScheduleConfirmed,
 }) => {
   const [selectedDept, setSelectedDept] = useState<Department | 'todos'>('todos');
@@ -79,6 +92,20 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
   const [isQuickReplyOpen, setIsQuickReplyOpen] = useState(false);
   const [newTagInput, setNewTagInput] = useState('');
   const [isAddingTag, setIsAddingTag] = useState(false);
+
+  const quickReplyQuery = inputText.startsWith('/') ? inputText.slice(1).toLowerCase() : '';
+  const filteredQuickReplies = quickReplyQuery
+    ? quickReplies.filter((reply) => reply.shortcut.toLowerCase().includes(quickReplyQuery))
+    : quickReplies;
+
+  const handleInputChange = (value: string) => {
+    setInputText(value);
+    if (value.startsWith('/')) {
+      setIsQuickReplyOpen(true);
+    } else if (isQuickReplyOpen) {
+      setIsQuickReplyOpen(false);
+    }
+  };
 
   const selectedContact = contacts.find((c) => c.id === selectedContactId) ?? null;
 
@@ -113,7 +140,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
   };
 
   return (
-    <div className="flex h-[calc(100vh-65px)] w-full overflow-hidden bg-slate-100 font-sans antialiased text-slate-800">
+    <div className="flex h-full w-full overflow-hidden bg-slate-100 font-sans antialiased text-slate-800">
       {/* =========================================================================
           COLUNA 1: FILA DE ATENDIMENTO (320px)
          ========================================================================= */}
@@ -244,6 +271,10 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                       </span>
                     </div>
 
+                    {c.clinicName && (
+                      <p className="text-[10px] font-semibold text-sky-700 mb-0.5 truncate">{c.clinicName}</p>
+                    )}
+
                     <p className="text-xs text-slate-500 truncate mb-1.5 leading-snug">
                       {c.lastMessage}
                     </p>
@@ -311,6 +342,11 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
                       WhatsApp Conectado
                     </span>
+                    {selectedContact.clinicName && (
+                      <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-sky-50 border border-sky-200 text-sky-700 text-[10px] font-medium">
+                        {selectedContact.clinicName}
+                      </span>
+                    )}
                   </div>
                   <p className="text-xs text-slate-500 font-mono truncate">{selectedContact.phone}</p>
                 </div>
@@ -403,7 +439,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                       }`}
                     >
                       <MessageSquare className="w-3.5 h-3.5" />
-                      Mensagem WhatsApp
+                      💬 Mensagem WhatsApp
                     </button>
                     <button
                       type="button"
@@ -415,7 +451,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                       }`}
                     >
                       <Lock className="w-3.5 h-3.5" />
-                      Nota Interna Privada
+                      🔒 Nota Interna (Privada)
                     </button>
                   </div>
 
@@ -438,20 +474,24 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                     <div className="px-3 py-1.5 text-[10px] font-mono uppercase font-bold text-slate-400 border-b border-slate-100">
                       Respostas rápidas
                     </div>
-                    {quickReplies.map((reply) => (
-                      <button
-                        key={reply.id}
-                        type="button"
-                        onClick={() => {
-                          setInputText((prev) => (prev ? `${prev} ${reply.content}` : reply.content));
-                          setIsQuickReplyOpen(false);
-                        }}
-                        className="w-full px-3 py-2 text-left text-xs hover:bg-slate-50 transition-colors"
-                      >
-                        <p className="font-medium text-emerald-700">{reply.shortcut}</p>
-                        <p className="text-slate-500 truncate">{reply.content}</p>
-                      </button>
-                    ))}
+                    {filteredQuickReplies.length === 0 ? (
+                      <p className="px-3 py-2 text-xs text-slate-400">Nenhuma resposta encontrada.</p>
+                    ) : (
+                      filteredQuickReplies.map((reply) => (
+                        <button
+                          key={reply.id}
+                          type="button"
+                          onClick={() => {
+                            setInputText(reply.content);
+                            setIsQuickReplyOpen(false);
+                          }}
+                          className="w-full px-3 py-2 text-left text-xs hover:bg-slate-50 transition-colors"
+                        >
+                          <p className="font-medium text-emerald-700">{reply.shortcut}</p>
+                          <p className="text-slate-500 truncate">{reply.content}</p>
+                        </button>
+                      ))
+                    )}
                   </div>
                 )}
 
@@ -465,7 +505,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                   <textarea
                     rows={2}
                     value={inputText}
-                    onChange={(e) => setInputText(e.target.value)}
+                    onChange={(e) => handleInputChange(e.target.value)}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' && !e.shiftKey) {
                         e.preventDefault();
@@ -633,16 +673,28 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                 {selectedContact.tags.map((tag) => (
                   <span
                     key={tag}
-                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium bg-slate-100 text-slate-700 border border-slate-200 group"
+                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium border group ${tagClasses(tag)}`}
                   >
                     {tag}
                     <button
                       onClick={() => onRemoveTag(tag)}
-                      className="text-slate-400 hover:text-rose-600 opacity-60 group-hover:opacity-100 transition-opacity"
+                      className="text-current opacity-50 hover:text-rose-600 hover:opacity-100 transition-opacity"
                     >
                       <X className="w-3 h-3" />
                     </button>
                   </span>
+                ))}
+              </div>
+
+              <div className="flex flex-wrap gap-1.5">
+                {PRESET_TAGS.filter((preset) => !selectedContact.tags.includes(preset.label)).map((preset) => (
+                  <button
+                    key={preset.label}
+                    onClick={() => onAddTag(preset.label)}
+                    className={`px-2.5 py-1 rounded-md text-xs font-medium border border-dashed transition-colors hover:border-solid ${preset.classes} opacity-70 hover:opacity-100`}
+                  >
+                    + {preset.label}
+                  </button>
                 ))}
               </div>
 
@@ -726,7 +778,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                 data-od-id="btn-create-schedule"
               >
                 <Calendar className="w-4 h-4" />
-                Criar Agendamento Conecta Saúde
+                ➕ Criar Agendamento Rápido
               </button>
             </div>
           </div>
@@ -739,6 +791,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
           contact={selectedContact}
           isOpen={isScheduleModalOpen}
           onClose={() => setIsScheduleModalOpen(false)}
+          fetchProcedures={fetchProcedures}
           onConfirmSchedule={onScheduleConfirmed}
         />
       )}

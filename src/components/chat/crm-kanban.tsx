@@ -6,23 +6,33 @@ import { AvatarBadge } from './avatar-badge';
 import {
   Search,
   Phone,
-  MessageSquare,
   ArrowRight,
   ArrowLeft,
 } from 'lucide-react';
+
+type KanbanStage = FunnelStage | 'finalizado';
 
 interface CRMKanbanProps {
   contacts: Contact[];
   onOpenContactChat?: (contactId: string) => void;
   onMoveStage: (contactId: string, stage: FunnelStage) => void;
+  onFinish: (contactId: string) => void;
+  onReopen: (contactId: string) => void;
 }
 
-const STAGES: { id: FunnelStage; title: string; color: string; bgBadge: string }[] = [
-  { id: 'novos', title: 'Novos Contatos', color: 'border-amber-400', bgBadge: 'bg-amber-100 text-amber-800' },
-  { id: 'triagem', title: 'Em Triagem', color: 'border-blue-400', bgBadge: 'bg-blue-100 text-blue-800' },
-  { id: 'orcamento', title: 'Orçamento Enviado', color: 'border-purple-400', bgBadge: 'bg-purple-100 text-purple-800' },
-  { id: 'agendado', title: 'Agendamento Confirmado', color: 'border-emerald-500', bgBadge: 'bg-emerald-100 text-emerald-800' },
+const STAGES: { id: KanbanStage; title: string; color: string; bgBadge: string }[] = [
+  { id: 'novos', title: '🆕 Novos Contatos', color: 'border-amber-400', bgBadge: 'bg-amber-100 text-amber-800' },
+  { id: 'triagem', title: '💬 Em Atendimento', color: 'border-blue-400', bgBadge: 'bg-blue-100 text-blue-800' },
+  { id: 'orcamento', title: '💲 Orçamento Enviado', color: 'border-purple-400', bgBadge: 'bg-purple-100 text-purple-800' },
+  { id: 'agendado', title: '✅ Agendamento Confirmado', color: 'border-emerald-500', bgBadge: 'bg-emerald-100 text-emerald-800' },
+  { id: 'finalizado', title: '🏁 Finalizado', color: 'border-slate-400', bgBadge: 'bg-slate-200 text-slate-700' },
 ];
+
+const STAGE_ORDER: KanbanStage[] = ['novos', 'triagem', 'orcamento', 'agendado', 'finalizado'];
+
+function kanbanStageOf(contact: Contact): KanbanStage {
+  return contact.statusTag.label === 'Finalizado' ? 'finalizado' : contact.funnelStage;
+}
 
 function parseEstimatedValue(value?: string) {
   if (!value) return 0;
@@ -33,18 +43,29 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
   contacts,
   onOpenContactChat,
   onMoveStage,
+  onFinish,
+  onReopen,
 }) => {
   const [search, setSearch] = useState('');
 
-  const stageOrder: FunnelStage[] = ['novos', 'triagem', 'orcamento', 'agendado'];
   const moveStage = (contactId: string, direction: 'forward' | 'backward') => {
     const current = contacts.find((c) => c.id === contactId);
     if (!current) return;
-    const currentIndex = stageOrder.indexOf(current.funnelStage);
+    const wasFinalizado: boolean = kanbanStageOf(current) === 'finalizado';
+    const currentIndex = STAGE_ORDER.indexOf(kanbanStageOf(current));
     let nextIndex = direction === 'forward' ? currentIndex + 1 : currentIndex - 1;
     if (nextIndex < 0) nextIndex = 0;
-    if (nextIndex >= stageOrder.length) nextIndex = stageOrder.length - 1;
-    onMoveStage(contactId, stageOrder[nextIndex]);
+    if (nextIndex >= STAGE_ORDER.length) nextIndex = STAGE_ORDER.length - 1;
+    const nextStage = STAGE_ORDER[nextIndex];
+    const willBeFinalizado: boolean = nextStage === 'finalizado';
+
+    if (willBeFinalizado) {
+      onFinish(contactId);
+    } else if (wasFinalizado) {
+      onReopen(contactId);
+    } else {
+      onMoveStage(contactId, nextStage as FunnelStage);
+    }
   };
 
   const filtered = contacts.filter((c) =>
@@ -57,7 +78,7 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
 
   return (
     <div
-      className="flex-1 flex flex-col h-[calc(100vh-65px)] bg-slate-100/90 overflow-hidden font-sans"
+      className="flex-1 flex flex-col h-full bg-slate-100/90 overflow-hidden font-sans"
       data-od-id="crm-kanban-view"
     >
       {/* Sub-header do Kanban com Filtros e Métricas */}
@@ -94,13 +115,10 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
 
       {/* Grid de Colunas do Funil */}
       <div className="flex-1 overflow-x-auto p-6">
-        <div className="flex gap-5 h-full min-w-[1100px]">
+        <div className="flex gap-5 h-full min-w-[1350px]">
           {STAGES.map((stage) => {
-            const stageContacts = filtered.filter((c) => c.funnelStage === stage.id);
-            const totalStageValue = stageContacts.reduce((acc, curr) => {
-              const val = parseFloat(curr.estimatedValue?.replace('R$', '').replace('.', '').replace(',', '.') || '0');
-              return acc + val;
-            }, 0);
+            const stageContacts = filtered.filter((c) => kanbanStageOf(c) === stage.id);
+            const totalStageValue = stageContacts.reduce((acc, curr) => acc + parseEstimatedValue(curr.estimatedValue), 0);
 
             return (
               <div
@@ -136,7 +154,7 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
                         className="bg-white rounded-xl border border-slate-200 p-3.5 shadow-2xs hover:shadow-md transition-all space-y-3 group"
                         data-od-id={`kanban-card-${contact.id}`}
                       >
-                        {/* Topo do Card: Foto, Nome e Canal */}
+                        {/* Topo do Card: Foto, Nome e Telefone */}
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex items-center gap-2.5 min-w-0">
                             <AvatarBadge name={contact.name} size={36} className="ring-1 ring-slate-200" />
@@ -150,15 +168,25 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
                             </div>
                           </div>
 
-                          <span className="p-1 rounded bg-emerald-50 text-emerald-600 shrink-0" title="WhatsApp">
-                            <MessageSquare className="w-3.5 h-3.5" />
-                          </span>
+                          {contact.clinicName && (
+                            <span
+                              className="shrink-0 rounded-full bg-sky-50 px-2 py-0.5 text-[9.5px] font-semibold text-sky-700"
+                              title={contact.clinicName}
+                            >
+                              {contact.clinicName}
+                            </span>
+                          )}
                         </div>
 
-                        {/* Mensagem Recente */}
-                        <p className="text-xs text-slate-600 line-clamp-2 bg-slate-50 p-2 rounded-lg leading-relaxed">
-                          &ldquo;{contact.lastMessage}&rdquo;
-                        </p>
+                        {/* Última Interação */}
+                        <div className="bg-slate-50 p-2 rounded-lg space-y-0.5">
+                          <p className="text-xs text-slate-600 line-clamp-2 leading-relaxed">
+                            &ldquo;{contact.lastMessage}&rdquo;
+                          </p>
+                          {contact.lastMessageTime && (
+                            <p className="text-[10px] text-slate-400 font-mono">{contact.lastMessageTime}</p>
+                          )}
+                        </div>
 
                         {/* Tags e Valor Estimado */}
                         <div className="space-y-1.5">
@@ -193,7 +221,7 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
                                 <ArrowLeft className="w-3.5 h-3.5" />
                               </button>
                             )}
-                            {stage.id !== 'agendado' && (
+                            {stage.id !== 'finalizado' && (
                               <button
                                 onClick={() => moveStage(contact.id, 'forward')}
                                 className="p-1.5 text-slate-400 hover:text-emerald-700 hover:bg-emerald-50 rounded-md transition-colors"
@@ -209,7 +237,7 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
                               onClick={() => onOpenContactChat(contact.id)}
                               className="text-[11px] font-semibold text-emerald-700 hover:text-emerald-800 flex items-center gap-1 hover:underline"
                             >
-                              Abrir Chat <ArrowRight className="w-3 h-3" />
+                              💬 Abrir no Chat
                             </button>
                           )}
                         </div>

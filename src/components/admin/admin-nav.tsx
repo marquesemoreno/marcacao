@@ -4,10 +4,12 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const navItems: { href: string; label: string; exact?: boolean }[] = [
-  { href: "/admin", label: "Dashboard", exact: true },
-  { href: "/admin/clinicas", label: "Clínicas" },
-  { href: "/admin/relatorio", label: "Relatório Financeiro" },
-  { href: "/admin/leads", label: "Leads" },
+  { href: "/admin", label: "📊 Início", exact: true },
+  { href: "/admin/inbox", label: "💬 Chat / WhatsApp" },
+  { href: "/admin/crm", label: "📋 CRM (Funil de Leads)" },
+  { href: "/admin/clinicas", label: "🏥 Clínicas" },
+  { href: "/admin/leads", label: "📈 Leads B2B" },
+  { href: "/admin/relatorio", label: "💲 Relatórios" },
 ];
 
 export function AdminNav() {

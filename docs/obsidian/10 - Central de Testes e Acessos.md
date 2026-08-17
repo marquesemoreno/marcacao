@@ -34,6 +34,8 @@
 | Rota | Descrição |
 |---|---|
 | `/admin` | Visão geral: clínicas ativas, total de pedidos, taxa de conversão, procedimentos mais buscados |
+| `/admin/inbox` | Chat/WhatsApp cross-clínica — mesmas conversas do inbox de cada clínica, vistas de uma vez só pelo Admin (badge com o nome da clínica em cada card) — ver [[11 - Modulo Isolado de Atendimento e CRM]] |
+| `/admin/crm` | Kanban de funil de leads cross-clínica (Novos → Em Atendimento → Orçamento → Agendado → Finalizado) — ver [[11 - Modulo Isolado de Atendimento e CRM]] |
 | `/admin/clinicas` | Gestão das 11 clínicas cadastradas e taxas de comissão |
 | `/admin/leads` | Painel de prospecção B2B, com botões "Chamar no WhatsApp" e "Enviar Proposta" |
 | `/admin/relatorio` | Fechamento financeiro e controle de comissões por clínica |
@@ -45,6 +47,7 @@
 | `/clinic` | Resumo do dia, da semana e pendências |
 | `/clinic/agendamentos` | Gestão de presenças (confirmar/concluir/faltar/cancelar) e lista de pacientes |
 | `/clinic/inbox` | Live chat multicanal com pacientes via WhatsApp, em tempo real (polling + Supabase Realtime opcional) |
+| `/clinic/crm` | Kanban de funil de leads da clínica (Novos → Em Atendimento → Orçamento → Agendado → Finalizado) — ver [[11 - Modulo Isolado de Atendimento e CRM]] |
 | `/clinic/precos` | Tabela de procedimentos, preços e horários de atendimento da clínica |
 
 ## 3. Matriz de Credenciais de Acesso (Login e Senha)
@@ -101,9 +104,20 @@ Nenhum erro de console real foi encontrado. Uma única requisição `POST /clini
 
 Os dados de teste criados durante esta bateria (1 `PartnerLead` e 1 `Appointment` fictícios) foram removidos do banco ao final, para não poluir o ambiente de demonstração.
 
+### Validação das novas rotas de CRM/Chat (`/clinic/crm`, `/admin/inbox`, `/admin/crm`)
+
+Sessão posterior, mesmo ambiente. `tsc`/`lint`/`test`/`build` limpos (24 rotas). Testado ao vivo com uma conversa de teste (removida ao final):
+
+- **`/clinic/crm`**: Kanban com as 5 colunas, card com nome/telefone/última interação/valor estimado, "💬 Abrir no Chat" navegando para `/clinic/inbox?c=<id>` com a conversa já selecionada.
+- **`/admin/inbox`** e **`/admin/crm`**: mesma conversa (de uma clínica específica) visível cross-clínica, com badge do nome da clínica no card/cabeçalho; tags, funil, nota interna, transferência e agendamento funcionando idênticos ao `/clinic`.
+- **Atalho "➕ Criar Agendamento Rápido"**: catálogo real de procedimentos carregado (`fetchProcedures`, escopado por clínica no admin), agendamento criado via `createAppointment`, nota interna com o link de `/comprovante/[id]` colada automaticamente no chat, e etapa do funil avançando para "Agendado".
+- **Bug encontrado e corrigido**: a coluna "🏁 Finalizado" do Kanban nunca populava — o filtro usado (`"todas"`) exclui conversas com `status: RESOLVED` por design (mesmo comportamento da aba "Todas" da Caixa de Entrada, que não deveria misturar finalizadas). Corrigido buscando `"todas"` + `"finalizadas"` em paralelo só quando `view === "crm"`, sem alterar o filtro da Caixa de Entrada.
+- **Atalho `/` no composer**: digitar `/` (ex. `/pix`) abre e filtra a lista de respostas rápidas; selecionar uma agora **substitui** o texto digitado em vez de concatenar (documentado como comportamento pretendido desde a nota 05, mas que tinha sido perdido nessa reimplementação — corrigido aqui).
+
 ## Notas relacionadas
 
 - [[00 - Visão Geral]]
 - [[01 - Setup e Infraestrutura]] — como rodar o projeto localmente e variáveis de ambiente
 - [[07 - Guia de Encaminhamento e Captação B2B]] — detalhes do fluxo de guia/QR Code testado no Teste 1 e 2
 - [[08 - Playbook Comercial e Proposta B2B]] — conteúdo de `/proposta-comercial`, testada na seção 5
+- [[11 - Modulo Isolado de Atendimento e CRM]] — módulo de chat/CRM, incluindo as rotas `/clinic/crm`, `/admin/inbox` e `/admin/crm`
