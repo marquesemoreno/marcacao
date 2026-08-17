@@ -27,6 +27,12 @@ const specialtiesData = [
   { name: "Cirurgia Geral" },
   { name: "Ginecologia" },
   { name: "Ortopedia" },
+  { name: "Endocrinologia" },
+  { name: "Proctologia" },
+  { name: "Nutrição" },
+  { name: "Cirurgia Pediátrica" },
+  { name: "Anestesiologia" },
+  { name: "Obstetrícia" },
 ];
 
 const consultationProceduresData = [
@@ -109,6 +115,301 @@ const otherProceduresData: {
     category: ProcedureCategory.SURGERY,
     description: "Procedimento cirúrgico urológico minimamente invasivo, a laser.",
     preparationInstructions: "Jejum de 6 horas. Trazer exames pré-operatórios recentes e acompanhante.",
+  },
+];
+
+/**
+ * Tabela oficial de procedimentos e preços da Urolaser (2026) — ver
+ * docs/obsidian/12 - Tabela de Precos e Procedimentos Urolaser.md.
+ *
+ * `tussCode`: só preenchido quando encontrado com uma única fonte clara e
+ * sem divergência durante a pesquisa (feita via busca na web, não contra a
+ * tabela oficial da ANS diretamente). Deixado `null` nos demais — são
+ * procedimentos reais, só o código-índice de faturamento TUSS específico
+ * não foi possível confirmar com segurança; a nota do Obsidian marca cada
+ * um explicitamente como "confirmado" ou "pendente de conferência" pelo
+ * setor de faturamento da clínica antes de usar em guias TISS de verdade.
+ */
+const urolaserProceduresData: {
+  name: string;
+  category: ProcedureCategory;
+  specialty?: string;
+  tussCode?: string;
+  description: string;
+  preparationInstructions?: string;
+}[] = [
+  // --- Consultas novas (Consulta - Urologia e Consulta - Ginecologia já existem) ---
+  {
+    name: "Consulta - Endocrinologia",
+    category: ProcedureCategory.CONSULTATION,
+    specialty: "Endocrinologia",
+    tussCode: "10101012",
+    description: "Avaliação endocrinológica com médico especialista.",
+  },
+  {
+    name: "Consulta - Proctologia",
+    category: ProcedureCategory.CONSULTATION,
+    specialty: "Proctologia",
+    tussCode: "10101012",
+    description: "Avaliação proctológica com médico especialista.",
+  },
+  {
+    name: "Consulta - Nutrição c/ Bioimpedância",
+    category: ProcedureCategory.CONSULTATION,
+    specialty: "Nutrição",
+    description: "Consulta nutricional com avaliação de composição corporal por bioimpedância inclusa.",
+    preparationInstructions: "Jejum de 4 horas, evitar exercício físico intenso nas 24h anteriores e vir com roupas leves.",
+  },
+  {
+    name: "Consulta - Cirurgia Pediátrica",
+    category: ProcedureCategory.CONSULTATION,
+    specialty: "Cirurgia Pediátrica",
+    tussCode: "10101012",
+    description: "Avaliação cirúrgica pediátrica com médico especialista.",
+  },
+  {
+    name: "Consulta - Pré-Anestésica",
+    category: ProcedureCategory.CONSULTATION,
+    specialty: "Anestesiologia",
+    tussCode: "10101012",
+    description: "Avaliação pré-anestésica obrigatória antes de procedimentos com sedação ou anestesia.",
+    preparationInstructions: "Trazer exames pré-operatórios solicitados e lista de medicamentos em uso.",
+  },
+  {
+    name: "Consulta - Obstétrica",
+    category: ProcedureCategory.CONSULTATION,
+    specialty: "Obstetrícia",
+    tussCode: "10101012",
+    description: "Acompanhamento pré-natal com médico obstetra.",
+  },
+
+  // --- Procedimentos urológicos ---
+  {
+    name: "Biópsia de Próstata Local",
+    category: ProcedureCategory.SURGERY,
+    specialty: "Urologia",
+    tussCode: "40902030",
+    description: "Biópsia de próstata guiada por ultrassom transretal, sob anestesia local.",
+    preparationInstructions: "Preparo intestinal e antibiótico profilático conforme orientação médica. Vir acompanhado.",
+  },
+  {
+    name: "Biópsia Endoscópica Bexiga",
+    category: ProcedureCategory.SURGERY,
+    specialty: "Urologia",
+    description: "Biópsia de lesão vesical por via endoscópica (cistoscopia).",
+    preparationInstructions: "Jejum de 6 horas. Trazer exames de imagem recentes.",
+  },
+  {
+    name: "Biópsia Peniana",
+    category: ProcedureCategory.SURGERY,
+    specialty: "Urologia",
+    description: "Biópsia de lesão peniana sob anestesia local.",
+  },
+  {
+    name: "Cistoscopia",
+    category: ProcedureCategory.SURGERY,
+    specialty: "Urologia",
+    description: "Exame endoscópico da uretra e bexiga.",
+    preparationInstructions: "Não é necessário jejum. Vir com a bexiga vazia.",
+  },
+  {
+    name: "Dilatação Uretral",
+    category: ProcedureCategory.SURGERY,
+    specialty: "Urologia",
+    tussCode: "31102085",
+    description: "Dilatação endoscópica da uretra para tratamento de estenose.",
+  },
+  {
+    name: "Urodinâmica Completa",
+    category: ProcedureCategory.EXAM,
+    specialty: "Urologia",
+    description: "Estudo urodinâmico completo para avaliação funcional da bexiga e uretra.",
+    preparationInstructions: "Vir com a bexiga cheia, sem urinar 2 horas antes do exame.",
+  },
+  {
+    name: "Urofluxometria",
+    category: ProcedureCategory.EXAM,
+    specialty: "Urologia",
+    description: "Medição do fluxo urinário.",
+    preparationInstructions: "Vir com vontade de urinar (bexiga confortavelmente cheia).",
+  },
+  {
+    name: "Peniscopia",
+    category: ProcedureCategory.EXAM,
+    specialty: "Urologia",
+    description: "Exame de mapeamento peniano com ácido acético, para rastreio de lesões por HPV.",
+  },
+  {
+    name: "Retirada Duplo J",
+    category: ProcedureCategory.SURGERY,
+    specialty: "Urologia",
+    tussCode: "31103472",
+    description: "Retirada endoscópica de cateter ureteral duplo J.",
+    preparationInstructions: "Jejum de 6 horas.",
+  },
+  {
+    name: "Eletrocoagulação",
+    category: ProcedureCategory.SURGERY,
+    specialty: "Urologia",
+    description: "Eletrocoagulação de lesões (verrugas genitais, condilomas) sob anestesia local.",
+  },
+  {
+    name: "USG Próstata Abdominal",
+    category: ProcedureCategory.EXAM,
+    specialty: "Urologia",
+    tussCode: "40901173",
+    description: "Ultrassonografia de próstata por via abdominal.",
+    preparationInstructions: "Vir com a bexiga cheia (beber água e não urinar 1 hora antes).",
+  },
+  {
+    name: "USG Próstata Transretal",
+    category: ProcedureCategory.EXAM,
+    specialty: "Urologia",
+    tussCode: "40901335",
+    description: "Ultrassonografia de próstata por via transretal.",
+    preparationInstructions: "Fazer um enema (lavagem intestinal) 2 horas antes do exame.",
+  },
+  {
+    name: "USG Testicular com Doppler",
+    category: ProcedureCategory.EXAM,
+    specialty: "Urologia",
+    tussCode: "40901203",
+    description: "Ultrassonografia da bolsa escrotal com estudo Doppler do fluxo sanguíneo.",
+  },
+  {
+    name: "USG Testicular simples",
+    category: ProcedureCategory.EXAM,
+    specialty: "Urologia",
+    tussCode: "40901203",
+    description: "Ultrassonografia da bolsa escrotal, sem Doppler.",
+  },
+  {
+    name: "Cateterismo Vesical",
+    category: ProcedureCategory.SURGERY,
+    specialty: "Urologia",
+    description: "Passagem de sonda vesical para alívio de retenção urinária ou coleta de amostra.",
+  },
+  {
+    name: "Exérese de Lesão/Tumor",
+    category: ProcedureCategory.SURGERY,
+    specialty: "Urologia",
+    description: "Retirada cirúrgica de lesão ou tumor de pele/subcutâneo, sob anestesia local.",
+  },
+
+  // --- Procedimentos ginecológicos ---
+  {
+    name: "Preventivo com Colposcopia",
+    category: ProcedureCategory.EXAM,
+    specialty: "Ginecologia",
+    tussCode: "41301102",
+    description: "Coleta de citologia oncótica (Papanicolau) associada a colposcopia.",
+    preparationInstructions: "Evitar relações sexuais, duchas e uso de cremes vaginais nas 48h anteriores. Não agendar durante a menstruação.",
+  },
+  {
+    name: "PCR HPV Genotipagem 28 tipos",
+    category: ProcedureCategory.EXAM,
+    specialty: "Ginecologia",
+    description: "Pesquisa molecular por PCR com genotipagem de 28 tipos de HPV.",
+  },
+  {
+    name: "Biópsia Colo Uterino",
+    category: ProcedureCategory.SURGERY,
+    specialty: "Ginecologia",
+    tussCode: "31303021",
+    description: "Biópsia de lesão do colo uterino identificada em colposcopia.",
+  },
+  {
+    name: "USG Transvaginal",
+    category: ProcedureCategory.EXAM,
+    specialty: "Ginecologia",
+    tussCode: "40901300",
+    description: "Ultrassonografia transvaginal (útero, ovários e anexos).",
+    preparationInstructions: "Vir com a bexiga vazia.",
+  },
+  {
+    name: "USG Obstétrica",
+    category: ProcedureCategory.EXAM,
+    specialty: "Obstetrícia",
+    description: "Ultrassonografia obstétrica para acompanhamento da gestação.",
+    preparationInstructions: "No primeiro trimestre, vir com a bexiga cheia (a critério médico).",
+  },
+  {
+    name: "USG Abdome Inferior",
+    category: ProcedureCategory.EXAM,
+    specialty: "Ginecologia",
+    tussCode: "40901181",
+    description: "Ultrassonografia de abdome inferior feminino (bexiga, útero, ovários e anexos).",
+    preparationInstructions: "Vir com a bexiga cheia.",
+  },
+  {
+    name: "Check-up Ginecológico Completo",
+    category: ProcedureCategory.EXAM,
+    specialty: "Ginecologia",
+    description: "Pacote com consulta, preventivo e ultrassonografia transvaginal em um único atendimento.",
+  },
+
+  // --- Cirurgias / procedimentos com anestesia local ---
+  {
+    name: "Vasectomia Local",
+    category: ProcedureCategory.SURGERY,
+    specialty: "Urologia",
+    tussCode: "31205046",
+    description: "Vasectomia bilateral sob anestesia local.",
+    preparationInstructions: "Jejum de 6 horas. Vir acompanhado e com cueca justa para usar após o procedimento.",
+  },
+  {
+    name: "Postectomia Local",
+    category: ProcedureCategory.SURGERY,
+    specialty: "Urologia",
+    tussCode: "31206220",
+    description: "Postectomia (circuncisão) sob anestesia local.",
+    preparationInstructions: "Jejum de 6 horas. Vir acompanhado.",
+  },
+  {
+    name: "Implante DIU Mirena/Kyleena",
+    category: ProcedureCategory.SURGERY,
+    specialty: "Ginecologia",
+    tussCode: "31303293",
+    description: "Inserção de DIU hormonal (Mirena ou Kyleena) — dispositivo não incluso no valor do procedimento.",
+    preparationInstructions: "Preferencialmente durante o período menstrual. Trazer o dispositivo já adquirido em farmácia.",
+  },
+  {
+    name: "Implanon",
+    category: ProcedureCategory.SURGERY,
+    specialty: "Ginecologia",
+    description: "Inserção de implante contraceptivo subdérmico (Implanon) — dispositivo não incluso no valor do procedimento.",
+    preparationInstructions: "Trazer o dispositivo já adquirido em farmácia.",
+  },
+  {
+    name: "DIU de Cobre",
+    category: ProcedureCategory.SURGERY,
+    specialty: "Ginecologia",
+    tussCode: "31303269",
+    description: "Inserção de DIU de cobre (não hormonal) — dispositivo não incluso no valor do procedimento.",
+    preparationInstructions: "Preferencialmente durante o período menstrual. Trazer o dispositivo já adquirido em farmácia.",
+  },
+
+  // --- Psicologia e outros ---
+  {
+    name: "Sessão Psicoterapia",
+    category: ProcedureCategory.EXAM,
+    description: "Sessão individual de psicoterapia.",
+  },
+  {
+    name: "Pacote 4 Sessões de Psicoterapia",
+    category: ProcedureCategory.EXAM,
+    description: "Pacote fechado com 4 sessões de psicoterapia.",
+  },
+  {
+    name: "Aplicação de Injeção",
+    category: ProcedureCategory.SURGERY,
+    description: "Aplicação de medicamento injetável — medicamento não incluso no valor do procedimento.",
+  },
+  {
+    name: "Bioimpedância",
+    category: ProcedureCategory.EXAM,
+    description: "Avaliação isolada de composição corporal por bioimpedância.",
+    preparationInstructions: "Jejum de 4 horas, evitar exercício físico intenso nas 24h anteriores e vir com roupas leves.",
   },
 ];
 
@@ -195,11 +496,11 @@ const clinicsData = [
   },
   {
     name: "Urolaser Serviços Urológicos Ltda",
-    tradeName: "Urolaser",
+    tradeName: "Urolaser - Clínica de Urologia e Diagnóstico",
     cnpj: "66.777.888/0001-06",
-    phone: "(77) 3421-1006",
-    whatsapp: "(77) 99911-1006",
-    address: "Av. Otávio Santos, 980",
+    phone: "(77) 3422-1010",
+    whatsapp: "(77) 98800-1010",
+    address: "Av. Otávio Santos, 145",
     neighborhood: "Recreio",
     city: CITY,
     active: true,
@@ -207,7 +508,7 @@ const clinicsData = [
     rating: 4.9,
     reviewCount: 156,
     businessHours: defaultBusinessHours,
-    staffEmail: null,
+    staffEmail: "urolaser@clinica.com.br",
   },
   {
     name: "Clínica Àgape Ltda",
@@ -376,23 +677,52 @@ const clinicProceduresData: {
     requiresAppointment: false,
     appointmentType: AppointmentType.ARRIVAL_ORDER,
   },
-  // Urolaser
-  {
-    clinic: "Urolaser",
-    procedure: "Consulta - Urologia",
-    price: "250.00",
-    promotionalPrice: null,
-    requiresAppointment: true,
-    appointmentType: AppointmentType.SCHEDULED,
-  },
-  {
-    clinic: "Urolaser",
-    procedure: "Procedimento Urológico a Laser",
-    price: "1200.00",
-    promotionalPrice: null,
-    requiresAppointment: true,
-    appointmentType: AppointmentType.SCHEDULED,
-  },
+  // Urolaser — tabela oficial completa 2026, ver
+  // docs/obsidian/12 - Tabela de Precos e Procedimentos Urolaser.md
+  { clinic: "Urolaser - Clínica de Urologia e Diagnóstico", procedure: "Consulta - Urologia", price: "250.00", promotionalPrice: "200.00", requiresAppointment: true, appointmentType: AppointmentType.SCHEDULED },
+  { clinic: "Urolaser - Clínica de Urologia e Diagnóstico", procedure: "Consulta - Ginecologia", price: "250.00", promotionalPrice: "200.00", requiresAppointment: true, appointmentType: AppointmentType.SCHEDULED },
+  { clinic: "Urolaser - Clínica de Urologia e Diagnóstico", procedure: "Consulta - Endocrinologia", price: "300.00", promotionalPrice: "250.00", requiresAppointment: true, appointmentType: AppointmentType.SCHEDULED },
+  { clinic: "Urolaser - Clínica de Urologia e Diagnóstico", procedure: "Consulta - Proctologia", price: "350.00", promotionalPrice: "320.00", requiresAppointment: true, appointmentType: AppointmentType.SCHEDULED },
+  { clinic: "Urolaser - Clínica de Urologia e Diagnóstico", procedure: "Consulta - Nutrição c/ Bioimpedância", price: "300.00", promotionalPrice: "250.00", requiresAppointment: true, appointmentType: AppointmentType.SCHEDULED },
+  { clinic: "Urolaser - Clínica de Urologia e Diagnóstico", procedure: "Consulta - Cirurgia Pediátrica", price: "290.00", promotionalPrice: "240.00", requiresAppointment: true, appointmentType: AppointmentType.SCHEDULED },
+  { clinic: "Urolaser - Clínica de Urologia e Diagnóstico", procedure: "Consulta - Pré-Anestésica", price: "250.00", promotionalPrice: "200.00", requiresAppointment: true, appointmentType: AppointmentType.SCHEDULED },
+  { clinic: "Urolaser - Clínica de Urologia e Diagnóstico", procedure: "Consulta - Obstétrica", price: "300.00", promotionalPrice: "250.00", requiresAppointment: true, appointmentType: AppointmentType.SCHEDULED },
+
+  { clinic: "Urolaser - Clínica de Urologia e Diagnóstico", procedure: "Biópsia de Próstata Local", price: "1500.00", promotionalPrice: "1300.00", requiresAppointment: true, appointmentType: AppointmentType.SCHEDULED },
+  { clinic: "Urolaser - Clínica de Urologia e Diagnóstico", procedure: "Biópsia Endoscópica Bexiga", price: "750.00", promotionalPrice: "700.00", requiresAppointment: true, appointmentType: AppointmentType.SCHEDULED },
+  { clinic: "Urolaser - Clínica de Urologia e Diagnóstico", procedure: "Biópsia Peniana", price: "600.00", promotionalPrice: "550.00", requiresAppointment: true, appointmentType: AppointmentType.SCHEDULED },
+  { clinic: "Urolaser - Clínica de Urologia e Diagnóstico", procedure: "Cistoscopia", price: "650.00", promotionalPrice: "590.00", requiresAppointment: true, appointmentType: AppointmentType.SCHEDULED },
+  { clinic: "Urolaser - Clínica de Urologia e Diagnóstico", procedure: "Dilatação Uretral", price: "650.00", promotionalPrice: "590.00", requiresAppointment: true, appointmentType: AppointmentType.SCHEDULED },
+  { clinic: "Urolaser - Clínica de Urologia e Diagnóstico", procedure: "Urodinâmica Completa", price: "650.00", promotionalPrice: "590.00", requiresAppointment: true, appointmentType: AppointmentType.SCHEDULED },
+  { clinic: "Urolaser - Clínica de Urologia e Diagnóstico", procedure: "Urofluxometria", price: "150.00", promotionalPrice: "130.00", requiresAppointment: true, appointmentType: AppointmentType.SCHEDULED },
+  { clinic: "Urolaser - Clínica de Urologia e Diagnóstico", procedure: "Peniscopia", price: "300.00", promotionalPrice: "250.00", requiresAppointment: true, appointmentType: AppointmentType.SCHEDULED },
+  { clinic: "Urolaser - Clínica de Urologia e Diagnóstico", procedure: "Retirada Duplo J", price: "650.00", promotionalPrice: "590.00", requiresAppointment: true, appointmentType: AppointmentType.SCHEDULED },
+  { clinic: "Urolaser - Clínica de Urologia e Diagnóstico", procedure: "Eletrocoagulação", price: "500.00", promotionalPrice: "450.00", requiresAppointment: true, appointmentType: AppointmentType.SCHEDULED },
+  { clinic: "Urolaser - Clínica de Urologia e Diagnóstico", procedure: "USG Próstata Abdominal", price: "160.00", promotionalPrice: "130.00", requiresAppointment: true, appointmentType: AppointmentType.SCHEDULED },
+  { clinic: "Urolaser - Clínica de Urologia e Diagnóstico", procedure: "USG Próstata Transretal", price: "160.00", promotionalPrice: "130.00", requiresAppointment: true, appointmentType: AppointmentType.SCHEDULED },
+  { clinic: "Urolaser - Clínica de Urologia e Diagnóstico", procedure: "USG Testicular com Doppler", price: "230.00", promotionalPrice: "200.00", requiresAppointment: true, appointmentType: AppointmentType.SCHEDULED },
+  { clinic: "Urolaser - Clínica de Urologia e Diagnóstico", procedure: "USG Testicular simples", price: "150.00", promotionalPrice: "120.00", requiresAppointment: true, appointmentType: AppointmentType.SCHEDULED },
+  { clinic: "Urolaser - Clínica de Urologia e Diagnóstico", procedure: "Cateterismo Vesical", price: "350.00", promotionalPrice: "300.00", requiresAppointment: false, appointmentType: AppointmentType.ARRIVAL_ORDER },
+  { clinic: "Urolaser - Clínica de Urologia e Diagnóstico", procedure: "Exérese de Lesão/Tumor", price: "1000.00", promotionalPrice: "900.00", requiresAppointment: true, appointmentType: AppointmentType.SCHEDULED },
+
+  { clinic: "Urolaser - Clínica de Urologia e Diagnóstico", procedure: "Preventivo com Colposcopia", price: "160.00", promotionalPrice: "140.00", requiresAppointment: true, appointmentType: AppointmentType.SCHEDULED },
+  { clinic: "Urolaser - Clínica de Urologia e Diagnóstico", procedure: "PCR HPV Genotipagem 28 tipos", price: "500.00", promotionalPrice: "460.00", requiresAppointment: true, appointmentType: AppointmentType.SCHEDULED },
+  { clinic: "Urolaser - Clínica de Urologia e Diagnóstico", procedure: "Biópsia Colo Uterino", price: "250.00", promotionalPrice: "200.00", requiresAppointment: true, appointmentType: AppointmentType.SCHEDULED },
+  { clinic: "Urolaser - Clínica de Urologia e Diagnóstico", procedure: "USG Transvaginal", price: "160.00", promotionalPrice: "140.00", requiresAppointment: true, appointmentType: AppointmentType.SCHEDULED },
+  { clinic: "Urolaser - Clínica de Urologia e Diagnóstico", procedure: "USG Obstétrica", price: "160.00", promotionalPrice: "140.00", requiresAppointment: true, appointmentType: AppointmentType.SCHEDULED },
+  { clinic: "Urolaser - Clínica de Urologia e Diagnóstico", procedure: "USG Abdome Inferior", price: "160.00", promotionalPrice: "140.00", requiresAppointment: true, appointmentType: AppointmentType.SCHEDULED },
+  { clinic: "Urolaser - Clínica de Urologia e Diagnóstico", procedure: "Check-up Ginecológico Completo", price: "500.00", promotionalPrice: "450.00", requiresAppointment: true, appointmentType: AppointmentType.SCHEDULED },
+
+  { clinic: "Urolaser - Clínica de Urologia e Diagnóstico", procedure: "Vasectomia Local", price: "3500.00", promotionalPrice: "3000.00", requiresAppointment: true, appointmentType: AppointmentType.SCHEDULED },
+  { clinic: "Urolaser - Clínica de Urologia e Diagnóstico", procedure: "Postectomia Local", price: "3500.00", promotionalPrice: "3000.00", requiresAppointment: true, appointmentType: AppointmentType.SCHEDULED },
+  { clinic: "Urolaser - Clínica de Urologia e Diagnóstico", procedure: "Implante DIU Mirena/Kyleena", price: "2300.00", promotionalPrice: "2100.00", requiresAppointment: true, appointmentType: AppointmentType.SCHEDULED },
+  { clinic: "Urolaser - Clínica de Urologia e Diagnóstico", procedure: "Implanon", price: "2000.00", promotionalPrice: "1800.00", requiresAppointment: true, appointmentType: AppointmentType.SCHEDULED },
+  { clinic: "Urolaser - Clínica de Urologia e Diagnóstico", procedure: "DIU de Cobre", price: "700.00", promotionalPrice: "600.00", requiresAppointment: true, appointmentType: AppointmentType.SCHEDULED },
+
+  { clinic: "Urolaser - Clínica de Urologia e Diagnóstico", procedure: "Sessão Psicoterapia", price: "250.00", promotionalPrice: "200.00", requiresAppointment: true, appointmentType: AppointmentType.SCHEDULED },
+  { clinic: "Urolaser - Clínica de Urologia e Diagnóstico", procedure: "Pacote 4 Sessões de Psicoterapia", price: "700.00", promotionalPrice: "650.00", requiresAppointment: true, appointmentType: AppointmentType.SCHEDULED },
+  { clinic: "Urolaser - Clínica de Urologia e Diagnóstico", procedure: "Aplicação de Injeção", price: "50.00", promotionalPrice: null, requiresAppointment: false, appointmentType: AppointmentType.ARRIVAL_ORDER },
+  { clinic: "Urolaser - Clínica de Urologia e Diagnóstico", procedure: "Bioimpedância", price: "160.00", promotionalPrice: "120.00", requiresAppointment: false, appointmentType: AppointmentType.ARRIVAL_ORDER },
   // Clínica Àgape
   {
     clinic: "Clínica Àgape",
@@ -550,6 +880,21 @@ async function main() {
     procedures.set(record.name, record.id);
   }
 
+  console.log("Seeding tabela oficial de procedimentos da Urolaser...");
+  for (const proc of urolaserProceduresData) {
+    const record = await prisma.procedure.create({
+      data: {
+        name: proc.name,
+        category: proc.category,
+        tussCode: proc.tussCode ?? null,
+        description: proc.description,
+        preparationInstructions: proc.preparationInstructions ?? null,
+        specialtyId: proc.specialty ? specialties.get(proc.specialty) : undefined,
+      },
+    });
+    procedures.set(record.name, record.id);
+  }
+
   console.log("Seeding clínicas parceiras de Vitória da Conquista...");
   const clinics = new Map<string, string>();
   for (const { staffEmail, ...clinic } of clinicsData) {
@@ -680,7 +1025,7 @@ async function main() {
       paymentMethod: "Pix",
     },
     {
-      key: "Urolaser::Consulta - Urologia",
+      key: "Urolaser - Clínica de Urologia e Diagnóstico::Consulta - Urologia",
       patientName: "Marcos Souza",
       patientPhone: "77999110004",
       patientCpf: "11122233304",
@@ -787,6 +1132,7 @@ async function main() {
   const addressShortcuts: { clinic: string; shortcut: string }[] = [
     { clinic: "Clinica Cirurgica Santa Clara", shortcut: "/endereco" },
     { clinic: "Imad Diagnóstico Por Imagem", shortcut: "/endereco" },
+    { clinic: "Urolaser - Clínica de Urologia e Diagnóstico", shortcut: "/endereco" },
   ];
   for (const { clinic: clinicTradeName, shortcut } of addressShortcuts) {
     const clinicData = clinicsData.find((c) => c.tradeName === clinicTradeName);
@@ -803,6 +1149,7 @@ async function main() {
   console.log(`  Admin:                    admin@tivdc.com.br / ${ADMIN_PASSWORD}`);
   console.log(`  Clínica (Santa Clara):    santaclara@clinica.com.br / ${CLINIC_PASSWORD}`);
   console.log(`  Clínica (Imad):           imad@clinica.com.br / ${CLINIC_PASSWORD}`);
+  console.log(`  Clínica (Urolaser):       urolaser@clinica.com.br / ${CLINIC_PASSWORD}`);
   console.log(`  Atendente (inbox, Santa Clara): atendente@tivdc.com.br / ${AGENT_PASSWORD}`);
   console.log(`  Paciente (sem área própria):    paciente@teste.com.br / ${PATIENT_PASSWORD}`);
 }

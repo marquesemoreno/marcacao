@@ -167,6 +167,7 @@ model Procedure {
   specialtyId             String?           @map("specialty_id")
   name                    String            @unique
   category                ProcedureCategory
+  tussCode                String?           @map("tuss_code")
   description             String?
   preparationInstructions String?           @map("preparation_instructions")
   createdAt               DateTime          @default(now()) @map("created_at")

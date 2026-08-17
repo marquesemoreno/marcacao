@@ -60,6 +60,7 @@
 | **👑 Administrador Master** | `admin@tivdc.com.br` | `Admin@123` | `/admin` |
 | **🏥 Clínica Santa Clara** | `santaclara@clinica.com.br` | `Clinica@123` | `/clinic` |
 | **🏥 Clínica Imad** | `imad@clinica.com.br` | `Clinica@123` | `/clinic` |
+| **🏥 Urolaser** | `urolaser@clinica.com.br` | `Clinica@123` | `/clinic` — tabela oficial de preços em [[12 - Tabela de Precos e Procedimentos Urolaser]] |
 | **🎧 Atendente / Recepção (Santa Clara)** | `atendente@tivdc.com.br` | `Atendente@123` | `/clinic/inbox` |
 | **👤 Paciente de Teste** | `paciente@teste.com.br` | `Paciente@123` | `/` (ver nota abaixo) |
 
@@ -121,3 +122,4 @@ Sessão posterior, mesmo ambiente. `tsc`/`lint`/`test`/`build` limpos (24 rotas)
 - [[07 - Guia de Encaminhamento e Captação B2B]] — detalhes do fluxo de guia/QR Code testado no Teste 1 e 2
 - [[08 - Playbook Comercial e Proposta B2B]] — conteúdo de `/proposta-comercial`, testada na seção 5
 - [[11 - Modulo Isolado de Atendimento e CRM]] — módulo de chat/CRM, incluindo as rotas `/clinic/crm`, `/admin/inbox` e `/admin/crm`
+- [[12 - Tabela de Precos e Procedimentos Urolaser]] — tabela oficial de preços 2026 da Urolaser, códigos TUSS
