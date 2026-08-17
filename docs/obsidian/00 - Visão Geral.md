@@ -58,13 +58,13 @@ MARCACAO/
 │   │   ├── (admin)/
 │   │   │   ├── layout.tsx       # Nav "Painel Administrativo" + Sair
 │   │   │   └── admin/
-│   │   │       ├── dashboard/page.tsx    # KPIs
+│   │   │       ├── page.tsx              # KPIs ("/admin" — sem sufixo /dashboard)
 │   │   │       ├── clinicas/page.tsx     # Gestão de clínicas + comissão
 │   │   │       └── relatorio/page.tsx    # Relatório financeiro
 │   │   └── (clinic)/
 │   │       ├── layout.tsx       # Nav "Painel da Clínica" + Sair
 │   │       └── clinic/
-│   │           ├── dashboard/page.tsx      # Visão geral + agenda do dia
+│   │           ├── page.tsx                # Visão geral + agenda do dia ("/clinic" — sem sufixo /dashboard)
 │   │           ├── agendamentos/page.tsx   # Lista completa com filtro de status
 │   │           ├── precos/page.tsx         # Tabela de preços + horários
 │   │           └── inbox/page.tsx          # Chat/CRM — ver [[05 - Módulo de Atendimento e Chat Realtime]]
@@ -110,7 +110,7 @@ MARCACAO/
 └── .env.prod.example             # Variáveis de ambiente (docker-compose.prod.yml)
 ```
 
-**Por que route groups (`(public)`, `(admin)`, `(clinic)`)?** No App Router do Next.js, pastas entre parênteses organizam o código sem afetar a URL. Por isso `(admin)/admin/dashboard` e `(clinic)/clinic/dashboard` precisam de um segmento real (`admin/`, `clinic/`) dentro do grupo — sem isso as duas rotas colidiriam em `/dashboard`.
+**Por que route groups (`(public)`, `(admin)`, `(clinic)`)?** No App Router do Next.js, pastas entre parênteses organizam o código sem afetar a URL. Por isso `(admin)/admin` e `(clinic)/clinic` precisam de um segmento real (`admin/`, `clinic/`) dentro do grupo — sem isso `admin/page.tsx` e `clinic/page.tsx` colidiriam entre si e com a home pública em `/`. Desde a simplificação de rotas, `/admin/page.tsx` e `/clinic/page.tsx` já são os próprios dashboards — não existe mais um segmento `/dashboard` separado (as URLs antigas `/admin/dashboard` e `/clinic/dashboard` redirecionam permanentemente via `next.config.mjs`).
 
 ## Fluxo do paciente (o que é real hoje)
 
@@ -139,7 +139,7 @@ flowchart LR
 ```
 
 > [!note] Modelo de dados por trás do fluxo
-> O agendamento (`Appointment`) tem status `PENDING → CONFIRMED → COMPLETED`, com `CANCELLED` e `NO_SHOW` como saídas alternativas a partir de `PENDING`/`CONFIRMED` (ver [[02 - Dicionário de Dados e Banco]]). A troca de status acontece de duas formas: a equipe da clínica em `/clinic/agendamentos`/`/clinic/dashboard` (botões `AppointmentActions`), ou o próprio paciente respondendo a mensagem de WhatsApp (`1`/`SIM` confirma, `2`/`CANCELAR` cancela) — ver [[03 - APIs e Webhooks n8n]] e [[04 - Manual de Edição Manual e Manutenção]].
+> O agendamento (`Appointment`) tem status `PENDING → CONFIRMED → COMPLETED`, com `CANCELLED` e `NO_SHOW` como saídas alternativas a partir de `PENDING`/`CONFIRMED` (ver [[02 - Dicionário de Dados e Banco]]). A troca de status acontece de duas formas: a equipe da clínica em `/clinic/agendamentos`/`/clinic` (botões `AppointmentActions`), ou o próprio paciente respondendo a mensagem de WhatsApp (`1`/`SIM` confirma, `2`/`CANCELAR` cancela) — ver [[03 - APIs e Webhooks n8n]] e [[04 - Manual de Edição Manual e Manutenção]].
 
 > [!note] O mesmo número de WhatsApp também vira conversa no inbox
 > Toda mensagem recebida pelo webhook (`H` no diagrama acima) — não só `1`/`SIM`/`2`/`CANCELAR` — também vira uma mensagem numa conversa em `/clinic/inbox`, onde a equipe pode responder livremente, com respostas rápidas e tags. Ver [[05 - Módulo de Atendimento e Chat Realtime]] para o fluxo completo.

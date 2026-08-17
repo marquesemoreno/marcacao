@@ -33,7 +33,7 @@
 
 | Rota | Descrição |
 |---|---|
-| `/admin/dashboard` | Visão geral: clínicas ativas, total de pedidos, taxa de conversão, procedimentos mais buscados |
+| `/admin` | Visão geral: clínicas ativas, total de pedidos, taxa de conversão, procedimentos mais buscados |
 | `/admin/clinicas` | Gestão das 11 clínicas cadastradas e taxas de comissão |
 | `/admin/leads` | Painel de prospecção B2B, com botões "Chamar no WhatsApp" e "Enviar Proposta" |
 | `/admin/relatorio` | Fechamento financeiro e controle de comissões por clínica |
@@ -42,7 +42,7 @@
 
 | Rota | Descrição |
 |---|---|
-| `/clinic/dashboard` | Resumo do dia, da semana e pendências |
+| `/clinic` | Resumo do dia, da semana e pendências |
 | `/clinic/agendamentos` | Gestão de presenças (confirmar/concluir/faltar/cancelar) e lista de pacientes |
 | `/clinic/inbox` | Live chat multicanal com pacientes via WhatsApp, em tempo real (polling + Supabase Realtime opcional) |
 | `/clinic/precos` | Tabela de procedimentos, preços e horários de atendimento da clínica |
@@ -54,9 +54,9 @@
 
 | Perfil | E-mail | Senha | Portal Principal |
 | :--- | :--- | :--- | :--- |
-| **👑 Administrador Master** | `admin@tivdc.com.br` | `Admin@123` | `/admin/dashboard` |
-| **🏥 Clínica Santa Clara** | `santaclara@clinica.com.br` | `Clinica@123` | `/clinic/dashboard` |
-| **🏥 Clínica Imad** | `imad@clinica.com.br` | `Clinica@123` | `/clinic/dashboard` |
+| **👑 Administrador Master** | `admin@tivdc.com.br` | `Admin@123` | `/admin` |
+| **🏥 Clínica Santa Clara** | `santaclara@clinica.com.br` | `Clinica@123` | `/clinic` |
+| **🏥 Clínica Imad** | `imad@clinica.com.br` | `Clinica@123` | `/clinic` |
 | **🎧 Atendente / Recepção (Santa Clara)** | `atendente@tivdc.com.br` | `Atendente@123` | `/clinic/inbox` |
 | **👤 Paciente de Teste** | `paciente@teste.com.br` | `Paciente@123` | `/` (ver nota abaixo) |
 
@@ -90,8 +90,11 @@ Todas as rotas da seção 2 foram abertas e conferidas uma a uma (conteúdo rend
 - **Públicas:** `/`, `/buscar` (23 resultados), `/procedimentos/[id]`, `/seja-parceiro`, `/proposta-comercial`, `/termos`, `/privacidade`, `/entrar`.
 - **Fluxo de agendamento completo (Teste 1 do roteiro):** busca → `/procedimentos/[id]` (Urolaser, Procedimento Urológico a Laser) → modal "Solicitar Agendamento" preenchido e enviado → guia gerada com QR Code, código `#VDC-2026-XXXXX`, instruções de jejum e botão "Enviar Guia no WhatsApp" — tudo correto.
 - **`/acompanhar/[id]` e `/comprovante/[id]`** com o `id` real gerado no passo acima: ambos renderizaram os mesmos dados da guia; `/comprovante/[id]` mostrou a faixa "Guia autêntica" corretamente.
-- **Admin** (login `admin@tivdc.com.br`): `/admin/dashboard` (11 clínicas ativas, 9 pedidos), `/admin/clinicas` (lista completa), `/admin/leads` (botão "Ver Proposta Comercial (PDF)" presente), `/admin/relatorio` (tabela de comissão por clínica).
-- **Clínica** (login `santaclara@clinica.com.br`): `/clinic/dashboard`, `/clinic/agendamentos` (1 agendamento confirmado listado), `/clinic/precos` (tabela de preços e horários), `/clinic/inbox` (fila de conversas carregando sem erro).
+- **Admin** (login `admin@tivdc.com.br`): `/admin` (11 clínicas ativas, 9 pedidos), `/admin/clinicas` (lista completa), `/admin/leads` (botão "Ver Proposta Comercial (PDF)" presente), `/admin/relatorio` (tabela de comissão por clínica).
+- **Clínica** (login `santaclara@clinica.com.br`): `/clinic`, `/clinic/agendamentos` (1 agendamento confirmado listado), `/clinic/precos` (tabela de preços e horários), `/clinic/inbox` (fila de conversas carregando sem erro).
+
+> [!note] Rotas simplificadas depois desse teste
+> As URLs acima refletem a validação E2E de quando os dashboards ainda viviam em `/admin/dashboard` e `/clinic/dashboard`. Desde a simplificação de rotas, os mesmos dashboards vivem em `/admin` e `/clinic` — as URLs antigas continuam funcionando via redirect permanente (`next.config.mjs`), mas o mapa de rotas na seção 2 já reflete as novas.
 - **Produção:** `https://marcacao-six.vercel.app` conferida ao vivo — título e hero já refletem a marca Conecta Saúde, sem erros de console.
 
 Nenhum erro de console real foi encontrado. Uma única requisição `POST /clinic/inbox` apareceu como `net::ERR_ABORTED` na aba de rede durante o teste do inbox — é o polling de 5s (`use-inbox-realtime.ts`) cancelando uma requisição em voo quando a próxima já estava saindo, comportamento esperado de `AbortController` em polling, não um erro real (sem entrada correspondente no console, e as chamadas antes/depois completaram normalmente com 200).

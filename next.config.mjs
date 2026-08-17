@@ -16,6 +16,12 @@ if (!process.env.NEXTAUTH_URL?.trim()) {
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: "standalone",
+  async redirects() {
+    return [
+      { source: "/admin/dashboard", destination: "/admin", permanent: true },
+      { source: "/clinic/dashboard", destination: "/clinic", permanent: true },
+    ];
+  },
 };
 
 export default nextConfig;

@@ -30,7 +30,7 @@ export default async function ClinicLayout({
       </header>
       <nav className="flex gap-1 overflow-x-auto border-b px-4 py-2">
         <Link
-          href="/clinic/dashboard"
+          href="/clinic"
           className="shrink-0 rounded-md px-3 py-1.5 text-sm font-medium hover:bg-accent"
         >
           Visão Geral

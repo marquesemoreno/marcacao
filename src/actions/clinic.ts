@@ -74,7 +74,7 @@ export async function updateAppointmentStatus(appointmentId: string, status: App
   });
 
   revalidatePath("/clinic/agendamentos");
-  revalidatePath("/clinic/dashboard");
+  revalidatePath("/clinic");
 }
 
 export async function listClinicProcedures() {

@@ -46,9 +46,9 @@ function LoginForm() {
     if (callbackUrl) {
       router.push(callbackUrl);
     } else if (session?.user.role === "ADMIN") {
-      router.push("/admin/dashboard");
+      router.push("/admin");
     } else if (session?.user.role === "CLINIC") {
-      router.push("/clinic/dashboard");
+      router.push("/clinic");
     } else {
       router.push("/");
     }

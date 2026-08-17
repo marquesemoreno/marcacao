@@ -80,7 +80,7 @@ Login como a clínica → `/clinic/precos` → seção "Horários de atendimento
 
 ## Como confirmar presença ou mudar o status de um agendamento
 
-Login como a clínica → `/clinic/dashboard` (agenda de hoje) ou `/clinic/agendamentos` (lista completa, com filtro por status). Cada linha tem botões de ação rápida conforme o status atual:
+Login como a clínica → `/clinic` (agenda de hoje) ou `/clinic/agendamentos` (lista completa, com filtro por status). Cada linha tem botões de ação rápida conforme o status atual:
 
 - **Pendente** → `Confirmar` ou `Cancelar`
 - **Confirmado** → `Concluir`, `Falta` (no-show) ou `Cancelar`
@@ -157,7 +157,7 @@ Se `phone` já tiver um agendamento `PENDING`/`CONFIRMED` (ou já tiver conversa
 
 ## Como ver o relatório financeiro e os KPIs da plataforma
 
-Login como admin → `/admin/relatorio` (receita e comissão por clínica, calculadas sobre agendamentos `Concluído`) ou `/admin/dashboard` (clínicas ativas, total de pedidos, taxa de conversão, procedimentos mais buscados). Detalhes de como cada número é calculado estão em [[03 - APIs e Webhooks n8n]], incluindo a ressalva de que a receita usa o **preço vigente**, não o preço no momento do agendamento.
+Login como admin → `/admin/relatorio` (receita e comissão por clínica, calculadas sobre agendamentos `Concluído`) ou `/admin` (clínicas ativas, total de pedidos, taxa de conversão, procedimentos mais buscados). Detalhes de como cada número é calculado estão em [[03 - APIs e Webhooks n8n]], incluindo a ressalva de que a receita usa o **preço vigente**, não o preço no momento do agendamento.
 
 ## Testes automatizados
 
