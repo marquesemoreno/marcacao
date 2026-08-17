@@ -553,8 +553,8 @@ const clinicsData = [
     staffEmail: null,
   },
   {
-    name: "HSVP Prime Serviços Médicos Ltda",
-    tradeName: "HSVP PRIME",
+    name: "Hospital São Vicente Ltda",
+    tradeName: "Hospital São Vicente",
     cnpj: "10.111.222/0001-10",
     phone: "(77) 3421-1010",
     whatsapp: "(77) 99911-1010",
@@ -776,9 +776,9 @@ const clinicProceduresData: {
     requiresAppointment: true,
     appointmentType: AppointmentType.SCHEDULED,
   },
-  // HSVP PRIME
+  // Hospital São Vicente
   {
-    clinic: "HSVP PRIME",
+    clinic: "Hospital São Vicente",
     procedure: "Consulta - Cardiologia",
     price: "300.00",
     promotionalPrice: null,
@@ -786,7 +786,7 @@ const clinicProceduresData: {
     appointmentType: AppointmentType.SCHEDULED,
   },
   {
-    clinic: "HSVP PRIME",
+    clinic: "Hospital São Vicente",
     procedure: "Eletrocardiograma (ECG)",
     price: "100.00",
     promotionalPrice: "50.00",
@@ -794,7 +794,7 @@ const clinicProceduresData: {
     appointmentType: AppointmentType.SCHEDULED,
   },
   {
-    clinic: "HSVP PRIME",
+    clinic: "Hospital São Vicente",
     procedure: "Hemograma Completo",
     price: "60.00",
     promotionalPrice: null,
@@ -1039,7 +1039,7 @@ async function main() {
       paymentMethod: null,
     },
     {
-      key: "HSVP PRIME::Eletrocardiograma (ECG)",
+      key: "Hospital São Vicente::Eletrocardiograma (ECG)",
       patientName: "Paulo Henrique",
       patientPhone: "77999110006",
       patientCpf: "11122233306",
