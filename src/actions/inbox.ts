@@ -6,6 +6,8 @@ import { prisma } from "@/lib/prisma";
 import { requireClinicSession } from "@/lib/session";
 import { whatsappService } from "@/lib/whatsapp";
 import { toPlainClinicProcedureItem } from "@/lib/serialize";
+import { toChatContact, toChatMessage, departmentToDb, funnelStageToDb } from "@/lib/chat-crm-adapters";
+import type { Department, FunnelStage, InboxFilter } from "@/types/chat-crm";
 import {
   sendMessageSchema,
   updateTagsSchema,
@@ -105,7 +107,7 @@ export async function markConversationRead(conversationId: string) {
   revalidatePath("/clinic/inbox");
 }
 
-export async function sendMessage(conversationId: string, content: string) {
+export async function sendMessage(conversationId: string, content: string, isInternalNote = false) {
   const { clinicId, userId } = await requireClinicSession();
   const data = sendMessageSchema.parse({ conversationId, content });
 
@@ -115,6 +117,25 @@ export async function sendMessage(conversationId: string, content: string) {
   });
   if (!conversation || conversation.clinicId !== clinicId) {
     throw new Error("Conversa não encontrada");
+  }
+
+  if (isInternalNote) {
+    const note = await prisma.message.create({
+      data: {
+        conversationId: data.conversationId,
+        direction: "OUTBOUND",
+        content: data.content,
+        status: "SENT",
+        type: "INTERNAL_NOTE",
+        senderUserId: userId,
+      },
+    });
+    await prisma.conversation.update({
+      where: { id: data.conversationId },
+      data: { lastMessageAt: new Date() },
+    });
+    revalidatePath("/clinic/inbox");
+    return note;
   }
 
   const message = await prisma.message.create({
@@ -234,4 +255,119 @@ export async function listCannedResponses() {
     where: { OR: [{ clinicId }, { clinicId: null }] },
     orderBy: { shortcut: "asc" },
   });
+}
+
+const INBOX_FILTER_TO_CONVERSATION_FILTER: Record<InboxFilter, ConversationFilter> = {
+  minhas: "mine",
+  nao_atribuidas: "unassigned",
+  todas: "all",
+  finalizadas: "resolved",
+};
+
+/** Camada visual do módulo de atendimento (src/components/chat/) — mesmo dado de
+ * listConversations, mapeado para o formato Contact usado pelo design novo. */
+export async function listChatContacts(filter: InboxFilter, search?: string) {
+  const conversations = await listConversations(INBOX_FILTER_TO_CONVERSATION_FILTER[filter], search);
+  return conversations.map(toChatContact);
+}
+
+export async function getChatMessages(conversationId: string) {
+  const conversation = await getConversation(conversationId);
+  return conversation.messages.map(toChatMessage);
+}
+
+export async function listChatAgents() {
+  const { clinicId } = await requireClinicSession();
+  const users = await prisma.user.findMany({
+    where: { clinicId, role: "CLINIC" },
+    select: { id: true, name: true },
+    orderBy: { name: "asc" },
+  });
+  return users.map((user) => ({ id: user.id, name: user.name, avatar: "", role: "Equipe da clínica" }));
+}
+
+/** Histórico clínico do contato (consultas/exames já realizados ou agendados),
+ * casado por telefone dentro da própria clínica — Appointment não tem FK para
+ * Contact porque o fluxo público de agendamento não exige login/cadastro prévio. */
+export async function getChatContactHistory(conversationId: string) {
+  const { clinicId } = await requireClinicSession();
+  const conversation = await prisma.conversation.findUnique({
+    where: { id: conversationId },
+    select: { clinicId: true, contact: { select: { phone: true } } },
+  });
+  if (!conversation || conversation.clinicId !== clinicId) {
+    throw new Error("Conversa não encontrada");
+  }
+
+  const appointments = await prisma.appointment.findMany({
+    where: { patientPhone: conversation.contact.phone, clinicProcedure: { clinicId } },
+    include: { clinicProcedure: { include: { procedure: true } } },
+    orderBy: { date: "desc" },
+    take: 10,
+  });
+
+  const statusMap = { PENDING: "agendada", CONFIRMED: "agendada", COMPLETED: "concluida", CANCELLED: "cancelada", NO_SHOW: "cancelada" } as const;
+
+  return appointments.map((appointment) => ({
+    id: appointment.id,
+    specialty: appointment.clinicProcedure.procedure.name,
+    doctor: appointment.timeSlot ? `Horário: ${appointment.timeSlot}` : "Ordem de chegada",
+    date: new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeZone: "UTC" }).format(appointment.date),
+    status: statusMap[appointment.status],
+    price: undefined,
+  }));
+}
+
+export async function assignConversationToUser(conversationId: string, targetUserId: string) {
+  const { clinicId } = await requireClinicSession();
+
+  const conversation = await prisma.conversation.findUnique({
+    where: { id: conversationId },
+    select: { clinicId: true },
+  });
+  if (!conversation || conversation.clinicId !== clinicId) {
+    throw new Error("Conversa não encontrada");
+  }
+
+  await prisma.conversation.update({
+    where: { id: conversationId },
+    data: { assignedUserId: targetUserId },
+  });
+  revalidatePath("/clinic/inbox");
+}
+
+export async function updateConversationFunnelStage(conversationId: string, stage: FunnelStage) {
+  const { clinicId } = await requireClinicSession();
+
+  const conversation = await prisma.conversation.findUnique({
+    where: { id: conversationId },
+    select: { clinicId: true },
+  });
+  if (!conversation || conversation.clinicId !== clinicId) {
+    throw new Error("Conversa não encontrada");
+  }
+
+  await prisma.conversation.update({
+    where: { id: conversationId },
+    data: { funnelStage: funnelStageToDb[stage] },
+  });
+  revalidatePath("/clinic/inbox");
+}
+
+export async function updateConversationDepartment(conversationId: string, department: Department) {
+  const { clinicId } = await requireClinicSession();
+
+  const conversation = await prisma.conversation.findUnique({
+    where: { id: conversationId },
+    select: { clinicId: true },
+  });
+  if (!conversation || conversation.clinicId !== clinicId) {
+    throw new Error("Conversa não encontrada");
+  }
+
+  await prisma.conversation.update({
+    where: { id: conversationId },
+    data: { department: departmentToDb[department] },
+  });
+  revalidatePath("/clinic/inbox");
 }

@@ -178,3 +178,4 @@ Nada disso está implementado — é o desenho de extensão, não uma funcionali
 - [[02 - Dicionário de Dados e Banco]]
 - [[03 - APIs e Webhooks n8n]]
 - [[04 - Manual de Edição Manual e Manutenção]]
+- [[11 - Modulo Isolado de Atendimento e CRM]] — camada visual nova (Open Design) e CRM em Kanban construídos em cima deste modelo de dados

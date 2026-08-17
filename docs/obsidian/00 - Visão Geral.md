@@ -155,3 +155,4 @@ flowchart LR
 - [[08 - Playbook Comercial e Proposta B2B]] — proposta comercial (`/proposta-comercial`) e o roteiro de vendas para fechar parcerias
 - [[09 - Roadmap e Planejamento Estratégico]] — roadmap em 4 fases (go-to-market, automação WhatsApp, fintech/split de pagamentos, vertical SaaS/IA) e os KPIs de validação de cada uma
 - [[10 - Central de Testes e Acessos]] — mapa completo de rotas, matriz de credenciais de teste e o registro da última bateria de testes E2E
+- [[11 - Modulo Isolado de Atendimento e CRM]] — camada visual nova do inbox (Open Design) e o CRM em Kanban por etapa do funil
