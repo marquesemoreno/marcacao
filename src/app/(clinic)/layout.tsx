@@ -1,6 +1,8 @@
-import Link from "next/link";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
 import { SignOutButton } from "@/components/sign-out-button";
 import { Logo } from "@/components/brand/logo";
+import { ClinicNav } from "@/components/clinic/clinic-nav";
 import { getClinicInfo } from "@/actions/clinic";
 
 // Evita que o Next tente pré-renderizar estaticamente rotas protegidas
@@ -14,47 +16,39 @@ export default async function ClinicLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const clinic = await getClinicInfo();
+  const [clinic, session] = await Promise.all([getClinicInfo(), getServerSession(authOptions)]);
 
   return (
-    <div className="flex h-screen flex-col overflow-hidden">
-      <header className="flex items-center justify-between border-b px-4 py-3">
-        <div className="flex items-center gap-3">
+    <div className="flex h-screen flex-col overflow-hidden bg-slate-50">
+      <header className="flex items-center justify-between gap-4 border-b border-slate-200 bg-white px-4 py-3 sm:px-6">
+        <div className="flex min-w-0 items-center gap-3">
           <Logo variant="icon-only" size="sm" />
-          <div>
-            <p className="text-lg font-semibold">Painel da Clínica</p>
-            <p className="text-sm text-muted-foreground">{clinic.tradeName}</p>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <p className="truncate text-base font-bold text-slate-900">{clinic.tradeName}</p>
+              <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
+                🟢 Clínica Ativa
+              </span>
+            </div>
+            <p className="truncate text-xs text-slate-500">Painel da Clínica</p>
           </div>
         </div>
-        <SignOutButton />
+
+        <div className="flex shrink-0 items-center gap-3">
+          {session?.user.name && (
+            <span className="hidden text-sm font-medium text-slate-600 sm:inline">
+              {session.user.name}
+            </span>
+          )}
+          <SignOutButton />
+        </div>
       </header>
-      <nav className="flex gap-1 overflow-x-auto border-b px-4 py-2">
-        <Link
-          href="/clinic"
-          className="shrink-0 rounded-md px-3 py-1.5 text-sm font-medium hover:bg-accent"
-        >
-          Visão Geral
-        </Link>
-        <Link
-          href="/clinic/inbox"
-          className="shrink-0 rounded-md px-3 py-1.5 text-sm font-medium hover:bg-accent"
-        >
-          Inbox
-        </Link>
-        <Link
-          href="/clinic/agendamentos"
-          className="shrink-0 rounded-md px-3 py-1.5 text-sm font-medium hover:bg-accent"
-        >
-          Agendamentos
-        </Link>
-        <Link
-          href="/clinic/precos"
-          className="shrink-0 rounded-md px-3 py-1.5 text-sm font-medium hover:bg-accent"
-        >
-          Preços e Horários
-        </Link>
-      </nav>
-      <main className="flex-1 overflow-y-auto p-4">{children}</main>
+
+      <div className="border-b border-slate-200 bg-white px-4 py-3 sm:px-6">
+        <ClinicNav />
+      </div>
+
+      <main className="flex-1 overflow-y-auto p-4 sm:p-6">{children}</main>
     </div>
   );
 }
