@@ -44,7 +44,7 @@ export function HeroSearch() {
   }
 
   return (
-    <div className="w-full rounded-3xl border border-slate-200 bg-white/95 p-3 shadow-xl shadow-sky-900/5 backdrop-blur sm:p-4">
+    <div className="w-full rounded-3xl border border-slate-200 bg-white/95 p-3 shadow-lg shadow-sky-900/5 backdrop-blur sm:p-4">
       <div className="mb-3 flex gap-2">
         <button
           type="button"
@@ -122,7 +122,7 @@ export function HeroSearch() {
         <Button
           type="submit"
           size="lg"
-          className="h-12 gap-2 rounded-xl bg-sky-600 px-6 text-base text-white hover:bg-sky-700"
+          className="h-12 gap-2 rounded-xl bg-gradient-to-r from-sky-600 to-emerald-600 px-6 text-base text-white hover:from-sky-700 hover:to-emerald-700"
         >
           <Search className="h-5 w-5" />
           Buscar

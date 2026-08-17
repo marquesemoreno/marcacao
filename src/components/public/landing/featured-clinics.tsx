@@ -22,7 +22,7 @@ export function FeaturedClinics({ clinics }: { clinics: FeaturedClinic[] }) {
           {clinics.map((clinic) => (
             <div
               key={clinic.id}
-              className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-5 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl"
+              className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-all hover:-translate-y-1 hover:shadow-md"
             >
               <div className="flex items-start gap-3">
                 <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-sky-50 text-sky-600">
@@ -30,10 +30,13 @@ export function FeaturedClinics({ clinics }: { clinics: FeaturedClinic[] }) {
                 </span>
                 <div className="min-w-0">
                   <p className="truncate font-semibold text-slate-900">{clinic.tradeName}</p>
-                  <span className="inline-flex items-center gap-1 text-xs text-slate-500">
+                  <Badge
+                    variant="outline"
+                    className="mt-1 gap-1 border-slate-200 font-normal text-slate-600"
+                  >
                     <MapPin className="h-3 w-3" />
                     {clinic.neighborhood} · {clinic.city}
-                  </span>
+                  </Badge>
                 </div>
               </div>
 
@@ -52,9 +55,9 @@ export function FeaturedClinics({ clinics }: { clinics: FeaturedClinic[] }) {
               <Button
                 render={<Link href={`/buscar?q=${encodeURIComponent(clinic.tradeName)}`} />}
                 nativeButton={false}
-                className="mt-auto h-11 w-full bg-sky-600 text-white hover:bg-sky-700"
+                className="mt-auto h-11 w-full bg-emerald-600 text-white hover:bg-emerald-700"
               >
-                Ver Horários e Agendar
+                Agendar
               </Button>
             </div>
           ))}

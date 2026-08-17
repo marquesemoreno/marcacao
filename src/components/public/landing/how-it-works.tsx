@@ -31,7 +31,7 @@ const steps: Step[] = [
 
 export function HowItWorks() {
   return (
-    <section id="como-funciona" className="bg-slate-50">
+    <section id="como-funciona" className="bg-slate-50/50">
       <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-20 lg:px-8">
         <div className="mx-auto max-w-2xl text-center">
           <h2 className="text-3xl font-bold tracking-tight text-slate-900">Como funciona</h2>
@@ -42,7 +42,7 @@ export function HowItWorks() {
           {steps.map(({ number, title, description, icon: Icon }) => (
             <div
               key={number}
-              className="relative flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-6 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl"
+              className="relative flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition-all hover:-translate-y-1 hover:shadow-md"
             >
               <div className="flex items-center gap-3">
                 <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-sky-600 text-base font-bold text-white">

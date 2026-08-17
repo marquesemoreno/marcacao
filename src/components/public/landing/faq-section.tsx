@@ -37,9 +37,13 @@ export function FaqSection() {
           <p className="mt-3 text-slate-600">Tudo o que você precisa saber antes de agendar.</p>
         </div>
 
-        <Accordion className="mt-8">
+        <Accordion className="mt-8 flex flex-col gap-3">
           {faqs.map(({ question, answer }) => (
-            <AccordionItem key={question} value={question} className="border-slate-200">
+            <AccordionItem
+              key={question}
+              value={question}
+              className="rounded-xl border border-slate-200 px-4"
+            >
               <AccordionTrigger className="py-4 text-base font-semibold text-slate-900 hover:no-underline">
                 {question}
               </AccordionTrigger>

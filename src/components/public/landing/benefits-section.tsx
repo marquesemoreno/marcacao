@@ -27,9 +27,9 @@ const benefits = [
 
 export function BenefitsSection() {
   return (
-    <section className="bg-slate-50">
+    <section className="bg-slate-50/50">
       <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-20 lg:px-8">
-        <div className="grid grid-cols-1 items-center gap-10 rounded-3xl bg-slate-900 p-8 text-white sm:p-12 lg:grid-cols-2 lg:gap-16">
+        <div className="grid grid-cols-1 items-center gap-10 rounded-3xl bg-slate-900 p-8 text-white shadow-sm sm:p-12 lg:grid-cols-2 lg:gap-16">
           <div className="flex flex-col gap-4">
             <span className="w-fit rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-sky-300">
               Sem plano de saúde? Sem problema.
@@ -46,7 +46,7 @@ export function BenefitsSection() {
               render={<Link href="/buscar?category=EXAM" />}
               nativeButton={false}
               size="lg"
-              className="mt-2 h-12 w-fit gap-2 bg-sky-500 px-6 text-base text-white hover:bg-sky-400"
+              className="mt-2 h-12 w-fit gap-2 bg-emerald-500 px-6 text-base text-white hover:bg-emerald-400"
             >
               Buscar exames particulares
             </Button>

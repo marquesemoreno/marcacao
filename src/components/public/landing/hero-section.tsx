@@ -9,14 +9,14 @@ const socialProof = [
 
 export function HeroSection() {
   return (
-    <section className="relative overflow-hidden bg-gradient-to-b from-sky-50 via-white to-white">
+    <section className="relative overflow-hidden bg-white">
       <div
         aria-hidden
-        className="pointer-events-none absolute -top-24 left-1/2 h-96 w-[42rem] -translate-x-1/2 rounded-full bg-sky-200/40 blur-3xl"
+        className="pointer-events-none absolute -top-24 left-1/2 h-96 w-[42rem] -translate-x-1/2 rounded-full bg-sky-100/60 blur-3xl"
       />
       <div
         aria-hidden
-        className="pointer-events-none absolute -right-24 top-32 h-72 w-72 rounded-full bg-teal-200/40 blur-3xl"
+        className="pointer-events-none absolute -right-24 top-32 h-72 w-72 rounded-full bg-emerald-100/60 blur-3xl"
       />
 
       <div className="relative mx-auto flex max-w-4xl flex-col items-center gap-6 px-4 py-16 text-center sm:px-6 sm:py-24">
@@ -25,7 +25,7 @@ export function HeroSection() {
         </span>
 
         <h1 className="text-4xl font-bold tracking-tight text-slate-900 sm:text-5xl lg:text-6xl">
-          <span className="bg-gradient-to-r from-sky-600 to-teal-600 bg-clip-text text-transparent">
+          <span className="bg-gradient-to-r from-sky-600 to-emerald-600 bg-clip-text text-transparent">
             Conecta Saúde
           </span>{" "}
           — Marque suas consultas e exames na sua região com agilidade e preços acessíveis

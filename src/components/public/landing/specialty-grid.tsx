@@ -10,6 +10,7 @@ import {
   Sparkles,
   type LucideIcon,
 } from "lucide-react";
+import { formatCurrency } from "@/lib/format";
 
 type SpecialtyItem = {
   label: string;
@@ -29,7 +30,7 @@ const specialties: SpecialtyItem[] = [
   { label: "Dermatologia", query: "Dermatologia", icon: Sparkles, iconClassName: "bg-emerald-50 text-emerald-600" },
 ];
 
-export function SpecialtyGrid() {
+export function SpecialtyGrid({ prices }: { prices: Record<string, number> }) {
   return (
     <section id="especialidades" className="bg-white">
       <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-20 lg:px-8">
@@ -43,20 +44,28 @@ export function SpecialtyGrid() {
         </div>
 
         <div className="mt-10 grid grid-cols-2 gap-4 sm:grid-cols-4">
-          {specialties.map(({ label, query, icon: Icon, iconClassName }) => (
-            <Link
-              key={label}
-              href={`/buscar?q=${encodeURIComponent(query)}`}
-              className="group flex flex-col items-center gap-3 rounded-2xl border border-slate-200 bg-white p-5 text-center transition-all duration-300 hover:-translate-y-1 hover:border-sky-200 hover:shadow-xl"
-            >
-              <span
-                className={`flex size-12 items-center justify-center rounded-2xl transition-transform duration-300 group-hover:scale-110 ${iconClassName}`}
+          {specialties.map(({ label, query, icon: Icon, iconClassName }) => {
+            const startingPrice = prices[query];
+            return (
+              <Link
+                key={label}
+                href={`/buscar?q=${encodeURIComponent(query)}`}
+                className="group flex flex-col items-center gap-3 rounded-2xl border border-slate-200 bg-white p-5 text-center shadow-sm transition-all hover:-translate-y-1 hover:border-sky-200 hover:shadow-md"
               >
-                <Icon className="h-6 w-6" />
-              </span>
-              <span className="text-sm font-semibold text-slate-800">{label}</span>
-            </Link>
-          ))}
+                <span
+                  className={`flex size-12 items-center justify-center rounded-2xl transition-transform duration-300 group-hover:scale-110 ${iconClassName}`}
+                >
+                  <Icon className="h-6 w-6" />
+                </span>
+                <span className="text-sm font-semibold text-slate-800">{label}</span>
+                {startingPrice !== undefined && (
+                  <span className="text-xs font-medium text-emerald-600">
+                    A partir de {formatCurrency(startingPrice)}
+                  </span>
+                )}
+              </Link>
+            );
+          })}
         </div>
       </div>
     </section>
