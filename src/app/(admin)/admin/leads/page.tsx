@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { listPartnerLeads } from "@/actions/partner-leads";
 import { PartnerLeadStatusForm } from "@/components/admin/partner-lead-status-form";
+import { ApproveClinicDialog } from "@/components/admin/approve-clinic-dialog";
 import {
   partnerLeadStatusLabels,
   partnerLeadStatusVariant,
@@ -128,6 +129,14 @@ export default async function AdminLeadsPage() {
                       <FileText className="h-4 w-4" />
                       Enviar Proposta
                     </Button>
+                    {lead.status !== "PARTNER" && (
+                      <ApproveClinicDialog
+                        leadId={lead.id}
+                        clinicName={lead.clinicName}
+                        phone={lead.phone}
+                        neighborhood={lead.neighborhood}
+                      />
+                    )}
                   </div>
                   <PartnerLeadStatusForm leadId={lead.id} status={lead.status} />
                 </div>
