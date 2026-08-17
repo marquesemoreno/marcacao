@@ -21,20 +21,19 @@ export function HeroSection() {
 
       <div className="relative mx-auto flex max-w-4xl flex-col items-center gap-6 px-4 py-16 text-center sm:px-6 sm:py-24">
         <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-200 bg-sky-50 px-4 py-1.5 text-sm font-medium text-sky-700">
-          ⚡ A forma mais rápida de marcar consultas e exames em Vitória da Conquista
+          ⚡ A forma mais rápida de marcar consultas e exames na sua região
         </span>
 
         <h1 className="text-4xl font-bold tracking-tight text-slate-900 sm:text-5xl lg:text-6xl">
           <span className="bg-gradient-to-r from-sky-600 to-teal-600 bg-clip-text text-transparent">
             Conecta Saúde
           </span>{" "}
-          — Cuidado com a sua saúde sem complicação e com preços acessíveis em Vitória da
-          Conquista
+          — Marque suas consultas e exames na sua região com agilidade e preços acessíveis
         </h1>
 
         <p className="max-w-2xl text-balance text-lg text-slate-600">
-          Compare preços e horários em clínicas de confiança, agende em poucos cliques e
-          receba tudo direto no seu WhatsApp — sem plano de saúde, sem burocracia.
+          Sem mensalidade, sem burocracia. Compare clínicas de confiança, veja valores
+          transparentes e receba tudo no WhatsApp.
         </p>
 
         <div className="w-full max-w-3xl pt-2">

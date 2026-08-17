@@ -15,6 +15,12 @@ const appointmentTypeOptions = [
   { value: "ARRIVAL_ORDER", label: "Ordem de chegada" },
 ];
 
+const cityOptions = [
+  { value: "any", label: "Qualquer cidade" },
+  { value: "Vitória da Conquista", label: "Vitória da Conquista" },
+  { value: "Planalto", label: "Planalto" },
+];
+
 const selectClassName =
   "h-12 w-full rounded-xl border border-slate-200 bg-white px-3 text-base text-slate-900 outline-none transition-colors focus-visible:border-sky-500 focus-visible:ring-3 focus-visible:ring-sky-500/20 sm:w-56";
 
@@ -23,6 +29,7 @@ export function HeroSearch() {
   const [category, setCategory] = useState<Category>("CONSULTATION");
   const [query, setQuery] = useState("");
   const [neighborhood, setNeighborhood] = useState("");
+  const [city, setCity] = useState("any");
   const [appointmentType, setAppointmentType] = useState("any");
 
   function handleSubmit(event: FormEvent) {
@@ -31,6 +38,7 @@ export function HeroSearch() {
     params.set("category", category);
     if (query.trim()) params.set("q", query.trim());
     if (neighborhood.trim()) params.set("bairro", neighborhood.trim());
+    if (city !== "any") params.set("cidade", city);
     if (appointmentType !== "any") params.set("appointmentType", appointmentType);
     router.push(`/buscar?${params.toString()}`);
   }
@@ -66,7 +74,7 @@ export function HeroSearch() {
         </button>
       </div>
 
-      <form onSubmit={handleSubmit} className="flex flex-col gap-2 sm:flex-row">
+      <form onSubmit={handleSubmit} className="flex flex-col gap-2 lg:flex-row">
         <div className="relative flex-[1.3]">
           <Stethoscope className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
           <Input
@@ -87,6 +95,18 @@ export function HeroSearch() {
             aria-label="Bairro ou região"
           />
         </div>
+        <select
+          value={city}
+          onChange={(event) => setCity(event.target.value)}
+          className={cn(selectClassName, "sm:w-48")}
+          aria-label="Cidade"
+        >
+          {cityOptions.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
         <select
           value={appointmentType}
           onChange={(event) => setAppointmentType(event.target.value)}

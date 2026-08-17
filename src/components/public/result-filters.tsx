@@ -28,6 +28,12 @@ const ratingOptions = [
   { value: "4.5", label: "4.5+ estrelas" },
 ];
 
+const cityOptions = [
+  { value: "any", label: "Qualquer cidade" },
+  { value: "Vitória da Conquista", label: "Vitória da Conquista" },
+  { value: "Planalto", label: "Planalto" },
+];
+
 function labelFor(options: { value: string; label: string }[], value: string | null) {
   return options.find((option) => option.value === value)?.label ?? options[0].label;
 }
@@ -50,9 +56,28 @@ export function ResultFilters() {
   const priceValue = searchParams.get("maxPrice") ?? "any";
   const appointmentTypeValue = searchParams.get("appointmentType") ?? "any";
   const ratingValue = searchParams.get("minRating") ?? "any";
+  const cityValue = searchParams.get("cidade") ?? "any";
 
   return (
-    <div className="grid grid-cols-3 gap-2">
+    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+      <Select
+        defaultValue={cityValue}
+        onValueChange={(value: string | null) => updateParam("cidade", value)}
+      >
+        <SelectTrigger className="text-xs">
+          <SelectValue placeholder="Cidade">
+            {() => labelFor(cityOptions, cityValue)}
+          </SelectValue>
+        </SelectTrigger>
+        <SelectContent>
+          {cityOptions.map((option) => (
+            <SelectItem key={option.value} value={option.value}>
+              {option.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+
       <Select
         defaultValue={priceValue}
         onValueChange={(value: string | null) => updateParam("maxPrice", value)}

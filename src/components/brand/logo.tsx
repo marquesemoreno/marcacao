@@ -109,7 +109,7 @@ export function Logo({
             isWhite ? "text-white/70" : "text-slate-500"
           )}
         >
-          Vitória da Conquista
+          Consultas & Exames
         </span>
       </span>
     </span>

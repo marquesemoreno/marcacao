@@ -18,13 +18,13 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://conectasaudevc.com.br"),
-  title: "Conecta Saúde | Consultas e Exames em Vitória da Conquista",
+  title: "Conecta Saúde | Consultas e Exames Perto de Você",
   description:
-    "A forma mais rápida e acessível de agendar consultas médicas, exames e procedimentos em clínicas parceiras de Vitória da Conquista.",
+    "A forma mais rápida e acessível de agendar consultas médicas e exames em clínicas parceiras.",
   openGraph: {
-    title: "Conecta Saúde | Consultas e Exames em Vitória da Conquista",
+    title: "Conecta Saúde | Consultas e Exames Perto de Você",
     description:
-      "A forma mais rápida e acessível de agendar consultas médicas, exames e procedimentos em clínicas parceiras de Vitória da Conquista.",
+      "A forma mais rápida e acessível de agendar consultas médicas e exames em clínicas parceiras.",
     url: "https://conectasaudevc.com.br",
     siteName: "Conecta Saúde",
     locale: "pt_BR",
@@ -32,9 +32,9 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Conecta Saúde | Consultas e Exames em Vitória da Conquista",
+    title: "Conecta Saúde | Consultas e Exames Perto de Você",
     description:
-      "A forma mais rápida e acessível de agendar consultas médicas, exames e procedimentos em clínicas parceiras de Vitória da Conquista.",
+      "A forma mais rápida e acessível de agendar consultas médicas e exames em clínicas parceiras.",
   },
 };
 

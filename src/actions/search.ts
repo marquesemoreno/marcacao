@@ -6,6 +6,7 @@ import { AppointmentType, Prisma, ProcedureCategory } from "@prisma/client";
 export type SearchFilters = {
   query?: string;
   neighborhood?: string;
+  city?: string;
   category?: ProcedureCategory;
   appointmentType?: AppointmentType;
   maxPrice?: number;
@@ -14,13 +15,14 @@ export type SearchFilters = {
 };
 
 export async function searchClinicProcedures(filters: SearchFilters) {
-  const { query, neighborhood, category, appointmentType, maxPrice, minRating, sort } = filters;
+  const { query, neighborhood, city, category, appointmentType, maxPrice, minRating, sort } = filters;
 
   const where: Prisma.ClinicProcedureWhereInput = {
     clinic: {
       active: true,
       ...(minRating ? { rating: { gte: minRating } } : {}),
       ...(neighborhood ? { neighborhood: { contains: neighborhood, mode: "insensitive" } } : {}),
+      ...(city ? { city: { equals: city, mode: "insensitive" } } : {}),
     },
     ...(category ? { procedure: { category } } : {}),
     ...(appointmentType ? { appointmentType } : {}),

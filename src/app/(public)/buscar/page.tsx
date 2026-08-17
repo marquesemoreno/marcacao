@@ -8,6 +8,7 @@ type SearchPageProps = {
   searchParams: Promise<{
     q?: string;
     bairro?: string;
+    cidade?: string;
     category?: string;
     appointmentType?: string;
     maxPrice?: string;
@@ -21,6 +22,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
   const results = await searchClinicProcedures({
     query: params.q,
     neighborhood: params.bairro,
+    city: params.cidade,
     category: params.category as ProcedureCategory | undefined,
     appointmentType: params.appointmentType as AppointmentType | undefined,
     maxPrice: params.maxPrice ? Number(params.maxPrice) : undefined,
