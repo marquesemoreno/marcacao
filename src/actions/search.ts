@@ -3,6 +3,59 @@
 import { prisma } from "@/lib/prisma";
 import { AppointmentType, Prisma, ProcedureCategory } from "@prisma/client";
 
+/** Remove acentos para casar "clinico"/"clínico", "cardiologista"/"Cardiologista" etc. */
+function stripAccents(value: string) {
+  return value.normalize("NFD").replace(/[̀-ͯ]/g, "");
+}
+
+/**
+ * Sinônimos médicos populares — o paciente digita como fala ("cardiologista"),
+ * o catálogo guarda como especialidade ("Cardiologia"). Chave normalizada
+ * (minúscula, sem acento); cada busca expande para o termo digitado + estes.
+ */
+const MEDICAL_SYNONYMS: Record<string, string[]> = {
+  urologista: ["urologia"],
+  cardiologista: ["cardiologia"],
+  oftalmologista: ["oftalmologia"],
+  ginecologista: ["ginecologia"],
+  ortopedista: ["ortopedia"],
+  "clinico geral": ["clinica geral", "consulta"],
+  clinico: ["clinica geral", "consulta"],
+};
+
+/** Se o termo digitado bater com uma categoria, também filtra por ela (procedure.category é enum — não dá pra usar "contains"). */
+const CATEGORY_SYNONYMS: Record<string, ProcedureCategory> = {
+  consulta: ProcedureCategory.CONSULTATION,
+  consultas: ProcedureCategory.CONSULTATION,
+  exame: ProcedureCategory.EXAM,
+  exames: ProcedureCategory.EXAM,
+  cirurgia: ProcedureCategory.SURGERY,
+  cirurgias: ProcedureCategory.SURGERY,
+  procedimento: ProcedureCategory.SURGERY,
+  procedimentos: ProcedureCategory.SURGERY,
+};
+
+function buildQueryConditions(query: string): Prisma.ClinicProcedureWhereInput {
+  const normalized = stripAccents(query.trim().toLowerCase());
+  const terms = new Set<string>([query.trim()]);
+  for (const extra of MEDICAL_SYNONYMS[normalized] ?? []) terms.add(extra);
+
+  const termConditions: Prisma.ClinicProcedureWhereInput[] = Array.from(terms).flatMap((term) => [
+    { procedure: { name: { contains: term, mode: "insensitive" as const } } },
+    { procedure: { specialty: { name: { contains: term, mode: "insensitive" as const } } } },
+    { clinic: { name: { contains: term, mode: "insensitive" as const } } },
+    { clinic: { tradeName: { contains: term, mode: "insensitive" as const } } },
+    { clinic: { neighborhood: { contains: term, mode: "insensitive" as const } } },
+  ]);
+
+  const matchedCategory = CATEGORY_SYNONYMS[normalized];
+  if (matchedCategory) {
+    termConditions.push({ procedure: { category: matchedCategory } });
+  }
+
+  return { OR: termConditions };
+}
+
 export type SearchFilters = {
   query?: string;
   neighborhood?: string;
@@ -27,16 +80,7 @@ export async function searchClinicProcedures(filters: SearchFilters) {
     ...(category ? { procedure: { category } } : {}),
     ...(appointmentType ? { appointmentType } : {}),
     ...(maxPrice ? { price: { lte: maxPrice } } : {}),
-    ...(query
-      ? {
-          OR: [
-            { procedure: { name: { contains: query, mode: "insensitive" } } },
-            { procedure: { specialty: { name: { contains: query, mode: "insensitive" } } } },
-            { clinic: { tradeName: { contains: query, mode: "insensitive" } } },
-            { clinic: { neighborhood: { contains: query, mode: "insensitive" } } },
-          ],
-        }
-      : {}),
+    ...(query ? buildQueryConditions(query) : {}),
   };
 
   return prisma.clinicProcedure.findMany({
@@ -64,13 +108,14 @@ export async function getSpecialtyStartingPrices() {
     where: { clinic: { active: true } },
     select: {
       price: true,
+      promotionalPrice: true,
       procedure: { select: { name: true, specialty: { select: { name: true } } } },
     },
   });
 
   const minPrices = new Map<string, number>();
   for (const row of rows) {
-    const price = Number(row.price);
+    const price = row.promotionalPrice ? Number(row.promotionalPrice) : Number(row.price);
     const keys = [row.procedure.name, row.procedure.specialty?.name].filter(
       (key): key is string => Boolean(key)
     );

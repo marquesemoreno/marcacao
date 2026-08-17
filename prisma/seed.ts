@@ -110,12 +110,6 @@ const otherProceduresData: {
     description: "Sessão individual ou em grupo de pilates terapêutico.",
     preparationInstructions: "Vir com roupas leves e confortáveis. Evitar refeições pesadas antes da sessão.",
   },
-  {
-    name: "Procedimento Urológico a Laser",
-    category: ProcedureCategory.SURGERY,
-    description: "Procedimento cirúrgico urológico minimamente invasivo, a laser.",
-    preparationInstructions: "Jejum de 6 horas. Trazer exames pré-operatórios recentes e acompanhante.",
-  },
 ];
 
 /**
@@ -605,7 +599,7 @@ const clinicProceduresData: {
     clinic: "Clinique Medical",
     procedure: "Consulta - Clínica Geral",
     price: "150.00",
-    promotionalPrice: "120.00",
+    promotionalPrice: null,
     requiresAppointment: true,
     appointmentType: AppointmentType.SCHEDULED,
   },
@@ -647,7 +641,7 @@ const clinicProceduresData: {
   {
     clinic: "Acurae",
     procedure: "Consulta - Clínica Geral",
-    price: "130.00",
+    price: "145.00",
     promotionalPrice: null,
     requiresAppointment: true,
     appointmentType: AppointmentType.SCHEDULED,
@@ -664,7 +658,7 @@ const clinicProceduresData: {
   {
     clinic: "Clinica Essencial",
     procedure: "Consulta - Clínica Geral",
-    price: "120.00",
+    price: "150.00",
     promotionalPrice: null,
     requiresAppointment: true,
     appointmentType: AppointmentType.SCHEDULED,
@@ -727,7 +721,7 @@ const clinicProceduresData: {
   {
     clinic: "Clínica Àgape",
     procedure: "Consulta - Clínica Geral",
-    price: "110.00",
+    price: "145.00",
     promotionalPrice: null,
     requiresAppointment: true,
     appointmentType: AppointmentType.SCHEDULED,
@@ -753,8 +747,8 @@ const clinicProceduresData: {
   {
     clinic: "Policlínica Mais Médico",
     procedure: "Consulta - Clínica Geral",
-    price: "100.00",
-    promotionalPrice: "80.00",
+    price: "160.00",
+    promotionalPrice: "140.00",
     requiresAppointment: true,
     appointmentType: AppointmentType.SCHEDULED,
   },
@@ -762,7 +756,7 @@ const clinicProceduresData: {
     clinic: "Policlínica Mais Médico",
     procedure: "Consulta - Cardiologia",
     price: "230.00",
-    promotionalPrice: null,
+    promotionalPrice: "140.00",
     requiresAppointment: true,
     appointmentType: AppointmentType.SCHEDULED,
   },
@@ -795,7 +789,7 @@ const clinicProceduresData: {
     clinic: "HSVP PRIME",
     procedure: "Eletrocardiograma (ECG)",
     price: "100.00",
-    promotionalPrice: null,
+    promotionalPrice: "50.00",
     requiresAppointment: true,
     appointmentType: AppointmentType.SCHEDULED,
   },
@@ -812,7 +806,7 @@ const clinicProceduresData: {
     clinic: "Sonnar",
     procedure: "Ultrassonografia Abdominal",
     price: "190.00",
-    promotionalPrice: "160.00",
+    promotionalPrice: "120.00",
     requiresAppointment: true,
     appointmentType: AppointmentType.SCHEDULED,
   },

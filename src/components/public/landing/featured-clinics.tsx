@@ -1,11 +1,25 @@
 import Link from "next/link";
-import { Building2, MapPin, CheckCircle2, ShieldCheck, ArrowRight, Sparkles } from "lucide-react";
+import { MapPin, CheckCircle2, ShieldCheck, ArrowRight, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { RatingStars } from "@/components/public/rating-stars";
 import type { getFeaturedClinics } from "@/actions/search";
 
 type FeaturedClinic = Awaited<ReturnType<typeof getFeaturedClinics>>[number];
+
+/** Fotos ilustrativas de fachada/recepção — genéricas (banco de imagens, sem
+ * pessoas identificáveis), cicladas por índice. Nenhuma é da clínica real:
+ * a plataforma não tem cadastro de fotos próprio ainda, então usar uma foto
+ * real aqui seria enganoso. Ver docs/obsidian/13 - ... quando essa limitação
+ * for resolvida com upload de fotos de verdade por clínica. */
+const clinicPhotos = [
+  "https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?w=800&auto=format&fit=crop&q=80",
+  "https://images.unsplash.com/photo-1629909614456-6b1c5c94cecc?w=800&auto=format&fit=crop&q=80",
+  "https://images.unsplash.com/photo-1606318313647-137d1f3b4d3c?w=800&auto=format&fit=crop&q=80",
+  "https://images.unsplash.com/photo-1581982231900-6a1a46b744c9?w=800&auto=format&fit=crop&q=80",
+  "https://images.unsplash.com/photo-1608979827489-2b855e79debe?w=800&auto=format&fit=crop&q=80",
+  "https://images.unsplash.com/photo-1631507623095-c710d184498f?w=800&auto=format&fit=crop&q=80",
+];
 
 export function FeaturedClinics({ clinics }: { clinics: FeaturedClinic[] }) {
   if (!clinics || clinics.length === 0) return null;
@@ -30,30 +44,35 @@ export function FeaturedClinics({ clinics }: { clinics: FeaturedClinic[] }) {
 
         {/* Clinics Grid */}
         <div className="mt-12 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {clinics.map((clinic) => (
+          {clinics.map((clinic, index) => (
             <div
               key={clinic.id}
-              className="group relative flex flex-col justify-between rounded-3xl border border-slate-200/80 bg-white p-6 shadow-sm transition-all duration-300 hover:-translate-y-1.5 hover:border-emerald-300/60 hover:shadow-xl"
+              className="group relative flex flex-col justify-between overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1.5 hover:border-emerald-300/60 hover:shadow-xl"
             >
-              <div>
-                {/* Clinic Header: Icon + Badge + Verified */}
+              {/* Foto ilustrativa de fachada/recepção */}
+              <div className="relative h-36 w-full overflow-hidden bg-slate-100">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={clinicPhotos[index % clinicPhotos.length]}
+                  alt=""
+                  loading="lazy"
+                  className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-slate-900/40 via-transparent to-transparent" />
+              </div>
+
+              <div className="p-6">
+                {/* Clinic Header: Nome + Verified */}
                 <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-50 to-sky-100/90 text-sky-600 shadow-inner group-hover:scale-105 transition-transform">
-                      <Building2 className="h-6 w-6" />
-                    </span>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        <p className="truncate font-bold text-slate-900 text-lg group-hover:text-sky-700 transition-colors">
-                          {clinic.tradeName}
-                        </p>
-                      </div>
-                      <div className="mt-0.5 flex items-center gap-1 text-xs text-slate-500 font-medium">
-                        <MapPin className="h-3.5 w-3.5 text-sky-600 shrink-0" />
-                        <span className="truncate">
-                          {clinic.neighborhood} · {clinic.city}
-                        </span>
-                      </div>
+                  <div className="min-w-0">
+                    <p className="truncate font-bold text-slate-900 text-lg group-hover:text-sky-700 transition-colors">
+                      {clinic.tradeName}
+                    </p>
+                    <div className="mt-0.5 flex items-center gap-1 text-xs text-slate-500 font-medium">
+                      <MapPin className="h-3.5 w-3.5 text-sky-600 shrink-0" />
+                      <span className="truncate">
+                        {clinic.neighborhood} · {clinic.city}
+                      </span>
                     </div>
                   </div>
 
@@ -103,7 +122,7 @@ export function FeaturedClinics({ clinics }: { clinics: FeaturedClinic[] }) {
               </div>
 
               {/* Action Button */}
-              <div className="mt-6 pt-2">
+              <div className="px-6 pb-6 pt-2">
                 <Button
                   render={<Link href={`/buscar?q=${encodeURIComponent(clinic.tradeName)}`} />}
                   nativeButton={false}

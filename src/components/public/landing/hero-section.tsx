@@ -35,7 +35,7 @@ export function HeroSection() {
             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
             <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
           </span>
-          <span>Agendamento em tempo real • Sem mensalidade • Vitória da Conquista, Planalto e Região</span>
+          <span>Agendamento em tempo real • Sem mensalidade • Disponível em várias cidades</span>
         </div>
 
         {/* Title & Subtitle */}
@@ -47,7 +47,7 @@ export function HeroSection() {
         </h1>
 
         <p className="max-w-2xl text-balance text-base text-slate-600 sm:text-lg lg:text-xl font-normal leading-relaxed">
-          Sem mensalidade, sem plano de saúde. Compare clínicas de confiança, veja valores transparentes e receba tudo no seu WhatsApp.
+          Escolha a sua cidade, compare clínicas credenciadas, veja valores transparentes e receba tudo no WhatsApp.
         </p>
 
         {/* Floating Search Bar */}

@@ -2,19 +2,19 @@
 
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { Search, MapPin, Stethoscope, FlaskConical, Sparkles, ArrowRight } from "lucide-react";
+import { Search, MapPin, Stethoscope, FlaskConical, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 type Category = "CONSULTATION" | "EXAM";
 
 const cityOptions = [
+  { value: "any", label: "📍 Selecione a Cidade" },
   { value: "Vitória da Conquista", label: "Vitória da Conquista" },
   { value: "Planalto", label: "Planalto" },
   { value: "Barra do Choça", label: "Barra do Choça" },
   { value: "Poções", label: "Poções" },
   { value: "Itambé", label: "Itambé" },
-  { value: "any", label: "Todas as cidades" },
 ];
 
 const quickFilters = [
@@ -28,7 +28,7 @@ export function HeroSearch() {
   const router = useRouter();
   const [category, setCategory] = useState<Category>("CONSULTATION");
   const [query, setQuery] = useState("");
-  const [city, setCity] = useState("Vitória da Conquista");
+  const [city, setCity] = useState("any");
 
   function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -131,7 +131,7 @@ export function HeroSearch() {
               </div>
               <div className="flex-1">
                 <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                  {category === "CONSULTATION" ? "Especialidade ou Médico" : "Exame ou Procedimento"}
+                  Especialidade, Exame ou Médico
                 </label>
                 <input
                   type="text"
@@ -157,8 +157,7 @@ export function HeroSearch() {
               className="group h-[56px] w-full gap-2 rounded-2xl bg-gradient-to-r from-sky-600 via-teal-600 to-emerald-600 px-8 text-base font-bold text-white shadow-lg shadow-sky-600/25 transition-all duration-300 hover:opacity-95 hover:shadow-xl hover:shadow-teal-600/30 active:scale-[0.98] lg:w-auto"
             >
               <Search className="h-5 w-5 transition-transform group-hover:scale-110" />
-              <span>Buscar Clínicas</span>
-              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+              <span>Buscar</span>
             </Button>
           </div>
         </form>

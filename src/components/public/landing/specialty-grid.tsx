@@ -48,7 +48,7 @@ const specialties: SpecialtyItem[] = [
   },
   {
     label: "Ultrassonografia",
-    query: "Ultrassonografia",
+    query: "Ultrassonografia Abdominal",
     category: "exame",
     icon: Waves,
     iconBgGradient: "from-teal-50 to-teal-100/90",

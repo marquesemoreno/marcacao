@@ -32,6 +32,9 @@ const cityOptions = [
   { value: "any", label: "Qualquer cidade" },
   { value: "Vitória da Conquista", label: "Vitória da Conquista" },
   { value: "Planalto", label: "Planalto" },
+  { value: "Barra do Choça", label: "Barra do Choça" },
+  { value: "Poções", label: "Poções" },
+  { value: "Itambé", label: "Itambé" },
 ];
 
 function labelFor(options: { value: string; label: string }[], value: string | null) {
