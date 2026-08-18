@@ -102,30 +102,32 @@ export async function getClinicProcedureDetail(id: string) {
   });
 }
 
-/** Menor preço ativo por especialidade e por procedimento — alimenta o "A partir de R$ X" da grade de especialidades. */
+/** Número de clínicas credenciadas disponíveis por especialidade e por procedimento. */
 export async function getSpecialtyStartingPrices() {
   const rows = await prisma.clinicProcedure.findMany({
     where: { clinic: { active: true } },
     select: {
-      price: true,
-      promotionalPrice: true,
+      clinicId: true,
       procedure: { select: { name: true, specialty: { select: { name: true } } } },
     },
   });
 
-  const minPrices = new Map<string, number>();
+  const clinicSets = new Map<string, Set<string>>();
   for (const row of rows) {
-    const price = row.promotionalPrice ? Number(row.promotionalPrice) : Number(row.price);
-    if (!price || price <= 0) continue;
     const keys = [row.procedure.name, row.procedure.specialty?.name].filter(
       (key): key is string => Boolean(key)
     );
     for (const key of keys) {
-      const current = minPrices.get(key);
-      if (current === undefined || price < current) minPrices.set(key, price);
+      if (!clinicSets.has(key)) clinicSets.set(key, new Set());
+      clinicSets.get(key)!.add(row.clinicId);
     }
   }
-  return Object.fromEntries(minPrices);
+
+  const result: Record<string, number> = {};
+  for (const [key, set] of clinicSets.entries()) {
+    result[key] = set.size;
+  }
+  return result;
 }
 
 export async function getFeaturedClinics(limit = 6) {

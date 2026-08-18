@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { MapPin, CheckCircle2, ShieldCheck, ArrowRight, Sparkles } from "lucide-react";
+import { MapPin, CheckCircle2, ShieldCheck, ArrowRight, MessageCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { RatingStars } from "@/components/public/rating-stars";
@@ -26,14 +26,14 @@ export function FeaturedClinics({ clinics }: { clinics: FeaturedClinic[] }) {
         <div className="mx-auto max-w-2xl text-center">
           <div className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200/80 bg-emerald-50/90 px-3.5 py-1 text-xs font-semibold uppercase tracking-wider text-emerald-800 shadow-2xs font-mono">
             <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
-            <span>Rede Verificada Oficial</span>
+            <span>Rede Credenciada por Região</span>
           </div>
 
           <h2 className="mt-4 text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">
             Clínicas e centros de diagnóstico credenciados
           </h2>
           <p className="mt-3 text-base sm:text-lg text-slate-600 font-normal leading-relaxed">
-            Corpo clínico qualificado, equipamentos modernos e atendimento com carinho e agilidade na sua região.
+            Selecione uma clínica para visualizar o catálogo completo de procedimentos e consultar horários.
           </p>
         </div>
 
@@ -60,30 +60,30 @@ export function FeaturedClinics({ clinics }: { clinics: FeaturedClinic[] }) {
                 {/* Clinic Header: Nome + Verified */}
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="truncate font-bold text-slate-900 text-lg group-hover:text-sky-700 transition-colors">
+                    <p className="truncate font-bold text-slate-900 text-lg group-hover:text-teal-700 transition-colors">
                       {clinic.tradeName}
                     </p>
                     <div className="mt-0.5 flex items-center gap-1 text-xs text-slate-500 font-medium">
-                      <MapPin className="h-3.5 w-3.5 text-sky-600 shrink-0" />
+                      <MapPin className="h-3.5 w-3.5 text-teal-600 shrink-0" />
                       <span className="truncate">
                         {clinic.neighborhood} · {clinic.city}
                       </span>
                     </div>
                   </div>
 
-                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 border border-emerald-200/60 shrink-0">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 border border-emerald-200/60 shrink-0 font-mono">
                     <CheckCircle2 className="h-3 w-3 text-emerald-600" />
-                    Verificado
+                    Verificada
                   </span>
                 </div>
 
-                {/* Rating & Economy Badge */}
+                {/* Rating & Under Consultation Badge */}
                 <div className="mt-4 flex items-center justify-between border-y border-slate-100 py-3">
                   <RatingStars rating={clinic.rating} reviewCount={clinic.reviewCount} />
 
-                  <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 bg-emerald-50/70 px-2.5 py-1 rounded-lg">
-                    <Sparkles className="h-3 w-3 text-emerald-600" />
-                    Até 40% economia
+                  <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-lg">
+                    <MessageCircle className="h-3 w-3 text-emerald-600" />
+                    Valor sob consulta
                   </span>
                 </div>
 
@@ -98,7 +98,7 @@ export function FeaturedClinics({ clinics }: { clinics: FeaturedClinic[] }) {
                         <Badge
                           key={procedure.name}
                           variant="outline"
-                          className="border-slate-200/80 bg-slate-50 text-slate-700 font-medium text-xs px-2.5 py-0.5 rounded-lg transition-colors group-hover:bg-sky-50/50 group-hover:border-sky-200"
+                          className="border-slate-200/80 bg-slate-50 text-slate-700 font-medium text-xs px-2.5 py-0.5 rounded-lg transition-colors group-hover:bg-teal-50/50 group-hover:border-teal-200"
                         >
                           {procedure.name}
                         </Badge>
@@ -121,9 +121,9 @@ export function FeaturedClinics({ clinics }: { clinics: FeaturedClinic[] }) {
                 <Button
                   render={<Link href={`/buscar?q=${encodeURIComponent(clinic.tradeName)}`} />}
                   nativeButton={false}
-                  className="group/btn h-12 w-full bg-emerald-600 text-white font-semibold rounded-2xl shadow-sm hover:bg-emerald-700 hover:shadow-md transition-all flex items-center justify-center gap-2 text-sm"
+                  className="group/btn h-12 w-full bg-teal-600 text-white font-bold rounded-2xl shadow-sm hover:bg-teal-700 hover:shadow-md transition-all flex items-center justify-center gap-2 text-sm"
                 >
-                  <span>Ver Horários e Agendar</span>
+                  <span>Ver Exames desta Clínica</span>
                   <ArrowRight className="h-4 w-4 transition-transform group-hover/btn:translate-x-1" />
                 </Button>
               </div>
