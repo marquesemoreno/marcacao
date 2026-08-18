@@ -67,7 +67,7 @@ export function ResultFilters() {
         defaultValue={cityValue}
         onValueChange={(value: string | null) => updateParam("cidade", value)}
       >
-        <SelectTrigger className="text-xs">
+        <SelectTrigger className="!h-11 w-full text-xs">
           <SelectValue placeholder="Cidade">
             {() => labelFor(cityOptions, cityValue)}
           </SelectValue>
@@ -85,7 +85,7 @@ export function ResultFilters() {
         defaultValue={priceValue}
         onValueChange={(value: string | null) => updateParam("maxPrice", value)}
       >
-        <SelectTrigger className="text-xs">
+        <SelectTrigger className="!h-11 w-full text-xs">
           <SelectValue placeholder="Preço">
             {() => labelFor(priceOptions, priceValue)}
           </SelectValue>
@@ -103,7 +103,7 @@ export function ResultFilters() {
         defaultValue={appointmentTypeValue}
         onValueChange={(value: string | null) => updateParam("appointmentType", value)}
       >
-        <SelectTrigger className="text-xs">
+        <SelectTrigger className="!h-11 w-full text-xs">
           <SelectValue placeholder="Atendimento">
             {() => labelFor(appointmentTypeOptions, appointmentTypeValue)}
           </SelectValue>
@@ -121,7 +121,7 @@ export function ResultFilters() {
         defaultValue={ratingValue}
         onValueChange={(value: string | null) => updateParam("minRating", value)}
       >
-        <SelectTrigger className="text-xs">
+        <SelectTrigger className="!h-11 w-full text-xs">
           <SelectValue placeholder="Avaliação">
             {() => labelFor(ratingOptions, ratingValue)}
           </SelectValue>

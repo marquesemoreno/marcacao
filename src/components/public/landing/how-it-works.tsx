@@ -76,9 +76,7 @@ export function HowItWorks() {
           
           <h2 className="mt-4 text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">
             Como funciona a Conecta Saúde em{" "}
-            <span className="bg-gradient-to-r from-sky-600 via-teal-600 to-emerald-600 bg-clip-text text-transparent">
-              3 passos simples
-            </span>
+            <span className="text-teal-600">3 passos simples</span>
           </h2>
           
           <p className="mt-4 text-base leading-relaxed text-slate-600 sm:text-lg">

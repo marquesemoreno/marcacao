@@ -17,10 +17,11 @@ export function AvatarBadge({
 }) {
   return (
     <div
-      className={`flex shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 font-semibold text-white ${className}`}
+      className={`flex shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-emerald-500 via-teal-600 to-emerald-700 font-bold tracking-tight text-white shadow-2xs select-none transition-transform hover:scale-105 ${className}`}
       style={{ width: size, height: size, fontSize: Math.max(10, size * 0.38) }}
     >
       {initialsFor(name)}
     </div>
   );
 }
+

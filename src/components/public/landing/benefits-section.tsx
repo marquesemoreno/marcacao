@@ -75,9 +75,7 @@ export function BenefitsSection() {
           
           <h2 className="mt-4 text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl lg:text-5xl">
             Por que milhares de pessoas escolhem a{" "}
-            <span className="bg-gradient-to-r from-sky-600 via-teal-600 to-emerald-600 bg-clip-text text-transparent">
-              Conecta Saúde
-            </span>
+            <span className="text-teal-600">Conecta Saúde</span>
             ?
           </h2>
           

@@ -41,9 +41,7 @@ export function HeroSection() {
         {/* Title & Subtitle */}
         <h1 className="max-w-4xl text-balance text-3xl font-extrabold tracking-tight text-slate-900 sm:text-5xl lg:text-6xl lg:leading-[1.12]">
           Marque suas consultas e exames com{" "}
-          <span className="bg-gradient-to-r from-sky-600 via-teal-600 to-emerald-600 bg-clip-text text-transparent">
-            agilidade e preços acessíveis
-          </span>
+          <span className="text-teal-600">agilidade e preços acessíveis</span>
         </h1>
 
         <p className="max-w-2xl text-balance text-base text-slate-600 sm:text-lg lg:text-xl font-normal leading-relaxed">

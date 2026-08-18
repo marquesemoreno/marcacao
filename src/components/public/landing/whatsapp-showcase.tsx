@@ -41,9 +41,7 @@ export function WhatsAppShowcase() {
 
               <h2 className="mt-4 text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl lg:text-4xl">
                 Tudo direto no seu WhatsApp,{" "}
-                <span className="bg-gradient-to-r from-emerald-600 via-teal-600 to-sky-600 bg-clip-text text-transparent">
-                  sem baixar nenhum aplicativo
-                </span>
+                <span className="text-teal-600">sem baixar nenhum aplicativo</span>
               </h2>
 
               <p className="mt-4 text-base leading-relaxed text-slate-600 sm:text-lg">

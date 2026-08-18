@@ -61,7 +61,7 @@ export function HeroSearch() {
               type="button"
               onClick={() => setCategory("CONSULTATION")}
               className={cn(
-                "flex items-center gap-2 rounded-xl px-4 py-2 text-xs sm:text-sm font-bold tracking-tight transition-all duration-200",
+                "flex min-h-11 items-center gap-2 rounded-xl px-4 py-2 text-xs sm:text-sm font-bold tracking-tight transition-all duration-200",
                 category === "CONSULTATION"
                   ? "bg-white text-sky-700 shadow-sm shadow-slate-300/40 font-semibold"
                   : "text-slate-600 hover:text-slate-900"
@@ -74,7 +74,7 @@ export function HeroSearch() {
               type="button"
               onClick={() => setCategory("EXAM")}
               className={cn(
-                "flex items-center gap-2 rounded-xl px-4 py-2 text-xs sm:text-sm font-bold tracking-tight transition-all duration-200",
+                "flex min-h-11 items-center gap-2 rounded-xl px-4 py-2 text-xs sm:text-sm font-bold tracking-tight transition-all duration-200",
                 category === "EXAM"
                   ? "bg-white text-teal-700 shadow-sm shadow-slate-300/40 font-semibold"
                   : "text-slate-600 hover:text-slate-900"
@@ -172,7 +172,7 @@ export function HeroSearch() {
               key={filter.label}
               type="button"
               onClick={() => handleQuickFilter(filter)}
-              className="inline-flex items-center gap-1.5 rounded-full border border-slate-200/80 bg-slate-50/80 px-3 py-1 text-xs font-medium text-slate-700 transition-all hover:border-sky-300 hover:bg-sky-50/60 hover:text-sky-800"
+              className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-slate-200/80 bg-slate-50/80 px-3 py-1 text-xs font-medium text-slate-700 transition-all hover:border-sky-300 hover:bg-sky-50/60 hover:text-sky-800"
             >
               {filter.label}
             </button>

@@ -182,7 +182,7 @@ export function BookingDialog({ clinicProcedure }: { clinicProcedure: PlainClini
                       if (value) setValue("timeSlot", value);
                     }}
                   >
-                    <SelectTrigger id="timeSlot" className="h-11">
+                    <SelectTrigger id="timeSlot" className="!h-11 w-full">
                       <SelectValue placeholder="Escolha um horário" />
                     </SelectTrigger>
                     <SelectContent>

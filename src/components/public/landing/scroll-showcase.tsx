@@ -93,9 +93,7 @@ export function ScrollShowcase() {
 
           <h2 className="mt-4 text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">
             Do agendamento ao atendimento em{" "}
-            <span className="bg-gradient-to-r from-sky-600 via-teal-600 to-emerald-600 bg-clip-text text-transparent">
-              3 passos simples
-            </span>
+            <span className="text-teal-600">3 passos simples</span>
           </h2>
 
           <p className="mt-3 text-base sm:text-lg text-slate-600 font-normal leading-relaxed">
@@ -111,7 +109,7 @@ export function ScrollShowcase() {
               type="button"
               onClick={() => goToStep(index)}
               className={cn(
-                "shrink-0 rounded-full px-4 py-2 text-xs font-bold tracking-tight transition-all duration-300",
+                "flex min-h-11 shrink-0 items-center rounded-full px-4 py-2 text-xs font-bold tracking-tight transition-all duration-300",
                 activeStep === index
                   ? "bg-gradient-to-r from-sky-600 via-teal-600 to-emerald-600 text-white shadow-sm"
                   : "border border-slate-200 bg-white text-slate-500"
