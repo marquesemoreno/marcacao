@@ -116,6 +116,7 @@ export async function getSpecialtyStartingPrices() {
   const minPrices = new Map<string, number>();
   for (const row of rows) {
     const price = row.promotionalPrice ? Number(row.promotionalPrice) : Number(row.price);
+    if (!price || price <= 0) continue;
     const keys = [row.procedure.name, row.procedure.specialty?.name].filter(
       (key): key is string => Boolean(key)
     );
