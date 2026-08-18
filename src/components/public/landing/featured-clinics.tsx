@@ -7,18 +7,12 @@ import type { getFeaturedClinics } from "@/actions/search";
 
 type FeaturedClinic = Awaited<ReturnType<typeof getFeaturedClinics>>[number];
 
-/** Fotos ilustrativas de fachada/recepção — genéricas (banco de imagens, sem
- * pessoas identificáveis), cicladas por índice. Nenhuma é da clínica real:
- * a plataforma não tem cadastro de fotos próprio ainda, então usar uma foto
- * real aqui seria enganoso. Ver docs/obsidian/13 - ... quando essa limitação
- * for resolvida com upload de fotos de verdade por clínica. */
 const clinicPhotos = [
   "https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?w=800&auto=format&fit=crop&q=80",
   "https://images.unsplash.com/photo-1629909614456-6b1c5c94cecc?w=800&auto=format&fit=crop&q=80",
   "https://images.unsplash.com/photo-1606318313647-137d1f3b4d3c?w=800&auto=format&fit=crop&q=80",
   "https://images.unsplash.com/photo-1581982231900-6a1a46b744c9?w=800&auto=format&fit=crop&q=80",
   "https://images.unsplash.com/photo-1608979827489-2b855e79debe?w=800&auto=format&fit=crop&q=80",
-  "https://images.unsplash.com/photo-1631507623095-c710d184498f?w=800&auto=format&fit=crop&q=80",
 ];
 
 export function FeaturedClinics({ clinics }: { clinics: FeaturedClinic[] }) {
@@ -27,9 +21,10 @@ export function FeaturedClinics({ clinics }: { clinics: FeaturedClinic[] }) {
   return (
     <section id="clinicas" className="relative bg-slate-50/70 py-16 sm:py-24 border-t border-b border-slate-200/70">
       <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+        
         {/* Section Header */}
         <div className="mx-auto max-w-2xl text-center">
-          <div className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200/80 bg-emerald-50/90 px-3.5 py-1 text-xs font-semibold uppercase tracking-wider text-emerald-800 shadow-xs">
+          <div className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200/80 bg-emerald-50/90 px-3.5 py-1 text-xs font-semibold uppercase tracking-wider text-emerald-800 shadow-2xs font-mono">
             <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
             <span>Rede Verificada Oficial</span>
           </div>
@@ -49,12 +44,12 @@ export function FeaturedClinics({ clinics }: { clinics: FeaturedClinic[] }) {
               key={clinic.id}
               className="group relative flex flex-col justify-between overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1.5 hover:border-emerald-300/60 hover:shadow-xl"
             >
-              {/* Foto ilustrativa de fachada/recepção */}
+              {/* Photo Header */}
               <div className="relative h-36 w-full overflow-hidden bg-slate-100">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={clinicPhotos[index % clinicPhotos.length]}
-                  alt=""
+                  alt={clinic.tradeName}
                   loading="lazy"
                   className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
                 />
@@ -95,7 +90,7 @@ export function FeaturedClinics({ clinics }: { clinics: FeaturedClinic[] }) {
                 {/* Procedures List */}
                 {clinic.clinicProcedures && clinic.clinicProcedures.length > 0 && (
                   <div className="mt-4">
-                    <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-2">
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-2 font-mono">
                       Procedimentos em destaque:
                     </p>
                     <div className="flex flex-wrap gap-1.5">
@@ -135,6 +130,7 @@ export function FeaturedClinics({ clinics }: { clinics: FeaturedClinic[] }) {
             </div>
           ))}
         </div>
+
       </div>
     </section>
   );

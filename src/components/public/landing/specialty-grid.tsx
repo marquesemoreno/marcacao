@@ -111,17 +111,18 @@ const specialties: SpecialtyItem[] = [
 export function SpecialtyGrid({ prices }: { prices: Record<string, number> }) {
   return (
     <section id="especialidades" className="relative bg-white py-16 sm:py-24">
-      {/* Decorative ambient light */}
+      {/* Ambient background light */}
       <div
         aria-hidden
         className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-[#FAFAFB] to-transparent"
       />
 
       <div className="relative mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+        
         {/* Section Header */}
         <div className="mx-auto max-w-2xl text-center">
-          <div className="inline-flex items-center gap-1.5 rounded-full border border-sky-200/70 bg-sky-50/80 px-3.5 py-1 text-xs font-semibold uppercase tracking-wider text-sky-700">
-            <Zap className="h-3.5 w-3.5 text-sky-600 fill-sky-600" />
+          <div className="inline-flex items-center gap-1.5 rounded-full border border-sky-200/70 bg-sky-50/80 px-3.5 py-1 text-xs font-semibold uppercase tracking-wider text-sky-700 font-mono">
+            <Zap className="size-3.5 text-sky-600 fill-sky-600" />
             <span>Transparência Total & Preços Acessíveis</span>
           </div>
 
@@ -163,7 +164,7 @@ export function SpecialtyGrid({ prices }: { prices: Record<string, number> }) {
                         <Icon className="h-6 w-6 sm:h-7 sm:w-7" />
                       </div>
 
-                      <span className="rounded-full bg-slate-100/90 px-2.5 py-0.5 text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      <span className="rounded-full bg-slate-100/90 px-2.5 py-0.5 text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-slate-500 font-mono">
                         {category}
                       </span>
                     </div>
@@ -175,7 +176,7 @@ export function SpecialtyGrid({ prices }: { prices: Record<string, number> }) {
 
                     {/* Price Pill Badge */}
                     {priceValue !== undefined && (
-                      <div className="mt-2.5 inline-flex items-center gap-1.5 rounded-full border border-teal-200/70 bg-teal-50/90 px-3 py-1 text-xs font-bold text-teal-800 shadow-xs">
+                      <div className="mt-2.5 inline-flex items-center gap-1.5 rounded-full border border-teal-200/70 bg-teal-50/90 px-3 py-1 text-xs font-bold text-teal-800 shadow-2xs font-mono">
                         <span>A partir de {formatCurrency(priceValue)}</span>
                       </div>
                     )}
@@ -197,6 +198,7 @@ export function SpecialtyGrid({ prices }: { prices: Record<string, number> }) {
             }
           )}
         </div>
+
       </div>
     </section>
   );

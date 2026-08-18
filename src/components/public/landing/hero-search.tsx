@@ -54,6 +54,7 @@ export function HeroSearch() {
     <div className="w-full text-left">
       {/* Floating Card (App / Glassmorphism Style - Oscar Health / Stripe aesthetic) */}
       <div className="w-full rounded-3xl border border-slate-200/80 bg-white/95 p-3.5 sm:p-5 shadow-[0_10px_30px_-5px_rgba(0,0,0,0.06)] backdrop-blur-md transition-all hover:shadow-[0_20px_40px_-10px_rgba(0,0,0,0.08)]">
+        
         {/* Upper Sliding Pill Tabs */}
         <div className="mb-4 flex items-center justify-between">
           <div className="inline-flex rounded-2xl bg-slate-100/90 p-1 border border-slate-200/60 shadow-inner">
@@ -100,7 +101,7 @@ export function HeroSearch() {
                 <MapPin className="h-4 w-4" />
               </div>
               <div className="flex-1">
-                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 font-mono">
                   Cidade / Região
                 </label>
                 <select
@@ -130,7 +131,7 @@ export function HeroSearch() {
                 )}
               </div>
               <div className="flex-1">
-                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 font-mono">
                   Especialidade, Exame ou Médico
                 </label>
                 <input
@@ -164,7 +165,7 @@ export function HeroSearch() {
 
         {/* Quick Filter Pills */}
         <div className="mt-3.5 flex flex-wrap items-center gap-2 pt-3 border-t border-slate-100">
-          <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mr-1">
+          <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mr-1 font-mono">
             Mais buscados:
           </span>
           {quickFilters.map((filter) => (
@@ -172,7 +173,7 @@ export function HeroSearch() {
               key={filter.label}
               type="button"
               onClick={() => handleQuickFilter(filter)}
-              className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-slate-200/80 bg-slate-50/80 px-3 py-1 text-xs font-medium text-slate-700 transition-all hover:border-sky-300 hover:bg-sky-50/60 hover:text-sky-800"
+              className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-slate-200/80 bg-slate-50/80 px-3.5 py-1.5 text-xs font-medium text-slate-700 transition-all hover:border-sky-300 hover:bg-sky-50/60 hover:text-sky-800"
             >
               {filter.label}
             </button>

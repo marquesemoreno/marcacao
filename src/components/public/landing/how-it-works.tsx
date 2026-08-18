@@ -69,7 +69,7 @@ export function HowItWorks() {
         
         {/* Header */}
         <div className="mx-auto max-w-3xl text-center">
-          <div className="inline-flex items-center gap-2 rounded-full border border-sky-200/60 bg-sky-50/80 px-3.5 py-1.5 text-xs font-semibold text-sky-800 shadow-sm backdrop-blur-sm">
+          <div className="inline-flex items-center gap-2 rounded-full border border-sky-200/60 bg-sky-50/80 px-3.5 py-1.5 text-xs font-semibold text-sky-800 shadow-2xs backdrop-blur-xs font-mono">
             <Sparkles className="h-3.5 w-3.5 text-sky-600" />
             Simples, Rápido e Sem Burocracia
           </div>
@@ -105,18 +105,18 @@ export function HowItWorks() {
                 <div>
                   {/* Top Bar: Pill number + Icon */}
                   <div className="flex items-center justify-between gap-4">
-                    <span className={`inline-flex items-center justify-center rounded-2xl bg-gradient-to-r ${step.gradient} px-3.5 py-1.5 text-xs font-black tracking-wider text-white shadow-sm`}>
+                    <span className={`inline-flex items-center justify-center rounded-2xl bg-gradient-to-r ${step.gradient} px-3.5 py-1.5 text-xs font-black tracking-wider text-white shadow-2xs font-mono`}>
                       PASSO {step.number}
                     </span>
 
-                    <div className={`flex size-12 items-center justify-center rounded-2xl border ${step.iconBg} shadow-xs transition-transform duration-300 group-hover:scale-110`}>
+                    <div className={`flex size-12 items-center justify-center rounded-2xl border ${step.iconBg} shadow-2xs transition-transform duration-300 group-hover:scale-110`}>
                       <Icon className={`h-6 w-6 ${step.iconColor}`} />
                     </div>
                   </div>
 
                   {/* Badge & Title */}
                   <div className="mt-6">
-                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 font-mono">
                       {step.badge}
                     </span>
                     <h3 className="mt-1 text-xl font-bold tracking-tight text-slate-900 group-hover:text-teal-900 transition-colors">
@@ -143,7 +143,7 @@ export function HowItWorks() {
         </div>
 
         {/* Bottom Trust CTA Ribbon */}
-        <div className="mt-12 rounded-2xl border border-slate-200/80 bg-white/80 p-5 shadow-sm backdrop-blur-sm sm:p-6">
+        <div className="mt-12 rounded-2xl border border-slate-200/80 bg-white/80 p-5 shadow-sm backdrop-blur-xs sm:p-6">
           <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
             <div className="flex items-center gap-3">
               <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700">
@@ -160,8 +160,8 @@ export function HowItWorks() {
             </div>
 
             <a
-              href="#busca"
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-sky-600 via-teal-600 to-emerald-600 px-5 py-2.5 text-xs font-bold text-white shadow-sm transition-all duration-200 hover:shadow-md hover:brightness-105 active:scale-98"
+              href="#especialidades"
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-sky-600 via-teal-600 to-emerald-600 px-5 py-2.5 text-xs font-bold text-white shadow-2xs transition-all duration-200 hover:shadow-md hover:brightness-105 active:scale-98"
             >
               <span>Buscar Especialidades</span>
               <ArrowRight className="h-3.5 w-3.5" />
