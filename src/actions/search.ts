@@ -60,6 +60,8 @@ export type SearchFilters = {
   query?: string;
   neighborhood?: string;
   city?: string;
+  clinicId?: string;
+  clinicName?: string;
   category?: ProcedureCategory;
   appointmentType?: AppointmentType;
   maxPrice?: number;
@@ -68,11 +70,13 @@ export type SearchFilters = {
 };
 
 export async function searchClinicProcedures(filters: SearchFilters) {
-  const { query, neighborhood, city, category, appointmentType, maxPrice, minRating, sort } = filters;
+  const { query, neighborhood, city, clinicId, clinicName, category, appointmentType, maxPrice, minRating, sort } = filters;
 
   const where: Prisma.ClinicProcedureWhereInput = {
     clinic: {
       active: true,
+      ...(clinicId ? { id: clinicId } : {}),
+      ...(clinicName ? { tradeName: { contains: clinicName, mode: "insensitive" } } : {}),
       ...(minRating ? { rating: { gte: minRating } } : {}),
       ...(neighborhood ? { neighborhood: { contains: neighborhood, mode: "insensitive" } } : {}),
       ...(city ? { city: { equals: city, mode: "insensitive" } } : {}),
@@ -130,7 +134,7 @@ export async function getSpecialtyStartingPrices() {
   return result;
 }
 
-export async function getFeaturedClinics(limit = 6) {
+export async function getFeaturedClinics(limit = 12) {
   return prisma.clinic.findMany({
     where: { active: true },
     orderBy: { rating: "desc" },
@@ -140,12 +144,40 @@ export async function getFeaturedClinics(limit = 6) {
       tradeName: true,
       neighborhood: true,
       city: true,
+      address: true,
+      phone: true,
       rating: true,
       reviewCount: true,
       clinicProcedures: {
-        take: 4,
+        take: 6,
         orderBy: { procedure: { name: "asc" } },
-        select: { procedure: { select: { name: true } } },
+        select: { procedure: { select: { name: true, category: true } } },
+      },
+    },
+  });
+}
+
+export async function getAllClinics(city?: string, neighborhood?: string) {
+  return prisma.clinic.findMany({
+    where: {
+      active: true,
+      ...(city ? { city: { equals: city, mode: "insensitive" } } : {}),
+      ...(neighborhood ? { neighborhood: { contains: neighborhood, mode: "insensitive" } } : {}),
+    },
+    orderBy: { rating: "desc" },
+    select: {
+      id: true,
+      tradeName: true,
+      neighborhood: true,
+      city: true,
+      address: true,
+      phone: true,
+      rating: true,
+      reviewCount: true,
+      clinicProcedures: {
+        take: 6,
+        orderBy: { procedure: { name: "asc" } },
+        select: { procedure: { select: { name: true, category: true } } },
       },
     },
   });

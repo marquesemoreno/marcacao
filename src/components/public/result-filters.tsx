@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import {
   Select,
   SelectContent,
@@ -12,8 +12,8 @@ import { cn } from "@/lib/utils";
 
 const categoryTabs = [
   { value: "any", label: "🩺 Todas" },
-  { value: "CONSULTATION", label: "🩺 Consultas Médicas" },
-  { value: "EXAM", label: "🔬 Exames de Imagem & Diagnóstico" },
+  { value: "CONSULTATION", label: "🩺 Consultas" },
+  { value: "EXAM", label: "🔬 Exames de Imagem" },
   { value: "SURGERY", label: "🏥 Cirurgias & Procedimentos" },
 ];
 
@@ -34,10 +34,18 @@ const neighborhoodOptions = [
   { value: "Alto Maron", label: "Alto Maron" },
 ];
 
-const appointmentTypeOptions = [
-  { value: "any", label: "Atendimento: Todos" },
-  { value: "SCHEDULED", label: "Horário marcado" },
-  { value: "ARRIVAL_ORDER", label: "Ordem de chegada" },
+const clinicOptions = [
+  { value: "any", label: "🏥 Clínica: Todas" },
+  { value: "Clinica Cirurgica Santa Clara", label: "Clínica Cirúrgica Santa Clara" },
+  { value: "Imad Diagnóstico Por Imagem", label: "IMAD Diagnóstico Por Imagem" },
+  { value: "Urolaser - Clínica de Urologia e Diagnóstico", label: "Urolaser Urologia" },
+  { value: "Clinique Medical", label: "Clinique Medical" },
+  { value: "Acurae", label: "Acurae Saúde" },
+  { value: "Clinica Essencial", label: "Clínica Essencial" },
+  { value: "Policlínica Mais Médico", label: "Policlínica Mais Médico" },
+  { value: "Hospital São Vicente", label: "Hospital São Vicente" },
+  { value: "Sonnar", label: "Sonnar Diagnósticos" },
+  { value: "Clínica Àgape", label: "Clínica Àgape" },
 ];
 
 function labelFor(options: { value: string; label: string }[], value: string | null) {
@@ -47,6 +55,7 @@ function labelFor(options: { value: string; label: string }[], value: string | n
 export function ResultFilters() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const pathname = usePathname();
 
   function updateParam(key: string, value: string | null) {
     if (value === null) return;
@@ -56,13 +65,14 @@ export function ResultFilters() {
     } else {
       params.set(key, value);
     }
-    router.push(`/buscar?${params.toString()}`);
+    const targetPath = pathname.startsWith("/procedimentos") ? "/procedimentos" : "/procedimentos";
+    router.push(`${targetPath}?${params.toString()}`);
   }
 
   const activeCategory = searchParams.get("category") ?? "any";
   const cityValue = searchParams.get("cidade") ?? "any";
   const neighborhoodValue = searchParams.get("bairro") ?? "any";
-  const appointmentTypeValue = searchParams.get("appointmentType") ?? "any";
+  const clinicValue = searchParams.get("clinica") ?? "any";
 
   return (
     <div className="space-y-3.5">
@@ -127,16 +137,16 @@ export function ResultFilters() {
         </Select>
 
         <Select
-          defaultValue={appointmentTypeValue}
-          onValueChange={(value: string | null) => updateParam("appointmentType", value)}
+          defaultValue={clinicValue}
+          onValueChange={(value: string | null) => updateParam("clinica", value)}
         >
           <SelectTrigger className="!h-10 w-full text-xs font-bold rounded-xl border-slate-200">
-            <SelectValue placeholder="Atendimento">
-              {() => labelFor(appointmentTypeOptions, appointmentTypeValue)}
+            <SelectValue placeholder="Clínica Parceira">
+              {() => labelFor(clinicOptions, clinicValue)}
             </SelectValue>
           </SelectTrigger>
           <SelectContent>
-            {appointmentTypeOptions.map((option) => (
+            {clinicOptions.map((option) => (
               <SelectItem key={option.value} value={option.value}>
                 {option.label}
               </SelectItem>

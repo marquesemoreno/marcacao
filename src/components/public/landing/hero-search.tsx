@@ -36,7 +36,7 @@ export function HeroSearch() {
     params.set("category", category);
     if (query.trim()) params.set("q", query.trim());
     if (city !== "any") params.set("cidade", city);
-    router.push(`/buscar?${params.toString()}`);
+    router.push(`/procedimentos?${params.toString()}`);
   }
 
   function handleQuickFilter(filter: (typeof quickFilters)[number]) {
@@ -47,7 +47,7 @@ export function HeroSearch() {
     params.set("q", filter.query);
     if (filter.neighborhood) params.set("bairro", filter.neighborhood);
     if (city !== "any") params.set("cidade", city);
-    router.push(`/buscar?${params.toString()}`);
+    router.push(`/procedimentos?${params.toString()}`);
   }
 
   return (

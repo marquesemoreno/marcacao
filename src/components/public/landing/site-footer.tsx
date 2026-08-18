@@ -8,9 +8,9 @@ import {
 } from "lucide-react";
 
 const patientLinks = [
-  { label: "Buscar Clínicas e Especialidades", href: "/buscar" },
+  { label: "Catálogo de Procedimentos e Exames", href: "/procedimentos" },
+  { label: "Rede de Clínicas Credenciadas", href: "/clinicas" },
   { label: "Como Funciona", href: "/#como-funciona" },
-  { label: "Validar Guia de Encaminhamento", href: "/validar" },
   { label: "Perguntas Frequentes (FAQ)", href: "/#faq" },
 ];
 

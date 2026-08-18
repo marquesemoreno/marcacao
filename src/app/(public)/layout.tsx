@@ -4,8 +4,9 @@ import { Logo } from "@/components/brand/logo";
 import { SiteFooter } from "@/components/public/landing/site-footer";
 
 const navLinks = [
-  { label: "Buscar clínicas", href: "/buscar" },
-  { label: "Como funciona", href: "/#como-funciona" },
+  { label: "Procedimentos e Exames", href: "/procedimentos" },
+  { label: "Clínicas Credenciadas", href: "/clinicas" },
+  { label: "Como Funciona", href: "/#como-funciona" },
   { label: "Para Clínicas e Médicos", href: "/seja-parceiro" },
 ];
 
@@ -24,7 +25,7 @@ export default function PublicLayout({
 
           <nav className="hidden items-center gap-6 text-sm font-medium text-slate-600 sm:flex">
             {navLinks.map((link) => (
-              <Link key={link.href} href={link.href} className="hover:text-sky-700">
+              <Link key={link.href} href={link.href} className="hover:text-teal-700 transition-colors font-semibold">
                 {link.label}
               </Link>
             ))}
@@ -35,16 +36,16 @@ export default function PublicLayout({
               render={<Link href="/entrar" />}
               nativeButton={false}
               variant="ghost"
-              className="hidden sm:inline-flex"
+              className="hidden sm:inline-flex text-xs font-semibold"
             >
               Sou uma clínica
             </Button>
             <Button
-              render={<Link href="/buscar" />}
+              render={<Link href="/procedimentos" />}
               nativeButton={false}
-              className="bg-sky-600 text-white hover:bg-sky-700"
+              className="bg-teal-600 text-white hover:bg-teal-700 font-bold text-xs rounded-xl shadow-2xs"
             >
-              Agendar agora
+              Consultar Catálogo
             </Button>
           </div>
         </div>

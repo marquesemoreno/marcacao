@@ -119,7 +119,7 @@ export function FeaturedClinics({ clinics }: { clinics: FeaturedClinic[] }) {
               {/* Action Button */}
               <div className="px-6 pb-6 pt-2">
                 <Button
-                  render={<Link href={`/buscar?q=${encodeURIComponent(clinic.tradeName)}`} />}
+                  render={<Link href={`/procedimentos?clinica=${encodeURIComponent(clinic.tradeName)}`} />}
                   nativeButton={false}
                   className="group/btn h-12 w-full bg-teal-600 text-white font-bold rounded-2xl shadow-sm hover:bg-teal-700 hover:shadow-md transition-all flex items-center justify-center gap-2 text-sm"
                 >

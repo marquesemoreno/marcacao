@@ -14,7 +14,7 @@ export function SearchBar({ defaultValue = "" }: { defaultValue?: string }) {
     event.preventDefault();
     const params = new URLSearchParams();
     if (query.trim()) params.set("q", query.trim());
-    router.push(`/buscar?${params.toString()}`);
+    router.push(`/procedimentos?${params.toString()}`);
   }
 
   return (

@@ -135,7 +135,7 @@ export function SpecialtyGrid({ prices }: { prices: Record<string, number> }) {
               return (
                 <Link
                   key={label}
-                  href={`/buscar?q=${encodeURIComponent(query)}`}
+                  href={`/procedimentos?q=${encodeURIComponent(query)}`}
                   className={`group relative flex flex-col justify-between rounded-3xl border border-slate-200/80 bg-white p-5 sm:p-6 shadow-sm transition-all duration-300 hover:-translate-y-1.5 hover:shadow-xl ${borderHover}`}
                 >
                   <div>
