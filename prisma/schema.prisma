@@ -226,6 +226,7 @@ model Appointment {
   notes               String?
   affiliateId         String?           @map("affiliate_id")
   affiliateCommission Decimal?          @map("affiliate_commission") @db.Decimal(10, 2)
+  commissionReleased  Boolean           @default(false) @map("commission_released")
   createdAt           DateTime          @default(now()) @map("created_at")
   updatedAt           DateTime          @updatedAt @map("updated_at")
 
@@ -248,12 +249,26 @@ model Affiliate {
   code        String          @unique
   status      AffiliateStatus @default(PENDING)
   totalEarned Decimal         @default(0) @map("total_earned") @db.Decimal(10, 2)
+  totalPaid   Decimal         @default(0) @map("total_paid") @db.Decimal(10, 2)
   createdAt   DateTime        @default(now()) @map("created_at")
   updatedAt   DateTime        @updatedAt @map("updated_at")
 
   appointments Appointment[]
+  payments     AffiliatePayment[]
 
   @@map("affiliates")
+}
+
+model AffiliatePayment {
+  id          String   @id @default(cuid())
+  affiliateId String   @map("affiliate_id")
+  amount      Decimal  @db.Decimal(10, 2)
+  notes       String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  affiliate Affiliate @relation(fields: [affiliateId], references: [id])
+
+  @@map("affiliate_payments")
 }
 
 model Contact {

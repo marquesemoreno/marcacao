@@ -63,9 +63,41 @@ export async function updateAppointmentStatus(appointmentId: string, status: App
     throw new Error("Agendamento não encontrado");
   }
 
+  const isTargetConfirmedOrCompleted = validStatus === "CONFIRMED" || validStatus === "COMPLETED";
+  const shouldReleaseCommission =
+    isTargetConfirmedOrCompleted &&
+    appointment.affiliateId &&
+    appointment.affiliateCommission &&
+    !appointment.commissionReleased;
+
+  const shouldRevokeCommission =
+    !isTargetConfirmedOrCompleted &&
+    appointment.affiliateId &&
+    appointment.affiliateCommission &&
+    appointment.commissionReleased;
+
+  let newCommissionReleased = appointment.commissionReleased;
+
+  if (shouldReleaseCommission && appointment.affiliateId && appointment.affiliateCommission) {
+    newCommissionReleased = true;
+    await prisma.affiliate.update({
+      where: { id: appointment.affiliateId },
+      data: { totalEarned: { increment: appointment.affiliateCommission } },
+    });
+  } else if (shouldRevokeCommission && appointment.affiliateId && appointment.affiliateCommission) {
+    newCommissionReleased = false;
+    await prisma.affiliate.update({
+      where: { id: appointment.affiliateId },
+      data: { totalEarned: { decrement: appointment.affiliateCommission } },
+    });
+  }
+
   const updated = await prisma.appointment.update({
     where: { id: appointmentId },
-    data: { status: validStatus },
+    data: {
+      status: validStatus,
+      commissionReleased: newCommissionReleased,
+    },
     include: { clinicProcedure: { include: { clinic: true, procedure: true } } },
   });
 

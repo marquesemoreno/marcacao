@@ -59,16 +59,10 @@ export async function createAppointment(input: CreateAppointmentInput) {
       notes: data.notes || null,
       affiliateId: affiliate?.id ?? null,
       affiliateCommission: affiliate ? AFFILIATE_COMMISSION_FLAT : null,
+      commissionReleased: false,
     },
     include: { clinicProcedure: { include: { clinic: true, procedure: true } } },
   });
-
-  if (affiliate) {
-    await prisma.affiliate.update({
-      where: { id: affiliate.id },
-      data: { totalEarned: { increment: AFFILIATE_COMMISSION_FLAT } },
-    });
-  }
 
   // Dispara sem `await`: não faz sentido segurar a confirmação de agendamento
   // (fluxo público, de alta conversão) esperando o WhatsApp responder.

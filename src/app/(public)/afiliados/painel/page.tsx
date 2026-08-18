@@ -73,40 +73,55 @@ export default async function AffiliatePanelPage() {
         </CardContent>
       </Card>
 
+      {/* Cards Principais Financeiros */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <Card>
-          <CardContent className="flex items-center gap-3 pt-6">
-            <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-sky-50 text-sky-600">
-              <Users className="h-5 w-5" />
-            </span>
-            <div>
-              <p className="text-2xl font-bold text-slate-900">{referralsThisMonth}</p>
-              <p className="text-xs text-slate-500">Indicações no Mês</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="flex items-center gap-3 pt-6">
-            <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
-              <CheckCircle2 className="h-5 w-5" />
-            </span>
-            <div>
-              <p className="text-2xl font-bold text-slate-900">{confirmedCount}</p>
-              <p className="text-xs text-slate-500">Atendimentos Confirmados</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="flex items-center gap-3 pt-6">
-            <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
+        <Card className="border-emerald-200 bg-emerald-50/40">
+          <CardContent className="flex items-center gap-3.5 pt-6">
+            <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700 shadow-2xs">
               <Wallet className="h-5 w-5" />
             </span>
             <div>
-              <p className="text-2xl font-bold text-slate-900">{formatCurrency(affiliate.totalEarned)}</p>
-              <p className="text-xs text-slate-500">Comissão a Receber (R$)</p>
+              <p className="text-2xl font-bold text-emerald-800">{formatCurrency(affiliate.availableBalance)}</p>
+              <p className="text-xs font-semibold text-emerald-700">Saldo Liberado p/ Saque (PIX)</p>
             </div>
           </CardContent>
         </Card>
+
+        <Card>
+          <CardContent className="flex items-center gap-3.5 pt-6">
+            <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-600 shadow-2xs">
+              <CheckCircle2 className="h-5 w-5" />
+            </span>
+            <div>
+              <p className="text-2xl font-bold text-slate-900">{formatCurrency(affiliate.pendingCommissions)}</p>
+              <p className="text-xs font-medium text-slate-500">Comissões Pendentes</p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="flex items-center gap-3.5 pt-6">
+            <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-sky-50 text-sky-600 shadow-2xs">
+              <Users className="h-5 w-5" />
+            </span>
+            <div>
+              <p className="text-2xl font-bold text-slate-900">{formatCurrency(affiliate.totalPaid)}</p>
+              <p className="text-xs font-medium text-slate-500">Total Já Recebido (PIX)</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Resumo de Desempenho de Indicações */}
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200/80 bg-slate-50 p-4 text-xs font-medium text-slate-600">
+        <div className="flex items-center gap-2">
+          <Users className="h-4 w-4 text-emerald-600" />
+          <span>Indicações no Mês: <strong className="font-bold text-slate-900">{referralsThisMonth}</strong></span>
+        </div>
+        <div className="flex items-center gap-2">
+          <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+          <span>Atendimentos Concluídos: <strong className="font-bold text-slate-900">{confirmedCount}</strong></span>
+        </div>
       </div>
 
       <Card>
@@ -127,14 +142,15 @@ export default async function AffiliatePanelPage() {
                     <TableHead>Procedimento</TableHead>
                     <TableHead>Clínica</TableHead>
                     <TableHead>Data</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Comissão</TableHead>
+                    <TableHead>Status Atendimento</TableHead>
+                    <TableHead>Status Comissão</TableHead>
+                    <TableHead className="text-right">Comissão</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {history.map((item) => (
                     <TableRow key={item.id}>
-                      <TableCell>{item.patientName}</TableCell>
+                      <TableCell className="font-medium">{item.patientName}</TableCell>
                       <TableCell>{item.procedureName}</TableCell>
                       <TableCell>{item.clinicName}</TableCell>
                       <TableCell>{formatDate(item.date)}</TableCell>
@@ -143,7 +159,22 @@ export default async function AffiliatePanelPage() {
                           {appointmentStatusLabels[item.status]}
                         </Badge>
                       </TableCell>
-                      <TableCell>{formatCurrency(item.commission)}</TableCell>
+                      <TableCell>
+                        <span
+                          className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                            item.commissionStatusLabel === "Liberada (PIX)"
+                              ? "bg-emerald-100 text-emerald-800"
+                              : item.commissionStatusLabel === "Cancelada"
+                              ? "bg-rose-100 text-rose-800"
+                              : "bg-amber-100 text-amber-800"
+                          }`}
+                        >
+                          {item.commissionStatusLabel}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-right font-mono font-bold text-slate-900">
+                        {formatCurrency(item.commission)}
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
