@@ -1,6 +1,5 @@
 import { HeroSection } from "@/components/public/landing/hero-section";
 import { SpecialtyGrid } from "@/components/public/landing/specialty-grid";
-import { ScrollShowcase } from "@/components/public/landing/scroll-showcase";
 import { WhatsAppShowcase } from "@/components/public/landing/whatsapp-showcase";
 import { HowItWorks } from "@/components/public/landing/how-it-works";
 import { FeaturedClinics } from "@/components/public/landing/featured-clinics";
@@ -23,10 +22,9 @@ export default async function HomePage() {
     <main className="flex flex-col">
       <HeroSection />
       <SpecialtyGrid prices={specialtyPrices} />
-      <ScrollShowcase />
       <WhatsAppShowcase />
-      <HowItWorks />
       <FeaturedClinics clinics={clinics} />
+      <HowItWorks />
       <BenefitsSection />
       <FaqSection />
     </main>

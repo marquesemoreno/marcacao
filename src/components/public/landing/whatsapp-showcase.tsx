@@ -13,128 +13,136 @@ import {
   ExternalLink,
   MessageCircle,
   Clock,
-  Sparkles,
+  Search,
+  CheckCircle2,
   Paperclip,
   Smile,
   Mic,
-  Camera
+  Camera,
 } from "lucide-react";
 
 export function WhatsAppShowcase() {
   return (
-    <section id="whatsapp-demo" className="relative overflow-hidden bg-gradient-to-b from-slate-50 via-white to-slate-50 py-20 lg:py-28">
-      {/* Decorative subtle background elements */}
-      <div className="pointer-events-none absolute -left-40 top-1/4 h-96 w-96 rounded-full bg-teal-500/5 blur-3xl" />
-      <div className="pointer-events-none absolute -right-40 bottom-1/4 h-96 w-96 rounded-full bg-emerald-500/5 blur-3xl" />
+    <section id="whatsapp-demo" className="relative overflow-hidden bg-gradient-to-b from-slate-50 via-white to-slate-50 py-16 lg:py-24">
+      {/* Decorative background glows */}
+      <div className="pointer-events-none absolute -left-40 top-1/4 size-96 rounded-full bg-teal-500/5 blur-3xl" />
+      <div className="pointer-events-none absolute -right-40 bottom-1/4 size-96 rounded-full bg-emerald-500/5 blur-3xl" />
 
       <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+        {/* Header Title */}
+        <div className="mx-auto max-w-3xl text-center mb-12 lg:mb-16 space-y-4">
+          <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200/80 bg-emerald-50/90 px-4 py-1.5 text-xs font-semibold text-emerald-800 shadow-2xs backdrop-blur-xs">
+            <span className="flex size-2 rounded-full bg-emerald-500 animate-pulse" />
+            <MessageCircle className="size-3.5 text-emerald-600" />
+            Experiência 100% no WhatsApp
+          </div>
+
+          <h2 className="text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl lg:text-4xl leading-tight">
+            Do agendamento ao atendimento <span className="bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">direto no seu WhatsApp</span>
+          </h2>
+
+          <p className="text-base leading-relaxed text-slate-600 sm:text-lg">
+            Esqueça filas, senhas ou aplicativos pesados. Você escolhe sua consulta ou exame no site e recebe a confirmação, o preparo e a Guia com QR Code direto na conversa.
+          </p>
+        </div>
+
         <div className="grid grid-cols-1 items-center gap-12 lg:grid-cols-12 lg:gap-16">
           
-          {/* Left Column: Copy & Value Proposition */}
+          {/* Left Column: 3 Essential Steps */}
           <div className="flex flex-col gap-6 lg:col-span-6 xl:col-span-7">
-            <div>
-              <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200/60 bg-emerald-50/80 px-3.5 py-1.5 text-xs font-semibold text-emerald-800 shadow-sm backdrop-blur-sm">
-                <span className="flex size-2 rounded-full bg-emerald-500 animate-pulse" />
-                <MessageCircle className="h-3.5 w-3.5 text-emerald-600" />
-                Experiência 100% no WhatsApp
+            <div className="flex flex-col gap-4">
+              
+              {/* Step 01 */}
+              <div className="group flex items-start gap-4 rounded-2xl border border-slate-200/80 bg-white/90 p-4 shadow-2xs transition-all hover:border-teal-300 hover:shadow-md">
+                <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-xs">
+                  <Search className="size-5" />
+                </div>
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] font-bold uppercase tracking-wider font-mono text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200/60">
+                      Passo 01
+                    </span>
+                    <h3 className="text-base font-bold text-slate-900">Escolha a Cidade e o Procedimento</h3>
+                  </div>
+                  <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+                    Compare clínicas credenciadas, veja valores transparentes e escolha o melhor horário.
+                  </p>
+                </div>
               </div>
 
-              <h2 className="mt-4 text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl lg:text-4xl">
-                Tudo direto no seu WhatsApp,{" "}
-                <span className="text-teal-600">sem baixar nenhum aplicativo</span>
-              </h2>
+              {/* Step 02 */}
+              <div className="group flex items-start gap-4 rounded-2xl border border-slate-200/80 bg-white/90 p-4 shadow-2xs transition-all hover:border-teal-300 hover:shadow-md">
+                <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-500 to-teal-600 text-white shadow-xs">
+                  <Clock className="size-5" />
+                </div>
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] font-bold uppercase tracking-wider font-mono text-sky-700 bg-sky-50 px-2 py-0.5 rounded-md border border-sky-200/60">
+                      Passo 02
+                    </span>
+                    <h3 className="text-base font-bold text-slate-900">Orientações e Confirmação no WhatsApp</h3>
+                  </div>
+                  <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+                    Receba o lembrete com data, horário e instruções detalhadas de preparo (como jejum), confirmando em 1 clique.
+                  </p>
+                </div>
+              </div>
 
-              <p className="mt-4 text-base leading-relaxed text-slate-600 sm:text-lg">
-                Esqueça filas, senhas perdidas ou apps pesados. Você escolhe sua consulta ou exame no site e nossa inteligência médica envia a confirmação, preparo de exames e a guia com QR Code direto na conversa.
-              </p>
+              {/* Step 03 */}
+              <div className="group flex items-start gap-4 rounded-2xl border border-slate-200/80 bg-white/90 p-4 shadow-2xs transition-all hover:border-teal-300 hover:shadow-md">
+                <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-teal-500 to-emerald-600 text-white shadow-xs">
+                  <QrCode className="size-5" />
+                </div>
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] font-bold uppercase tracking-wider font-mono text-teal-700 bg-teal-50 px-2 py-0.5 rounded-md border border-teal-200/60">
+                      Passo 03
+                    </span>
+                    <h3 className="text-base font-bold text-slate-900">Guia Digital com QR Code no Balcão</h3>
+                  </div>
+                  <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+                    Apresente o comprovante digital direto na recepção da clínica para fazer check-in sem fila e com o preço reduzido garantido.
+                  </p>
+                </div>
+              </div>
+
             </div>
 
-            {/* Feature List */}
-            <div className="flex flex-col gap-3.5">
-              <div className="group flex items-start gap-3.5 rounded-2xl border border-slate-200/70 bg-white/90 p-3.5 shadow-sm transition-all hover:border-teal-200 hover:shadow-md">
-                <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-sm">
-                  <Zap className="h-4 w-4" />
-                </div>
-                <div>
-                  <h4 className="text-sm font-bold text-slate-900">Confirmação e Lembretes Automáticos</h4>
-                  <p className="text-xs text-slate-600 mt-0.5">
-                    Notificações em tempo real com data, horário exato, endereço da clínica e botão para confirmação rápida de presença.
-                  </p>
-                </div>
+            {/* Trust Badges */}
+            <div className="flex flex-wrap items-center gap-4 pt-2 text-xs font-semibold text-slate-600">
+              <div className="flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-xl border border-slate-200/80 shadow-2xs">
+                <ShieldCheck className="size-4 text-emerald-600" />
+                <span>🔒 Dados protegidos pela LGPD</span>
               </div>
-
-              <div className="group flex items-start gap-3.5 rounded-2xl border border-slate-200/70 bg-white/90 p-3.5 shadow-sm transition-all hover:border-teal-200 hover:shadow-md">
-                <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-sky-500 to-teal-600 text-white shadow-sm">
-                  <Clock className="h-4 w-4" />
-                </div>
-                <div>
-                  <h4 className="text-sm font-bold text-slate-900">Orientações Claras de Preparo</h4>
-                  <p className="text-xs text-slate-600 mt-0.5">
-                    Instruções completas para exames que exigem jejum, bexiga cheia ou suspensão temporária de medicamentos.
-                  </p>
-                </div>
-              </div>
-
-              <div className="group flex items-start gap-3.5 rounded-2xl border border-slate-200/70 bg-white/90 p-3.5 shadow-sm transition-all hover:border-teal-200 hover:shadow-md">
-                <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-teal-500 to-emerald-600 text-white shadow-sm">
-                  <QrCode className="h-4 w-4" />
-                </div>
-                <div>
-                  <h4 className="text-sm font-bold text-slate-900">Guia de Encaminhamento com QR Code</h4>
-                  <p className="text-xs text-slate-600 mt-0.5">
-                    Apresente a guia digital diretamente na recepção da clínica para validar seu atendimento e garantir o preço reduzido.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Quick trust metrics */}
-            <div className="flex flex-wrap items-center gap-4 pt-1 text-xs font-medium text-slate-500">
-              <div className="flex items-center gap-1.5">
-                <ShieldCheck className="h-4 w-4 text-emerald-600" />
-                <span>Dados protegidos pela LGPD</span>
-              </div>
-              <span className="text-slate-300">•</span>
-              <div className="flex items-center gap-1.5">
-                <Sparkles className="h-4 w-4 text-sky-600" />
-                <span>Atendimento 24 horas por dia</span>
+              <div className="flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-xl border border-slate-200/80 shadow-2xs">
+                <Smartphone className="size-4 text-sky-600" />
+                <span>📱 100% no seu WhatsApp, sem baixar nada</span>
               </div>
             </div>
           </div>
 
-          {/* Right Column: Realistic Smartphone Mockup & Floating Badges */}
+          {/* Right Column: Realistic Smartphone Mockup */}
           <div className="relative flex justify-center lg:col-span-6 xl:col-span-5">
             
             {/* Floating Badge 1: Confirmação instantânea */}
-            <div className="absolute -top-3 -left-4 z-20 hidden sm:flex items-center gap-2 rounded-2xl border border-emerald-100 bg-white/95 px-3.5 py-2 shadow-lg shadow-emerald-500/10 backdrop-blur-md transition-transform hover:scale-105">
-              <span className="flex size-7 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600">
-                <Zap className="h-4 w-4" />
+            <div className="absolute -top-3 -left-4 z-20 hidden sm:flex items-center gap-2.5 rounded-2xl border border-emerald-200 bg-white/95 px-3.5 py-2.5 shadow-lg shadow-emerald-500/10 backdrop-blur-md transition-transform hover:scale-105">
+              <span className="flex size-7 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700 font-bold">
+                <Zap className="size-4" />
               </span>
               <div className="text-left">
-                <p className="text-[11px] font-bold text-slate-900 leading-tight">Confirmação instantânea</p>
-                <p className="text-[10px] text-slate-500">Em menos de 10 segundos</p>
+                <p className="text-[11px] font-bold text-slate-900 leading-tight">Confirmação Instantânea</p>
+                <p className="text-[10px] text-slate-500">Em poucos segundos</p>
               </div>
             </div>
 
-            {/* Floating Badge 2: 100% no seu WhatsApp */}
-            <div className="absolute top-1/2 -right-6 z-20 hidden sm:flex items-center gap-2.5 rounded-2xl border border-teal-100 bg-white/95 px-3.5 py-2.5 shadow-lg shadow-teal-500/10 backdrop-blur-md transition-transform hover:scale-105">
-              <span className="flex size-7 items-center justify-center rounded-xl bg-teal-100 text-teal-600">
-                <Smartphone className="h-4 w-4" />
+            {/* Floating Badge 2: Preço reduzido garantido */}
+            <div className="absolute -bottom-4 right-2 z-20 hidden sm:flex items-center gap-2.5 rounded-2xl border border-slate-200 bg-white/95 px-3.5 py-2.5 shadow-lg shadow-slate-900/10 backdrop-blur-md transition-transform hover:scale-105">
+              <span className="flex size-7 items-center justify-center rounded-xl bg-slate-100 text-slate-800">
+                <CheckCircle2 className="size-4 text-emerald-600" />
               </span>
               <div className="text-left">
-                <p className="text-[11px] font-bold text-slate-900 leading-tight">100% no seu WhatsApp</p>
-                <p className="text-[10px] text-slate-500">Sem download de apps</p>
-              </div>
-            </div>
-
-            {/* Floating Badge 3: Dados protegidos */}
-            <div className="absolute -bottom-4 left-2 z-20 hidden sm:flex items-center gap-2 rounded-2xl border border-slate-200 bg-white/95 px-3.5 py-2 shadow-lg shadow-slate-900/5 backdrop-blur-md transition-transform hover:scale-105">
-              <span className="flex size-7 items-center justify-center rounded-xl bg-slate-100 text-slate-700">
-                <ShieldCheck className="h-4 w-4 text-emerald-600" />
-              </span>
-              <div className="text-left">
-                <p className="text-[11px] font-bold text-slate-900 leading-tight">Segurança Total LGPD</p>
-                <p className="text-[10px] text-slate-500">Criptografia de ponta</p>
+                <p className="text-[11px] font-bold text-slate-900 leading-tight">Check-in Express</p>
+                <p className="text-[10px] text-slate-500">Preço com desconto garantido</p>
               </div>
             </div>
 
@@ -152,16 +160,16 @@ export function WhatsAppShowcase() {
                 <div className="flex items-center justify-between bg-[#075E54] px-5 pt-3 pb-1 text-white">
                   <span className="text-[11px] font-semibold tracking-tight">09:41</span>
                   <div className="flex items-center gap-1.5">
-                    <Signal className="h-3 w-3 text-white/90" />
-                    <Wifi className="h-3 w-3 text-white/90" />
-                    <Battery className="h-3.5 w-3.5 text-white/90" />
+                    <Signal className="size-3 text-white/90" />
+                    <Wifi className="size-3 text-white/90" />
+                    <Battery className="size-3.5 text-white/90" />
                   </div>
                 </div>
 
                 {/* WhatsApp Chat Header */}
                 <div className="flex items-center justify-between bg-[#075E54] px-3 py-2.5 text-white shadow-md">
                   <div className="flex items-center gap-2">
-                    <ChevronLeft className="h-5 w-5 text-white/90 cursor-pointer" />
+                    <ChevronLeft className="size-5 text-white/90 cursor-pointer" />
                     <div className="relative">
                       <div className="flex size-9 items-center justify-center rounded-full bg-gradient-to-br from-emerald-400 to-teal-600 text-white font-black text-xs ring-2 ring-white/30">
                         CS
@@ -181,12 +189,12 @@ export function WhatsAppShowcase() {
                     </div>
                   </div>
                   <div className="flex items-center gap-3 text-white/90">
-                    <Video className="h-4 w-4 cursor-pointer hover:text-white" />
-                    <Phone className="h-3.5 w-3.5 cursor-pointer hover:text-white" />
+                    <Video className="size-4 cursor-pointer hover:text-white" />
+                    <Phone className="size-3.5 cursor-pointer hover:text-white" />
                   </div>
                 </div>
 
-                {/* WhatsApp Chat Message Area with custom pattern */}
+                {/* WhatsApp Chat Message Area */}
                 <div 
                   className="flex-1 overflow-y-auto px-3 py-3.5 flex flex-col gap-2.5 text-[12px] leading-relaxed"
                   style={{
@@ -195,16 +203,16 @@ export function WhatsAppShowcase() {
                   }}
                 >
                   {/* Encryption Notice */}
-                  <div className="mx-auto my-1 max-w-[85%] rounded-lg bg-[#FFEECD]/90 px-3 py-1.5 text-center text-[10px] text-amber-900 shadow-sm">
+                  <div className="mx-auto my-1 max-w-[85%] rounded-lg bg-[#FFEECD]/90 px-3 py-1.5 text-center text-[10px] text-amber-900 shadow-2xs">
                     🔒 As mensagens e chamadas são protegidas com a criptografia de ponta a ponta.
                   </div>
 
                   {/* Day Divider */}
-                  <div className="mx-auto my-0.5 rounded-full bg-white/80 px-2.5 py-0.5 text-[10px] font-medium text-slate-500 shadow-xs">
+                  <div className="mx-auto my-0.5 rounded-full bg-white/80 px-2.5 py-0.5 text-[10px] font-medium text-slate-500 shadow-2xs">
                     Hoje
                   </div>
 
-                  {/* Balloon 1: Recebido - Agendamento */}
+                  {/* Message 1: Confirmation */}
                   <div className="relative max-w-[88%] self-start rounded-2xl rounded-tl-none bg-white p-3 text-slate-800 shadow-[0_1px_2px_rgba(0,0,0,0.08)]">
                     <p className="text-[11.5px] leading-relaxed">
                       Olá, Lucas! 👋 Seu agendamento para <strong className="text-slate-900 font-bold">Consulta com Clínico Geral</strong> na <strong className="text-teal-700 font-bold">Clínica Cirúrgica Santa Clara</strong> foi confirmado para amanhã às <strong className="text-slate-900 font-bold">14:00</strong>.
@@ -214,7 +222,7 @@ export function WhatsAppShowcase() {
                     </div>
                   </div>
 
-                  {/* Balloon 2: Recebido - Orientações */}
+                  {/* Message 2: Instructions */}
                   <div className="relative max-w-[88%] self-start rounded-2xl rounded-tl-none bg-white p-3 text-slate-800 shadow-[0_1px_2px_rgba(0,0,0,0.08)]">
                     <p className="font-semibold text-slate-900 text-[11.5px] mb-1">
                       📋 Orientações para a Consulta:
@@ -227,8 +235,8 @@ export function WhatsAppShowcase() {
                     <div className="mt-2 rounded-xl bg-slate-50 p-2 border border-slate-100">
                       <p className="text-[10.5px] font-semibold text-slate-700">Responda para confirmar:</p>
                       <p className="text-[10.5px] text-slate-600 mt-0.5">
-                        <strong className="text-emerald-700">1</strong> - Confirmar presença<br />
-                        <strong className="text-rose-700">2</strong> - Cancelar ou reagendar
+                        <strong className="text-emerald-700 font-bold">1</strong> - Confirmar presença<br />
+                        <strong className="text-rose-700 font-bold">2</strong> - Cancelar ou reagendar
                       </p>
                     </div>
                     <div className="mt-1 flex items-center justify-end gap-1 text-[9px] text-slate-400">
@@ -236,16 +244,16 @@ export function WhatsAppShowcase() {
                     </div>
                   </div>
 
-                  {/* Balloon 3: Enviado pelo Paciente */}
+                  {/* Message 3: Patient Reply */}
                   <div className="relative max-w-[40%] self-end rounded-2xl rounded-tr-none bg-[#DCF8C6] p-2.5 text-slate-800 shadow-[0_1px_2px_rgba(0,0,0,0.08)]">
                     <p className="text-[13px] font-bold text-slate-900 px-1">1</p>
                     <div className="mt-0.5 flex items-center justify-end gap-1 text-[9px] text-emerald-800">
                       <span>14:01</span>
-                      <CheckCheck className="h-3.5 w-3.5 text-sky-600" />
+                      <CheckCheck className="size-3.5 text-sky-600" />
                     </div>
                   </div>
 
-                  {/* Balloon 4: Guia Oficial com QR Code anexada */}
+                  {/* Message 4: Voucher QR Code Attachment */}
                   <div className="relative max-w-[92%] self-start rounded-2xl rounded-tl-none bg-white p-3 text-slate-800 shadow-[0_1px_2px_rgba(0,0,0,0.08)] border border-emerald-100">
                     <div className="flex items-center gap-1.5 text-[11px] font-bold text-emerald-700">
                       <span>🎟️</span>
@@ -254,8 +262,8 @@ export function WhatsAppShowcase() {
                     
                     <div className="mt-2 rounded-xl border border-slate-200/80 bg-gradient-to-b from-slate-50 to-white p-2.5">
                       <div className="flex items-center gap-2.5">
-                        <div className="flex size-12 shrink-0 items-center justify-center rounded-lg bg-white p-1 shadow-sm border border-slate-200">
-                          <QrCode className="h-10 w-10 text-slate-800" />
+                        <div className="flex size-12 shrink-0 items-center justify-center rounded-lg bg-white p-1 shadow-2xs border border-slate-200">
+                          <QrCode className="size-10 text-slate-800" />
                         </div>
                         <div className="min-w-0 flex-1">
                           <p className="text-[10px] font-bold text-slate-900">#VDC-2026-84920</p>
@@ -267,9 +275,9 @@ export function WhatsAppShowcase() {
                       </div>
 
                       <div className="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between">
-                        <span className="text-[9.5px] font-bold text-teal-700">Valor com desconto: R$ 140</span>
+                        <span className="text-[9.5px] font-bold text-teal-700">Valor reduzido: R$ 140</span>
                         <span className="flex items-center gap-1 text-[9.5px] font-bold text-sky-600">
-                          Ver Guia <ExternalLink className="h-2.5 w-2.5" />
+                          Ver Guia <ExternalLink className="size-2.5" />
                         </span>
                       </div>
                     </div>
@@ -283,19 +291,20 @@ export function WhatsAppShowcase() {
 
                 {/* WhatsApp Chat Footer Input Bar */}
                 <div className="flex items-center gap-1.5 bg-[#F0F2F5] px-2 py-2 border-t border-slate-200/60">
-                  <Smile className="h-5 w-5 text-slate-500 cursor-pointer hover:text-slate-700 ml-1" />
-                  <Paperclip className="h-4 w-4 text-slate-500 cursor-pointer hover:text-slate-700" />
+                  <Smile className="size-5 text-slate-500 cursor-pointer hover:text-slate-700 ml-1" />
+                  <Paperclip className="size-4 text-slate-500 cursor-pointer hover:text-slate-700" />
                   <div className="flex-1 rounded-full bg-white px-3 py-1.5 text-[11px] text-slate-400 shadow-inner">
                     Digite uma mensagem...
                   </div>
-                  <Camera className="h-4 w-4 text-slate-500 cursor-pointer hover:text-slate-700" />
-                  <div className="flex size-7 items-center justify-center rounded-full bg-[#00A884] text-white shadow-sm cursor-pointer">
-                    <Mic className="h-3.5 w-3.5" />
+                  <Camera className="size-4 text-slate-500 cursor-pointer hover:text-slate-700" />
+                  <div className="flex size-7 items-center justify-center rounded-full bg-[#00A884] text-white shadow-2xs cursor-pointer">
+                    <Mic className="size-3.5" />
                   </div>
                 </div>
 
               </div>
             </div>
+
           </div>
 
         </div>
