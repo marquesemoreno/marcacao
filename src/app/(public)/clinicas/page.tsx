@@ -64,10 +64,10 @@ export default async function ClinicasCredenciadasPage({ searchParams }: Clinica
         </div>
 
         <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight sm:text-4xl">
-          Rede de Clínicas e Laboratórios Credenciados
+          Rede de Clínicas e Centros Médicos Credenciados
         </h1>
         <p className="text-base sm:text-lg text-slate-600 leading-relaxed font-normal">
-          Centros médicos de referência em Vitória da Conquista, Barra do Choça, Planalto e região com atendimento particular e valores sob consulta.
+          Encontre atendimento particular com valores sob consulta em Vitória da Conquista, Barra do Choça, Planalto e região.
         </p>
 
         {/* Filter Form with Text Search + City + Neighborhood */}
@@ -149,7 +149,7 @@ export default async function ClinicasCredenciadasPage({ searchParams }: Clinica
                   <div className="absolute bottom-3 left-4 right-4 flex items-center justify-between">
                     <Badge variant="outline" className="border-emerald-300 bg-emerald-950/80 text-emerald-300 backdrop-blur-xs font-mono text-[10px] uppercase font-bold">
                       <CheckCircle2 className="size-3 mr-1 text-emerald-400" />
-                      Credenciada Conecta
+                      Credenciada Oficial
                     </Badge>
                     <RatingStars rating={clinic.rating} reviewCount={clinic.reviewCount} />
                   </div>
@@ -177,7 +177,7 @@ export default async function ClinicasCredenciadasPage({ searchParams }: Clinica
                   {clinic.clinicProcedures && clinic.clinicProcedures.length > 0 && (
                     <div className="border-t border-slate-100 pt-3">
                       <p className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400 mb-2">
-                        Procedimentos em Destaque:
+                        Especialidades Atendidas:
                       </p>
                       <div className="flex flex-wrap gap-1.5">
                         {clinic.clinicProcedures.slice(0, 5).map(({ procedure }) => (
@@ -210,7 +210,7 @@ export default async function ClinicasCredenciadasPage({ searchParams }: Clinica
                     className="h-11 w-full bg-teal-600 text-white font-bold rounded-xl shadow-2xs hover:bg-teal-700 transition-all flex items-center justify-center gap-1.5 text-xs"
                   >
                     <Building2 className="size-3.5" />
-                    <span>Ver Procedimentos e Exames</span>
+                    <span>Ver Procedimentos</span>
                     <ArrowRight className="size-3.5" />
                   </Button>
 
@@ -223,7 +223,7 @@ export default async function ClinicasCredenciadasPage({ searchParams }: Clinica
                     className="h-10 w-full border-emerald-300 text-emerald-800 bg-emerald-50/60 font-bold rounded-xl hover:bg-emerald-100 transition-all flex items-center justify-center gap-1.5 text-xs"
                   >
                     <MessageCircle className="size-3.5 text-emerald-600" />
-                    <span>Contato via WhatsApp</span>
+                    <span>Falar no WhatsApp</span>
                   </Button>
                 </div>
               </div>

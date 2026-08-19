@@ -1,15 +1,10 @@
 import { HeroSection } from "@/components/public/landing/hero-section";
 import { SpecialtyGrid } from "@/components/public/landing/specialty-grid";
 import { WhatsAppShowcase } from "@/components/public/landing/whatsapp-showcase";
-import { HowItWorks } from "@/components/public/landing/how-it-works";
 import { FeaturedClinics } from "@/components/public/landing/featured-clinics";
-import { BenefitsSection } from "@/components/public/landing/benefits-section";
 import { FaqSection } from "@/components/public/landing/faq-section";
 import { getFeaturedClinics, getSpecialtyStartingPrices } from "@/actions/search";
 
-// Preços/avaliações mudam a qualquer momento — evita que a home fique
-// congelada com dados do instante do build (e evita build do Docker
-// depender de um banco acessível/populado nesse momento, ver Dockerfile).
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
@@ -20,12 +15,19 @@ export default async function HomePage() {
 
   return (
     <main className="flex flex-col">
+      {/* 1. Hero Section com Busca (Cidade + Especialidade) */}
       <HeroSection />
+
+      {/* 2. Grid de Especialidades Populares (com Valores sob consulta) */}
       <SpecialtyGrid prices={specialtyPrices} />
+
+      {/* 3. Seção Única do WhatsApp / Como Funciona */}
       <WhatsAppShowcase />
+
+      {/* 4. Vitrine de Clínicas Parceiras (com botão levando para /clinicas) */}
       <FeaturedClinics clinics={clinics} />
-      <HowItWorks />
-      <BenefitsSection />
+
+      {/* 5. FAQ e Rodapé */}
       <FaqSection />
     </main>
   );

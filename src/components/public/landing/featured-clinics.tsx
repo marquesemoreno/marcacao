@@ -131,6 +131,18 @@ export function FeaturedClinics({ clinics }: { clinics: FeaturedClinic[] }) {
           ))}
         </div>
 
+        {/* Footer CTA: Ver todas as clínicas */}
+        <div className="mt-10 text-center">
+          <Button
+            render={<Link href="/clinicas" />}
+            nativeButton={false}
+            variant="outline"
+            className="h-12 border-teal-300 bg-white text-teal-800 font-bold rounded-2xl px-8 hover:bg-teal-50 shadow-2xs text-sm"
+          >
+            <span>Ver Toda a Rede de Clínicas Credenciadas</span>
+            <ArrowRight className="h-4 w-4 ml-2" />
+          </Button>
+        </div>
       </div>
     </section>
   );
