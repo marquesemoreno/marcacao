@@ -1163,10 +1163,11 @@ async function main() {
   console.log("Seeding conversas de demonstração...");
   const santaClaraClinicId = clinics.get("Clinica Cirurgica Santa Clara");
   if (santaClaraClinicId) {
+    // Conversa 1: Marcos Silva (Urologia / Vasectomia)
     const contact1 = await prisma.contact.upsert({
-      where: { phone: "77999110001" },
-      update: { name: "Maria Silva (Demonstração)" },
-      create: { phone: "77999110001", name: "Maria Silva (Demonstração)" },
+      where: { phone: "77999881122" },
+      update: { name: "Marcos Silva" },
+      create: { phone: "77999881122", name: "Marcos Silva" },
     });
 
     await prisma.conversation.upsert({
@@ -1179,26 +1180,38 @@ async function main() {
         status: "OPEN",
         funnelStage: "TRIAGEM",
         department: "RECEPCAO",
-        tags: ["Consulta Geral", "Urgente"],
+        tags: ["Urologia", "Vasectomia"],
         lastMessageAt: new Date(),
         messages: {
           create: [
             {
               direction: "INBOUND",
-              content: "Olá! Gostaria de consultar o valor da consulta com cirurgião geral para esta semana.",
+              content: "Olá! Gostaria de saber os horários disponíveis para consulta com Urologista e informações sobre cirurgia de Vasectomia.",
+              status: "DELIVERED",
+              createdAt: new Date(Date.now() - 1000 * 60 * 60),
+            },
+            {
+              direction: "OUTBOUND",
+              content: "Olá Marcos! Atendemos na Urolaser com tabela especial Conecta Saúde sob consulta. O especialista em Urologia atende às terças e quintas.",
+              status: "DELIVERED",
+              createdAt: new Date(Date.now() - 1000 * 60 * 45),
+            },
+            {
+              direction: "INBOUND",
+              content: "Excelente! Quais documentos preciso levar no dia da primeira consulta?",
               status: "DELIVERED",
               createdAt: new Date(Date.now() - 1000 * 60 * 30),
             },
             {
               direction: "OUTBOUND",
-              content: "Olá Maria! Na Clínica Santa Clara atendemos com valor sob consulta negociado sem carência. Temos horários disponíveis para quinta-feira às 14:00.",
+              content: "Traga documento com foto e a Guia Conecta Saúde gerada no app. Quer que eu reserve seu horário para esta quinta-feira?",
               status: "DELIVERED",
               createdAt: new Date(Date.now() - 1000 * 60 * 20),
             },
             {
               direction: "OUTBOUND",
               type: "INTERNAL_NOTE",
-              content: "🔒 Paciente preferencial encaminhada pelo Dr. Roberto. Agendar sem custo adicional.",
+              content: "🔒 Paciente prefere atendimento no turno da tarde.",
               status: "DELIVERED",
               createdAt: new Date(Date.now() - 1000 * 60 * 10),
             },
@@ -1207,10 +1220,11 @@ async function main() {
       },
     });
 
+    // Conversa 2: Dra. Camila Santos (Lead B2B - Barra do Choça)
     const contact2 = await prisma.contact.upsert({
-      where: { phone: "77999110002" },
-      update: { name: "Carlos Oliveira (Demonstração)" },
-      create: { phone: "77999110002", name: "Carlos Oliveira (Demonstração)" },
+      where: { phone: "77988773344" },
+      update: { name: "Dra. Camila Santos" },
+      create: { phone: "77988773344", name: "Dra. Camila Santos" },
     });
 
     await prisma.conversation.upsert({
@@ -1221,23 +1235,68 @@ async function main() {
         clinicId: santaClaraClinicId,
         contactId: contact2.id,
         status: "OPEN",
-        funnelStage: "AGENDADO",
-        department: "AGENDAMENTO",
-        tags: ["Ultrassom", "Jejum"],
-        lastMessageAt: new Date(),
+        funnelStage: "NOVOS",
+        department: "RECEPCAO",
+        tags: ["Lead B2B", "Prioritário"],
+        lastMessageAt: new Date(Date.now() - 1000 * 60 * 5),
         messages: {
           create: [
             {
               direction: "INBOUND",
-              content: "Preciso de informações sobre o preparo para ultrassom de abdome total.",
+              content: "Boa tarde! Sou a Dra. Camila Santos, gestora do Centro Médico Choça. Gostaria de credenciar nossa unidade à Rede Conecta Saúde.",
               status: "DELIVERED",
-              createdAt: new Date(Date.now() - 1000 * 60 * 45),
+              createdAt: new Date(Date.now() - 1000 * 60 * 40),
             },
             {
               direction: "OUTBOUND",
-              content: "📌 Orientação: Para a ultrassonografia abdominal, mantenha jejum de 8 horas e tome 4 copos de água 1 hora antes do exame.",
+              content: "Olá Dra. Camila! Seja muito bem-vinda à Conecta Saúde. Nosso modelo de credenciamento sem mensalidade atende perfeitamente a região de Barra do Choça. Vamos agendar uma reunião comercial?",
               status: "DELIVERED",
               createdAt: new Date(Date.now() - 1000 * 60 * 15),
+            },
+          ],
+        },
+      },
+    });
+
+    // Conversa 3: Maria Eduarda (Ultrassom - Santa Clara)
+    const contact3 = await prisma.contact.upsert({
+      where: { phone: "77991223344" },
+      update: { name: "Maria Eduarda" },
+      create: { phone: "77991223344", name: "Maria Eduarda" },
+    });
+
+    await prisma.conversation.upsert({
+      where: { id: "demo-conv-3" },
+      update: {},
+      create: {
+        id: "demo-conv-3",
+        clinicId: santaClaraClinicId,
+        contactId: contact3.id,
+        status: "OPEN",
+        funnelStage: "AGENDADO",
+        department: "AGENDAMENTO",
+        tags: ["Ultrassom", "Jejum"],
+        lastMessageAt: new Date(Date.now() - 1000 * 60 * 2),
+        messages: {
+          create: [
+            {
+              direction: "INBOUND",
+              content: "Oi! Preciso confirmar os procedimentos para o meu exame de ultrassonografia amanhã de manhã na Santa Clara.",
+              status: "DELIVERED",
+              createdAt: new Date(Date.now() - 1000 * 60 * 50),
+            },
+            {
+              direction: "OUTBOUND",
+              content: "Olá Maria Eduarda! Seu exame de Ultrassom Abdominal está pré-agendado. Lembre-se de manter jejum de 8 horas e tomar 4 copos de água 1 hora antes do exame.",
+              status: "DELIVERED",
+              createdAt: new Date(Date.now() - 1000 * 60 * 25),
+            },
+            {
+              direction: "OUTBOUND",
+              type: "INTERNAL_NOTE",
+              content: "🔒 Guia de agendamento gerada e enviada via WhatsApp.",
+              status: "DELIVERED",
+              createdAt: new Date(Date.now() - 1000 * 60 * 5),
             },
           ],
         },
