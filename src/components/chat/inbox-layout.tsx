@@ -13,6 +13,7 @@ import { MessageBubble } from './message-bubble';
 import { ScheduleModal } from './schedule-modal';
 import { AvatarBadge } from './avatar-badge';
 import type { PlainClinicProcedureItem } from '@/lib/serialize';
+import { toast } from "sonner";
 import {
   Search,
   Send,
@@ -28,6 +29,7 @@ import {
   Plus,
   X,
   Phone,
+  Sparkles,
   MessageSquare,
   Zap,
   Clock,
@@ -64,6 +66,7 @@ interface InboxLayoutProps {
   onFinishAttendance: () => Promise<void> | void;
   fetchProcedures: () => Promise<PlainClinicProcedureItem[]>;
   onScheduleConfirmed: (data: { appointmentId: string; specialty: string; doctor: string; date: string; time: string; price: string }) => void;
+  onSuggestIaReply?: () => Promise<string>;
 }
 
 export const InboxLayout: React.FC<InboxLayoutProps> = ({
@@ -85,6 +88,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
   onFinishAttendance,
   fetchProcedures,
   onScheduleConfirmed,
+  onSuggestIaReply,
 }) => {
   const [selectedDept, setSelectedDept] = useState<Department | 'todos'>('todos');
   const [composerMode, setComposerMode] = useState<'whatsapp' | 'internal_note'>('whatsapp');
@@ -94,6 +98,23 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
   const [isQuickReplyOpen, setIsQuickReplyOpen] = useState(false);
   const [newTagInput, setNewTagInput] = useState('');
   const [isAddingTag, setIsAddingTag] = useState(false);
+  const [isGeneratingIa, setIsGeneratingIa] = useState(false);
+
+  async function handleGenerateIaReply() {
+    if (!onSuggestIaReply || isGeneratingIa) return;
+    setIsGeneratingIa(true);
+    try {
+      const suggestion = await onSuggestIaReply();
+      if (suggestion) {
+        setInputText(suggestion);
+        toast.success("Rascunho de IA inserido na resposta!");
+      }
+    } catch {
+      toast.error("Não foi possível gerar sugestão de IA.");
+    } finally {
+      setIsGeneratingIa(false);
+    }
+  }
 
   // Responsividade Móvel: controle de visão ('queue' | 'chat' | 'crm')
   const [mobileView, setMobileView] = useState<'queue' | 'chat' | 'crm'>(
@@ -582,6 +603,17 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                       >
                         <Zap className="w-3 h-3 text-amber-500" />
                         /respostas
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={handleGenerateIaReply}
+                        disabled={isGeneratingIa}
+                        className="flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-bold text-teal-800 bg-teal-50 hover:bg-teal-100 border border-teal-200/80 rounded-md transition-all shadow-2xs font-mono"
+                        title="Sugerir resposta com IA baseada no contexto do paciente"
+                      >
+                        <Sparkles className={`w-3 h-3 text-teal-600 ${isGeneratingIa ? 'animate-spin' : ''}`} />
+                        <span>{isGeneratingIa ? 'Gerando...' : '✨ Sugerir Resposta com IA'}</span>
                       </button>
                     </div>
 

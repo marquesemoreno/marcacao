@@ -369,3 +369,14 @@ model WebhookLog {
 
   @@map("webhook_logs")
 }
+
+model ChatAutomation {
+  id           String   @id @default(cuid())
+  keyword      String   @unique
+  responseText String   @map("response_text")
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@map("chat_automations")
+}

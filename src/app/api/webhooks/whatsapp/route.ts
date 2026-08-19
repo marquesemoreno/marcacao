@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { AppointmentStatus, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { notifyAppointmentStatus } from "@/lib/whatsapp";
+import { notifyAppointmentStatus, whatsappService } from "@/lib/whatsapp";
 
 type IncomingMessage = { phone: string; text: string; name?: string };
 
@@ -148,6 +148,26 @@ export async function POST(request: Request) {
       where: { id: conversation.id },
       data: { lastMessageAt: new Date(), status: conversation.status === "RESOLVED" ? "OPEN" : conversation.status },
     });
+
+    const activeAutomations = await prisma.chatAutomation.findMany({
+      where: { active: true },
+    });
+    const textLower = incoming.text.toLowerCase();
+    const matchedAutomation = activeAutomations.find((auto) =>
+      textLower.includes(auto.keyword.toLowerCase())
+    );
+
+    if (matchedAutomation) {
+      await prisma.message.create({
+        data: {
+          conversationId: conversation.id,
+          direction: "OUTBOUND",
+          content: matchedAutomation.responseText,
+          status: "DELIVERED",
+        },
+      });
+      whatsappService.sendMessage(incoming.phone, matchedAutomation.responseText, "chat_automation.triggered").catch(() => {});
+    }
   }
 
   const newStatus = resolveStatusFromReply(incoming.text);

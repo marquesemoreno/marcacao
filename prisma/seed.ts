@@ -1137,6 +1137,29 @@ async function main() {
     });
   }
 
+  const automations = [
+    {
+      keyword: "jejum",
+      responseText: "📌 *Orientação sobre Jejum:* Para exames de ultrassonografia abdominal e exames de sangue gerais, recomenda-se jejum de 8 a 12 horas. Beba água moderadamente.",
+    },
+    {
+      keyword: "preparo",
+      responseText: "📋 *Preparo Geral:* Chegue com 15 minutos de antecedência munido de documento com foto e a Guia Oficial do Conecta Saúde.",
+    },
+    {
+      keyword: "localizacao",
+      responseText: "📍 *Localização:* Nossas clínicas parceiras estão situadas no Centro, Recreio e Candeias em Vitória da Conquista. Consulte sua guia para o endereço exato.",
+    },
+  ];
+
+  for (const auto of automations) {
+    await prisma.chatAutomation.upsert({
+      where: { keyword: auto.keyword },
+      update: { responseText: auto.responseText, active: true },
+      create: { keyword: auto.keyword, responseText: auto.responseText, active: true },
+    });
+  }
+
   console.log("Seed concluído.");
   console.log("\nCredenciais de acesso:");
   console.log(`  Admin:                    admin@tivdc.com.br / ${ADMIN_PASSWORD}`);

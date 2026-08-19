@@ -17,6 +17,7 @@ import {
   reopenConversation,
   listCannedResponses,
   listClinicProceduresForAppointment,
+  suggestIaReply,
 } from "@/actions/inbox";
 import {
   listChatContactsAdmin,
@@ -31,6 +32,7 @@ import {
   reopenConversationAdmin,
   listCannedResponsesAdmin,
   listClinicProceduresForAppointmentAdmin,
+  suggestIaReplyAdmin,
 } from "@/actions/admin-inbox";
 import { useInboxRealtime } from "@/hooks/use-inbox-realtime";
 import { playNotificationSound } from "@/lib/notification-sound";
@@ -54,6 +56,7 @@ const ACTIONS_BY_SCOPE = {
     resolveConversation,
     reopenConversation,
     listCannedResponses,
+    suggestIaReply,
   },
   admin: {
     listChatContacts: listChatContactsAdmin,
@@ -67,6 +70,7 @@ const ACTIONS_BY_SCOPE = {
     resolveConversation: resolveConversationAdmin,
     reopenConversation: reopenConversationAdmin,
     listCannedResponses: listCannedResponsesAdmin,
+    suggestIaReply: suggestIaReplyAdmin,
   },
 } as const;
 
@@ -289,6 +293,10 @@ export function ChatCrmApp({ scope, basePath, view }: ChatCrmAppProps) {
           onFinishAttendance={handleFinishAttendance}
           fetchProcedures={fetchProcedures}
           onScheduleConfirmed={handleScheduleConfirmed}
+          onSuggestIaReply={async () => {
+            if (!selectedContactId) return "";
+            return actions.suggestIaReply(selectedContactId);
+          }}
         />
       ) : (
         <CRMKanban

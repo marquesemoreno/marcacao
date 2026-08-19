@@ -8,6 +8,7 @@ import { whatsappService } from "@/lib/whatsapp";
 import { toPlainClinicProcedureItem } from "@/lib/serialize";
 import { toChatContact, toChatMessage, departmentToDb, funnelStageToDb } from "@/lib/chat-crm-adapters";
 import type { Department, FunnelStage, InboxFilter } from "@/types/chat-crm";
+import { applyMessageVariables, getBaseUrl } from "@/lib/format";
 import {
   sendMessageSchema,
   updateTagsSchema,
@@ -341,7 +342,7 @@ export async function updateConversationFunnelStage(conversationId: string, stag
 
   const conversation = await prisma.conversation.findUnique({
     where: { id: conversationId },
-    select: { clinicId: true },
+    include: { contact: true, clinic: true },
   });
   if (!conversation || conversation.clinicId !== clinicId) {
     throw new Error("Conversa não encontrada");
@@ -351,6 +352,43 @@ export async function updateConversationFunnelStage(conversationId: string, stag
     where: { id: conversationId },
     data: { funnelStage: funnelStageToDb[stage] },
   });
+
+  if (stage === "agendado") {
+    const appointment = await prisma.appointment.findFirst({
+      where: {
+        patientPhone: { endsWith: conversation.contact.phone.slice(-11) },
+        status: { in: ["PENDING", "CONFIRMED"] },
+      },
+      orderBy: { createdAt: "desc" },
+      include: { clinicProcedure: { include: { procedure: true } } },
+    });
+
+    const patientFirstName = conversation.contact.name.split(" ")[0];
+    const clinicName = conversation.clinic.tradeName;
+    const procedureName = appointment?.clinicProcedure.procedure.name || "Consulta/Exame";
+    const guideUrl = appointment
+      ? `${getBaseUrl()}/comprovante/${appointment.id}`
+      : `${getBaseUrl()}/procedimentos`;
+
+    const rawTemplate = "✅ *Agendamento Confirmado!* 👋 Olá, {{nome}}! Seu agendamento para *{{procedimento}}* na clínica *{{clinica}}* foi confirmado com sucesso!\n\n📎 Guia Oficial com QR Code: " + guideUrl;
+    const confirmMessage = applyMessageVariables(rawTemplate, {
+      nome: patientFirstName,
+      clinica: clinicName,
+      procedimento: procedureName,
+    });
+
+    await prisma.message.create({
+      data: {
+        conversationId,
+        direction: "OUTBOUND",
+        content: confirmMessage,
+        status: "DELIVERED",
+      },
+    });
+
+    whatsappService.sendMessage(conversation.contact.phone, confirmMessage, "appointment.confirmed.crm_kanban").catch(() => {});
+  }
+
   revalidatePath("/clinic/inbox");
 }
 
@@ -370,4 +408,36 @@ export async function updateConversationDepartment(conversationId: string, depar
     data: { department: departmentToDb[department] },
   });
   revalidatePath("/clinic/inbox");
+}
+
+export async function suggestIaReply(conversationId: string) {
+  const { clinicId } = await requireClinicSession();
+  const conversation = await prisma.conversation.findUnique({
+    where: { id: conversationId },
+    include: {
+      contact: true,
+      clinic: true,
+      messages: { orderBy: { createdAt: "desc" }, take: 6 },
+    },
+  });
+
+  if (!conversation || conversation.clinicId !== clinicId) {
+    throw new Error("Conversa não encontrada");
+  }
+
+  const patientName = conversation.contact.name.split(" ")[0];
+  const lastInbound = conversation.messages.find((m) => m.direction === "INBOUND");
+  const lastText = lastInbound?.content.toLowerCase() || "";
+
+  if (lastText.includes("jejum") || lastText.includes("preparo")) {
+    return `Olá, ${patientName}! 👋 Para exames de ultrassonografia e laboratoriais, recomendamos jejum de 8 a 12 horas. Como posso te auxiliar com seu atendimento hoje?`;
+  }
+  if (lastText.includes("valor") || lastText.includes("preço") || lastText.includes("quanto")) {
+    return `Olá, ${patientName}! 👋 Nossas consultas e exames são particulares com valores negociados sob consulta e sem mensalidade. Qual especialidade você precisa?`;
+  }
+  if (lastText.includes("endereco") || lastText.includes("localizacao") || lastText.includes("onde")) {
+    return `Olá, ${patientName}! 👋 Ficamos localizados na ${conversation.clinic.address}, no bairro ${conversation.clinic.neighborhood}. Gostaria de agendar seu horário?`;
+  }
+
+  return `Olá, ${patientName}! 👋 Obrigado por entrar em contato com a ${conversation.clinic.tradeName}. Como posso te ajudar com o seu agendamento hoje?`;
 }

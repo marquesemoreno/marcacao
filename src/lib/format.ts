@@ -42,6 +42,19 @@ export function maskCpf(value: string) {
   return `${digits.slice(0, 3)}.***.**${digits[8]}-${digits.slice(9)}`;
 }
 
+/** Substitui tags dinâmicas como {{nome}}, {{clinica}}, {{procedimento}}, {{data}} nas mensagens de notificação. */
+export function applyMessageVariables(
+  template: string,
+  vars: { nome?: string; clinica?: string; procedimento?: string; data?: string }
+) {
+  let result = template;
+  if (vars.nome) result = result.replace(/\{\{\s*nome\s*\}\}/gi, vars.nome);
+  if (vars.clinica) result = result.replace(/\{\{\s*clinica\s*\}\}/gi, vars.clinica);
+  if (vars.procedimento) result = result.replace(/\{\{\s*procedimento\s*\}\}/gi, vars.procedimento);
+  if (vars.data) result = result.replace(/\{\{\s*data\s*\}\}/gi, vars.data);
+  return result;
+}
+
 /** Domínio oficial de produção — usado nos links absolutos (QR Code, WhatsApp, metadata). */
 const PRODUCTION_URL = "https://conectasaudevc.com.br";
 
