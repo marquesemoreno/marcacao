@@ -18,6 +18,8 @@ type ProceduresPageProps = {
   }>;
 };
 
+export const dynamic = "force-dynamic";
+
 export default async function ProceduresCatalogPage({ searchParams }: ProceduresPageProps) {
   const params = await searchParams;
 

@@ -14,6 +14,8 @@ type ClinicasPageProps = {
   }>;
 };
 
+export const dynamic = "force-dynamic";
+
 const clinicPhotos = [
   "https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?w=800&auto=format&fit=crop&q=80",
   "https://images.unsplash.com/photo-1629909614456-6b1c5c94cecc?w=800&auto=format&fit=crop&q=80",
