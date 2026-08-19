@@ -247,7 +247,7 @@ export function ChatCrmApp({ scope, basePath, view }: ChatCrmAppProps) {
   }
 
   return (
-    <div className="flex h-full w-full flex-col">
+    <div className="flex h-[calc(100vh-3.5rem)] w-full flex-col overflow-hidden">
       {view === "inbox" ? (
         <InboxLayout
           contacts={contacts}

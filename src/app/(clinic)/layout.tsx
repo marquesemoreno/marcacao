@@ -5,9 +5,6 @@ import { Logo } from "@/components/brand/logo";
 import { ClinicNav } from "@/components/clinic/clinic-nav";
 import { getClinicInfo } from "@/actions/clinic";
 
-// Evita que o Next tente pré-renderizar estaticamente rotas protegidas
-// (getServerSession não tem request de verdade em build-time e pode
-// quebrar a montagem de URL — ver docs/obsidian/01, seção de deploy).
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
@@ -19,24 +16,31 @@ export default async function ClinicLayout({
   const [clinic, session] = await Promise.all([getClinicInfo(), getServerSession(authOptions)]);
 
   return (
-    <div className="flex h-screen flex-col overflow-hidden bg-slate-50">
-      <header className="flex items-center justify-between gap-4 border-b border-slate-200 bg-white px-4 py-3 sm:px-6">
-        <div className="flex min-w-0 items-center gap-3">
-          <Logo variant="icon-only" size="sm" />
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <p className="truncate text-base font-bold text-slate-900">{clinic.tradeName}</p>
-              <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
-                🟢 Clínica Ativa
-              </span>
-            </div>
-            <p className="truncate text-xs text-slate-500">Painel da Clínica</p>
+    <div className="flex h-screen w-screen flex-col overflow-hidden bg-slate-50">
+      {/* Cabeçalho Slim de Linha Única (56px / h-14) */}
+      <header className="flex h-14 shrink-0 items-center justify-between gap-4 border-b border-slate-200/80 bg-white px-4">
+        {/* Esquerda: Logo + Nome da Clínica + Badge */}
+        <div className="flex shrink-0 items-center gap-2.5">
+          <Logo variant="full" size="sm" />
+          <div className="hidden sm:flex items-center gap-1.5 border-l border-slate-200 pl-2.5">
+            <span className="font-extrabold text-xs text-slate-900 truncate max-w-[140px] sm:max-w-[180px]">
+              {clinic.tradeName}
+            </span>
+            <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 border border-emerald-200/80 px-2 py-0.5 text-[10px] font-extrabold text-emerald-700 font-mono">
+              🟢 Clínica
+            </span>
           </div>
         </div>
 
+        {/* Centro: Abas de Navegação */}
+        <div className="flex-1 overflow-x-auto min-w-0 flex items-center justify-center">
+          <ClinicNav />
+        </div>
+
+        {/* Direita: Nome do Usuário + Sair */}
         <div className="flex shrink-0 items-center gap-3">
           {session?.user.name && (
-            <span className="hidden text-sm font-medium text-slate-600 sm:inline">
+            <span className="hidden text-xs font-bold text-slate-700 md:inline font-mono">
               {session.user.name}
             </span>
           )}
@@ -44,11 +48,8 @@ export default async function ClinicLayout({
         </div>
       </header>
 
-      <div className="border-b border-slate-200 bg-white px-4 py-3 sm:px-6">
-        <ClinicNav />
-      </div>
-
-      <main className="flex-1 overflow-y-auto p-4 sm:p-6">{children}</main>
+      {/* Conteúdo Principal em Tela Cheia */}
+      <main className="flex-1 overflow-hidden flex flex-col">{children}</main>
     </div>
   );
 }

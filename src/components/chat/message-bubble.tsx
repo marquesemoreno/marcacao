@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { Message } from '@/types/chat-crm';
-import { Play, Pause, Lock, CheckCheck, FileText, Copy, Check } from 'lucide-react';
+import { Play, Pause, Lock, CheckCheck, FileText, Copy, Check, Download, ZoomIn, X, Image as ImageIcon } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface MessageBubbleProps {
@@ -11,13 +11,21 @@ interface MessageBubbleProps {
 
 export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
   const [isPlaying, setIsPlaying] = useState(false);
+  const [playbackSpeed, setPlaybackSpeed] = useState<'1x' | '1.5x' | '2x'>('1x');
   const [copied, setCopied] = useState(false);
+  const [isLightboxOpen, setIsLightboxOpen] = useState(false);
 
   const handleCopyText = (text: string) => {
     navigator.clipboard.writeText(text);
     setCopied(true);
     toast.success('Texto copiado para a área de transferência!');
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const cycleSpeed = () => {
+    if (playbackSpeed === '1x') setPlaybackSpeed('1.5x');
+    else if (playbackSpeed === '1.5x') setPlaybackSpeed('2x');
+    else setPlaybackSpeed('1x');
   };
 
   // 1. Nota Interna Privada
@@ -28,7 +36,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
           <div className="flex items-center justify-between pb-2 border-b border-amber-200/70">
             <span className="inline-flex items-center gap-1.5 font-bold text-[11px] text-amber-800 bg-amber-100/90 px-2.5 py-0.5 rounded-full uppercase tracking-wider font-mono">
               <Lock className="w-3 h-3 text-amber-700" />
-              Nota Privada (Equipe)
+              🔒 Nota Privada (Equipe)
             </span>
             <div className="flex items-center gap-2">
               <button
@@ -103,7 +111,22 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
               </div>
 
               <div className="flex justify-between items-center text-[10.5px] opacity-85 font-mono">
-                <span>{message.audioDuration || '0:34'}</span>
+                <div className="flex items-center gap-2">
+                  <span>{message.audioDuration || '0:34'}</span>
+                  {/* Seletor de Velocidade */}
+                  <button
+                    onClick={cycleSpeed}
+                    className={`px-1.5 py-0.5 rounded font-mono font-extrabold text-[10px] transition-colors ${
+                      isAgent
+                        ? 'bg-emerald-700 hover:bg-emerald-800 text-emerald-100'
+                        : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                    }`}
+                    title="Alternar velocidade de reprodução (1x, 1.5x, 2x)"
+                  >
+                    {playbackSpeed}
+                  </button>
+                </div>
+
                 <span className="flex items-center gap-1">
                   {message.timestamp}
                   {isAgent && <CheckCheck className="w-3.5 h-3.5 text-emerald-200" />}
@@ -116,36 +139,81 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
     );
   }
 
-  // 3. Balão de Anexo
+  // 3. Balão de Anexo / Imagem / Documento
   if (message.type === 'attachment') {
     return (
-      <div
-        className={`flex w-full mb-3 animate-in fade-in slide-in-from-bottom-1 duration-150 ${isAgent ? 'justify-end' : 'justify-start'}`}
-        data-od-id={`attachment-msg-${message.id}`}
-      >
+      <>
         <div
-          className={`max-w-md rounded-2xl p-3.5 shadow-2xs ${
-            isAgent
-              ? 'bg-emerald-600 text-white rounded-tr-xs'
-              : 'bg-white border border-slate-200/90 text-slate-800 rounded-tl-xs hover:border-slate-300'
-          }`}
+          className={`flex w-full mb-3 animate-in fade-in slide-in-from-bottom-1 duration-150 ${isAgent ? 'justify-end' : 'justify-start'}`}
+          data-od-id={`attachment-msg-${message.id}`}
         >
-          <div className="flex items-center gap-3 p-2.5 rounded-xl bg-black/5 mb-2 border border-black/5">
-            <div className={`p-2 rounded-lg ${isAgent ? 'bg-white/20' : 'bg-slate-100 text-slate-600'}`}>
-              <FileText className="w-5 h-5" />
+          <div
+            className={`max-w-md rounded-2xl p-3.5 shadow-2xs cursor-pointer transition-all ${
+              isAgent
+                ? 'bg-emerald-600 text-white rounded-tr-xs'
+                : 'bg-white border border-slate-200/90 text-slate-800 rounded-tl-xs hover:border-slate-300'
+            }`}
+            onClick={() => setIsLightboxOpen(true)}
+          >
+            <div className="flex items-center gap-3 p-2.5 rounded-xl bg-black/5 mb-2 border border-black/5 hover:bg-black/10 transition-colors">
+              <div className={`p-2 rounded-lg ${isAgent ? 'bg-white/20' : 'bg-slate-100 text-slate-600'}`}>
+                <FileText className="w-5 h-5" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-semibold truncate">{message.attachmentName || 'documento_pedido.pdf'}</p>
+                <p className="text-[10px] opacity-80 font-mono">{message.attachmentSize || '1.4 MB'}</p>
+              </div>
+              <ZoomIn className="w-4 h-4 opacity-75 shrink-0" />
             </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-semibold truncate">{message.attachmentName || 'documento.pdf'}</p>
-              <p className="text-[10px] opacity-80 font-mono">{message.attachmentSize || '1.4 MB'}</p>
+            {message.text && <p className="text-xs sm:text-sm mb-1 leading-relaxed">{message.text}</p>}
+            <div className={`flex items-center justify-end gap-1 text-[10.5px] font-mono opacity-85 mt-1`}>
+              <span>{message.timestamp}</span>
+              {isAgent && <CheckCheck className="w-3.5 h-3.5 text-emerald-200" />}
             </div>
-          </div>
-          {message.text && <p className="text-xs sm:text-sm mb-1 leading-relaxed">{message.text}</p>}
-          <div className={`flex items-center justify-end gap-1 text-[10.5px] font-mono opacity-85 mt-1`}>
-            <span>{message.timestamp}</span>
-            {isAgent && <CheckCheck className="w-3.5 h-3.5 text-emerald-200" />}
           </div>
         </div>
-      </div>
+
+        {/* Lightbox Visualizador de Mídias e Pedidos Médicos */}
+        {isLightboxOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+            <div className="relative max-w-2xl w-full bg-white rounded-3xl p-6 shadow-2xl space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div className="flex items-center gap-2">
+                  <FileText className="w-5 h-5 text-teal-600" />
+                  <h3 className="font-extrabold text-slate-900 text-sm">{message.attachmentName || 'Documento / Pedido Médico'}</h3>
+                </div>
+                <button
+                  onClick={() => setIsLightboxOpen(false)}
+                  className="p-1.5 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-100"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Preview Container */}
+              <div className="flex flex-col items-center justify-center p-8 bg-slate-50 border border-dashed border-slate-200 rounded-2xl space-y-3">
+                <ImageIcon className="w-16 h-16 text-teal-500" />
+                <p className="text-xs font-bold text-slate-700">{message.attachmentName || 'arquivo_anexo.pdf'}</p>
+                <span className="text-[11px] text-slate-400 font-mono">{message.attachmentSize || '1.4 MB'}</span>
+              </div>
+
+              {/* Actions */}
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  onClick={() => {
+                    toast.success('Download iniciado!');
+                    setIsLightboxOpen(false);
+                  }}
+                  className="inline-flex items-center justify-center gap-2 h-10 px-4 bg-teal-600 text-white font-bold text-xs rounded-xl shadow-2xs hover:bg-teal-700"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>Baixar Arquivo</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </>
     );
   }
 
@@ -175,4 +243,3 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
     </div>
   );
 };
-

@@ -13,7 +13,7 @@ export default async function AdminDashboardPage() {
   const maxProcedureCount = Math.max(...kpis.topProcedures.map((p) => p.count), 1);
 
   return (
-    <div className="space-y-8 bg-slate-50/60 p-1 sm:p-2 min-h-full">
+    <div className="space-y-8 bg-slate-50/60 p-4 sm:p-6 flex-1 overflow-y-auto">
       {/* Header com Título e Ações Rápidas */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-slate-200/60 pb-5">
         <div>
