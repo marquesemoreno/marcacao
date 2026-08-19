@@ -75,9 +75,10 @@ export async function getFinancialReport() {
 export async function getKpis() {
   await requireAdminSession();
 
-  const [totalOrders, convertedOrders, topProceduresRaw] = await Promise.all([
+  const [totalOrders, convertedOrders, totalAffiliates, topProceduresRaw] = await Promise.all([
     prisma.appointment.count(),
     prisma.appointment.count({ where: { status: { in: ["CONFIRMED", "COMPLETED"] } } }),
+    prisma.affiliate.count(),
     prisma.appointment.groupBy({
       by: ["clinicProcedureId"],
       _count: { clinicProcedureId: true },
@@ -88,18 +89,19 @@ export async function getKpis() {
 
   const clinicProcedures = await prisma.clinicProcedure.findMany({
     where: { id: { in: topProceduresRaw.map((item) => item.clinicProcedureId) } },
-    include: { procedure: true },
+    include: { procedure: { include: { specialty: true } } },
   });
 
   const topProcedures = topProceduresRaw.map((item) => {
     const clinicProcedure = clinicProcedures.find((cp) => cp.id === item.clinicProcedureId);
     return {
       name: clinicProcedure?.procedure.name ?? "—",
+      specialty: clinicProcedure?.procedure.specialty?.name ?? "Geral",
       count: item._count.clinicProcedureId,
     };
   });
 
   const conversionRate = totalOrders > 0 ? (convertedOrders / totalOrders) * 100 : 0;
 
-  return { totalOrders, conversionRate, topProcedures };
+  return { totalOrders, conversionRate, totalAffiliates, topProcedures };
 }

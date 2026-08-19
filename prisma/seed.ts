@@ -1160,6 +1160,91 @@ async function main() {
     });
   }
 
+  console.log("Seeding conversas de demonstração...");
+  const santaClaraClinicId = clinics.get("Clinica Cirurgica Santa Clara");
+  if (santaClaraClinicId) {
+    const contact1 = await prisma.contact.upsert({
+      where: { phone: "77999110001" },
+      update: { name: "Maria Silva (Demonstração)" },
+      create: { phone: "77999110001", name: "Maria Silva (Demonstração)" },
+    });
+
+    await prisma.conversation.upsert({
+      where: { id: "demo-conv-1" },
+      update: {},
+      create: {
+        id: "demo-conv-1",
+        clinicId: santaClaraClinicId,
+        contactId: contact1.id,
+        status: "OPEN",
+        funnelStage: "TRIAGEM",
+        department: "RECEPCAO",
+        tags: ["Consulta Geral", "Urgente"],
+        lastMessageAt: new Date(),
+        messages: {
+          create: [
+            {
+              direction: "INBOUND",
+              content: "Olá! Gostaria de consultar o valor da consulta com cirurgião geral para esta semana.",
+              status: "DELIVERED",
+              createdAt: new Date(Date.now() - 1000 * 60 * 30),
+            },
+            {
+              direction: "OUTBOUND",
+              content: "Olá Maria! Na Clínica Santa Clara atendemos com valor sob consulta negociado sem carência. Temos horários disponíveis para quinta-feira às 14:00.",
+              status: "DELIVERED",
+              createdAt: new Date(Date.now() - 1000 * 60 * 20),
+            },
+            {
+              direction: "OUTBOUND",
+              type: "INTERNAL_NOTE",
+              content: "🔒 Paciente preferencial encaminhada pelo Dr. Roberto. Agendar sem custo adicional.",
+              status: "DELIVERED",
+              createdAt: new Date(Date.now() - 1000 * 60 * 10),
+            },
+          ],
+        },
+      },
+    });
+
+    const contact2 = await prisma.contact.upsert({
+      where: { phone: "77999110002" },
+      update: { name: "Carlos Oliveira (Demonstração)" },
+      create: { phone: "77999110002", name: "Carlos Oliveira (Demonstração)" },
+    });
+
+    await prisma.conversation.upsert({
+      where: { id: "demo-conv-2" },
+      update: {},
+      create: {
+        id: "demo-conv-2",
+        clinicId: santaClaraClinicId,
+        contactId: contact2.id,
+        status: "OPEN",
+        funnelStage: "AGENDADO",
+        department: "AGENDAMENTO",
+        tags: ["Ultrassom", "Jejum"],
+        lastMessageAt: new Date(),
+        messages: {
+          create: [
+            {
+              direction: "INBOUND",
+              content: "Preciso de informações sobre o preparo para ultrassom de abdome total.",
+              status: "DELIVERED",
+              createdAt: new Date(Date.now() - 1000 * 60 * 45),
+            },
+            {
+              direction: "OUTBOUND",
+              content: "📌 Orientação: Para a ultrassonografia abdominal, mantenha jejum de 8 horas e tome 4 copos de água 1 hora antes do exame.",
+              status: "DELIVERED",
+              createdAt: new Date(Date.now() - 1000 * 60 * 15),
+            },
+          ],
+        },
+      },
+    });
+  }
+
   console.log("Seed concluído.");
   console.log("\nCredenciais de acesso:");
   console.log(`  Admin:                    admin@tivdc.com.br / ${ADMIN_PASSWORD}`);

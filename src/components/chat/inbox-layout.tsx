@@ -452,6 +452,16 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                   )}
                 </div>
 
+                {/* Botão Criar Agendamento Conecta Saúde */}
+                <button
+                  onClick={() => setIsScheduleModalOpen(true)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-teal-600 hover:bg-teal-700 rounded-xl transition-all shadow-2xs"
+                  title="Criar novo agendamento de consulta ou exame"
+                >
+                  <Calendar className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">➕ Criar Agendamento</span>
+                </button>
+
                 {/* Finalizar Atendimento */}
                 <button
                   onClick={() => onFinishAttendance()}
