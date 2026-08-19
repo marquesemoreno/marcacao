@@ -7,10 +7,13 @@ export default withAuth(
     const { pathname, searchParams } = req.nextUrl;
     const role = req.nextauth.token?.role;
 
-    if (pathname.startsWith("/admin") && role !== "ADMIN") {
+    const isAdminRoute = pathname.startsWith("/admin");
+    const isClinicRoute = (pathname === "/clinic" || pathname.startsWith("/clinic/")) && !pathname.startsWith("/clinicas");
+
+    if (isAdminRoute && role !== "ADMIN") {
       return NextResponse.redirect(new URL("/entrar", req.url));
     }
-    if (pathname.startsWith("/clinic") && role !== "CLINIC") {
+    if (isClinicRoute && role !== "CLINIC") {
       return NextResponse.redirect(new URL("/entrar", req.url));
     }
 
@@ -32,10 +35,13 @@ export default withAuth(
   {
     callbacks: {
       // Só exige sessão para as rotas protegidas — nas demais (incluindo
-      // páginas públicas com ?ref=), deixa passar pra rodar o tracking acima.
+      // páginas públicas como /clinicas, /procedimentos, /buscar com ?ref=), deixa passar.
       authorized: ({ token, req }) => {
         const { pathname } = req.nextUrl;
-        if (pathname.startsWith("/admin") || pathname.startsWith("/clinic")) {
+        const isAdminRoute = pathname.startsWith("/admin");
+        const isClinicRoute = (pathname === "/clinic" || pathname.startsWith("/clinic/")) && !pathname.startsWith("/clinicas");
+
+        if (isAdminRoute || isClinicRoute) {
           return !!token;
         }
         return true;
