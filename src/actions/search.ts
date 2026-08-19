@@ -42,6 +42,7 @@ function buildQueryConditions(query: string): Prisma.ClinicProcedureWhereInput {
 
   const termConditions: Prisma.ClinicProcedureWhereInput[] = Array.from(terms).flatMap((term) => [
     { procedure: { name: { contains: term, mode: "insensitive" as const } } },
+    { procedure: { description: { contains: term, mode: "insensitive" as const } } },
     { procedure: { specialty: { name: { contains: term, mode: "insensitive" as const } } } },
     { clinic: { name: { contains: term, mode: "insensitive" as const } } },
     { clinic: { tradeName: { contains: term, mode: "insensitive" as const } } },

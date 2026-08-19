@@ -3,15 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Menu, X, Building2, Stethoscope, HelpCircle, UserCheck } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/brand/logo";
-
-const navLinks = [
-  { label: "Procedimentos e Exames", href: "/procedimentos", icon: Stethoscope },
-  { label: "Clínicas Credenciadas", href: "/clinicas", icon: Building2 },
-  { label: "Como Funciona", href: "/#como-funciona", icon: HelpCircle },
-  { label: "Para Clínicas e Médicos", href: "/seja-parceiro", icon: UserCheck },
-];
 
 export function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -26,34 +18,50 @@ export function Navbar() {
 
         {/* Desktop Navigation */}
         <nav className="hidden items-center gap-6 text-sm font-semibold text-slate-700 md:flex">
-          {navLinks.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              className="hover:text-teal-700 transition-colors font-semibold"
-            >
-              {link.label}
-            </Link>
-          ))}
+          <Link
+            href="/procedimentos"
+            className="hover:text-teal-700 transition-colors font-semibold"
+          >
+            Procedimentos e Exames
+          </Link>
+
+          <Link
+            href="/clinicas"
+            className="hover:text-teal-700 transition-colors font-semibold"
+          >
+            Clínicas Credenciadas
+          </Link>
+
+          <Link
+            href="/#como-funciona"
+            className="hover:text-teal-700 transition-colors font-semibold"
+          >
+            Como Funciona
+          </Link>
+
+          <Link
+            href="/seja-parceiro"
+            className="hover:text-teal-700 transition-colors font-semibold"
+          >
+            Para Clínicas e Médicos
+          </Link>
         </nav>
 
         {/* Action Buttons (Desktop) */}
         <div className="hidden items-center gap-2 md:flex">
-          <Button
-            render={<Link href="/seja-parceiro" />}
-            nativeButton={false}
-            variant="ghost"
-            className="text-xs font-bold text-slate-600 hover:text-teal-700"
+          <Link
+            href="/seja-parceiro"
+            className="inline-flex h-10 items-center justify-center rounded-xl px-4 text-xs font-bold text-slate-600 hover:bg-slate-100 hover:text-teal-700 transition-colors"
           >
             Sou uma clínica
-          </Button>
-          <Button
-            render={<Link href="/procedimentos" />}
-            nativeButton={false}
-            className="bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs rounded-xl shadow-2xs px-4 h-10"
+          </Link>
+
+          <Link
+            href="/procedimentos"
+            className="inline-flex h-10 items-center justify-center rounded-xl bg-teal-600 px-4 text-xs font-bold text-white shadow-2xs hover:bg-teal-700 transition-colors"
           >
             Consultar Catálogo
-          </Button>
+          </Link>
         </div>
 
         {/* Mobile Menu Toggle Button */}
@@ -71,39 +79,57 @@ export function Navbar() {
       {mobileMenuOpen && (
         <div className="border-t border-slate-200 bg-white px-4 py-5 shadow-lg md:hidden animate-in slide-in-from-top-2">
           <div className="flex flex-col gap-3">
-            {navLinks.map((link) => {
-              const Icon = link.icon;
-              return (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-bold text-slate-800 hover:bg-slate-50 hover:text-teal-700"
-                >
-                  <Icon className="h-4 w-4 text-teal-600" />
-                  <span>{link.label}</span>
-                </Link>
-              );
-            })}
+            <Link
+              href="/procedimentos"
+              onClick={() => setMobileMenuOpen(false)}
+              className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-bold text-slate-800 hover:bg-slate-50 hover:text-teal-700"
+            >
+              <Stethoscope className="h-4 w-4 text-teal-600" />
+              <span>Procedimentos e Exames</span>
+            </Link>
+
+            <Link
+              href="/clinicas"
+              onClick={() => setMobileMenuOpen(false)}
+              className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-bold text-slate-800 hover:bg-slate-50 hover:text-teal-700"
+            >
+              <Building2 className="h-4 w-4 text-teal-600" />
+              <span>Clínicas Credenciadas</span>
+            </Link>
+
+            <Link
+              href="/#como-funciona"
+              onClick={() => setMobileMenuOpen(false)}
+              className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-bold text-slate-800 hover:bg-slate-50 hover:text-teal-700"
+            >
+              <HelpCircle className="h-4 w-4 text-teal-600" />
+              <span>Como Funciona</span>
+            </Link>
+
+            <Link
+              href="/seja-parceiro"
+              onClick={() => setMobileMenuOpen(false)}
+              className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-bold text-slate-800 hover:bg-slate-50 hover:text-teal-700"
+            >
+              <UserCheck className="h-4 w-4 text-teal-600" />
+              <span>Para Clínicas e Médicos</span>
+            </Link>
 
             <div className="mt-2 flex flex-col gap-2 pt-3 border-t border-slate-100">
-              <Button
-                render={<Link href="/procedimentos" />}
-                nativeButton={false}
+              <Link
+                href="/procedimentos"
                 onClick={() => setMobileMenuOpen(false)}
-                className="h-11 w-full bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs rounded-xl shadow-2xs"
+                className="flex h-11 w-full items-center justify-center rounded-xl bg-teal-600 text-xs font-bold text-white shadow-2xs hover:bg-teal-700"
               >
                 Consultar Catálogo Geral
-              </Button>
-              <Button
-                render={<Link href="/seja-parceiro" />}
-                nativeButton={false}
-                variant="outline"
+              </Link>
+              <Link
+                href="/seja-parceiro"
                 onClick={() => setMobileMenuOpen(false)}
-                className="h-11 w-full border-slate-200 text-slate-700 font-bold text-xs rounded-xl"
+                className="flex h-11 w-full items-center justify-center rounded-xl border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50"
               >
                 Sou uma clínica / Médico parceiro
-              </Button>
+              </Link>
             </div>
           </div>
         </div>

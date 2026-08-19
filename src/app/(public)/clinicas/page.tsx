@@ -3,7 +3,7 @@ import { MapPin, Phone, CheckCircle2, ShieldCheck, ArrowRight, MessageCircle, Bu
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { RatingStars } from "@/components/public/rating-stars";
-import { getAllClinics } from "@/actions/search";
+import { prisma } from "@/lib/prisma";
 import { buildWhatsAppLink } from "@/lib/format";
 
 type ClinicasPageProps = {
@@ -43,18 +43,41 @@ const neighborhoodOptions = [
 
 export default async function ClinicasCredenciadasPage({ searchParams }: ClinicasPageProps) {
   const params = await searchParams;
-  let clinics = await getAllClinics(params.cidade, params.bairro);
 
-  if (params.q && params.q.trim()) {
-    const qLower = params.q.trim().toLowerCase();
-    clinics = clinics.filter(
-      (c) =>
-        c.tradeName.toLowerCase().includes(qLower) ||
-        c.neighborhood.toLowerCase().includes(qLower) ||
-        c.address.toLowerCase().includes(qLower) ||
-        c.clinicProcedures.some((cp) => cp.procedure.name.toLowerCase().includes(qLower))
-    );
-  }
+  // Busca todas as clínicas credenciadas diretamente no banco via Prisma
+  const dbClinics = await prisma.clinic.findMany({
+    where: {
+      active: true,
+      ...(params.cidade ? { city: { equals: params.cidade, mode: "insensitive" } } : {}),
+      ...(params.bairro ? { neighborhood: { equals: params.bairro, mode: "insensitive" } } : {}),
+      ...(params.q
+        ? {
+            OR: [
+              { tradeName: { contains: params.q, mode: "insensitive" } },
+              { name: { contains: params.q, mode: "insensitive" } },
+              { neighborhood: { contains: params.q, mode: "insensitive" } },
+              { city: { contains: params.q, mode: "insensitive" } },
+            ],
+          }
+        : {}),
+    },
+    orderBy: { rating: "desc" },
+    select: {
+      id: true,
+      tradeName: true,
+      neighborhood: true,
+      city: true,
+      address: true,
+      phone: true,
+      rating: true,
+      reviewCount: true,
+      clinicProcedures: {
+        take: 6,
+        orderBy: { procedure: { name: "asc" } },
+        select: { procedure: { select: { name: true, category: true } } },
+      },
+    },
+  });
 
   return (
     <main className="mx-auto flex max-w-6xl flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8">
@@ -72,7 +95,7 @@ export default async function ClinicasCredenciadasPage({ searchParams }: Clinica
           Encontre atendimento particular com valores sob consulta em Vitória da Conquista, Barra do Choça, Planalto e região.
         </p>
 
-        {/* Filter Form with Text Search + City + Neighborhood */}
+        {/* Filter Form */}
         <form className="mt-6 flex flex-col sm:flex-row flex-wrap items-center justify-center gap-2 pt-2">
           <div className="relative flex-1 min-w-[240px] w-full sm:w-auto">
             <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -80,7 +103,7 @@ export default async function ClinicasCredenciadasPage({ searchParams }: Clinica
               type="text"
               name="q"
               defaultValue={params.q ?? ""}
-              placeholder="Buscar clínica por nome..."
+              placeholder="Buscar clínica por nome ou bairro..."
               aria-label="Buscar clínica por nome"
               className="h-11 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-4 text-xs font-bold text-slate-800 shadow-2xs outline-none focus:border-teal-500"
             />
@@ -119,14 +142,14 @@ export default async function ClinicasCredenciadasPage({ searchParams }: Clinica
       </div>
 
       {/* Grid of Clinics */}
-      {clinics.length === 0 ? (
+      {dbClinics.length === 0 ? (
         <div className="flex flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-slate-300 bg-slate-50 py-16 text-center">
           <p className="font-bold text-slate-800 text-base">Nenhuma clínica encontrada com os filtros selecionados</p>
           <p className="text-xs text-slate-500">Tente buscar por outro termo ou selecione todas as cidades.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {clinics.map((clinic, index) => {
+          {dbClinics.map((clinic, index) => {
             const fullAddress = `${clinic.address}, ${clinic.neighborhood}, ${clinic.city}`;
             const waMessage = `Olá! Vi a ${clinic.tradeName} no Conecta Saúde e gostaria de consultar horários e exames disponíveis.`;
             const waLink = clinic.phone
