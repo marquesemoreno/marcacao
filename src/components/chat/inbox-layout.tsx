@@ -13,6 +13,7 @@ import { MessageBubble } from './message-bubble';
 import { ScheduleModal } from './schedule-modal';
 import { AvatarBadge } from './avatar-badge';
 import type { PlainClinicProcedureItem } from '@/lib/serialize';
+import { seedDemoConversations } from '@/actions/inbox';
 import { toast } from "sonner";
 import {
   Search,
@@ -113,6 +114,22 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
       toast.error("Não foi possível gerar sugestão de IA.");
     } finally {
       setIsGeneratingIa(false);
+    }
+  }
+
+  const [isSeedingDemo, setIsSeedingDemo] = useState(false);
+
+  async function handleSeedDemo() {
+    if (isSeedingDemo) return;
+    setIsSeedingDemo(true);
+    try {
+      await seedDemoConversations();
+      toast.success("Conversas de demonstração geradas no banco com sucesso!");
+      window.location.reload();
+    } catch {
+      toast.error("Não foi possível gerar conversas de demonstração.");
+    } finally {
+      setIsSeedingDemo(false);
     }
   }
 
@@ -368,9 +385,35 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
         data-od-id="inbox-chat-column"
       >
         {!selectedContact ? (
-          <div className="flex-1 flex flex-col items-center justify-center p-6 text-center text-slate-400 gap-3">
-            <MessageSquare className="w-12 h-12 text-slate-300" />
-            <p className="text-sm font-medium">Selecione uma conversa na fila para iniciar o atendimento.</p>
+          <div className="flex-1 flex flex-col items-center justify-center p-6 text-center text-slate-500 gap-4">
+            <div className="flex size-16 items-center justify-center rounded-3xl bg-emerald-50 text-emerald-600 shadow-2xs border border-emerald-100">
+              <MessageSquare className="w-8 h-8" />
+            </div>
+
+            {contacts.length === 0 ? (
+              <div className="max-w-md space-y-3 bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm">
+                <h3 className="text-base font-extrabold text-slate-900">
+                  Nenhuma conversa aberta nesta caixa de entrada
+                </h3>
+                <p className="text-xs text-slate-500 leading-relaxed font-medium">
+                  Deseja popular a fila com conversas reais de demonstração (pacientes com dúvidas de urologia, ultrassom e lead B2B)?
+                </p>
+
+                <button
+                  type="button"
+                  onClick={handleSeedDemo}
+                  disabled={isSeedingDemo}
+                  className="mt-2 inline-flex items-center justify-center gap-2 h-11 px-5 w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-2xs transition-all active:scale-95 disabled:opacity-50"
+                >
+                  <Sparkles className={`w-4 h-4 text-emerald-200 ${isSeedingDemo ? 'animate-spin' : ''}`} />
+                  <span>{isSeedingDemo ? "Gerando conversas..." : "🌱 Gerar Conversas de Demonstração no Banco"}</span>
+                </button>
+              </div>
+            ) : (
+              <p className="text-sm font-medium text-slate-500">
+                Selecione uma conversa na fila à esquerda para iniciar o atendimento.
+              </p>
+            )}
           </div>
         ) : (
           <>
