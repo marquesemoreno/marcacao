@@ -307,6 +307,7 @@ export function ChatCrmApp({ scope, basePath, view }: ChatCrmAppProps) {
       ) : (
         <CRMKanban
           contacts={contacts}
+          agents={agents}
           onMoveStage={handleMoveStage}
           onFinish={handleFinish}
           onReopen={handleReopen}

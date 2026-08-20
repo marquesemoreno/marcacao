@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from 'react';
-import { Contact, FunnelStage } from '@/types/chat-crm';
+import { Agent, Contact, FunnelStage } from '@/types/chat-crm';
 import { AvatarBadge } from './avatar-badge';
 import {
   Search,
@@ -9,12 +9,16 @@ import {
   ArrowRight,
   ArrowLeft,
   Filter,
+  UserCheck,
+  Building2,
+  ExternalLink,
 } from 'lucide-react';
 
 type KanbanStage = FunnelStage | 'finalizado';
 
 interface CRMKanbanProps {
   contacts: Contact[];
+  agents?: Agent[];
   onOpenContactChat?: (contactId: string) => void;
   onMoveStage: (contactId: string, stage: FunnelStage) => void;
   onFinish: (contactId: string) => void;
@@ -22,18 +26,14 @@ interface CRMKanbanProps {
 }
 
 const STAGES: { id: KanbanStage; title: string; shortLabel: string; color: string; bgBadge: string }[] = [
-  { id: 'novos', title: '🆕 Novos Contatos', shortLabel: '🆕 Novos', color: 'border-amber-400', bgBadge: 'bg-amber-100 text-amber-800' },
-  { id: 'triagem', title: '💬 Em Atendimento', shortLabel: '💬 Em Atendimento', color: 'border-blue-400', bgBadge: 'bg-blue-100 text-blue-800' },
-  { id: 'orcamento', title: '💲 Orçamento Enviado', shortLabel: '💲 Orçamento', color: 'border-purple-400', bgBadge: 'bg-purple-100 text-purple-800' },
-  { id: 'agendado', title: '✅ Agendamento Confirmado', shortLabel: '✅ Agendado', color: 'border-emerald-500', bgBadge: 'bg-emerald-100 text-emerald-800' },
-  { id: 'finalizado', title: '🏁 Finalizado', shortLabel: '🏁 Finalizado', color: 'border-slate-400', bgBadge: 'bg-slate-200 text-slate-700' },
+  { id: 'novos', title: '🆕 Novos Leads', shortLabel: '🆕 Novos', color: 'border-amber-400', bgBadge: 'bg-amber-100 text-amber-800 border-amber-200' },
+  { id: 'triagem', title: '💬 Em Atendimento', shortLabel: '💬 Em Atendimento', color: 'border-sky-400', bgBadge: 'bg-sky-100 text-sky-800 border-sky-200' },
+  { id: 'orcamento', title: '💲 Orçamento / Dúvidas', shortLabel: '💲 Orçamento', color: 'border-purple-400', bgBadge: 'bg-purple-100 text-purple-800 border-purple-200' },
+  { id: 'agendado', title: '🎟️ Agendamento Confirmado', shortLabel: '🎟️ Agendado', color: 'border-emerald-500', bgBadge: 'bg-emerald-100 text-emerald-800 border-emerald-200' },
+  { id: 'finalizado', title: '🏁 Finalizado / Realizado', shortLabel: '🏁 Finalizado', color: 'border-slate-400', bgBadge: 'bg-slate-200 text-slate-700 border-slate-300' },
 ];
 
 const STAGE_ORDER: KanbanStage[] = ['novos', 'triagem', 'orcamento', 'agendado', 'finalizado'];
-
-function kanbanStageOf(contact: Contact): KanbanStage {
-  return contact.statusTag.label === 'Finalizado' ? 'finalizado' : contact.funnelStage;
-}
 
 function parseEstimatedValue(value?: string) {
   if (!value) return 0;
@@ -42,39 +42,60 @@ function parseEstimatedValue(value?: string) {
 
 export const CRMKanban: React.FC<CRMKanbanProps> = ({
   contacts,
+  agents = [],
   onOpenContactChat,
   onMoveStage,
   onFinish,
   onReopen,
 }) => {
   const [search, setSearch] = useState('');
+  const [selectedAgent, setSelectedAgent] = useState<string>('todos');
+  const [selectedDept, setSelectedDept] = useState<string>('todos');
   const [mobileSelectedStage, setMobileSelectedStage] = useState<KanbanStage | 'todos'>('todos');
 
-  const moveStage = (contactId: string, direction: 'forward' | 'backward') => {
+  const moveStage = (contactId: string, targetStage: KanbanStage) => {
     const current = contacts.find((c) => c.id === contactId);
     if (!current) return;
-    const wasFinalizado: boolean = kanbanStageOf(current) === 'finalizado';
-    const currentIndex = STAGE_ORDER.indexOf(kanbanStageOf(current));
-    let nextIndex = direction === 'forward' ? currentIndex + 1 : currentIndex - 1;
-    if (nextIndex < 0) nextIndex = 0;
-    if (nextIndex >= STAGE_ORDER.length) nextIndex = STAGE_ORDER.length - 1;
-    const nextStage = STAGE_ORDER[nextIndex];
-    const willBeFinalizado: boolean = nextStage === 'finalizado';
+    const isCurrentFinalized = current.statusTag.label === 'Finalizado';
 
-    if (willBeFinalizado) {
+    if (targetStage === 'finalizado') {
       onFinish(contactId);
-    } else if (wasFinalizado) {
+    } else if (isCurrentFinalized) {
       onReopen(contactId);
+      onMoveStage(contactId, targetStage as FunnelStage);
     } else {
-      onMoveStage(contactId, nextStage as FunnelStage);
+      onMoveStage(contactId, targetStage as FunnelStage);
     }
   };
 
-  const filtered = contacts.filter((c) =>
-    c.name.toLowerCase().includes(search.toLowerCase()) ||
-    c.phone.includes(search) ||
-    c.tags.some((t) => t.toLowerCase().includes(search.toLowerCase()))
-  );
+  const moveStageDirection = (contactId: string, direction: 'forward' | 'backward') => {
+    const current = contacts.find((c) => c.id === contactId);
+    if (!current) return;
+    const currentStage = current.statusTag.label === 'Finalizado' ? 'finalizado' : current.funnelStage;
+    const currentIndex = STAGE_ORDER.indexOf(currentStage);
+    let nextIndex = direction === 'forward' ? currentIndex + 1 : currentIndex - 1;
+    if (nextIndex < 0) nextIndex = 0;
+    if (nextIndex >= STAGE_ORDER.length) nextIndex = STAGE_ORDER.length - 1;
+    moveStage(contactId, STAGE_ORDER[nextIndex]);
+  };
+
+  const filtered = contacts.filter((c) => {
+    const matchesSearch =
+      c.name.toLowerCase().includes(search.toLowerCase()) ||
+      c.phone.includes(search) ||
+      c.tags.some((t) => t.toLowerCase().includes(search.toLowerCase()));
+
+    const matchesAgent =
+      selectedAgent === 'todos' ||
+      (selectedAgent === 'unassigned'
+        ? !c.responsibleAgent || c.responsibleAgent === 'Não Atribuído' || c.responsibleAgent === 'Não atribuído'
+        : c.responsibleAgent === selectedAgent);
+
+    const matchesDept =
+      selectedDept === 'todos' || c.department === selectedDept;
+
+    return matchesSearch && matchesAgent && matchesDept;
+  });
 
   const pipelineTotal = filtered.reduce((acc, c) => acc + parseEstimatedValue(c.estimatedValue), 0);
 
@@ -87,41 +108,68 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
       className="flex-1 flex flex-col h-full bg-slate-100/90 overflow-hidden font-sans"
       data-od-id="crm-kanban-view"
     >
-      {/* Sub-header do Kanban com Filtros e Métricas */}
-      <div className="bg-white border-b border-slate-200 px-4 sm:px-6 py-3 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 shrink-0">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-          <div className="flex items-center justify-between w-full sm:w-auto">
-            <h2 className="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-2">
-              <span>Funil de Leads & Oportunidades</span>
-              <span className="text-xs font-mono font-normal bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">
-                {filtered.length} leads
-              </span>
-            </h2>
-          </div>
+      <div className="bg-white border-b border-slate-200 px-4 sm:px-6 py-3 flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 shrink-0">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 flex-wrap">
+          <h2 className="text-sm sm:text-base font-extrabold text-slate-900 flex items-center gap-2">
+            <span>📋 Funil de Vendas & CRM</span>
+            <span className="text-xs font-mono font-bold bg-slate-100 text-slate-700 px-2.5 py-0.5 rounded-full border border-slate-200">
+              {filtered.length} paciente{filtered.length === 1 ? '' : 's'}
+            </span>
+          </h2>
 
-          <div className="relative w-full sm:w-64">
+          <div className="relative w-full sm:w-56">
             <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
             <input
               type="text"
-              placeholder="Buscar no funil..."
+              placeholder="Buscar paciente, fone ou tag..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full pl-9 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all text-slate-800 placeholder-slate-400"
             />
           </div>
+
+          <div className="relative w-full sm:w-44 flex items-center">
+            <UserCheck className="w-3.5 h-3.5 text-slate-400 absolute left-3 pointer-events-none" />
+            <select
+              value={selectedAgent}
+              onChange={(e) => setSelectedAgent(e.target.value)}
+              className="w-full pl-8 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-semibold text-slate-700 appearance-none cursor-pointer"
+            >
+              <option value="todos">👤 Todos Atendentes</option>
+              <option value="unassigned">⏳ Não Atribuídos</option>
+              {agents.map((ag) => (
+                <option key={ag.id} value={ag.name}>
+                  👤 {ag.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="relative w-full sm:w-44 flex items-center">
+            <Building2 className="w-3.5 h-3.5 text-slate-400 absolute left-3 pointer-events-none" />
+            <select
+              value={selectedDept}
+              onChange={(e) => setSelectedDept(e.target.value)}
+              className="w-full pl-8 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-semibold text-slate-700 appearance-none cursor-pointer"
+            >
+              <option value="todos">🏥 Todos Deptos</option>
+              <option value="recepcao">Recepção</option>
+              <option value="agendamento">Agendamento</option>
+              <option value="financeiro">Financeiro</option>
+            </select>
+          </div>
         </div>
 
         <div className="flex items-center justify-between sm:justify-end gap-3">
-          <div className="text-xs text-slate-500 font-medium flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl shadow-2xs">
+          <div className="text-xs text-slate-600 font-semibold flex items-center gap-2 bg-slate-50 border border-slate-200 px-3.5 py-1.5 rounded-xl shadow-2xs">
             <span>Pipeline Total:</span>
-            <span className="font-mono font-bold text-emerald-700">
+            <span className="font-mono font-bold text-emerald-700 text-sm">
               {pipelineTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
             </span>
           </div>
         </div>
       </div>
 
-      {/* Seletor Rápido de Etapas para Mobile (visível apenas em telas pequenas < md) */}
       <div className="md:hidden bg-white border-b border-slate-200 px-3 py-2 flex items-center gap-1.5 overflow-x-auto no-scrollbar shrink-0">
         <span className="text-[10px] uppercase font-mono tracking-wider text-slate-400 font-bold flex items-center gap-1 shrink-0">
           <Filter className="w-3 h-3" /> Etapa:
@@ -137,7 +185,7 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
           Todas ({filtered.length})
         </button>
         {STAGES.map((s) => {
-          const count = filtered.filter((c) => kanbanStageOf(c) === s.id).length;
+          const count = filtered.filter((c) => (c.statusTag.label === 'Finalizado' ? 'finalizado' : c.funnelStage) === s.id).length;
           const isActive = mobileSelectedStage === s.id;
           return (
             <button
@@ -156,11 +204,13 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
         })}
       </div>
 
-      {/* Grid de Colunas do Funil */}
-      <div className="flex-1 overflow-x-auto p-3 sm:p-6">
-        <div className={`flex gap-4 sm:gap-5 h-full ${mobileSelectedStage === 'todos' ? 'min-w-full sm:min-w-[1350px]' : 'w-full'}`}>
+      <div className="flex-1 overflow-x-auto p-3 sm:p-5">
+        <div className={`flex gap-4 sm:gap-5 h-full ${mobileSelectedStage === 'todos' ? 'min-w-full sm:min-w-[1400px]' : 'w-full'}`}>
           {visibleStages.map((stage) => {
-            const stageContacts = filtered.filter((c) => kanbanStageOf(c) === stage.id);
+            const stageContacts = filtered.filter((c) => {
+              const currentStage = c.statusTag.label === 'Finalizado' ? 'finalizado' : c.funnelStage;
+              return currentStage === stage.id;
+            });
             const totalStageValue = stageContacts.reduce((acc, curr) => acc + parseEstimatedValue(curr.estimatedValue), 0);
 
             return (
@@ -169,123 +219,143 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
                 className="flex-1 flex flex-col bg-slate-50/90 rounded-2xl border border-slate-200/90 overflow-hidden shadow-2xs min-w-[280px] sm:min-w-0"
                 data-od-id={`kanban-column-${stage.id}`}
               >
-                {/* Header da Coluna */}
-                <div className={`p-3 sm:p-3.5 bg-white border-t-4 ${stage.color} border-b border-slate-200 flex items-center justify-between`}>
+                <div className={`p-3 bg-white border-t-4 ${stage.color} border-b border-slate-200 flex items-center justify-between`}>
                   <div>
                     <div className="flex items-center gap-2">
                       <h3 className="font-bold text-xs sm:text-sm text-slate-900">{stage.title}</h3>
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full font-mono ${stage.bgBadge}`}>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full font-mono border ${stage.bgBadge}`}>
                         {stageContacts.length}
                       </span>
                     </div>
-                    <p className="text-[11px] text-slate-500 font-mono mt-0.5 font-medium">
-                      R$ {totalStageValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    <p className="text-[11px] text-slate-500 font-mono mt-0.5 font-semibold">
+                      {stageContacts.length} paciente{stageContacts.length === 1 ? '' : 's'} • R$ {totalStageValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </p>
                   </div>
                 </div>
 
-                {/* Lista de Cards da Etapa */}
                 <div className="flex-1 overflow-y-auto p-2.5 sm:p-3 space-y-3">
                   {stageContacts.length === 0 ? (
-                    <div className="h-32 border-2 border-dashed border-slate-200 rounded-xl flex items-center justify-center text-xs text-slate-400 font-medium">
-                      Nenhum lead nesta etapa
+                    <div className="h-32 border-2 border-dashed border-slate-200/80 rounded-2xl flex items-center justify-center text-xs text-slate-400 font-medium">
+                      Nenhum paciente nesta etapa
                     </div>
                   ) : (
-                    stageContacts.map((contact) => (
-                      <div
-                        key={contact.id}
-                        className="bg-white rounded-xl border border-slate-200/90 p-3 sm:p-3.5 shadow-2xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 space-y-3 group"
-                        data-od-id={`kanban-card-${contact.id}`}
-                      >
-                        {/* Topo do Card: Foto, Nome e Telefone */}
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="flex items-center gap-2.5 min-w-0">
-                            <AvatarBadge name={contact.name} size={36} className="ring-2 ring-slate-100" />
-                            <div className="min-w-0">
-                              <h4 className="font-bold text-xs text-slate-900 truncate">
-                                {contact.name}
-                              </h4>
-                              <p className="text-[11px] text-slate-500 font-mono flex items-center gap-1">
-                                <Phone className="w-3 h-3 text-slate-400" /> {contact.phone}
-                              </p>
+                    stageContacts.map((contact) => {
+                      const isUnassigned = !contact.responsibleAgent || contact.responsibleAgent === 'Não Atribuído' || contact.responsibleAgent === 'Não atribuído';
+
+                      return (
+                        <div
+                          key={contact.id}
+                          className="bg-white rounded-2xl border border-slate-200 p-3.5 shadow-2xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 space-y-3 group relative"
+                          data-od-id={`kanban-card-${contact.id}`}
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <AvatarBadge name={contact.name} size={36} className="ring-2 ring-slate-100 shrink-0" />
+                              <div className="min-w-0">
+                                <h4 className="font-bold text-xs text-slate-900 truncate">
+                                  {contact.name}
+                                </h4>
+                                <p className="text-[11px] text-slate-500 font-mono flex items-center gap-1 mt-0.5">
+                                  <Phone className="w-3 h-3 text-emerald-600" /> {contact.phone}
+                                </p>
+                              </div>
+                            </div>
+
+                            <span
+                              className={`shrink-0 rounded-full px-2 py-0.5 text-[9.5px] font-extrabold border ${
+                                isUnassigned
+                                  ? 'bg-amber-50 text-amber-700 border-amber-200'
+                                  : 'bg-slate-100 text-slate-700 border-slate-200'
+                              }`}
+                              title={isUnassigned ? "Nenhum atendente assumiu esta conversa" : `Atribuído a ${contact.responsibleAgent}`}
+                            >
+                              {isUnassigned ? "⏳ Livre" : `👤 ${contact.responsibleAgent}`}
+                            </span>
+                          </div>
+
+                          <div className="bg-slate-50 p-2.5 rounded-xl space-y-1 border border-slate-100">
+                            <p className="text-xs text-slate-600 line-clamp-2 leading-relaxed italic">
+                              &ldquo;{contact.lastMessage}&rdquo;
+                            </p>
+                            {contact.lastMessageTime && (
+                              <p className="text-[10px] text-slate-400 font-mono font-medium">{contact.lastMessageTime}</p>
+                            )}
+                          </div>
+
+                          <div className="space-y-1.5">
+                            <div className="flex flex-wrap gap-1">
+                              {contact.tags.map((tag) => (
+                                <span
+                                  key={tag}
+                                  className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 border border-slate-200/80"
+                                >
+                                  {tag}
+                                </span>
+                              ))}
+                              {contact.statusTag && (
+                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200">
+                                  {contact.statusTag.label}
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="flex items-center justify-between pt-1.5 border-t border-slate-100 text-xs">
+                              <span className="text-[11px] text-slate-400 font-medium">Estimado:</span>
+                              <span className="font-mono font-bold text-emerald-700">
+                                {contact.estimatedValue || '—'}
+                              </span>
                             </div>
                           </div>
 
-                          {contact.clinicName && (
-                            <span
-                              className="shrink-0 rounded-full bg-sky-50 px-2 py-0.5 text-[9.5px] font-semibold text-sky-700 border border-sky-100"
-                              title={contact.clinicName}
-                            >
-                              {contact.clinicName}
-                            </span>
-                          )}
-                        </div>
+                          <div className="flex items-center justify-between pt-2 border-t border-slate-100 gap-1.5">
+                            <div className="flex items-center gap-1">
+                              {stage.id !== 'novos' && (
+                                <button
+                                  onClick={() => moveStageDirection(contact.id, 'backward')}
+                                  className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
+                                  title="Voltar etapa"
+                                >
+                                  <ArrowLeft className="w-3.5 h-3.5" />
+                                </button>
+                              )}
 
-                        {/* Última Interação */}
-                        <div className="bg-slate-50 p-2.5 rounded-xl space-y-1 border border-slate-100">
-                          <p className="text-xs text-slate-600 line-clamp-2 leading-relaxed italic">
-                            &ldquo;{contact.lastMessage}&rdquo;
-                          </p>
-                          {contact.lastMessageTime && (
-                            <p className="text-[10px] text-slate-400 font-mono font-medium">{contact.lastMessageTime}</p>
-                          )}
-                        </div>
-
-                        {/* Tags e Valor Estimado */}
-                        <div className="space-y-1.5">
-                          <div className="flex flex-wrap gap-1">
-                            {contact.tags.map((tag) => (
-                              <span
-                                key={tag}
-                                className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 border border-slate-200/80"
+                              <select
+                                value={contact.statusTag.label === 'Finalizado' ? 'finalizado' : contact.funnelStage}
+                                onChange={(e) => moveStage(contact.id, e.target.value as KanbanStage)}
+                                className="text-[10px] font-bold bg-slate-50 border border-slate-200 rounded-lg py-1 px-1.5 text-slate-700 cursor-pointer focus:outline-none focus:ring-1 focus:ring-emerald-500"
                               >
-                                {tag}
-                              </span>
-                            ))}
-                          </div>
+                                {STAGES.map((s) => (
+                                  <option key={s.id} value={s.id}>
+                                    {s.shortLabel}
+                                  </option>
+                                ))}
+                              </select>
 
-                          <div className="flex items-center justify-between pt-1.5 border-t border-slate-100 text-xs">
-                            <span className="text-[11px] text-slate-400 font-medium">Potencial:</span>
-                            <span className="font-mono font-bold text-emerald-700">
-                              {contact.estimatedValue || '—'}
-                            </span>
-                          </div>
-                        </div>
+                              {stage.id !== 'finalizado' && (
+                                <button
+                                  onClick={() => moveStageDirection(contact.id, 'forward')}
+                                  className="p-1.5 text-slate-400 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition-colors"
+                                  title="Avançar etapa"
+                                >
+                                  <ArrowRight className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                            </div>
 
-                        {/* Ações Rápidas: Mover Etapa e Abrir Chat */}
-                        <div className="flex items-center justify-between pt-2 border-t border-slate-100">
-                          <div className="flex items-center gap-1">
-                            {stage.id !== 'novos' && (
+                            {onOpenContactChat && (
                               <button
-                                onClick={() => moveStage(contact.id, 'backward')}
-                                className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors min-h-[36px] min-w-[36px] flex items-center justify-center active:scale-95"
-                                title="Voltar etapa"
+                                onClick={() => onOpenContactChat(contact.id)}
+                                className="text-[11px] font-bold text-emerald-700 hover:text-emerald-800 flex items-center gap-1 hover:underline py-1 px-2.5 bg-emerald-50 hover:bg-emerald-100/80 rounded-xl transition-all border border-emerald-200/60 shadow-2xs"
+                                title="Abrir conversa na Caixa de Entrada"
                               >
-                                <ArrowLeft className="w-4 h-4" />
-                              </button>
-                            )}
-                            {stage.id !== 'finalizado' && (
-                              <button
-                                onClick={() => moveStage(contact.id, 'forward')}
-                                className="p-2 text-slate-400 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition-colors min-h-[36px] min-w-[36px] flex items-center justify-center active:scale-95"
-                                title="Avançar etapa"
-                              >
-                                <ArrowRight className="w-4 h-4" />
+                                <ExternalLink className="w-3 h-3" />
+                                <span>Chat</span>
                               </button>
                             )}
                           </div>
-
-                          {onOpenContactChat && (
-                            <button
-                              onClick={() => onOpenContactChat(contact.id)}
-                              className="text-[11px] font-bold text-emerald-700 hover:text-emerald-800 flex items-center gap-1 hover:underline py-1 px-2 rounded-lg hover:bg-emerald-50 transition-colors"
-                            >
-                              💬 Abrir no Chat
-                            </button>
-                          )}
                         </div>
-                      </div>
-                    ))
+                      );
+                    })
                   )}
                 </div>
               </div>
@@ -296,4 +366,3 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
     </div>
   );
 };
-
