@@ -771,6 +771,44 @@ export async function seedDemoConversations() {
     },
   });
 
+  // Conversa 4: Juliana Rocha (Triagem IA / Fora de Horário)
+  const contact4 = await prisma.contact.upsert({
+    where: { phone: "77999887766" },
+    update: { name: "Juliana Rocha", cpf: "098.765.432-11" },
+    create: { phone: "77999887766", name: "Juliana Rocha", cpf: "098.765.432-11" },
+  });
+
+  await prisma.conversation.upsert({
+    where: { id: "demo-conv-4" },
+    update: { lastMessageAt: new Date() },
+    create: {
+      id: "demo-conv-4",
+      clinicId,
+      contactId: contact4.id,
+      status: "OPEN",
+      funnelStage: "TRIAGEM",
+      department: "RECEPCAO",
+      tags: ["⚡ Triado por IA", "🔬 Triagem Concluída", "Ginecologia"],
+      lastMessageAt: new Date(),
+      messages: {
+        create: [
+          {
+            direction: "INBOUND",
+            content: "Olá! Meu nome é Juliana Rocha, CPF 098.765.432-11. Preciso agendar uma consulta de Ginecologia e um preventivo.",
+            status: "DELIVERED",
+            createdAt: new Date(Date.now() - 1000 * 60 * 15),
+          },
+          {
+            direction: "OUTBOUND",
+            content: "🤖 *TRIAGEM IA REALIZADA COM SUCESSO*\n\nObrigado pelas informações! Identificamos os dados do seu atendimento:\n• *CPF:* 098.765.432-11\n• *Interesse:* Ginecologia\n\nSua conversa foi movida para a *Fila de Atendimento Prioritário*. Um atendente da nossa recepção responderá em breve!",
+            status: "DELIVERED",
+            createdAt: new Date(Date.now() - 1000 * 60 * 14),
+          },
+        ],
+      },
+    },
+  });
+
   revalidatePath("/admin/inbox");
   revalidatePath("/clinic/inbox");
   revalidatePath("/admin/crm");

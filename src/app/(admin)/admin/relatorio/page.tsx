@@ -1,8 +1,7 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
 import { getFinancialReport, getAttendantPerformanceReport } from "@/actions/admin";
 import { formatCurrency } from "@/lib/format";
-import { Clock, Trophy, CheckCircle2, XCircle, TrendingUp, Users, Award } from "lucide-react";
+import { Clock, Trophy, CheckCircle2, XCircle, TrendingUp, Award } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
