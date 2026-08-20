@@ -3,7 +3,7 @@
 import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { createAppointmentSchema, type CreateAppointmentInput } from "@/lib/schemas/appointment";
-import { notifyAppointmentStatus } from "@/lib/whatsapp";
+import { sendAppointmentConfirmation } from "@/lib/whatsapp";
 import { toPlainAppointment } from "@/lib/serialize";
 import { AFFILIATE_REF_COOKIE, AFFILIATE_COMMISSION_FLAT } from "@/lib/affiliate";
 
@@ -64,9 +64,8 @@ export async function createAppointment(input: CreateAppointmentInput) {
     include: { clinicProcedure: { include: { clinic: true, procedure: true } } },
   });
 
-  // Dispara sem `await`: não faz sentido segurar a confirmação de agendamento
-  // (fluxo público, de alta conversão) esperando o WhatsApp responder.
-  notifyAppointmentStatus("PENDING", appointment).catch((error) => {
+  // Dispara a mensagem oficial de confirmação no WhatsApp via Evolution API v2 sem segurar a resposta
+  sendAppointmentConfirmation(appointment).catch((error) => {
     console.error("Falha ao notificar novo agendamento via WhatsApp:", error);
   });
 
