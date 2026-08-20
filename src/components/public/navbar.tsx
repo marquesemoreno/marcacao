@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Menu, X, Building2, Stethoscope, HelpCircle, UserCheck } from "lucide-react";
+import { Menu, X, Building2, Stethoscope, HelpCircle, UserCheck, Users } from "lucide-react";
 import { Logo } from "@/components/brand/logo";
 
 export function Navbar() {
@@ -17,7 +17,7 @@ export function Navbar() {
         </Link>
 
         {/* Desktop Navigation */}
-        <nav className="hidden items-center gap-6 text-sm font-semibold text-slate-700 md:flex">
+        <nav className="hidden items-center gap-5 text-sm font-semibold text-slate-700 md:flex">
           <Link
             href="/procedimentos"
             className="hover:text-teal-700 transition-colors font-semibold"
@@ -40,20 +40,20 @@ export function Navbar() {
           </Link>
 
           <Link
-            href="/seja-parceiro"
-            className="hover:text-teal-700 transition-colors font-semibold"
+            href="/afiliados"
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 transition-colors font-bold text-xs shadow-2xs"
           >
-            Para Clínicas e Médicos
+            <span>👥 Indique e Ganhe</span>
           </Link>
         </nav>
 
         {/* Action Buttons (Desktop) */}
-        <div className="hidden items-center gap-2 md:flex">
+        <div className="hidden items-center gap-3 md:flex">
           <Link
             href="/seja-parceiro"
-            className="inline-flex h-10 items-center justify-center rounded-xl px-4 text-xs font-bold text-slate-600 hover:bg-slate-100 hover:text-teal-700 transition-colors"
+            className="text-xs font-semibold text-slate-600 hover:text-teal-700 transition-colors"
           >
-            Sou uma clínica
+            Para Clínicas e Médicos
           </Link>
 
           <Link
@@ -107,6 +107,15 @@ export function Navbar() {
             </Link>
 
             <Link
+              href="/afiliados"
+              onClick={() => setMobileMenuOpen(false)}
+              className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100"
+            >
+              <Users className="h-4 w-4 text-emerald-600" />
+              <span>Indique e Ganhe (Afiliados / Marcadores)</span>
+            </Link>
+
+            <Link
               href="/seja-parceiro"
               onClick={() => setMobileMenuOpen(false)}
               className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-bold text-slate-800 hover:bg-slate-50 hover:text-teal-700"
@@ -121,14 +130,7 @@ export function Navbar() {
                 onClick={() => setMobileMenuOpen(false)}
                 className="flex h-11 w-full items-center justify-center rounded-xl bg-teal-600 text-xs font-bold text-white shadow-2xs hover:bg-teal-700"
               >
-                Consultar Catálogo Geral
-              </Link>
-              <Link
-                href="/seja-parceiro"
-                onClick={() => setMobileMenuOpen(false)}
-                className="flex h-11 w-full items-center justify-center rounded-xl border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50"
-              >
-                Sou uma clínica / Médico parceiro
+                Consultar Catálogo
               </Link>
             </div>
           </div>

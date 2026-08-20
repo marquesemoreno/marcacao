@@ -18,7 +18,7 @@ export const revalidate = 0;
 
 export default async function AdminLeadsPage() {
   const leads = await listPartnerLeads();
-  const proposalUrl = `${getBaseUrl()}/proposta-comercial`;
+  const partnerUrl = `${getBaseUrl()}/seja-parceiro`;
 
   return (
     <div className="space-y-6">
@@ -30,14 +30,14 @@ export default async function AdminLeadsPage() {
           </p>
         </div>
         <Button
-          render={<a href="/proposta-comercial" target="_blank" rel="noopener noreferrer" />}
+          render={<a href="/seja-parceiro" target="_blank" rel="noopener noreferrer" />}
           nativeButton={false}
           variant="outline"
           size="sm"
           className="gap-1.5"
         >
           <FileText className="h-4 w-4" />
-          Ver Proposta Comercial (PDF)
+          Página de Credenciamento
         </Button>
       </div>
 
@@ -115,7 +115,7 @@ export default async function AdminLeadsPage() {
                         <a
                           href={buildWhatsAppLink(
                             lead.phone,
-                            `Olá, ${lead.contactName}! Segue a proposta comercial da Conecta Saúde para a ${lead.clinicName}: ${proposalUrl}`
+                            `Olá, ${lead.contactName}! Segue o link de credenciamento da Conecta Saúde para a ${lead.clinicName}: ${partnerUrl}`
                           )}
                           target="_blank"
                           rel="noopener noreferrer"

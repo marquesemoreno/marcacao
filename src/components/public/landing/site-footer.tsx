@@ -16,7 +16,8 @@ const patientLinks = [
 
 const partnerLinks = [
   { label: "Seja uma Clínica Parceira", href: "/seja-parceiro", highlight: true },
-  { label: "Proposta Comercial B2B (PDF)", href: "/proposta-comercial" },
+  { label: "Programa de Marcadores (Indique e Ganhe)", href: "/afiliados", highlight: true },
+  { label: "Área do Marcador (Painel PIX)", href: "/afiliados/painel" },
   { label: "Painel da Clínica Credenciada", href: "/entrar" },
   { label: "Falar com Time de Parcerias", href: "mailto:parcerias@conectasaudevc.com.br" },
 ];
