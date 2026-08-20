@@ -28,9 +28,10 @@ erDiagram
         string name
         string email UK
         string phone "opcional"
-        enum role "ADMIN, CLINIC, PATIENT"
+        enum role "ADMIN, CLINIC"
         string passwordHash
         string clinicId FK "opcional, só p/ role CLINIC"
+        int maxConcurrentChats "default 5"
         datetime createdAt
         datetime updatedAt
     }
@@ -78,6 +79,22 @@ erDiagram
     APPOINTMENT {
         string id PK
         string patientName
+        string patientPhone
+        string patientCpf
+        string clinicProcedureId FK
+        date date
+        string timeSlot "opcional"
+        enum status "PENDING, CONFIRMED, COMPLETED, CANCELLED, NO_SHOW"
+        string paymentMethod "opcional"
+        string notes "opcional"
+        string affiliateId FK "opcional"
+        decimal affiliateCommission "10,2 opcional"
+        boolean commissionReleased "default false"
+        datetime reminderSentAt "opcional"
+        string reminderStatus "PENDING, SENT, CONFIRMED, RESCHEDULE_REQUESTED"
+        datetime createdAt
+        datetime updatedAt
+    }
         string patientPhone
         string patientCpf
         string clinicProcedureId FK

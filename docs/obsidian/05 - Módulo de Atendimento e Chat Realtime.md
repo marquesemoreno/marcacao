@@ -124,52 +124,43 @@ Atalhos digitados no campo de mensagem (`/jejum`, `/pix`, `/confirmacao`, `/atra
 - **Tags** — array de texto livre em `Conversation.tags`, editado em `contact-panel.tsx` (adicionar por Enter num campo, ou um clique nos botões de sugestão `Exame Pendente`/`Retorno`/`Prioritário`/`Confirmado`; remover pelo `x` no badge). Gravado por `updateConversationTags` (`src/actions/inbox.ts`), sem validação de vocabulário — qualquer string vira tag.
 - **"Criar Agendamento de Consulta/Exame"** — abre um diálogo (`create-appointment-shortcut.tsx`) pré-preenchido com nome/telefone/CPF do `Contact`, chamando a mesma `createAppointment` (`src/actions/appointments.ts`) usada pelo portal público. O CPF fica editável mesmo pré-preenchido, porque contatos vindos de WhatsApp podem não ter CPF cadastrado (`Contact.cpf` é opcional).
 
-## Atribuição e finalização de atendimento
+## Trava de Concorrência e Atribuição de Conversas
 
-- **Filtros da coluna 1** (`ConversationFilter` em `src/lib/schemas/inbox.ts`): `mine` (`assignedUserId` = usuário logado), `unassigned` (`assignedUserId = null`), `all` (qualquer conversa com status `OPEN`/`PENDING`, atribuída ou não) e `resolved` (`status = RESOLVED`).
-- **"Atribuir a mim"** — `assignConversationToMe`, grava o `id` do usuário da sessão.
-- **"Finalizar Atendimento" / "Reabrir"** — `resolveConversation`/`reopenConversation`, alternam `status` entre `RESOLVED` e `OPEN`.
+- **Trava de Concorrência (`claimConversation`)**: Impede que dois atendentes assumam a mesma conversa simultaneamente. Retorna aviso amigável se a conversa já tiver sido assumida por outro atendente.
+- **Transferência de Conversa (`transferConversation`)**: Permite encaminhar a conversa para outro membro da equipe ou departamento, inserindo nota interna automática no histórico (`"Conversa transferida para [Nome]"`).
 
-Todas essas Server Actions (em `src/actions/inbox.ts`) conferem que a conversa pertence à `clinicId` da sessão antes de gravar — mesmo padrão de defesa em profundidade descrito em [[03 - APIs e Webhooks n8n]] para as demais Server Actions do painel da clínica.
+## Limite de Conversas Simultâneas (`maxConcurrentChats`)
 
-## Som de notificação
+- **Capacidade Máxima do Atendente**: Campo `maxConcurrentChats` (padrão 5) no modelo `User`.
+- **Validação de Atribuição**: Ao tentar assumir (`claimConversation`) ou transferir (`transferConversation`), a Server Action valida se o atendente já possui `conversasAbertas >= maxConcurrentChats`. Se sim, bloqueia a atribuição com mensagem orientando a finalizar atendimentos abertos.
+- **Indicador Visual na Interface**: Pílula de capacidade `⚡ X/Y ativos` exibida no topo do painel e botão `[ 🙋‍♂️ Assumir Atendimento ]` desabilitado quando a capacidade máxima for atingida.
 
-`src/lib/notification-sound.ts` sintetiza um bipe de duas notas (660Hz → 880Hz) via Web Audio API (`AudioContext`/`OscillatorNode`) — não depende de nenhum arquivo de áudio externo. `inbox-app.tsx` compara o total de mensagens não lidas a cada atualização (`totalUnreadRef`) e só toca o som quando esse total **aumenta** (nunca no primeiro carregamento da página, controlado por `isFirstLoadRef`) — assim trocar de aba/filtro não dispara som à toa.
+## Modal Obrigatório de Motivo de Resolução (`resolveConversation`)
 
-## Layout de 3 colunas e responsividade
+- **Campos em `Conversation`**: `resolutionReason`, `resolutionNotes`, `resolvedAt`, `resolvedByUserId`.
+- **Modal de Finalização**: Ao clicar em "Finalizar Atendimento", exige a seleção de um dos motivos:
+  * 🎟️ `AGENDAMENTO_CONCLUIDO`
+  * 💡 `DUVIDA_ESCLARECIDA`
+  * 💲 `ORCAMENTO_ENVIADO`
+  * ⏳ `SEM_RESPOSTA`
+  * ❌ `CANCELAMENTO`
+  * 🔄 `ENCAMINHADO`
+- Insere nota do sistema no chat e libera 1 vaga da pílula de capacidade do atendente.
 
-`src/components/inbox/inbox-app.tsx` usa uma grid responsiva (`grid-cols-1 md:grid-cols-[300px_1fr] lg:grid-cols-[300px_1fr_300px]`):
+## Notificações em Tempo Real, Som e Título da Aba
 
-| Largura | O que aparece |
-|---|---|
-| `< 768px` (mobile) | Uma coluna por vez — lista **ou** chat, conforme uma conversa está selecionada ou não. O painel de contato (coluna 3) não aparece |
-| `768–1023px` (tablet) | Lista + chat lado a lado, sem painel de contato |
-| `≥ 1024px` (desktop) | As 3 colunas |
+- **Notificações de Desktop (Browser Notification API)**: Dispara pop-up nativo do sistema operacional/navegador ao receber novas mensagens no WhatsApp. O clique no pop-up foca na janela (`window.focus()`) e seleciona a conversa.
+- **Contador Dinâmico na Aba**: `updateTabTitleUnreadCount(unreadCount)` altera o título para `(3) Chat / WhatsApp | Conecta Saúde` quando houver mensagens pendentes.
+- **Efeito Sonoro Synthesizer**: `playNotificationSound()` executa o bipe sonoro via Web Audio API.
 
-Para isso funcionar dentro do shell compartilhado do painel da clínica, `src/app/(clinic)/layout.tsx` mudou de `min-h-screen` (rolagem na página inteira) para `h-screen overflow-hidden` no container externo, com `<main className="flex-1 overflow-y-auto p-4">` fazendo a rolagem — as outras páginas de `/clinic` continuam se comportando visualmente igual (cabeçalho/nav fixos), só que agora rolando dentro do `<main>` em vez da janela toda.
+## Chatbot de Triagem IA e Mensagem Fora de Horário
 
-## Testado no navegador
-
-Fluxo validado manualmente, logado como uma conta `CLINIC` (ver credenciais atuais em [[01 - Setup e Infraestrutura]]):
-- Filtros trocando corretamente entre "Minhas"/"Não Atribuídas"/"Todas"/"Finalizadas", com contagem de não lidas certa.
-- Abrir conversa, ver histórico com separador de data, enviar mensagem nova (aparece na hora, some do campo de texto).
-- Atalho `/jejum` abrindo o menu de respostas rápidas e substituindo o texto ao escolher.
-- Painel de contato (coluna 3, só ≥1024px) mostrando nome/telefone/CPF, tag pré-existente, botões de tag rápida.
-- "Criar Agendamento de Consulta/Exame" abrindo o diálogo com o catálogo de procedimentos da clínica carregado (preços formatados certo, sem erro de serialização de `Decimal`), CPF pré-preenchido e editável, e criando o agendamento de fato (confirmado consultando o banco depois).
-
-> [!note] Ferramenta de teste automatizado (`computer` tool) não clica em componentes base-ui
-> Durante o teste manual, cliques sintéticos de mouse (via a ferramenta de automação usada para testar) não acionavam `Tabs`/`Dialog` do base-ui (a lib de primitivos por trás do shadcn/ui deste projeto) — só um `.click()`/`dispatchEvent` direto via JavaScript funcionava. Confirmado como limitação da ferramenta de teste, não bug do código: os mesmos elementos respondem normalmente a cliques reais de mouse/touch de um usuário de verdade.
-
-## Como adicionar um canal novo (Instagram, Telegram...)
-
-O desenho já separa "canal de mensagem" de "conversa"/"mensagem" — `Conversation`/`Message` não têm nenhum campo específico de WhatsApp. Para adicionar um canal novo, o caminho seria:
-
-1. Adicionar um campo `channel` (enum: `WHATSAPP`, `INSTAGRAM`, `TELEGRAM`...) em `Conversation` (hoje implícito, sempre WhatsApp — o badge "WhatsApp" na UI é fixo, `src/components/inbox/conversation-list.tsx`).
-2. Criar um adapter de envio novo, no mesmo espírito de `buildProviderRequest()` em `src/lib/whatsapp.ts` (ver [[03 - APIs e Webhooks n8n]]) — cada canal tem API de envio própria.
-3. Criar um Route Handler de webhook novo (`/api/webhooks/instagram`, por exemplo) que chame uma versão genérica de `findOrCreateConversation` (hoje essa função está dentro de `src/app/api/webhooks/whatsapp/route.ts`, acoplada ao formato de payload do WhatsApp — precisaria ser extraída para `src/lib/inbox-ingestion.ts` ou similar antes de ser reaproveitada por outro canal).
-4. `sendMessage` (`src/actions/inbox.ts`) precisaria escolher o adapter certo com base no `channel` da conversa, em vez de sempre chamar `whatsappService`.
-
-Nada disso está implementado — é o desenho de extensão, não uma funcionalidade real hoje.
+- **Verificação de Expediente (`checkClinicBusinessHours`)**: Valida se a clínica está aberta no momento da mensagem (Horário de Brasília: Seg-Sex 08h-18h, Sáb 08h-12h). Se fechada, responde automaticamente com os horários de atendimento.
+- **Triagem Inicial por IA (`processInboundChatbotTriage`)**:
+  * Identifica **CPF** (formatados ou numéricos de 11 dígitos) e **Procedimentos/Especialidades** no texto enviado pelo paciente.
+  * Grava o CPF no cadastro do paciente (`Contact.cpf`).
+  * Atualiza a etapa do funil para `TRIAGEM` e atribui as tags `"⚡ Triado por IA"` e `"🔬 Triagem Concluída"`.
+  * Responde ao paciente confirmando os dados coletados e direcionando para a fila de atendimento prioritário da recepção.
 
 ## Notas relacionadas
 
@@ -178,4 +169,5 @@ Nada disso está implementado — é o desenho de extensão, não uma funcionali
 - [[02 - Dicionário de Dados e Banco]]
 - [[03 - APIs e Webhooks n8n]]
 - [[04 - Manual de Edição Manual e Manutenção]]
-- [[11 - Modulo Isolado de Atendimento e CRM]] — camada visual nova (Open Design) e CRM em Kanban construídos em cima deste modelo de dados
+- [[11 - Modulo Isolado de Atendimento e CRM]] — Kanban de 5 colunas integrado com atalhos de chat e filtros por atendente/departamento
+
