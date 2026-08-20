@@ -11,6 +11,8 @@ import {
   updateConversationTags,
   updateConversationFunnelStage,
   assignConversationToUser,
+  claimConversation,
+  transferConversation,
   resolveConversation,
   reopenConversation,
   listCannedResponses,
@@ -26,12 +28,15 @@ import {
   updateConversationTagsAdmin,
   updateConversationFunnelStageAdmin,
   assignConversationToUserAdmin,
+  claimConversationAdmin,
+  transferConversationAdmin,
   resolveConversationAdmin,
   reopenConversationAdmin,
   listCannedResponsesAdmin,
   listClinicProceduresForAppointmentAdmin,
   suggestIaReplyAdmin,
 } from "@/actions/admin-inbox";
+import { toast } from "sonner";
 import { useInboxRealtime } from "@/hooks/use-inbox-realtime";
 import { playNotificationSound } from "@/lib/notification-sound";
 import { InboxLayout } from "./inbox-layout";
@@ -207,12 +212,6 @@ export function ChatCrmApp({ scope, basePath, view }: ChatCrmAppProps) {
     await refreshContacts();
   }
 
-  async function handleTransferAgent(agentId: string) {
-    if (!selectedContactId) return;
-    await actions.assignConversationToUser(selectedContactId, agentId);
-    await refreshContacts();
-  }
-
   async function handleFinishAttendance() {
     if (!selectedContactId) return;
     await actions.resolveConversation(selectedContactId);
@@ -246,6 +245,32 @@ export function ChatCrmApp({ scope, basePath, view }: ChatCrmAppProps) {
     await refreshMessages();
   }
 
+  async function handleClaimConversation() {
+    if (!selectedContactId) return;
+    const claimFn = scope === "admin" ? claimConversationAdmin : claimConversation;
+    const result = await claimFn(selectedContactId);
+    if (!result.success) {
+      toast.error(result.message);
+    } else {
+      toast.success("Atendimento assumido por você com sucesso!");
+      await refreshContacts();
+      await refreshMessages();
+    }
+  }
+
+  async function handleTransferAgent(agentId: string) {
+    if (!selectedContactId) return;
+    const transferFn = scope === "admin" ? transferConversationAdmin : transferConversation;
+    const result = await transferFn(selectedContactId, agentId);
+    if (!result.success) {
+      toast.error(result.message);
+    } else {
+      toast.success("Conversa transferida com sucesso!");
+      await refreshContacts();
+      await refreshMessages();
+    }
+  }
+
   return (
     <div className="flex h-[calc(100vh-3.5rem)] w-full flex-col overflow-hidden">
       {view === "inbox" ? (
@@ -264,6 +289,7 @@ export function ChatCrmApp({ scope, basePath, view }: ChatCrmAppProps) {
           onAddTag={handleAddTag}
           onRemoveTag={handleRemoveTag}
           onUpdateFunnelStage={handleUpdateFunnelStage}
+          onClaimConversation={handleClaimConversation}
           onTransferAgent={handleTransferAgent}
           onFinishAttendance={handleFinishAttendance}
           fetchProcedures={fetchProcedures}

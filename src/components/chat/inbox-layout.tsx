@@ -87,6 +87,7 @@ interface InboxLayoutProps {
   onAddTag: (tag: string) => Promise<void> | void;
   onRemoveTag: (tag: string) => Promise<void> | void;
   onUpdateFunnelStage: (stage: FunnelStage) => Promise<void> | void;
+  onClaimConversation?: () => Promise<void> | void;
   onTransferAgent: (agentId: string, agentName: string) => Promise<void> | void;
   onFinishAttendance: () => Promise<void> | void;
   fetchProcedures: () => Promise<PlainClinicProcedureItem[]>;
@@ -109,6 +110,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
   onAddTag,
   onRemoveTag,
   onUpdateFunnelStage,
+  onClaimConversation,
   onTransferAgent,
   onFinishAttendance,
   fetchProcedures,
@@ -415,6 +417,16 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                         {c.statusTag.label}
                       </span>
 
+                      {c.responsibleAgent && c.responsibleAgent !== 'Não atribuído' ? (
+                        <span className="text-[9.5px] font-semibold text-slate-600 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded truncate max-w-[85px]" title={`Atribuído a ${c.responsibleAgent}`}>
+                          👤 {c.responsibleAgent.split(' ')[0]}
+                        </span>
+                      ) : (
+                        <span className="text-[9.5px] font-bold text-amber-700 bg-amber-50 border border-amber-200/80 px-1.5 py-0.5 rounded" title="Aguardando secretária">
+                          ⏳ Livre
+                        </span>
+                      )}
+
                       {c.unreadCount > 0 && (
                         <span className="bg-emerald-600 text-white text-[10px] font-extrabold px-1.5 py-0.2 rounded-full font-mono shadow-2xs">
                           {c.unreadCount}
@@ -504,6 +516,54 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
 
               {/* Ações do Header */}
               <div className="flex items-center gap-1.5 sm:gap-2">
+                {(!selectedContact.responsibleAgent || selectedContact.responsibleAgent === "Não atribuído") ? (
+                  onClaimConversation && (
+                    <button
+                      onClick={() => onClaimConversation()}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-extrabold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl transition-all shadow-md active:scale-95 animate-pulse"
+                      title="Assumir esta conversa para o seu atendimento"
+                    >
+                      <UserPlus className="w-4 h-4" />
+                      <span>🙋‍♂️ Assumir Atendimento</span>
+                    </button>
+                  )
+                ) : (
+                  <div className="relative">
+                    <button
+                      onClick={() => setIsTransferMenuOpen(!isTransferMenuOpen)}
+                      className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-200/80 rounded-xl transition-colors shadow-2xs"
+                      title="Clique para transferir a conversa"
+                    >
+                      <span className="text-slate-400 font-normal hidden sm:inline">Atendente:</span>
+                      <span className="font-bold text-slate-900 truncate max-w-[100px]">{selectedContact.responsibleAgent}</span>
+                    </button>
+
+                    {isTransferMenuOpen && (
+                      <div className="absolute right-0 mt-2 w-56 bg-white border border-slate-200 rounded-2xl shadow-xl py-2 z-50 animate-in fade-in zoom-in-95 text-xs font-medium">
+                        <div className="px-3 py-1 text-[10px] font-mono font-bold text-slate-400 uppercase border-b border-slate-100 mb-1">
+                          Transferir Atendimento Para
+                        </div>
+                        {agents.length === 0 ? (
+                          <p className="px-3 py-2 text-slate-400 text-xs">Nenhum outro atendente disponível.</p>
+                        ) : (
+                          agents.map((agent) => (
+                            <button
+                              key={agent.id}
+                              onClick={() => {
+                                onTransferAgent(agent.id, agent.name);
+                                setIsTransferMenuOpen(false);
+                              }}
+                              className="w-full px-3 py-2 text-left hover:bg-slate-50 flex items-center justify-between text-slate-700"
+                            >
+                              <span className="font-bold">{agent.name}</span>
+                              <span className="text-[10px] font-mono text-slate-400">{agent.role}</span>
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
                 <button
                   onClick={() => setIsScheduleModalOpen(true)}
                   className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-teal-600 hover:bg-teal-700 rounded-xl transition-all shadow-2xs"

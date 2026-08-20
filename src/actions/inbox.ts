@@ -165,22 +165,110 @@ export async function sendMessage(conversationId: string, content: string, isInt
   return updated;
 }
 
-export async function assignConversationToMe(conversationId: string) {
+export async function claimConversation(conversationId: string) {
+  const { clinicId, userId } = await requireClinicSession();
+
+  const conversation = await prisma.conversation.findUnique({
+    where: { id: conversationId },
+    include: { assignedUser: { select: { id: true, name: true } } },
+  });
+
+  if (!conversation || conversation.clinicId !== clinicId) {
+    return { success: false, message: "Conversa não encontrada." };
+  }
+
+  if (conversation.assignedUserId && conversation.assignedUserId !== userId) {
+    const assignedName = conversation.assignedUser?.name || "outro atendente";
+    return {
+      success: false,
+      message: `Esta conversa já foi assumida por ${assignedName}.`,
+    };
+  }
+
+  const currentUser = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { name: true },
+  });
+  const userName = currentUser?.name || "Atendente";
+
+  await prisma.conversation.update({
+    where: { id: conversationId },
+    data: {
+      assignedUserId: userId,
+      status: "OPEN",
+    },
+  });
+
+  await prisma.message.create({
+    data: {
+      conversationId,
+      direction: "OUTBOUND",
+      type: "INTERNAL_NOTE",
+      content: `🔒 Atendimento assumido por ${userName}.`,
+      status: "SENT",
+      senderUserId: userId,
+    },
+  });
+
+  revalidatePath("/clinic/inbox");
+  revalidatePath("/clinic/crm");
+  return { success: true };
+}
+
+export async function transferConversation(
+  conversationId: string,
+  targetUserId: string,
+  department?: Department
+) {
   const { clinicId, userId } = await requireClinicSession();
 
   const conversation = await prisma.conversation.findUnique({
     where: { id: conversationId },
     select: { clinicId: true },
   });
+
   if (!conversation || conversation.clinicId !== clinicId) {
-    throw new Error("Conversa não encontrada");
+    return { success: false, message: "Conversa não encontrada." };
+  }
+
+  const targetUser = await prisma.user.findUnique({
+    where: { id: targetUserId },
+    select: { name: true },
+  });
+
+  if (!targetUser) {
+    return { success: false, message: "Atendente de destino não encontrado." };
   }
 
   await prisma.conversation.update({
     where: { id: conversationId },
-    data: { assignedUserId: userId },
+    data: {
+      assignedUserId: targetUserId,
+      ...(department ? { department: departmentToDb[department] } : {}),
+    },
   });
+
+  await prisma.message.create({
+    data: {
+      conversationId,
+      direction: "OUTBOUND",
+      type: "INTERNAL_NOTE",
+      content: `🔒 Conversa transferida para ${targetUser.name}.`,
+      status: "SENT",
+      senderUserId: userId,
+    },
+  });
+
   revalidatePath("/clinic/inbox");
+  revalidatePath("/clinic/crm");
+  return { success: true };
+}
+
+export async function assignConversationToMe(conversationId: string) {
+  const result = await claimConversation(conversationId);
+  if (!result.success) {
+    throw new Error(result.message);
+  }
 }
 
 export async function resolveConversation(conversationId: string) {

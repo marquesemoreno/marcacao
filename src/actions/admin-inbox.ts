@@ -154,6 +154,105 @@ export async function sendMessageAdmin(conversationId: string, content: string, 
   return updated;
 }
 
+export async function claimConversationAdmin(conversationId: string) {
+  const { userId } = await requireAdminSession();
+
+  const conversation = await prisma.conversation.findUnique({
+    where: { id: conversationId },
+    include: { assignedUser: { select: { id: true, name: true } } },
+  });
+
+  if (!conversation) {
+    return { success: false, message: "Conversa não encontrada." };
+  }
+
+  if (conversation.assignedUserId && conversation.assignedUserId !== userId) {
+    const assignedName = conversation.assignedUser?.name || "outro atendente";
+    return {
+      success: false,
+      message: `Esta conversa já foi assumida por ${assignedName}.`,
+    };
+  }
+
+  const currentUser = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { name: true },
+  });
+  const userName = currentUser?.name || "Administrador";
+
+  await prisma.conversation.update({
+    where: { id: conversationId },
+    data: {
+      assignedUserId: userId,
+      status: "OPEN",
+    },
+  });
+
+  await prisma.message.create({
+    data: {
+      conversationId,
+      direction: "OUTBOUND",
+      type: "INTERNAL_NOTE",
+      content: `🔒 Atendimento assumido por ${userName}.`,
+      status: "SENT",
+      senderUserId: userId,
+    },
+  });
+
+  revalidatePath("/admin/inbox");
+  revalidatePath("/admin/crm");
+  return { success: true };
+}
+
+export async function transferConversationAdmin(
+  conversationId: string,
+  targetUserId: string,
+  department?: Department
+) {
+  const { userId } = await requireAdminSession();
+
+  const conversation = await prisma.conversation.findUnique({
+    where: { id: conversationId },
+    select: { id: true },
+  });
+
+  if (!conversation) {
+    return { success: false, message: "Conversa não encontrada." };
+  }
+
+  const targetUser = await prisma.user.findUnique({
+    where: { id: targetUserId },
+    select: { name: true },
+  });
+
+  if (!targetUser) {
+    return { success: false, message: "Atendente de destino não encontrado." };
+  }
+
+  await prisma.conversation.update({
+    where: { id: conversationId },
+    data: {
+      assignedUserId: targetUserId,
+      ...(department ? { department: departmentToDb[department] } : {}),
+    },
+  });
+
+  await prisma.message.create({
+    data: {
+      conversationId,
+      direction: "OUTBOUND",
+      type: "INTERNAL_NOTE",
+      content: `🔒 Conversa transferida para ${targetUser.name}.`,
+      status: "SENT",
+      senderUserId: userId,
+    },
+  });
+
+  revalidatePath("/admin/inbox");
+  revalidatePath("/admin/crm");
+  return { success: true };
+}
+
 export async function assignConversationToUserAdmin(conversationId: string, targetUserId: string) {
   await requireAdminSession();
   await prisma.conversation.update({
