@@ -3,6 +3,7 @@ import { authOptions } from "@/lib/auth";
 import { SignOutButton } from "@/components/sign-out-button";
 import { Logo } from "@/components/brand/logo";
 import { AdminNav } from "@/components/admin/admin-nav";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -15,13 +16,13 @@ export default async function AdminLayout({
   const session = await getServerSession(authOptions);
 
   return (
-    <div className="flex h-screen w-screen flex-col overflow-hidden bg-slate-50">
+    <div className="flex h-screen w-screen flex-col overflow-hidden bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100">
       {/* Cabeçalho Slim de Linha Única (56px / h-14) */}
-      <header className="flex h-14 shrink-0 items-center justify-between gap-4 border-b border-slate-200/80 bg-white px-4">
+      <header className="flex h-14 shrink-0 items-center justify-between gap-4 border-b border-slate-200/80 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 px-4">
         {/* Esquerda: Logo + Badge */}
         <div className="flex shrink-0 items-center gap-2.5">
           <Logo variant="full" size="sm" />
-          <span className="inline-flex items-center gap-1 rounded-md bg-sky-50 border border-sky-200/80 px-2 py-0.5 text-[10px] font-extrabold text-sky-700 font-mono">
+          <span className="inline-flex items-center gap-1 rounded-md bg-sky-50 dark:bg-sky-950/60 border border-sky-200/80 dark:border-sky-800 px-2 py-0.5 text-[10px] font-extrabold text-sky-700 dark:text-sky-300 font-mono">
             🛡️ Admin
           </span>
         </div>
@@ -31,10 +32,11 @@ export default async function AdminLayout({
           <AdminNav />
         </div>
 
-        {/* Direita: Nome do Usuário + Sair */}
-        <div className="flex shrink-0 items-center gap-3">
+        {/* Direita: Alternador de Tema + Nome do Usuário + Sair */}
+        <div className="flex shrink-0 items-center gap-2.5">
+          <ThemeToggle />
           {session?.user.name && (
-            <span className="hidden text-xs font-bold text-slate-700 md:inline font-mono">
+            <span className="hidden text-xs font-bold text-slate-700 dark:text-slate-300 md:inline font-mono">
               {session.user.name}
             </span>
           )}

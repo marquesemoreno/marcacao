@@ -22,10 +22,10 @@ export default async function AdminAffiliatesPage() {
   const totalAvailableSum = affiliates.reduce((sum, a) => sum + a.availableBalance, 0);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-4 sm:p-6 flex-1 overflow-y-auto font-sans text-slate-900 dark:text-slate-100">
       <div>
-        <h1 className="text-2xl font-bold text-slate-900">Programa de Marcadores e Afiliados</h1>
-        <p className="text-sm text-slate-500">
+        <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Programa de Marcadores e Afiliados</h1>
+        <p className="text-sm text-slate-500 dark:text-slate-400">
           Gestão de aprovados, contato WhatsApp, cópia de PIX e controle de repasse financeiro de indicações.
         </p>
       </div>

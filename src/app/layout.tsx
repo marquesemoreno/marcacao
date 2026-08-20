@@ -6,6 +6,8 @@ import { Toaster } from "@/components/ui/sonner";
 import { SessionProvider } from "@/components/session-provider";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
+import { ThemeProvider } from "@/components/theme-provider";
+
 const geistSans = Geist({
   subsets: ["latin"],
   variable: "--font-geist-sans",
@@ -44,16 +46,18 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="pt-BR" className="scroll-smooth">
+    <html lang="pt-BR" className="scroll-smooth" suppressHydrationWarning>
       <body
         className={cn(
           geistSans.variable,
           geistMono.variable,
-          "font-sans antialiased"
+          "font-sans antialiased bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100"
         )}
       >
         <SessionProvider>
-          <TooltipProvider>{children}</TooltipProvider>
+          <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+            <TooltipProvider>{children}</TooltipProvider>
+          </ThemeProvider>
         </SessionProvider>
         <Toaster />
       </body>

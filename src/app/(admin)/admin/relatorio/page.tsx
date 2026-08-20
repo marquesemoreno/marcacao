@@ -24,12 +24,12 @@ export default async function AdminReportPage() {
   const { overview, attendantStats } = attendantReport;
 
   return (
-    <div className="space-y-8 font-sans">
+    <div className="space-y-8 font-sans p-4 sm:p-6 flex-1 overflow-y-auto text-slate-900 dark:text-slate-100">
       <div>
-        <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">
+        <h1 className="text-2xl font-extrabold text-slate-900 dark:text-slate-100 tracking-tight">
           📊 Relatório Avançado de Produtividade & Finanças
         </h1>
-        <p className="text-xs text-slate-500 font-medium mt-1">
+        <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-1">
           Métricas de tempo de resposta (TMR), taxa de conversão da recepção e faturamento por clínica.
         </p>
       </div>

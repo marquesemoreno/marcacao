@@ -21,7 +21,7 @@ export default async function AdminLeadsPage() {
   const partnerUrl = `${getBaseUrl()}/seja-parceiro`;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-4 sm:p-6 flex-1 overflow-y-auto font-sans text-slate-900 dark:text-slate-100">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold">Leads de Clínicas Parceiras</h1>
