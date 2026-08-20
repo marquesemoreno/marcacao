@@ -49,19 +49,19 @@ export async function POST(request: Request) {
     const procedure = primaryMatch.procedure;
 
     const prepInstruction = procedure.preparationInstructions
-      ? `\n\n📌 **Preparo Essencial:** ${procedure.preparationInstructions}`
+      ? `\n\n📌 **Orientação de Preparo:** ${procedure.preparationInstructions}`
       : "";
 
-    const responseText = `Encontrei a recomendação ideal para o seu atendimento! 🩺
+    const responseText = `Olá! Que bom ter você aqui! 🩺
 
-Para **${procedure.name}** (${procedure.specialty?.name || "Especialidade Médica"}), recomendamos a clínica credenciada **${clinic.tradeName}** (${clinic.neighborhood}, ${clinic.city}).
+Para **${procedure.name}** (${procedure.specialty?.name || "Especialidade Médica"}), recomendo muito a nossa clínica credenciada **${clinic.tradeName}**, localizada no bairro **${clinic.neighborhood}** em **${clinic.city}**.
 
-💡 **Informação de Valor:** Atendimento particular com **valor sob consulta**, negociação direta e **sem carência ou mensalidade**.${prepInstruction}
+💡 **Atendimento Particular:** Oferecemos agendamento ágil com **valores acessíveis sob consulta**, direto no balcão e **sem mensalidades ou carência**.${prepInstruction}
 
-Deseja confirmar os horários disponíveis com a recepção da clínica?`;
+Posso te ajudar a agendar o melhor horário diretamente com a recepção da clínica?`;
 
     const defaultPhone = clinic.phone || "77999999999";
-    const waText = `Olá! Falei com a Assistente Virtual da Conecta Saúde e gostaria de consultar horários e agendar ${procedure.name} na ${clinic.tradeName}.`;
+    const waText = `Olá! Falei com a equipe de atendimento da Conecta Saúde e gostaria de consultar horários e agendar ${procedure.name} na ${clinic.tradeName}.`;
     const whatsappUrl = buildWhatsAppLink(defaultPhone, waText);
 
     return NextResponse.json({
@@ -79,7 +79,7 @@ Deseja confirmar os horários disponíveis com a recepção da clínica?`;
   } catch (error) {
     console.error("Erro na API de Chat:", error);
     return NextResponse.json(
-      { error: "Erro ao processar mensagem do assistente" },
+      { error: "Erro ao processar mensagem da equipe" },
       { status: 500 }
     );
   }

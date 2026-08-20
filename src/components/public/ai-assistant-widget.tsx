@@ -1,9 +1,8 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { X, Send, Bot, Sparkles, MessageCircle } from "lucide-react";
+import { X, Send, MessageCircleHeart, Sparkles, MessageCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Logo } from "@/components/brand/logo";
 
 type Message = {
   id: string;
@@ -19,6 +18,13 @@ type Message = {
   };
 };
 
+const QUICK_CHIPS = [
+  "🩺 Marcar Consulta Médica",
+  "🔬 Onde fazer Ultrassom?",
+  "📋 Como funciona o preparo de exames?",
+  "📍 Clínicas na minha cidade",
+];
+
 export function AIAssistantWidget() {
   const [isOpen, setIsOpen] = useState(false);
   const [input, setInput] = useState("");
@@ -29,7 +35,7 @@ export function AIAssistantWidget() {
     {
       id: "initial-1",
       sender: "bot",
-      text: "Olá! 👋 Sou a assistente virtual da Conecta Saúde. O que você precisa hoje? (Ex: exames, consultas, especialidades ou sintomas).",
+      text: "Olá! 👋 Seja muito bem-vindo(a) à Conecta Saúde. Qual especialidade, exame ou clínica você está procurando hoje?",
     },
   ]);
 
@@ -43,9 +49,8 @@ export function AIAssistantWidget() {
     }
   }, [messages, isOpen]);
 
-  async function handleSendMessage(e?: React.FormEvent) {
-    if (e) e.preventDefault();
-    const query = input.trim();
+  async function handleSendQuery(queryText: string) {
+    const query = queryText.trim();
     if (!query || loading) return;
 
     const userMsg: Message = {
@@ -82,7 +87,7 @@ export function AIAssistantWidget() {
         {
           id: `err-${Date.now()}`,
           sender: "bot",
-          text: "Desculpe, ocorreu um erro ao consultar o catálogo. Você pode buscar diretamente na nossa página de procedimentos ou tentar novamente.",
+          text: "Desculpe, ocorreu um pequeno imprevisto ao consultar o catálogo. Você pode buscar diretamente na nossa página de procedimentos ou tentar novamente.",
         },
       ]);
     } finally {
@@ -90,18 +95,23 @@ export function AIAssistantWidget() {
     }
   }
 
+  function handleSendMessage(e?: React.FormEvent) {
+    if (e) e.preventDefault();
+    handleSendQuery(input);
+  }
+
   return (
-    <div className="fixed bottom-5 right-5 z-50 flex flex-col items-end print:hidden">
+    <div className="fixed bottom-5 right-5 z-50 flex flex-col items-end print:hidden font-sans">
       {/* Floating Widget Trigger Button */}
       {!isOpen && (
         <button
           type="button"
           onClick={() => setIsOpen(true)}
-          className="group relative flex items-center gap-3 rounded-full bg-gradient-to-r from-teal-600 to-emerald-600 p-3.5 text-white shadow-2xl transition-all duration-300 hover:scale-105 hover:shadow-teal-600/40 active:scale-95"
-          aria-label="Abrir Assistente de IA Conecta Saúde"
+          className="group relative flex items-center gap-3 rounded-full bg-gradient-to-r from-teal-600 to-emerald-600 p-3.5 text-white shadow-2xl transition-all duration-300 hover:scale-105 hover:shadow-teal-600/40 active:scale-95 cursor-pointer"
+          aria-label="Abrir Atendimento Conecta Saúde"
         >
           <div className="relative flex h-8 w-8 items-center justify-center rounded-full bg-white/20 backdrop-blur-xs">
-            <Bot className="h-5 w-5 text-white" />
+            <MessageCircleHeart className="h-5 w-5 text-white" />
             <span className="absolute -top-1 -right-1 flex h-3 w-3">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
               <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-400" />
@@ -109,27 +119,30 @@ export function AIAssistantWidget() {
           </div>
 
           <div className="hidden sm:flex flex-col items-start pr-2">
-            <span className="text-xs font-extrabold tracking-tight">Assistente Virtual IA</span>
-            <span className="text-[10px] font-medium text-emerald-100">Tire dúvidas ou agende com IA</span>
+            <span className="text-xs font-extrabold tracking-tight">💬 Precisa de ajuda com consultas ou exames?</span>
+            <span className="text-[10px] font-medium text-emerald-100 flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              🟢 Equipe de Apoio Online
+            </span>
           </div>
         </button>
       )}
 
       {/* Expanded Chat Window */}
       {isOpen && (
-        <div className="flex h-[520px] w-[360px] sm:w-[400px] flex-col overflow-hidden rounded-3xl border border-slate-200/80 bg-white/95 shadow-2xl backdrop-blur-md animate-in slide-in-from-bottom-5">
+        <div className="flex h-[540px] w-[360px] sm:w-[400px] flex-col overflow-hidden rounded-3xl border border-slate-200/80 bg-white/95 shadow-2xl backdrop-blur-md animate-in slide-in-from-bottom-5">
           {/* Header */}
           <div className="flex items-center justify-between border-b border-slate-100 bg-gradient-to-r from-slate-900 via-slate-800 to-teal-950 p-4 text-white">
             <div className="flex items-center gap-2.5">
               <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-teal-500/20 border border-teal-400/30 text-teal-300">
-                <Bot className="h-5 w-5" />
+                <MessageCircleHeart className="h-5 w-5 text-emerald-400" />
               </div>
               <div>
-                <Logo variant="white" size="sm" />
+                <h3 className="text-sm font-extrabold text-white">Atendimento Conecta Saúde</h3>
                 <div className="flex items-center gap-1.5 mt-0.5">
                   <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-                  <span className="text-[10px] font-mono font-semibold uppercase tracking-wider text-emerald-300">
-                    Online 24h • Atendimento Inteligente
+                  <span className="text-[10px] font-mono font-semibold text-emerald-300">
+                    🟢 Equipe de Apoio ao Paciente • Resposta imediata
                   </span>
                 </div>
               </div>
@@ -176,17 +189,36 @@ export function AIAssistantWidget() {
                       className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-3.5 py-2.5 text-xs font-bold text-white shadow-2xs transition-all hover:bg-emerald-700 active:scale-95"
                     >
                       <MessageCircle className="h-4 w-4" />
-                      <span>📲 Continuar Agendamento no WhatsApp</span>
+                      <span>📲 Falar com a Recepção no WhatsApp</span>
                     </a>
                   </div>
                 )}
               </div>
             ))}
 
+            {/* Quick Chips Shortcuts */}
+            {messages.length === 1 && !loading && (
+              <div className="space-y-1.5 pt-2">
+                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider font-mono">Dúvidas Frequentes:</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {QUICK_CHIPS.map((chip) => (
+                    <button
+                      key={chip}
+                      type="button"
+                      onClick={() => handleSendQuery(chip)}
+                      className="text-xs font-semibold text-slate-700 bg-white hover:bg-teal-50 hover:text-teal-800 border border-slate-200/80 hover:border-teal-200 rounded-xl px-3 py-1.5 transition-all shadow-2xs text-left"
+                    >
+                      {chip}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {loading && (
-              <div className="flex items-center gap-2 text-xs font-semibold text-slate-400 bg-white p-3 rounded-2xl border border-slate-200 w-fit">
-                <Bot className="h-4 w-4 text-teal-600 animate-spin" />
-                <span>Consultando catálogo credenciado Conecta Saúde...</span>
+              <div className="flex items-center gap-2 text-xs font-semibold text-slate-500 bg-white p-3 rounded-2xl border border-slate-200 w-fit">
+                <MessageCircleHeart className="h-4 w-4 text-emerald-600 animate-spin" />
+                <span>Consultando disponibilidade nas clínicas parceiras...</span>
               </div>
             )}
             <div ref={messagesEndRef} />
@@ -199,8 +231,8 @@ export function AIAssistantWidget() {
                 type="text"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder="Digite sua dúvida ou exame desejado..."
-                aria-label="Digite sua dúvida ou exame"
+                placeholder="Digite sua dúvida ou especialidade..."
+                aria-label="Digite sua dúvida ou especialidade"
                 className="flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-xs font-medium text-slate-900 outline-none focus:border-teal-500 focus:bg-white"
               />
               <Button
