@@ -144,7 +144,7 @@ export async function sendMessage(conversationId: string, content: string, isInt
       conversationId: data.conversationId,
       direction: "OUTBOUND",
       content: data.content,
-      status: "PENDING",
+      status: "SENT",
       senderUserId: userId,
     },
   });
@@ -154,15 +154,19 @@ export async function sendMessage(conversationId: string, content: string, isInt
     data: { lastMessageAt: new Date(), status: "OPEN" },
   });
 
-  const result = await whatsappService.sendMessage(conversation.contact.phone, data.content, "chat.outbound");
-
-  const updated = await prisma.message.update({
-    where: { id: message.id },
-    data: { status: result.skipped ? "PENDING" : result.success ? "SENT" : "FAILED" },
-  });
+  // Dispara o envio ao WhatsApp via Evolution API em segundo plano (assíncrono), liberando a interface instantaneamente
+  whatsappService.sendMessage(conversation.contact.phone, data.content, "chat.outbound").then((result) => {
+    if (!result.success && !result.skipped) {
+      prisma.message.update({
+        where: { id: message.id },
+        data: { status: "FAILED" },
+      }).catch(() => {});
+    }
+  }).catch(() => {});
 
   revalidatePath("/clinic/inbox");
-  return updated;
+  revalidatePath("/admin/inbox");
+  return message;
 }
 
 export async function getAttendantCapacity() {

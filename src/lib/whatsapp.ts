@@ -8,7 +8,7 @@ type SendAttemptResult = {
   error?: string;
 };
 
-const MAX_ATTEMPTS = 3;
+const MAX_ATTEMPTS = 1;
 const RETRY_DELAY_MS = 1000;
 
 function sleep(ms: number) {
