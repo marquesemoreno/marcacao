@@ -23,7 +23,7 @@ import {
 
 export function WhatsAppShowcase() {
   return (
-    <section id="whatsapp-demo" className="relative overflow-hidden bg-gradient-to-b from-slate-50 via-white to-slate-50 py-16 lg:py-24">
+    <section id="como-funciona" className="scroll-mt-20 sm:scroll-mt-24 relative overflow-hidden bg-gradient-to-b from-slate-50 via-white to-slate-50 py-16 lg:py-24">
       {/* Decorative background glows */}
       <div className="pointer-events-none absolute -left-40 top-1/4 size-96 rounded-full bg-teal-500/5 blur-3xl" />
       <div className="pointer-events-none absolute -right-40 bottom-1/4 size-96 rounded-full bg-emerald-500/5 blur-3xl" />
