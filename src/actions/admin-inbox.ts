@@ -312,13 +312,53 @@ export async function assignConversationToUserAdmin(conversationId: string, targ
   revalidatePath("/admin/inbox");
 }
 
-export async function resolveConversationAdmin(conversationId: string) {
-  await requireAdminSession();
+const REASON_LABELS_ADMIN: Record<string, string> = {
+  AGENDAMENTO_CONCLUIDO: "🎟️ Agendamento Concluído",
+  DUVIDA_ESCLARECIDA: "💡 Dúvida Esclarecida / Informações",
+  ORCAMENTO_ENVIADO: "💲 Orçamento Enviado",
+  SEM_RESPOSTA: "⏳ Paciente Não Respondeu / Inativo",
+  CANCELAMENTO: "❌ Cancelamento / Desistência",
+  ENCAMINHADO: "🔄 Encaminhado para Outro Setor",
+};
+
+export async function resolveConversationAdmin(
+  conversationId: string,
+  resolutionData?: { reason: string; notes?: string }
+) {
+  const { userId } = await requireAdminSession();
+
+  const currentUser = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { name: true },
+  });
+  const userName = currentUser?.name || "Administrador";
+  const reasonKey = resolutionData?.reason || "DUVIDA_ESCLARECIDA";
+  const reasonLabel = REASON_LABELS_ADMIN[reasonKey] || reasonKey;
+
   await prisma.conversation.update({
     where: { id: conversationId },
-    data: { status: "RESOLVED" },
+    data: {
+      status: "RESOLVED",
+      resolutionReason: reasonKey,
+      resolutionNotes: resolutionData?.notes || null,
+      resolvedAt: new Date(),
+      resolvedByUserId: userId,
+    },
   });
+
+  await prisma.message.create({
+    data: {
+      conversationId,
+      direction: "OUTBOUND",
+      type: "INTERNAL_NOTE",
+      content: `🏁 Atendimento finalizado por ${userName} • Motivo: ${reasonLabel}${resolutionData?.notes ? `\n\nObs: ${resolutionData.notes}` : ""}`,
+      status: "SENT",
+      senderUserId: userId,
+    },
+  });
+
   revalidatePath("/admin/inbox");
+  revalidatePath("/admin/crm");
 }
 
 export async function reopenConversationAdmin(conversationId: string) {

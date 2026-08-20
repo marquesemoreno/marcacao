@@ -321,8 +321,20 @@ export async function assignConversationToMe(conversationId: string) {
   }
 }
 
-export async function resolveConversation(conversationId: string) {
-  const { clinicId } = await requireClinicSession();
+const REASON_LABELS: Record<string, string> = {
+  AGENDAMENTO_CONCLUIDO: "🎟️ Agendamento Concluído",
+  DUVIDA_ESCLARECIDA: "💡 Dúvida Esclarecida / Informações",
+  ORCAMENTO_ENVIADO: "💲 Orçamento Enviado",
+  SEM_RESPOSTA: "⏳ Paciente Não Respondeu / Inativo",
+  CANCELAMENTO: "❌ Cancelamento / Desistência",
+  ENCAMINHADO: "🔄 Encaminhado para Outro Setor",
+};
+
+export async function resolveConversation(
+  conversationId: string,
+  resolutionData?: { reason: string; notes?: string }
+) {
+  const { clinicId, userId } = await requireClinicSession();
 
   const conversation = await prisma.conversation.findUnique({
     where: { id: conversationId },
@@ -332,11 +344,38 @@ export async function resolveConversation(conversationId: string) {
     throw new Error("Conversa não encontrada");
   }
 
+  const currentUser = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { name: true },
+  });
+  const userName = currentUser?.name || "Atendente";
+  const reasonKey = resolutionData?.reason || "DUVIDA_ESCLARECIDA";
+  const reasonLabel = REASON_LABELS[reasonKey] || reasonKey;
+
   await prisma.conversation.update({
     where: { id: conversationId },
-    data: { status: "RESOLVED" },
+    data: {
+      status: "RESOLVED",
+      resolutionReason: reasonKey,
+      resolutionNotes: resolutionData?.notes || null,
+      resolvedAt: new Date(),
+      resolvedByUserId: userId,
+    },
   });
+
+  await prisma.message.create({
+    data: {
+      conversationId,
+      direction: "OUTBOUND",
+      type: "INTERNAL_NOTE",
+      content: `🏁 Atendimento finalizado por ${userName} • Motivo: ${reasonLabel}${resolutionData?.notes ? `\n\nObs: ${resolutionData.notes}` : ""}`,
+      status: "SENT",
+      senderUserId: userId,
+    },
+  });
+
   revalidatePath("/clinic/inbox");
+  revalidatePath("/clinic/crm");
 }
 
 export async function reopenConversation(conversationId: string) {

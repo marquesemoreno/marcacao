@@ -90,7 +90,7 @@ interface InboxLayoutProps {
   onUpdateFunnelStage: (stage: FunnelStage) => Promise<void> | void;
   onClaimConversation?: () => Promise<void> | void;
   onTransferAgent: (agentId: string, agentName: string) => Promise<void> | void;
-  onFinishAttendance: () => Promise<void> | void;
+  onFinishAttendance: (resolutionData?: { reason: string; notes?: string }) => Promise<void> | void;
   fetchProcedures: () => Promise<PlainClinicProcedureItem[]>;
   onScheduleConfirmed: (data: { appointmentId: string; specialty: string; doctor: string; date: string; time: string; price: string }) => void;
   onSuggestIaReply?: () => Promise<string>;
@@ -135,6 +135,11 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
   const [isAddingTag, setIsAddingTag] = useState(false);
   const [isGeneratingIa, setIsGeneratingIa] = useState(false);
   const [isSeedingDemo, setIsSeedingDemo] = useState(false);
+
+  // Modal de Motivo Obrigatório de Resolução
+  const [isFinishModalOpen, setIsFinishModalOpen] = useState(false);
+  const [selectedReason, setSelectedReason] = useState<string | null>(null);
+  const [finishNotes, setFinishNotes] = useState('');
 
   // Edição inline de dados do paciente
   const [isEditingPatient, setIsEditingPatient] = useState(false);
@@ -605,7 +610,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                 </button>
 
                 <button
-                  onClick={() => onFinishAttendance()}
+                  onClick={() => setIsFinishModalOpen(true)}
                   className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-100 border border-slate-200 rounded-xl transition-colors shadow-2xs"
                   title="Encerrar protocolo atual"
                 >
@@ -661,7 +666,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
 
                       <button
                         onClick={() => {
-                          onFinishAttendance();
+                          setIsFinishModalOpen(true);
                           setIsMoreMenuOpen(false);
                         }}
                         className="w-full px-3 py-2 text-left hover:bg-slate-50 flex items-center gap-2 text-rose-600 border-t border-slate-100"
@@ -1089,6 +1094,98 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
           fetchProcedures={fetchProcedures}
           onConfirmSchedule={onScheduleConfirmed}
         />
+      )}
+
+      {/* Modal de Motivo Obrigatório de Resolução */}
+      {isFinishModalOpen && selectedContact && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/80 backdrop-blur-xs p-4 animate-in fade-in duration-200">
+          <div className="max-w-md w-full bg-white rounded-3xl p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div>
+                <h3 className="font-extrabold text-slate-900 text-sm flex items-center gap-2">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                  Finalizar Atendimento do Paciente
+                </h3>
+                <p className="text-xs text-slate-500 font-medium mt-0.5">
+                  Selecione o desfecho obrigatório deste atendimento para {selectedContact.name}.
+                </p>
+              </div>
+              <button type="button" onClick={() => setIsFinishModalOpen(false)}>
+                <X className="w-5 h-5 text-slate-400 hover:text-slate-600" />
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-700 block">
+                Motivo do Encerramento (Obrigatório):
+              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {[
+                  { id: "AGENDAMENTO_CONCLUIDO", label: "🎟️ Agendamento Concluído" },
+                  { id: "DUVIDA_ESCLARECIDA", label: "💡 Dúvida Esclarecida" },
+                  { id: "ORCAMENTO_ENVIADO", label: "💲 Orçamento Enviado" },
+                  { id: "SEM_RESPOSTA", label: "⏳ Paciente Não Respondeu" },
+                  { id: "CANCELAMENTO", label: "❌ Cancelamento / Desistência" },
+                  { id: "ENCAMINHADO", label: "🔄 Encaminhado a Outro Setor" },
+                ].map((option) => (
+                  <button
+                    key={option.id}
+                    type="button"
+                    onClick={() => setSelectedReason(option.id)}
+                    className={`p-3 rounded-2xl text-left text-xs font-bold transition-all border flex items-center gap-2 ${
+                      selectedReason === option.id
+                        ? "bg-emerald-50 border-emerald-600 text-emerald-900 shadow-2xs"
+                        : "bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100"
+                    }`}
+                  >
+                    <span>{option.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="text-xs font-bold text-slate-700 block mb-1">
+                Observação Final da Equipe (Opcional):
+              </label>
+              <textarea
+                rows={2}
+                value={finishNotes}
+                onChange={(e) => setFinishNotes(e.target.value)}
+                placeholder="Ex: Paciente agendou consulta para a próxima semana..."
+                className="w-full p-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setIsFinishModalOpen(false)}
+                className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={!selectedReason}
+                onClick={async () => {
+                  if (!selectedReason) return;
+                  await onFinishAttendance({ reason: selectedReason, notes: finishNotes });
+                  setIsFinishModalOpen(false);
+                  setSelectedReason(null);
+                  setFinishNotes("");
+                }}
+                className={`px-5 py-2.5 font-bold text-xs rounded-xl shadow-2xs transition-all ${
+                  !selectedReason
+                    ? "bg-slate-200 text-slate-400 cursor-not-allowed"
+                    : "bg-emerald-600 hover:bg-emerald-700 text-white active:scale-95"
+                }`}
+              >
+                Confirmar e Finalizar Atendimento
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

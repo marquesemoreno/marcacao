@@ -215,9 +215,10 @@ export function ChatCrmApp({ scope, basePath, view }: ChatCrmAppProps) {
     await refreshContacts();
   }
 
-  async function handleFinishAttendance() {
+  async function handleFinishAttendance(resolutionData?: { reason: string; notes?: string }) {
     if (!selectedContactId) return;
-    await actions.resolveConversation(selectedContactId);
+    await actions.resolveConversation(selectedContactId, resolutionData);
+    toast.success("Atendimento finalizado com sucesso!");
     await refreshContacts();
   }
 

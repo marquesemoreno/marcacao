@@ -81,6 +81,15 @@ type ConversationWithRelations = Conversation & {
   clinic?: { id: string; tradeName: string };
 };
 
+const REASON_SHORT_LABELS: Record<string, string> = {
+  AGENDAMENTO_CONCLUIDO: "🎟️ Agendamento",
+  DUVIDA_ESCLARECIDA: "💡 Dúvida Esclarecida",
+  ORCAMENTO_ENVIADO: "💲 Orçamento Enviado",
+  SEM_RESPOSTA: "⏳ Sem Resposta",
+  CANCELAMENTO: "❌ Cancelado",
+  ENCAMINHADO: "🔄 Encaminhado",
+};
+
 /**
  * A "Contact" da UI do chat/CRM representa, na prática, uma Conversation (com
  * o Contact aninhado) — igual ao ConversationListItem do inbox original.
@@ -111,7 +120,7 @@ export function toChatContact(conversation: ConversationWithRelations): Contact 
       : "Sem mensagens ainda.",
     lastMessageTime: lastMessage ? formatMessageTimestamp(lastMessage.createdAt) : "",
     statusTag: isResolved
-      ? { label: "Finalizado", variant: "slate" }
+      ? { label: conversation.resolutionReason ? (REASON_SHORT_LABELS[conversation.resolutionReason] || conversation.resolutionReason) : "Finalizado", variant: "slate" }
       : { label: funnelStageLabels[funnelStageFromDb[conversation.funnelStage]], variant: funnelStageBadgeVariant[funnelStageFromDb[conversation.funnelStage]] },
     funnelStage: funnelStageFromDb[conversation.funnelStage],
     tags: conversation.tags,
