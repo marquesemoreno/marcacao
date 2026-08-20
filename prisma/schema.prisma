@@ -228,6 +228,8 @@ model Appointment {
   affiliateId         String?           @map("affiliate_id")
   affiliateCommission Decimal?          @map("affiliate_commission") @db.Decimal(10, 2)
   commissionReleased  Boolean           @default(false) @map("commission_released")
+  reminderSentAt      DateTime?         @map("reminder_sent_at")
+  reminderStatus      String?           @default("PENDING") @map("reminder_status")
   createdAt           DateTime          @default(now()) @map("created_at")
   updatedAt           DateTime          @updatedAt @map("updated_at")
 

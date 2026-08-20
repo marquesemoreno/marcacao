@@ -2,10 +2,12 @@
 
 import { useState } from "react";
 import type { AppointmentStatus } from "@prisma/client";
-import { CheckCircle2, XCircle, CheckCheck, UserX } from "lucide-react";
+import { CheckCircle2, XCircle, CheckCheck, UserX, Send } from "lucide-react";
 import { updateAppointmentStatus } from "@/actions/clinic";
+import { sendAppointmentReminder } from "@/actions/reminders";
 import { useActionFeedback } from "@/hooks/use-action-feedback";
 import { appointmentStatusLabels } from "@/lib/format";
+import { toast } from "sonner";
 
 const actionStyles: Record<
   AppointmentStatus,
@@ -51,28 +53,46 @@ const transitions: Record<AppointmentStatus, { status: AppointmentStatus; label:
 export function AppointmentActions({
   appointmentId,
   status,
+  reminderStatus,
 }: {
   appointmentId: string;
   status: AppointmentStatus;
+  reminderStatus?: string | null;
 }) {
   const actions = transitions[status];
   const { isPending, run } = useActionFeedback();
   const [pendingStatus, setPendingStatus] = useState<AppointmentStatus | null>(null);
+  const [isSendingReminder, setIsSendingReminder] = useState(false);
 
-  if (actions.length === 0) {
-    return <span className="text-xs text-slate-400">—</span>;
-  }
-
-  function handleClick(nextStatus: AppointmentStatus) {
-    setPendingStatus(nextStatus);
-    run(() => updateAppointmentStatus(appointmentId, nextStatus), {
-      successMessage: `Status atualizado para "${appointmentStatusLabels[nextStatus]}".`,
-      errorMessage: "Não foi possível atualizar o status. Tente novamente.",
-    });
+  async function handleSendReminder() {
+    setIsSendingReminder(true);
+    try {
+      const res = await sendAppointmentReminder(appointmentId);
+      if (res.success) {
+        toast.success(res.message);
+      } else {
+        toast.error(res.message);
+      }
+    } catch {
+      toast.error("Erro ao enviar lembrete.");
+    } finally {
+      setIsSendingReminder(false);
+    }
   }
 
   return (
-    <div className="flex flex-wrap gap-1.5">
+    <div className="flex flex-wrap gap-1.5 items-center">
+      <button
+        type="button"
+        disabled={isSendingReminder || status === "CANCELLED" || status === "COMPLETED"}
+        onClick={handleSendReminder}
+        className="inline-flex items-center gap-1 rounded-lg border border-emerald-300 bg-emerald-50 px-2.5 py-1.5 text-xs font-bold text-emerald-800 hover:bg-emerald-100 transition-colors disabled:opacity-50 shadow-2xs"
+        title="Enviar lembrete via WhatsApp para o paciente"
+      >
+        <Send className="h-3.5 w-3.5 text-emerald-600" />
+        {isSendingReminder ? "Enviando..." : reminderStatus === "SENT" ? "Reenviar Lembrete" : "Disparar Lembrete"}
+      </button>
+
       {actions.map((action) => {
         const style = actionStyles[action.status];
         const Icon = style.icon;
@@ -91,4 +111,12 @@ export function AppointmentActions({
       })}
     </div>
   );
+
+  function handleClick(nextStatus: AppointmentStatus) {
+    setPendingStatus(nextStatus);
+    run(() => updateAppointmentStatus(appointmentId, nextStatus), {
+      successMessage: `Status atualizado para "${appointmentStatusLabels[nextStatus]}".`,
+      errorMessage: "Não foi possível atualizar o status. Tente novamente.",
+    });
+  }
 }
