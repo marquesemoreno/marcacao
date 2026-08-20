@@ -15,13 +15,26 @@ function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-/** Sanitização universal de número de WhatsApp com DDI 55 */
-export function formatWhatsAppNumber(phone: string): string {
-  let clean = phone.replace(/@s\.whatsapp\.net|@c\.us/g, '').replace(/\D/g, '');
-  if (!clean.startsWith('55') && (clean.length === 10 || clean.length === 11)) {
-    clean = `55${clean}`;
+/** Formatador rigoroso de telefone brasileiro com DDI 55 */
+export function formatToWhatsAppNumber(phone: string): string {
+  let digits = phone.replace(/@s\.whatsapp\.net|@c\.us/g, '').replace(/\D/g, '');
+  
+  // Corrige números que vieram com apenas um 5 no início (ex: 57788411342 -> 557788411342)
+  if (digits.length === 11 && digits.startsWith('577')) {
+    digits = '55' + digits.substring(1);
+  } else if (digits.length === 12 && digits.startsWith('577')) {
+    digits = '55' + digits.substring(1);
   }
-  return clean;
+  // Se veio sem DDI 55 (ex: 77988411342 ou 7788411342), adiciona 55
+  else if (!digits.startsWith('55') && (digits.length === 10 || digits.length === 11)) {
+    digits = '55' + digits;
+  }
+  
+  return digits;
+}
+
+export function formatWhatsAppNumber(phone: string): string {
+  return formatToWhatsAppNumber(phone);
 }
 
 export function getEvolutionConfig() {
@@ -40,7 +53,7 @@ export function isWhatsAppConfigured(): boolean {
  * Serviço oficial de disparo de mensagens via Evolution API v2.
  * POST ${EVOLUTION_API_URL}/message/sendText/${EVOLUTION_INSTANCE_NAME}
  * Headers: { "apikey": EVOLUTION_API_KEY, "Content-Type": "application/json" }
- * Payload: { "number": formatWhatsAppNumber(to), "text": message }
+ * Payload: { "number": formatToWhatsAppNumber(to), "text": message }
  */
 export async function sendWhatsAppMessage(
   to: string,
@@ -48,13 +61,14 @@ export async function sendWhatsAppMessage(
   event: string = "whatsapp.send"
 ): Promise<{ success: boolean; skipped: boolean; responseCode?: number | null }> {
   const { apiUrl, apiKey, instanceName } = getEvolutionConfig();
-  const formattedNumber = formatWhatsAppNumber(to);
+  const target = formatToWhatsAppNumber(to);
+  console.log('[WhatsApp Envio] Disparando para:', target);
 
   if (!apiUrl || !apiKey || !instanceName) {
     await prisma.webhookLog.create({
       data: {
         event,
-        payload: { phone: formattedNumber, text },
+        payload: { phone: target, text },
         status: "SKIPPED",
         responseCode: null,
       },
@@ -77,7 +91,7 @@ export async function sendWhatsAppMessage(
           apikey: apiKey,
         },
         body: JSON.stringify({
-          number: formattedNumber,
+          number: target,
           text,
         }),
         signal: AbortSignal.timeout(8000),
@@ -103,7 +117,7 @@ export async function sendWhatsAppMessage(
       event,
       payload: {
         provider: "evolution_v2",
-        phone: formattedNumber,
+        phone: target,
         text,
         attempts,
         error: result.error ?? null,

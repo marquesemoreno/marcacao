@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { AppointmentStatus, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { sendAppointmentConfirmation, sendWhatsAppMessage, formatWhatsAppNumber } from "@/lib/whatsapp";
+import { sendAppointmentConfirmation, sendWhatsAppMessage, formatToWhatsAppNumber } from "@/lib/whatsapp";
 
 type IncomingMessage = { phone: string; text: string; name?: string };
 
@@ -14,7 +14,7 @@ function extractIncomingMessage(body: unknown): IncomingMessage | null {
 
   if (typeof payload.phone === "string" && typeof payload.text === "string") {
     return {
-      phone: formatWhatsAppNumber(payload.phone),
+      phone: formatToWhatsAppNumber(payload.phone),
       text: payload.text,
       name: typeof payload.name === "string" ? payload.name : undefined,
     };
@@ -30,7 +30,7 @@ function extractIncomingMessage(body: unknown): IncomingMessage | null {
 
   if (typeof remoteJid === "string" && typeof text === "string") {
     return {
-      phone: formatWhatsAppNumber(remoteJid),
+      phone: formatToWhatsAppNumber(remoteJid),
       text,
       name: typeof pushName === "string" ? pushName : undefined,
     };
@@ -61,13 +61,13 @@ async function logInbound(payload: Prisma.InputJsonValue, status: string) {
  * Garante um Contact para o telefone e uma Conversation aberta no painel de atendimento.
  */
 async function findOrCreateConversation(phone: string, name: string | undefined) {
-  const phoneDigits = formatWhatsAppNumber(phone);
-  const phoneSuffix = phoneDigits.slice(-11);
+  const fullPhone = formatToWhatsAppNumber(phone);
+  const phoneSuffix = fullPhone.slice(-11);
 
   const contact = await prisma.contact.upsert({
-    where: { phone: phoneSuffix },
+    where: { phone: fullPhone },
     update: name ? { name } : {},
-    create: { phone: phoneSuffix, name: name ?? phoneSuffix },
+    create: { phone: fullPhone, name: name ?? fullPhone },
   });
 
   const existingConversation = await prisma.conversation.findFirst({
@@ -203,7 +203,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, status: "chat_message_received" }, { status: 200 });
   }
 
-  const phoneDigits = formatWhatsAppNumber(incoming.phone);
+  const phoneDigits = formatToWhatsAppNumber(incoming.phone);
   const phoneSuffix = phoneDigits.slice(-11);
 
   const appointment = await prisma.appointment.findFirst({
