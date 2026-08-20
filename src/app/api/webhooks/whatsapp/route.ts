@@ -1,15 +1,12 @@
 import { NextResponse } from "next/server";
 import type { AppointmentStatus, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { notifyAppointmentStatus, whatsappService } from "@/lib/whatsapp";
+import { sendAppointmentConfirmation, sendWhatsAppMessage, formatWhatsAppNumber } from "@/lib/whatsapp";
 
 type IncomingMessage = { phone: string; text: string; name?: string };
 
 /**
- * Cada provedor entrega o webhook de mensagem recebida num formato diferente.
- * Tenta primeiro o formato simples ({ phone, text, name? } — útil pra testar
- * com curl e é o que UAZAPI/Z-API mandam com pouca adaptação), depois o
- * formato de evento da Evolution API (messages.upsert).
+ * Extrai a mensagem recebida no webhook da Evolution API v2 (ou payload simplificado).
  */
 function extractIncomingMessage(body: unknown): IncomingMessage | null {
   if (!body || typeof body !== "object") return null;
@@ -17,7 +14,7 @@ function extractIncomingMessage(body: unknown): IncomingMessage | null {
 
   if (typeof payload.phone === "string" && typeof payload.text === "string") {
     return {
-      phone: payload.phone,
+      phone: formatWhatsAppNumber(payload.phone),
       text: payload.text,
       name: typeof payload.name === "string" ? payload.name : undefined,
     };
@@ -33,7 +30,7 @@ function extractIncomingMessage(body: unknown): IncomingMessage | null {
 
   if (typeof remoteJid === "string" && typeof text === "string") {
     return {
-      phone: remoteJid.split("@")[0],
+      phone: formatWhatsAppNumber(remoteJid),
       text,
       name: typeof pushName === "string" ? pushName : undefined,
     };
@@ -44,8 +41,8 @@ function extractIncomingMessage(body: unknown): IncomingMessage | null {
 
 function resolveStatusFromReply(text: string): AppointmentStatus | null {
   const normalized = text.trim().toUpperCase();
-  if (normalized === "1" || normalized === "SIM") return "CONFIRMED";
-  if (normalized === "2" || normalized === "CANCELAR") return "CANCELLED";
+  if (normalized === "1" || normalized === "SIM" || normalized === "SIM, CONFIRMO") return "CONFIRMED";
+  if (normalized === "2" || normalized === "CANCELAR" || normalized === "NÃO" || normalized === "NAO") return "CANCELLED";
   return null;
 }
 
@@ -61,19 +58,10 @@ async function logInbound(payload: Prisma.InputJsonValue, status: string) {
 }
 
 /**
- * Garante um Contact para o telefone, e uma Conversation aberta pra ele.
- *
- * A clínica da conversa é resolvida em duas etapas: (1) reaproveita a
- * clínica de uma conversa já existente com esse contato, se houver; (2)
- * senão, usa a mesma heurística já empregada para confirmação de presença
- * — o agendamento mais recente (PENDING/CONFIRMED) para esse telefone.
- * Sem conversa prévia nem agendamento, não dá pra saber a clínica dona —
- * a mensagem só fica registrada em WebhookLog (ver limitação documentada
- * em docs/obsidian/05 - Módulo de Atendimento e Chat Realtime.md: hoje o
- * WhatsApp é um número único por plataforma, não um por clínica).
+ * Garante um Contact para o telefone e uma Conversation aberta no painel de atendimento.
  */
 async function findOrCreateConversation(phone: string, name: string | undefined) {
-  const phoneDigits = phone.replace(/\D/g, "");
+  const phoneDigits = formatWhatsAppNumber(phone);
   const phoneSuffix = phoneDigits.slice(-11);
 
   const contact = await prisma.contact.upsert({
@@ -98,6 +86,7 @@ async function findOrCreateConversation(phone: string, name: string | undefined)
     orderBy: { createdAt: "desc" },
     select: { clinicProcedure: { select: { clinicId: true } } },
   });
+
   let clinicId = appointment?.clinicProcedure.clinicId;
 
   if (!clinicId) {
@@ -137,12 +126,29 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "invalid body" }, { status: 400 });
   }
 
+  // =========================================================================
+  // 1. TRAVA ANTI-LOOP: ignora mensagens enviadas pela própria instância / bot / atendente
+  // =========================================================================
+  const bodyRec = body as Record<string, unknown>;
+  const dataPayload = bodyRec?.data as Record<string, unknown> | undefined;
+  const keyObj = (dataPayload?.key || bodyRec?.key) as Record<string, unknown> | undefined;
+  const isFromMe = Boolean(
+    keyObj?.fromMe ?? dataPayload?.fromMe ?? bodyRec?.fromMe
+  );
+
+  if (isFromMe) {
+    return NextResponse.json({ ignored: true, reason: "outbound_message" }, { status: 200 });
+  }
+
   const incoming = extractIncomingMessage(body);
   if (!incoming) {
     await logInbound(body, "IGNORED");
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ignored: true, reason: "non_message_event" }, { status: 200 });
   }
 
+  // =========================================================================
+  // 2. REGISTRO E APRESENTAÇÃO NA CAIXA DE ENTRADA DO CHAT (/admin/inbox)
+  // =========================================================================
   const { conversation } = await findOrCreateConversation(incoming.phone, incoming.name);
 
   if (conversation) {
@@ -176,10 +182,13 @@ export async function POST(request: Request) {
           status: "DELIVERED",
         },
       });
-      whatsappService.sendMessage(incoming.phone, matchedAutomation.responseText, "chat_automation.triggered").catch(() => {});
+      sendWhatsAppMessage(incoming.phone, matchedAutomation.responseText, "chat_automation.triggered").catch(() => {});
     }
   }
 
+  // =========================================================================
+  // 3. TRATAMENTO DE COMANDOS DO PACIENTE (1 - CONFIRMAR / 2 - CANCELAR)
+  // =========================================================================
   const newStatus = resolveStatusFromReply(incoming.text);
   if (!newStatus) {
     await logInbound(
@@ -187,16 +196,14 @@ export async function POST(request: Request) {
         phone: incoming.phone,
         text: incoming.text,
         conversationId: conversation?.id ?? null,
-        reason: conversation ? "mensagem de chat" : "sem clínica resolvida — só logado",
+        reason: conversation ? "mensagem de chat recebida no inbox" : "sem clínica resolvida — só logado",
       },
       conversation ? "SUCCESS" : "IGNORED"
     );
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, status: "chat_message_received" }, { status: 200 });
   }
 
-  // O número recebido pode vir com DDI (55) ou formatação diferente do que
-  // guardamos (só DDD+número); casamos pelos últimos 11 dígitos.
-  const phoneDigits = incoming.phone.replace(/\D/g, "");
+  const phoneDigits = formatWhatsAppNumber(incoming.phone);
   const phoneSuffix = phoneDigits.slice(-11);
 
   const appointment = await prisma.appointment.findFirst({
@@ -210,10 +217,10 @@ export async function POST(request: Request) {
 
   if (!appointment) {
     await logInbound(
-      { phone: incoming.phone, text: incoming.text, reason: "nenhum agendamento ativo encontrado" },
+      { phone: incoming.phone, text: incoming.text, reason: "nenhum agendamento ativo encontrado para este número" },
       "FAILED"
     );
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, status: "no_active_appointment" }, { status: 200 });
   }
 
   const updated = await prisma.appointment.update({
@@ -227,9 +234,15 @@ export async function POST(request: Request) {
     "SUCCESS"
   );
 
-  notifyAppointmentStatus(newStatus, updated).catch((error) => {
-    console.error("Falha ao notificar resposta via WhatsApp:", error);
-  });
+  // Se confirmado com "1" ou "SIM", envia a Guia Oficial com QR Code.
+  if (newStatus === "CONFIRMED") {
+    sendAppointmentConfirmation(updated).catch((error) => {
+      console.error("Falha ao enviar confirmação com Guia QR Code:", error);
+    });
+  } else if (newStatus === "CANCELLED") {
+    const cancelMsg = `Olá ${updated.patientName}! Seu agendamento para ${updated.clinicProcedure.procedure.name} na ${updated.clinicProcedure.clinic.tradeName} foi cancelado com sucesso. Caso precise remarcar, acesse nosso site!`;
+    sendWhatsAppMessage(updated.patientPhone, cancelMsg, "appointment.cancelled.ack").catch(() => {});
+  }
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, status: newStatus }, { status: 200 });
 }

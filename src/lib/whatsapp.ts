@@ -15,17 +15,19 @@ function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-/** Garante o DDI 55 (Brasil) e remove caracteres não numéricos. */
+/** Sanitização universal de número de WhatsApp com DDI 55 */
 export function formatWhatsAppNumber(phone: string): string {
-  const digits = phone.replace(/\D/g, "");
-  if (digits.startsWith("55") && digits.length >= 12) return digits;
-  return `55${digits}`;
+  let clean = phone.replace(/@s\.whatsapp\.net|@c\.us/g, '').replace(/\D/g, '');
+  if (!clean.startsWith('55') && (clean.length === 10 || clean.length === 11)) {
+    clean = `55${clean}`;
+  }
+  return clean;
 }
 
 export function getEvolutionConfig() {
-  const apiUrl = process.env.EVOLUTION_API_URL || process.env.WHATSAPP_API_URL;
+  const apiUrl = process.env.EVOLUTION_API_URL || process.env.WHATSAPP_API_URL || "https://evolution.tivdc.com.br";
   const apiKey = process.env.EVOLUTION_API_KEY || process.env.WHATSAPP_API_KEY;
-  const instanceName = process.env.EVOLUTION_INSTANCE_NAME || process.env.WHATSAPP_INSTANCE_NAME;
+  const instanceName = process.env.EVOLUTION_INSTANCE_NAME || process.env.WHATSAPP_INSTANCE_NAME || "TIVDC";
   return { apiUrl, apiKey, instanceName };
 }
 
@@ -37,7 +39,8 @@ export function isWhatsAppConfigured(): boolean {
 /**
  * Serviço oficial de disparo de mensagens via Evolution API v2.
  * POST ${EVOLUTION_API_URL}/message/sendText/${EVOLUTION_INSTANCE_NAME}
- * Header: apikey: ${EVOLUTION_API_KEY}
+ * Headers: { "apikey": EVOLUTION_API_KEY, "Content-Type": "application/json" }
+ * Payload: { "number": formatWhatsAppNumber(to), "text": message }
  */
 export async function sendWhatsAppMessage(
   to: string,
@@ -77,7 +80,7 @@ export async function sendWhatsAppMessage(
           number: formattedNumber,
           text,
         }),
-        signal: AbortSignal.timeout(5000),
+        signal: AbortSignal.timeout(8000),
       });
 
       result = { success: response.ok, responseCode: response.status };
