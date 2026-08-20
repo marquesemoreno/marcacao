@@ -41,6 +41,11 @@ import {
 import { toast } from "sonner";
 import { useInboxRealtime } from "@/hooks/use-inbox-realtime";
 import { playNotificationSound } from "@/lib/notification-sound";
+import {
+  requestNotificationPermission,
+  showDesktopNotification,
+  updateTabTitleUnreadCount,
+} from "@/lib/browser-notifications";
 import { InboxLayout } from "./inbox-layout";
 import { CRMKanban } from "./crm-kanban";
 import type { Agent, Contact, FunnelStage, InboxFilter, Message } from "@/types/chat-crm";
@@ -119,8 +124,17 @@ export function ChatCrmApp({ scope, basePath, view }: ChatCrmAppProps) {
     setContacts(result);
 
     const totalUnread = result.reduce((sum, item) => sum + item.unreadCount, 0);
+    updateTabTitleUnreadCount(totalUnread);
+
     if (!isFirstLoadRef.current && totalUnread > totalUnreadRef.current) {
       playNotificationSound();
+      const unreadContact = result.find((c) => c.unreadCount > 0);
+      if (unreadContact) {
+        showDesktopNotification(`💬 Nova mensagem de ${unreadContact.name}`, {
+          body: unreadContact.lastMessage,
+          onClick: () => setSelectedContactId(unreadContact.id),
+        });
+      }
     }
     totalUnreadRef.current = totalUnread;
     isFirstLoadRef.current = false;
@@ -131,6 +145,10 @@ export function ChatCrmApp({ scope, basePath, view }: ChatCrmAppProps) {
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [actions, filterTab, searchQuery]);
+
+  useEffect(() => {
+    requestNotificationPermission();
+  }, []);
 
   useEffect(() => {
     refreshContacts();
