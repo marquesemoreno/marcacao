@@ -11,9 +11,9 @@ export default withAuth(
     const isClinicRoute = (pathname === "/clinic" || pathname.startsWith("/clinic/")) && !pathname.startsWith("/clinicas");
 
     if (isAdminRoute && role !== "ADMIN") {
-      return NextResponse.redirect(new URL("/entrar", req.url));
+      return NextResponse.redirect(new URL("/clinic/inbox", req.url));
     }
-    if (isClinicRoute && role !== "CLINIC") {
+    if (isClinicRoute && role !== "CLINIC" && role !== "ADMIN") {
       return NextResponse.redirect(new URL("/entrar", req.url));
     }
 

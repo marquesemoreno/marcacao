@@ -117,3 +117,39 @@ export async function getKpis() {
 
   return { totalOrders, conversionRate, totalAffiliates, topProcedures };
 }
+
+export async function createTeamMember(formData: FormData) {
+  await requireAdminSession();
+
+  const name = String(formData.get("name") || "").trim();
+  const email = String(formData.get("email") || "").trim().toLowerCase();
+  const password = String(formData.get("password") || "");
+  const clinicId = String(formData.get("clinicId") || "");
+  const maxConcurrentChats = Number(formData.get("maxConcurrentChats")) || 5;
+
+  if (!name || !email || !password || !clinicId) {
+    throw new Error("Preencha todos os campos obrigatórios.");
+  }
+
+  const existing = await prisma.user.findUnique({ where: { email } });
+  if (existing) {
+    throw new Error("Já existe um usuário cadastrado com este e-mail.");
+  }
+
+  const bcrypt = (await import("bcryptjs")).default;
+  const passwordHash = await bcrypt.hash(password, 10);
+
+  await prisma.user.create({
+    data: {
+      name,
+      email,
+      passwordHash,
+      role: "CLINIC",
+      clinicId,
+      maxConcurrentChats: Math.max(1, Math.min(50, maxConcurrentChats)),
+    },
+  });
+
+  revalidatePath("/admin/clinicas");
+  revalidatePath("/admin/inbox");
+}
