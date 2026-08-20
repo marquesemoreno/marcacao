@@ -7,7 +7,62 @@ import { updateClinicSchema, createClinicSchema } from "@/lib/schemas/admin";
 
 export async function listClinics() {
   await requireAdminSession();
-  return prisma.clinic.findMany({ orderBy: { tradeName: "asc" } });
+  const clinics = await prisma.clinic.findMany({
+    orderBy: { tradeName: "asc" },
+    include: {
+      _count: {
+        select: {
+          clinicProcedures: true,
+          users: true,
+        },
+      },
+    },
+  });
+
+  return clinics.map((c) => ({
+    ...c,
+    commissionRate: Number(c.commissionRate),
+  }));
+}
+
+export async function updateClinicCommission(clinicId: string, commissionRate: number) {
+  await requireAdminSession();
+  const rate = Math.max(0, Math.min(100, Number(commissionRate) || 0));
+  await prisma.clinic.update({
+    where: { id: clinicId },
+    data: { commissionRate: rate },
+  });
+  revalidatePath("/admin/clinicas");
+  return { success: true, message: `Taxa de comissão atualizada para ${rate}%` };
+}
+
+export async function toggleClinicActive(clinicId: string, active: boolean) {
+  await requireAdminSession();
+  await prisma.clinic.update({
+    where: { id: clinicId },
+    data: { active },
+  });
+  revalidatePath("/admin/clinicas");
+  return { success: true };
+}
+
+export async function getClinicProceduresAdmin(clinicId: string) {
+  await requireAdminSession();
+  const procedures = await prisma.clinicProcedure.findMany({
+    where: { clinicId },
+    include: {
+      procedure: {
+        include: { specialty: true },
+      },
+    },
+    orderBy: { procedure: { name: "asc" } },
+  });
+
+  return procedures.map((p) => ({
+    ...p,
+    price: Number(p.price),
+    promotionalPrice: p.promotionalPrice ? Number(p.promotionalPrice) : null,
+  }));
 }
 
 export async function updateClinic(clinicId: string, formData: FormData) {
