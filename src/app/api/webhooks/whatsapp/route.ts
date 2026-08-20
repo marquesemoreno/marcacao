@@ -98,13 +98,23 @@ async function findOrCreateConversation(phone: string, name: string | undefined)
     orderBy: { createdAt: "desc" },
     select: { clinicProcedure: { select: { clinicId: true } } },
   });
-  if (!appointment) {
+  let clinicId = appointment?.clinicProcedure.clinicId;
+
+  if (!clinicId) {
+    const defaultClinic = await prisma.clinic.findFirst({
+      where: { active: true },
+      orderBy: { createdAt: "asc" },
+    });
+    clinicId = defaultClinic?.id;
+  }
+
+  if (!clinicId) {
     return { contact, conversation: null };
   }
 
   const conversation = await prisma.conversation.create({
     data: {
-      clinicId: appointment.clinicProcedure.clinicId,
+      clinicId,
       contactId: contact.id,
       status: "OPEN",
       lastMessageAt: new Date(),
