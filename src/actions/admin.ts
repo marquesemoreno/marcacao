@@ -150,6 +150,108 @@ export async function createTeamMember(formData: FormData) {
     },
   });
 
+  await prisma.user.create({
+    data: {
+      name,
+      email,
+      passwordHash,
+      role: "CLINIC",
+      clinicId,
+      maxConcurrentChats: Math.max(1, Math.min(50, maxConcurrentChats)),
+    },
+  });
+
   revalidatePath("/admin/clinicas");
   revalidatePath("/admin/inbox");
+}
+
+export async function getAttendantPerformanceReport() {
+  await requireAdminSession();
+
+  const attendants = await prisma.user.findMany({
+    where: { role: { in: ["CLINIC", "ADMIN"] } },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      maxConcurrentChats: true,
+      clinic: { select: { tradeName: true, name: true } },
+    },
+    orderBy: { name: "asc" },
+  });
+
+  const conversations = await prisma.conversation.findMany({
+    where: { assignedUserId: { not: null } },
+    select: {
+      id: true,
+      assignedUserId: true,
+      status: true,
+      resolutionReason: true,
+      createdAt: true,
+      resolvedAt: true,
+    },
+  });
+
+  const attendantStats = attendants
+    .map((attendant) => {
+      const userConvs = conversations.filter((c) => c.assignedUserId === attendant.id);
+      const assignedCount = userConvs.length;
+      const openCount = userConvs.filter((c) => c.status === "OPEN").length;
+      const resolvedConvs = userConvs.filter((c) => c.status === "RESOLVED");
+      const resolvedCount = resolvedConvs.length;
+
+      const reasonsCount = {
+        AGENDAMENTO_CONCLUIDO: resolvedConvs.filter((c) => c.resolutionReason === "AGENDAMENTO_CONCLUIDO").length,
+        DUVIDA_ESCLARECIDA: resolvedConvs.filter((c) => c.resolutionReason === "DUVIDA_ESCLARECIDA").length,
+        ORCAMENTO_ENVIADO: resolvedConvs.filter((c) => c.resolutionReason === "ORCAMENTO_ENVIADO").length,
+        SEM_RESPOSTA: resolvedConvs.filter((c) => c.resolutionReason === "SEM_RESPOSTA").length,
+        CANCELAMENTO: resolvedConvs.filter((c) => c.resolutionReason === "CANCELAMENTO").length,
+        ENCAMINHADO: resolvedConvs.filter((c) => c.resolutionReason === "ENCAMINHADO").length,
+      };
+
+      const conversionRate = resolvedCount > 0 ? (reasonsCount.AGENDAMENTO_CONCLUIDO / resolvedCount) * 100 : 0;
+
+      return {
+        id: attendant.id,
+        name: attendant.name,
+        email: attendant.email,
+        clinicName: attendant.clinic?.tradeName || attendant.clinic?.name || "Plataforma",
+        maxConcurrentChats: attendant.maxConcurrentChats ?? 5,
+        assignedCount,
+        openCount,
+        resolvedCount,
+        reasonsCount,
+        conversionRate: Math.round(conversionRate * 10) / 10,
+      };
+    })
+    .sort((a, b) => b.conversionRate - a.conversionRate || b.resolvedCount - a.resolvedCount);
+
+  const totalResolved = conversations.filter((c) => c.status === "RESOLVED").length;
+  const totalAgendados = conversations.filter((c) => c.resolutionReason === "AGENDAMENTO_CONCLUIDO").length;
+  const totalCancelados = conversations.filter((c) => c.resolutionReason === "CANCELAMENTO").length;
+  const globalConversionRate = totalResolved > 0 ? Math.round((totalAgendados / totalResolved) * 1000) / 10 : 0;
+
+  const resolvedWithTimestamps = conversations.filter((c) => c.resolvedAt && c.createdAt);
+  const avgMinutes =
+    resolvedWithTimestamps.length > 0
+      ? Math.round(
+          resolvedWithTimestamps.reduce(
+            (acc, c) => acc + (c.resolvedAt!.getTime() - c.createdAt.getTime()) / 60000,
+            0
+          ) / resolvedWithTimestamps.length
+        )
+      : 4;
+
+  return {
+    attendantStats,
+    overview: {
+      totalAssigned: conversations.length,
+      totalResolved,
+      totalAgendados,
+      totalCancelados,
+      globalConversionRate,
+      tmrMinutes: avgMinutes,
+      topAttendant: attendantStats[0]?.name || "Nenhum",
+    },
+  };
 }
