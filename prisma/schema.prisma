@@ -126,15 +126,16 @@ enum MessageType {
 }
 
 model User {
-  id           String   @id @default(cuid())
-  name         String
-  email        String   @unique
-  phone        String?
-  role         UserRole @default(PATIENT)
-  passwordHash String   @map("password_hash")
-  clinicId     String?  @map("clinic_id")
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
+  id                 String   @id @default(cuid())
+  name               String
+  email              String   @unique
+  phone              String?
+  role               UserRole @default(PATIENT)
+  passwordHash       String   @map("password_hash")
+  clinicId           String?  @map("clinic_id")
+  maxConcurrentChats Int      @default(5) @map("max_concurrent_chats")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
 
   clinic Clinic? @relation(fields: [clinicId], references: [id])
 

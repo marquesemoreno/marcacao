@@ -76,6 +76,7 @@ interface InboxLayoutProps {
   contacts: Contact[];
   agents: Agent[];
   messages: Message[];
+  attendantCapacity?: { activeCount: number; maxLimit: number } | null;
   selectedContactId: string | null;
   onSelectContact: (id: string) => void;
   filterTab: InboxFilter;
@@ -99,6 +100,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
   contacts,
   agents,
   messages,
+  attendantCapacity,
   selectedContactId,
   onSelectContact,
   filterTab,
@@ -268,14 +270,30 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
       >
         {/* Header & Busca */}
         <div className="p-3.5 sm:p-4 border-b border-slate-100 space-y-3 bg-white">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-1">
             <h2 className="font-bold text-slate-900 text-sm tracking-tight flex items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shadow-xs"></span>
               Fila de Atendimento
             </h2>
-            <span className="text-[11px] font-mono font-semibold text-slate-600 bg-slate-100 px-2.5 py-0.5 rounded-full border border-slate-200/60">
-              {filteredContacts.length} ativas
-            </span>
+            <div className="flex items-center gap-1.5">
+              {attendantCapacity && (
+                <span
+                  className={`text-[10px] font-mono font-extrabold px-2 py-0.5 rounded-full border ${
+                    attendantCapacity.activeCount >= attendantCapacity.maxLimit
+                      ? "bg-rose-100 text-rose-800 border-rose-200 font-bold"
+                      : attendantCapacity.activeCount >= attendantCapacity.maxLimit - 1
+                      ? "bg-amber-100 text-amber-800 border-amber-200"
+                      : "bg-emerald-100 text-emerald-800 border-emerald-200"
+                  }`}
+                  title="Seu limite de conversas ativas simultâneas"
+                >
+                  ⚡ {attendantCapacity.activeCount}/{attendantCapacity.maxLimit} ativos
+                </span>
+              )}
+              <span className="text-[11px] font-mono font-semibold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full border border-slate-200/60">
+                {filteredContacts.length}
+              </span>
+            </div>
           </div>
 
           {/* Barra de Busca */}
@@ -520,11 +538,24 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                   onClaimConversation && (
                     <button
                       onClick={() => onClaimConversation()}
-                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-extrabold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl transition-all shadow-md active:scale-95 animate-pulse"
-                      title="Assumir esta conversa para o seu atendimento"
+                      disabled={attendantCapacity ? attendantCapacity.activeCount >= attendantCapacity.maxLimit : false}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-extrabold rounded-xl transition-all shadow-md ${
+                        attendantCapacity && attendantCapacity.activeCount >= attendantCapacity.maxLimit
+                          ? "bg-slate-300 text-slate-500 cursor-not-allowed shadow-none"
+                          : "bg-emerald-600 hover:bg-emerald-700 text-white active:scale-95 animate-pulse"
+                      }`}
+                      title={
+                        attendantCapacity && attendantCapacity.activeCount >= attendantCapacity.maxLimit
+                          ? `Você atingiu seu limite de ${attendantCapacity.maxLimit} conversas simultâneas`
+                          : "Assumir esta conversa para o seu atendimento"
+                      }
                     >
                       <UserPlus className="w-4 h-4" />
-                      <span>🙋‍♂️ Assumir Atendimento</span>
+                      <span>
+                        {attendantCapacity && attendantCapacity.activeCount >= attendantCapacity.maxLimit
+                          ? "⚠️ Limite de Atendimentos Atingido"
+                          : "🙋‍♂️ Assumir Atendimento"}
+                      </span>
                     </button>
                   )
                 ) : (

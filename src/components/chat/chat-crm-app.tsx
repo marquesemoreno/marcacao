@@ -13,6 +13,7 @@ import {
   assignConversationToUser,
   claimConversation,
   transferConversation,
+  getAttendantCapacity,
   resolveConversation,
   reopenConversation,
   listCannedResponses,
@@ -30,6 +31,7 @@ import {
   assignConversationToUserAdmin,
   claimConversationAdmin,
   transferConversationAdmin,
+  getAttendantCapacityAdmin,
   resolveConversationAdmin,
   reopenConversationAdmin,
   listCannedResponsesAdmin,
@@ -99,11 +101,12 @@ export function ChatCrmApp({ scope, basePath, view }: ChatCrmAppProps) {
   const totalUnreadRef = useRef(0);
   const isFirstLoadRef = useRef(true);
 
+  const [attendantCapacity, setAttendantCapacity] = useState<{ activeCount: number; maxLimit: number } | null>(null);
+
   const refreshContacts = useCallback(async () => {
-    // O Kanban de CRM não tem abas de filtro próprias — sempre mostra todas as
-    // conversas (ativas + finalizadas, para a coluna "Finalizado" funcionar),
-    // independente da aba selecionada na Caixa de Entrada. "todas" sozinho não
-    // basta porque, na Caixa de Entrada, ele deliberadamente exclui as resolvidas.
+    const capacityFn = scope === "admin" ? getAttendantCapacityAdmin : getAttendantCapacity;
+    capacityFn().then(setAttendantCapacity).catch(() => {});
+
     const result =
       view === "crm"
         ? (
@@ -278,6 +281,7 @@ export function ChatCrmApp({ scope, basePath, view }: ChatCrmAppProps) {
           contacts={contacts}
           agents={agents}
           messages={messages}
+          attendantCapacity={attendantCapacity}
           selectedContactId={selectedContactId}
           onSelectContact={selectContact}
           filterTab={filterTab}

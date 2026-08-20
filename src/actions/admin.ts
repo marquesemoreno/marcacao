@@ -37,6 +37,18 @@ export async function createClinic(formData: FormData) {
   revalidatePath("/admin/clinicas");
 }
 
+export async function updateUserMaxConcurrentChats(userId: string, maxConcurrentChats: number) {
+  await requireAdminSession();
+  const limit = Math.max(1, Math.min(50, Number(maxConcurrentChats) || 5));
+  await prisma.user.update({
+    where: { id: userId },
+    data: { maxConcurrentChats: limit },
+  });
+  revalidatePath("/admin/clinicas");
+  revalidatePath("/admin/inbox");
+  revalidatePath("/clinic/inbox");
+}
+
 export async function getFinancialReport() {
   await requireAdminSession();
 

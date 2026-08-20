@@ -154,6 +154,24 @@ export async function sendMessageAdmin(conversationId: string, content: string, 
   return updated;
 }
 
+export async function getAttendantCapacityAdmin() {
+  const { userId } = await requireAdminSession();
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { maxConcurrentChats: true },
+  });
+  const maxLimit = user?.maxConcurrentChats ?? 5;
+
+  const activeCount = await prisma.conversation.count({
+    where: {
+      assignedUserId: userId,
+      status: "OPEN",
+    },
+  });
+
+  return { activeCount, maxLimit };
+}
+
 export async function claimConversationAdmin(conversationId: string) {
   const { userId } = await requireAdminSession();
 
@@ -176,9 +194,25 @@ export async function claimConversationAdmin(conversationId: string) {
 
   const currentUser = await prisma.user.findUnique({
     where: { id: userId },
-    select: { name: true },
+    select: { name: true, maxConcurrentChats: true, role: true },
   });
   const userName = currentUser?.name || "Administrador";
+  const maxLimit = currentUser?.maxConcurrentChats ?? 5;
+
+  const activeCount = await prisma.conversation.count({
+    where: {
+      assignedUserId: userId,
+      status: "OPEN",
+      id: { not: conversationId },
+    },
+  });
+
+  if (activeCount >= maxLimit && currentUser?.role !== "ADMIN") {
+    return {
+      success: false,
+      message: `Limite de atendimentos atingido: você já possui ${activeCount}/${maxLimit} conversas abertas. Finalize um atendimento antes de assumir novos pacientes.`,
+    };
+  }
 
   await prisma.conversation.update({
     where: { id: conversationId },
@@ -222,11 +256,27 @@ export async function transferConversationAdmin(
 
   const targetUser = await prisma.user.findUnique({
     where: { id: targetUserId },
-    select: { name: true },
+    select: { name: true, maxConcurrentChats: true, role: true },
   });
 
   if (!targetUser) {
     return { success: false, message: "Atendente de destino não encontrado." };
+  }
+
+  const maxLimit = targetUser.maxConcurrentChats ?? 5;
+  const activeCount = await prisma.conversation.count({
+    where: {
+      assignedUserId: targetUserId,
+      status: "OPEN",
+      id: { not: conversationId },
+    },
+  });
+
+  if (activeCount >= maxLimit && targetUser.role !== "ADMIN") {
+    return {
+      success: false,
+      message: `Limite atingido: ${targetUser.name} já possui ${activeCount}/${maxLimit} conversas abertas.`,
+    };
   }
 
   await prisma.conversation.update({
