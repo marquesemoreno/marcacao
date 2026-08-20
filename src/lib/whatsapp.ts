@@ -77,6 +77,7 @@ export async function sendWhatsAppMessage(
           number: formattedNumber,
           text,
         }),
+        signal: AbortSignal.timeout(5000),
       });
 
       result = { success: response.ok, responseCode: response.status };
