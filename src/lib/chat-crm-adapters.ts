@@ -129,7 +129,9 @@ export function toChatContact(conversation: ConversationWithRelations): Contact 
   };
 }
 
-export function toChatMessage(message: PrismaMessage & { senderUser?: Pick<User, "id" | "name"> | null }): Message {
+export function toChatMessage(
+  message: PrismaMessage & { senderUser?: Pick<User, "id" | "name"> | null; mediaUrl?: string | null }
+): Message {
   const typeMap: Record<MessageType, Message["type"]> = {
     TEXT: "text",
     AUDIO: "audio",
@@ -150,6 +152,8 @@ export function toChatMessage(message: PrismaMessage & { senderUser?: Pick<User,
     audioDuration: message.audioDuration ?? undefined,
     attachmentName: message.attachmentName ?? undefined,
     attachmentSize: message.attachmentSize ?? undefined,
+    mediaUrl: message.mediaUrl ?? undefined,
+    mimeType: message.mimeType ?? undefined,
     isRead: message.direction === "INBOUND" ? message.readAt !== null : undefined,
   };
 }

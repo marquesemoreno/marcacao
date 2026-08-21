@@ -2,11 +2,21 @@ import { NextResponse } from "next/server";
 import type { AppointmentStatus, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { sendAppointmentConfirmation, sendWhatsAppMessage, formatToWhatsAppNumber } from "@/lib/whatsapp";
+import { fetchMediaBase64, uploadWhatsAppMedia, formatFileSize } from "@/lib/whatsapp-media";
 
-type IncomingMessage = { phone: string; text: string; name?: string };
+type IncomingMedia = {
+  mimeType: string;
+  fileName: string;
+  sizeBytes: number;
+  key: Record<string, unknown>;
+};
+
+type IncomingMessage = { phone: string; text: string; name?: string; media?: IncomingMedia };
 
 /**
  * Extrai a mensagem recebida no webhook da Evolution API v2 (ou payload simplificado).
+ * Reconhece texto, imagem e documento — o conteúdo de imagem/documento não vem no
+ * próprio webhook (só metadados), é buscado depois via fetchMediaBase64 usando `media.key`.
  */
 function extractIncomingMessage(body: unknown): IncomingMessage | null {
   if (!body || typeof body !== "object") return null;
@@ -24,15 +34,38 @@ function extractIncomingMessage(body: unknown): IncomingMessage | null {
   const key = data?.key as Record<string, unknown> | undefined;
   const remoteJid = key?.remoteJid;
   const message = data?.message as Record<string, unknown> | undefined;
-  const extended = message?.extendedTextMessage as Record<string, unknown> | undefined;
-  const text = message?.conversation ?? extended?.text;
   const pushName = data?.pushName;
 
-  if (typeof remoteJid === "string" && typeof text === "string") {
+  if (typeof remoteJid !== "string") return null;
+  const name = typeof pushName === "string" ? pushName : undefined;
+  const phone = formatToWhatsAppNumber(remoteJid);
+
+  const extended = message?.extendedTextMessage as Record<string, unknown> | undefined;
+  const text = message?.conversation ?? extended?.text;
+  if (typeof text === "string") {
+    return { phone, text, name };
+  }
+
+  const imageMessage = message?.imageMessage as Record<string, unknown> | undefined;
+  const documentMessage = message?.documentMessage as Record<string, unknown> | undefined;
+  const mediaMessage = imageMessage ?? documentMessage;
+
+  if (mediaMessage && key && typeof mediaMessage.mimetype === "string") {
+    const caption = typeof mediaMessage.caption === "string" ? mediaMessage.caption : "";
+    const isImage = Boolean(imageMessage);
+    const fileName =
+      typeof mediaMessage.fileName === "string"
+        ? mediaMessage.fileName
+        : isImage
+          ? "imagem.jpg"
+          : "documento";
+    const sizeBytes = Number(mediaMessage.fileLength ?? 0) || 0;
+
     return {
-      phone: formatToWhatsAppNumber(remoteJid),
-      text,
-      name: typeof pushName === "string" ? pushName : undefined,
+      phone,
+      text: caption || (isImage ? "📷 Imagem recebida" : "📄 Documento recebido"),
+      name,
+      media: { mimeType: mediaMessage.mimetype, fileName, sizeBytes, key },
     };
   }
 
@@ -152,12 +185,44 @@ export async function POST(request: Request) {
   const { conversation } = await findOrCreateConversation(incoming.phone, incoming.name);
 
   if (conversation) {
+    let mediaData: { type: "ATTACHMENT"; mediaPath: string; mimeType: string; attachmentName: string; attachmentSize: string } | null = null;
+
+    if (incoming.media) {
+      const base64 = await fetchMediaBase64(incoming.media.key);
+      const uploaded = base64
+        ? await uploadWhatsAppMedia(conversation.id, base64, incoming.media.mimeType)
+        : null;
+
+      if (uploaded) {
+        mediaData = {
+          type: "ATTACHMENT",
+          mediaPath: uploaded.path,
+          mimeType: incoming.media.mimeType,
+          attachmentName: incoming.media.fileName,
+          attachmentSize: formatFileSize(uploaded.sizeBytes || incoming.media.sizeBytes),
+        };
+      }
+    }
+
+    const failedMediaNotice = incoming.media && !mediaData
+      ? `⚠️ Não foi possível baixar o anexo recebido (${incoming.media.fileName}).`
+      : null;
+
     await prisma.message.create({
       data: {
         conversationId: conversation.id,
         direction: "INBOUND",
-        content: incoming.text,
+        content: failedMediaNotice ?? incoming.text,
         status: "DELIVERED",
+        ...(mediaData
+          ? {
+              type: mediaData.type,
+              mediaPath: mediaData.mediaPath,
+              mimeType: mediaData.mimeType,
+              attachmentName: mediaData.attachmentName,
+              attachmentSize: mediaData.attachmentSize,
+            }
+          : {}),
       },
     });
     await prisma.conversation.update({

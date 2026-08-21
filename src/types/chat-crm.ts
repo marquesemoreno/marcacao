@@ -26,6 +26,9 @@ export interface Message {
   audioWaveform?: number[];
   attachmentName?: string;
   attachmentSize?: string;
+  /** URL assinada e temporária do Supabase Storage — gerada a cada leitura, não persiste. */
+  mediaUrl?: string;
+  mimeType?: string;
   isRead?: boolean;
 }
 

@@ -141,6 +141,11 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
 
   // 3. Balão de Anexo / Imagem / Documento
   if (message.type === 'attachment') {
+    const isImage = Boolean(message.mimeType?.startsWith('image/'));
+    const fileName = message.attachmentName || (isImage ? 'imagem.jpg' : 'documento');
+    const fileSize = message.attachmentSize || '';
+    const hasRealFile = Boolean(message.mediaUrl);
+
     return (
       <>
         <div
@@ -148,23 +153,34 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
           data-od-id={`attachment-msg-${message.id}`}
         >
           <div
-            className={`max-w-md rounded-2xl p-3.5 shadow-2xs cursor-pointer transition-all ${
+            className={`max-w-md rounded-2xl p-3.5 shadow-2xs transition-all ${hasRealFile ? 'cursor-pointer' : 'cursor-not-allowed opacity-80'} ${
               isAgent
                 ? 'bg-emerald-600 dark:bg-emerald-700 text-white rounded-tr-xs'
                 : 'bg-white dark:bg-slate-800 border border-slate-200/90 dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-tl-xs hover:border-slate-300 dark:hover:border-slate-600'
             }`}
-            onClick={() => setIsLightboxOpen(true)}
+            onClick={() => hasRealFile && setIsLightboxOpen(true)}
           >
-            <div className="flex items-center gap-3 p-2.5 rounded-xl bg-black/5 dark:bg-white/5 mb-2 border border-black/5 dark:border-white/10 hover:bg-black/10 transition-colors">
-              <div className={`p-2 rounded-lg ${isAgent ? 'bg-white/20' : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'}`}>
-                <FileText className="w-5 h-5" />
+            {isImage && hasRealFile ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={message.mediaUrl}
+                alt={fileName}
+                className="mb-2 max-h-64 w-full rounded-xl object-cover"
+              />
+            ) : (
+              <div className="flex items-center gap-3 p-2.5 rounded-xl bg-black/5 dark:bg-white/5 mb-2 border border-black/5 dark:border-white/10 hover:bg-black/10 transition-colors">
+                <div className={`p-2 rounded-lg ${isAgent ? 'bg-white/20' : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'}`}>
+                  <FileText className="w-5 h-5" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-semibold truncate">{fileName}</p>
+                  <p className="text-[10px] opacity-80 font-mono">
+                    {fileSize || (hasRealFile ? '' : 'Anexo indisponível')}
+                  </p>
+                </div>
+                {hasRealFile && <ZoomIn className="w-4 h-4 opacity-75 shrink-0" />}
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-semibold truncate">{message.attachmentName || 'documento_pedido.pdf'}</p>
-                <p className="text-[10px] opacity-80 font-mono">{message.attachmentSize || '1.4 MB'}</p>
-              </div>
-              <ZoomIn className="w-4 h-4 opacity-75 shrink-0" />
-            </div>
+            )}
             {message.text && <p className="text-xs sm:text-sm mb-1 leading-relaxed">{message.text}</p>}
             <div className={`flex items-center justify-end gap-1 text-[10.5px] font-mono opacity-85 mt-1`}>
               <span>{message.timestamp}</span>
@@ -174,13 +190,13 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
         </div>
 
         {/* Lightbox Visualizador de Mídias e Pedidos Médicos */}
-        {isLightboxOpen && (
+        {isLightboxOpen && hasRealFile && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
             <div className="relative max-w-2xl w-full bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-2xl space-y-4 border border-slate-200 dark:border-slate-800">
               <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
                 <div className="flex items-center gap-2">
                   <FileText className="w-5 h-5 text-teal-600 dark:text-teal-400" />
-                  <h3 className="font-extrabold text-slate-900 dark:text-slate-100 text-sm">{message.attachmentName || 'Documento / Pedido Médico'}</h3>
+                  <h3 className="font-extrabold text-slate-900 dark:text-slate-100 text-sm">{fileName}</h3>
                 </div>
                 <button
                   onClick={() => setIsLightboxOpen(false)}
@@ -191,24 +207,29 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
               </div>
 
               {/* Preview Container */}
-              <div className="flex flex-col items-center justify-center p-8 bg-slate-50 dark:bg-slate-950 border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl space-y-3">
-                <ImageIcon className="w-16 h-16 text-teal-500" />
-                <p className="text-xs font-bold text-slate-700 dark:text-slate-200">{message.attachmentName || 'arquivo_anexo.pdf'}</p>
-                <span className="text-[11px] text-slate-400 font-mono">{message.attachmentSize || '1.4 MB'}</span>
-              </div>
+              {isImage ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={message.mediaUrl} alt={fileName} className="max-h-[60vh] w-full rounded-2xl object-contain" />
+              ) : (
+                <div className="flex flex-col items-center justify-center p-8 bg-slate-50 dark:bg-slate-950 border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl space-y-3">
+                  <ImageIcon className="w-16 h-16 text-teal-500" />
+                  <p className="text-xs font-bold text-slate-700 dark:text-slate-200">{fileName}</p>
+                  {fileSize && <span className="text-[11px] text-slate-400 font-mono">{fileSize}</span>}
+                </div>
+              )}
 
               {/* Actions */}
               <div className="flex items-center justify-end gap-2 pt-2">
-                <button
-                  onClick={() => {
-                    toast.success('Download iniciado!');
-                    setIsLightboxOpen(false);
-                  }}
+                <a
+                  href={message.mediaUrl}
+                  download={fileName}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="inline-flex items-center justify-center gap-2 h-10 px-4 bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs rounded-xl shadow-2xs"
                 >
                   <Download className="w-4 h-4" />
                   <span>Baixar Arquivo</span>
-                </button>
+                </a>
               </div>
             </div>
           </div>

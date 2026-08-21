@@ -7,6 +7,7 @@ import { requireAdminSession } from "@/lib/session";
 import { whatsappService } from "@/lib/whatsapp";
 import { toPlainClinicProcedureItem } from "@/lib/serialize";
 import { departmentToDb, funnelStageToDb, toChatContact, toChatMessage } from "@/lib/chat-crm-adapters";
+import { attachSignedUrls } from "@/lib/whatsapp-media";
 import type { Department, FunnelStage, InboxFilter } from "@/types/chat-crm";
 import {
   sendMessageSchema,
@@ -93,7 +94,8 @@ export async function getChatMessagesAdmin(conversationId: string) {
     include: { senderUser: { select: { id: true, name: true } } },
   });
 
-  return messages.map(toChatMessage);
+  const withMediaUrls = await attachSignedUrls(messages);
+  return withMediaUrls.map(toChatMessage);
 }
 
 export async function getChatContactHistoryAdmin(conversationId: string) {

@@ -7,6 +7,7 @@ import { requireClinicSession } from "@/lib/session";
 import { whatsappService } from "@/lib/whatsapp";
 import { toPlainClinicProcedureItem } from "@/lib/serialize";
 import { toChatContact, toChatMessage, departmentToDb, funnelStageToDb } from "@/lib/chat-crm-adapters";
+import { attachSignedUrls } from "@/lib/whatsapp-media";
 import type { Department, FunnelStage, InboxFilter } from "@/types/chat-crm";
 import { applyMessageVariables, getBaseUrl } from "@/lib/format";
 import {
@@ -455,7 +456,8 @@ export async function listChatContacts(filter: InboxFilter, search?: string) {
 
 export async function getChatMessages(conversationId: string) {
   const conversation = await getConversation(conversationId);
-  return conversation.messages.map(toChatMessage);
+  const withMediaUrls = await attachSignedUrls(conversation.messages);
+  return withMediaUrls.map(toChatMessage);
 }
 
 export async function listChatAgents() {
