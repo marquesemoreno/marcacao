@@ -2,12 +2,22 @@
 
 import React, { useRef, useState } from 'react';
 import { Message } from '@/types/chat-crm';
-import { Play, Pause, Lock, CheckCheck, FileText, Copy, Check, Download, ZoomIn, X, Image as ImageIcon } from 'lucide-react';
+import { Play, Pause, Lock, CheckCheck, FileText, Copy, Check, Download, ZoomIn, X, Image as ImageIcon, Clock, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface MessageBubbleProps {
   message: Message;
 }
+
+/** Tiques de status real de entrega (WhatsApp): relógio (pendente), 1 tique (enviado),
+ * 2 tiques cinza (entregue), 2 tiques azuis (lido), alerta (falhou). */
+const MessageStatusTicks: React.FC<{ status?: Message['deliveryStatus'] }> = ({ status }) => {
+  if (status === 'failed') return <AlertCircle className="w-3.5 h-3.5 text-red-300" />;
+  if (status === 'read') return <CheckCheck className="w-3.5 h-3.5 text-sky-300" />;
+  if (status === 'delivered') return <CheckCheck className="w-3.5 h-3.5 text-emerald-200" />;
+  if (status === 'sent') return <Check className="w-3.5 h-3.5 text-emerald-200" />;
+  return <Clock className="w-3 h-3 text-emerald-200/80" />;
+};
 
 export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
   const [isPlaying, setIsPlaying] = useState(false);
@@ -165,7 +175,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
 
                 <span className="flex items-center gap-1">
                   {message.timestamp}
-                  {isAgent && <CheckCheck className="w-3.5 h-3.5 text-emerald-200" />}
+                  {isAgent && <MessageStatusTicks status={message.deliveryStatus} />}
                 </span>
               </div>
             </div>
@@ -220,7 +230,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
             {message.text && <p className="text-xs sm:text-sm mb-1 leading-relaxed">{message.text}</p>}
             <div className={`flex items-center justify-end gap-1 text-[10.5px] font-mono opacity-85 mt-1`}>
               <span>{message.timestamp}</span>
-              {isAgent && <CheckCheck className="w-3.5 h-3.5 text-emerald-200" />}
+              {isAgent && <MessageStatusTicks status={message.deliveryStatus} />}
             </div>
           </div>
         </div>
@@ -294,7 +304,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
           }`}
         >
           <span>{message.timestamp}</span>
-          {isAgent && <CheckCheck className="w-3.5 h-3.5 text-emerald-200" />}
+          {isAgent && <MessageStatusTicks status={message.deliveryStatus} />}
         </div>
       </div>
     </div>

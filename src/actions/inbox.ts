@@ -169,6 +169,12 @@ export async function sendMessage(conversationId: string, content: string, isInt
         where: { id: message.id },
         data: { status: "FAILED" },
       }).catch(() => {});
+    } else if (result.keyId) {
+      // Guarda o key.id do WhatsApp pra casar com os acks de entrega/leitura (webhook messages.update)
+      prisma.message.update({
+        where: { id: message.id },
+        data: { whatsappKeyId: result.keyId },
+      }).catch(() => {});
     }
   }).catch(() => {});
 
@@ -231,6 +237,8 @@ export async function sendMediaMessage(conversationId: string, formData: FormDat
       .then((result) => {
         if (!result.success && !result.skipped) {
           prisma.message.update({ where: { id: message.id }, data: { status: "FAILED" } }).catch(() => {});
+        } else if (result.keyId) {
+          prisma.message.update({ where: { id: message.id }, data: { whatsappKeyId: result.keyId } }).catch(() => {});
         }
       })
       .catch(() => {});

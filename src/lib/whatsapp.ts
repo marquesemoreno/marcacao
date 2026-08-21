@@ -6,7 +6,20 @@ type SendAttemptResult = {
   success: boolean;
   responseCode: number | null;
   error?: string;
+  keyId?: string;
 };
+
+/** Extrai o key.id (Baileys) da resposta do sendText/sendMedia — usado depois pra
+ * casar os acks de entrega/leitura (webhook "messages.update") com a mensagem. */
+async function extractKeyId(response: Response): Promise<string | undefined> {
+  try {
+    const body = await response.clone().json();
+    const id = body?.key?.id;
+    return typeof id === "string" ? id : undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 const MAX_ATTEMPTS = 1;
 const RETRY_DELAY_MS = 1000;
@@ -59,7 +72,7 @@ export async function sendWhatsAppMessage(
   to: string,
   text: string,
   event: string = "whatsapp.send"
-): Promise<{ success: boolean; skipped: boolean; responseCode?: number | null }> {
+): Promise<{ success: boolean; skipped: boolean; responseCode?: number | null; keyId?: string }> {
   const { apiUrl, apiKey, instanceName } = getEvolutionConfig();
   const target = formatToWhatsAppNumber(to);
   console.log('[WhatsApp Envio] Disparando para:', target);
@@ -97,7 +110,8 @@ export async function sendWhatsAppMessage(
         signal: AbortSignal.timeout(8000),
       });
 
-      result = { success: response.ok, responseCode: response.status };
+      const keyId = response.ok ? await extractKeyId(response) : undefined;
+      result = { success: response.ok, responseCode: response.status, keyId };
       if (response.ok) break;
     } catch (error) {
       result = {
@@ -127,7 +141,7 @@ export async function sendWhatsAppMessage(
     },
   });
 
-  return { success: result.success, skipped: false, responseCode: result.responseCode };
+  return { success: result.success, skipped: false, responseCode: result.responseCode, keyId: result.keyId };
 }
 
 /**
@@ -143,7 +157,7 @@ export async function sendWhatsAppMedia(
   fileName: string,
   caption: string,
   event: string = "whatsapp.send_media"
-): Promise<{ success: boolean; skipped: boolean; responseCode?: number | null }> {
+): Promise<{ success: boolean; skipped: boolean; responseCode?: number | null; keyId?: string }> {
   const { apiUrl, apiKey, instanceName } = getEvolutionConfig();
   const target = formatToWhatsAppNumber(to);
 
@@ -179,7 +193,8 @@ export async function sendWhatsAppMedia(
       }),
       signal: AbortSignal.timeout(15000),
     });
-    result = { success: response.ok, responseCode: response.status };
+    const keyId = response.ok ? await extractKeyId(response) : undefined;
+    result = { success: response.ok, responseCode: response.status, keyId };
   } catch (error) {
     result = {
       success: false,
@@ -197,7 +212,7 @@ export async function sendWhatsAppMedia(
     },
   });
 
-  return { success: result.success, skipped: false, responseCode: result.responseCode };
+  return { success: result.success, skipped: false, responseCode: result.responseCode, keyId: result.keyId };
 }
 
 export type AppointmentWithRelations = Prisma.AppointmentGetPayload<{

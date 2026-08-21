@@ -331,6 +331,9 @@ model Message {
   mediaPath      String?          @map("media_path")
   mimeType       String?          @map("mime_type")
   readAt         DateTime?        @map("read_at")
+  /// ID da mensagem no WhatsApp (Baileys key.id, ex: "3EB0305D...") — usado pra
+  /// casar os acks de entrega/leitura (webhook "messages.update") com esta linha.
+  whatsappKeyId  String?          @unique @map("whatsapp_key_id")
   createdAt      DateTime         @default(now()) @map("created_at")
 
   conversation Conversation @relation(fields: [conversationId], references: [id])

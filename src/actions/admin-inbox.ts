@@ -184,6 +184,11 @@ export async function sendMessageAdmin(conversationId: string, content: string, 
         where: { id: message.id },
         data: { status: "FAILED" },
       }).catch(() => {});
+    } else if (result.keyId) {
+      prisma.message.update({
+        where: { id: message.id },
+        data: { whatsappKeyId: result.keyId },
+      }).catch(() => {});
     }
   }).catch(() => {});
 
@@ -245,6 +250,8 @@ export async function sendMediaMessageAdmin(conversationId: string, formData: Fo
       .then((result) => {
         if (!result.success && !result.skipped) {
           prisma.message.update({ where: { id: message.id }, data: { status: "FAILED" } }).catch(() => {});
+        } else if (result.keyId) {
+          prisma.message.update({ where: { id: message.id }, data: { whatsappKeyId: result.keyId } }).catch(() => {});
         }
       })
       .catch(() => {});

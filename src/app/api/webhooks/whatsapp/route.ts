@@ -82,6 +82,40 @@ function extractIncomingMessage(body: unknown): IncomingMessage | null {
   return null;
 }
 
+const ACK_STATUS_MAP: Record<string, "SENT" | "DELIVERED" | "READ"> = {
+  SERVER_ACK: "SENT",
+  DELIVERY_ACK: "DELIVERED",
+  READ: "READ",
+  PLAYED: "READ",
+};
+const STATUS_RANK: Record<string, number> = { PENDING: 0, FAILED: 0, SENT: 1, DELIVERED: 2, READ: 3 };
+
+/**
+ * Trata o webhook "messages.update" (ack de entrega/leitura da Evolution API).
+ * Só nos interessam acks de mensagens QUE NÓS enviamos (fromMe: true) — o keyId
+ * é o Baileys key.id capturado no envio (ver sendWhatsAppMessage/sendWhatsAppMedia)
+ * e gravado em Message.whatsappKeyId. Nunca regride o status (ex: um DELIVERY_ACK
+ * atrasado não pode sobrescrever um READ que já chegou antes).
+ */
+async function handleMessageStatusUpdate(data: Record<string, unknown>) {
+  const keyId = data.keyId;
+  const fromMe = Boolean(data.fromMe);
+  const mapped = typeof data.status === "string" ? ACK_STATUS_MAP[data.status] : undefined;
+  if (!fromMe || typeof keyId !== "string" || !mapped) return;
+
+  const message = await prisma.message.findUnique({
+    where: { whatsappKeyId: keyId },
+    select: { id: true, status: true },
+  });
+  if (!message || STATUS_RANK[mapped] <= STATUS_RANK[message.status]) return;
+
+  await prisma.message.update({
+    where: { id: message.id },
+    data: { status: mapped, ...(mapped === "READ" ? { readAt: new Date() } : {}) },
+  });
+  notifyInboxRealtime().catch(() => {});
+}
+
 function resolveStatusFromReply(text: string): AppointmentStatus | null {
   const normalized = text.trim().toUpperCase();
   if (normalized === "1" || normalized === "SIM" || normalized === "SIM, CONFIRMO") return "CONFIRMED";
@@ -169,11 +203,21 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "invalid body" }, { status: 400 });
   }
 
+  const bodyRec = body as Record<string, unknown>;
+  const dataPayload = bodyRec?.data as Record<string, unknown> | undefined;
+
+  // =========================================================================
+  // 0. ACK DE ENTREGA/LEITURA: evento separado, tratado antes da trava anti-loop
+  // (que ignoraria fromMe:true e descartaria justamente os acks das nossas mensagens)
+  // =========================================================================
+  if (bodyRec.event === "messages.update" && dataPayload) {
+    await handleMessageStatusUpdate(dataPayload);
+    return NextResponse.json({ ok: true, status: "message_status_update" }, { status: 200 });
+  }
+
   // =========================================================================
   // 1. TRAVA ANTI-LOOP: ignora mensagens enviadas pela própria instância / bot / atendente
   // =========================================================================
-  const bodyRec = body as Record<string, unknown>;
-  const dataPayload = bodyRec?.data as Record<string, unknown> | undefined;
   const keyObj = (dataPayload?.key || bodyRec?.key) as Record<string, unknown> | undefined;
   const isFromMe = Boolean(
     keyObj?.fromMe ?? dataPayload?.fromMe ?? bodyRec?.fromMe

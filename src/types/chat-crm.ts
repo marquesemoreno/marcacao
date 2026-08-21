@@ -30,6 +30,8 @@ export interface Message {
   mediaUrl?: string;
   mimeType?: string;
   isRead?: boolean;
+  /** Status real de entrega no WhatsApp (só relevante pra mensagens enviadas pelo agente). */
+  deliveryStatus?: 'pending' | 'sent' | 'delivered' | 'read' | 'failed';
 }
 
 export interface Contact {

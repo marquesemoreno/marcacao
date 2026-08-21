@@ -149,6 +149,14 @@ export function toChatMessage(
   const sender: Message["sender"] =
     message.type === "INTERNAL_NOTE" ? "system" : message.direction === "INBOUND" ? "contact" : "agent";
 
+  const deliveryStatusMap: Record<PrismaMessage["status"], Message["deliveryStatus"]> = {
+    PENDING: "pending",
+    SENT: "sent",
+    DELIVERED: "delivered",
+    READ: "read",
+    FAILED: "failed",
+  };
+
   return {
     id: message.id,
     sender,
@@ -162,5 +170,6 @@ export function toChatMessage(
     mediaUrl: message.mediaUrl ?? undefined,
     mimeType: message.mimeType ?? undefined,
     isRead: message.direction === "INBOUND" ? message.readAt !== null : undefined,
+    deliveryStatus: message.direction === "OUTBOUND" ? deliveryStatusMap[message.status] : undefined,
   };
 }
