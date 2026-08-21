@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Message } from '@/types/chat-crm';
 import { Play, Pause, Lock, CheckCheck, FileText, Copy, Check, Download, ZoomIn, X, Image as ImageIcon } from 'lucide-react';
 import { toast } from 'sonner';
@@ -11,9 +11,11 @@ interface MessageBubbleProps {
 
 export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
   const [isPlaying, setIsPlaying] = useState(false);
+  const [progress, setProgress] = useState(0);
   const [playbackSpeed, setPlaybackSpeed] = useState<'1x' | '1.5x' | '2x'>('1x');
   const [copied, setCopied] = useState(false);
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
+  const audioRef = useRef<HTMLAudioElement>(null);
 
   const handleCopyText = (text: string) => {
     navigator.clipboard.writeText(text);
@@ -22,10 +24,22 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const speedValues: Record<'1x' | '1.5x' | '2x', number> = { '1x': 1, '1.5x': 1.5, '2x': 2 };
+
   const cycleSpeed = () => {
-    if (playbackSpeed === '1x') setPlaybackSpeed('1.5x');
-    else if (playbackSpeed === '1.5x') setPlaybackSpeed('2x');
-    else setPlaybackSpeed('1x');
+    const next = playbackSpeed === '1x' ? '1.5x' : playbackSpeed === '1.5x' ? '2x' : '1x';
+    setPlaybackSpeed(next);
+    if (audioRef.current) audioRef.current.playbackRate = speedValues[next];
+  };
+
+  const togglePlayback = () => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    if (audio.paused) {
+      audio.play();
+    } else {
+      audio.pause();
+    }
   };
 
   // 1. Nota Interna Privada
@@ -66,6 +80,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
   if (message.type === 'audio') {
     const defaultWaveform = [30, 45, 80, 60, 40, 75, 90, 65, 35, 50, 70, 85, 40, 60, 95, 80, 55, 30, 45, 60];
     const waveform = message.audioWaveform || defaultWaveform;
+    const hasRealAudio = Boolean(message.mediaUrl);
 
     return (
       <div
@@ -79,15 +94,35 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
               : 'bg-white dark:bg-slate-800 border border-slate-200/90 dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-tl-xs hover:border-slate-300 dark:hover:border-slate-600'
           }`}
         >
+          {hasRealAudio && (
+            <audio
+              ref={audioRef}
+              src={message.mediaUrl}
+              preload="metadata"
+              onPlay={() => setIsPlaying(true)}
+              onPause={() => setIsPlaying(false)}
+              onEnded={() => {
+                setIsPlaying(false);
+                setProgress(0);
+              }}
+              onTimeUpdate={(e) => {
+                const audio = e.currentTarget;
+                if (audio.duration) setProgress(audio.currentTime / audio.duration);
+              }}
+              className="hidden"
+            />
+          )}
+
           <div className="flex items-center gap-3">
             <button
-              onClick={() => setIsPlaying(!isPlaying)}
-              className={`w-10 h-10 rounded-full flex items-center justify-center transition-transform active:scale-95 shrink-0 shadow-2xs ${
+              onClick={togglePlayback}
+              disabled={!hasRealAudio}
+              className={`w-10 h-10 rounded-full flex items-center justify-center transition-transform active:scale-95 shrink-0 shadow-2xs disabled:opacity-40 disabled:cursor-not-allowed ${
                 isAgent
                   ? 'bg-emerald-500 hover:bg-emerald-400 text-white'
                   : 'bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 dark:hover:bg-emerald-900 text-emerald-700 dark:text-emerald-400'
               }`}
-              title={isPlaying ? 'Pausar áudio' : 'Reproduzir áudio'}
+              title={!hasRealAudio ? 'Áudio indisponível' : isPlaying ? 'Pausar áudio' : 'Reproduzir áudio'}
             >
               {isPlaying ? <Pause className="w-5 h-5 fill-current animate-pulse" /> : <Play className="w-5 h-5 fill-current ml-0.5" />}
             </button>
@@ -95,7 +130,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
             <div className="flex-1 flex flex-col justify-center gap-1.5">
               <div className="flex items-center gap-1 h-7">
                 {waveform.map((height, idx) => {
-                  const active = isPlaying ? idx < (waveform.length * 0.7) : idx < (waveform.length * 0.3);
+                  const active = idx < waveform.length * progress;
                   return (
                     <div
                       key={idx}
@@ -112,11 +147,12 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
 
               <div className="flex justify-between items-center text-[10.5px] opacity-85 font-mono">
                 <div className="flex items-center gap-2">
-                  <span>{message.audioDuration || '0:34'}</span>
+                  <span>{message.audioDuration || '--:--'}</span>
                   {/* Seletor de Velocidade */}
                   <button
                     onClick={cycleSpeed}
-                    className={`px-1.5 py-0.5 rounded font-mono font-extrabold text-[10px] transition-colors ${
+                    disabled={!hasRealAudio}
+                    className={`px-1.5 py-0.5 rounded font-mono font-extrabold text-[10px] transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
                       isAgent
                         ? 'bg-emerald-700 dark:bg-emerald-800 hover:bg-emerald-800 text-emerald-100'
                         : 'bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200'

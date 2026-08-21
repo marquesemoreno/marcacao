@@ -2,21 +2,18 @@ import { NextResponse } from "next/server";
 import type { AppointmentStatus, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { sendAppointmentConfirmation, sendWhatsAppMessage, formatToWhatsAppNumber } from "@/lib/whatsapp";
-import { fetchMediaBase64, uploadWhatsAppMedia, formatFileSize } from "@/lib/whatsapp-media";
+import { fetchMediaBase64, uploadWhatsAppMedia, formatFileSize, formatDuration } from "@/lib/whatsapp-media";
 
-type IncomingMedia = {
-  mimeType: string;
-  fileName: string;
-  sizeBytes: number;
-  key: Record<string, unknown>;
-};
+type IncomingMedia =
+  | { kind: "image" | "document"; mimeType: string; fileName: string; sizeBytes: number; key: Record<string, unknown> }
+  | { kind: "audio"; mimeType: string; seconds: number; key: Record<string, unknown> };
 
 type IncomingMessage = { phone: string; text: string; name?: string; media?: IncomingMedia };
 
 /**
  * Extrai a mensagem recebida no webhook da Evolution API v2 (ou payload simplificado).
- * Reconhece texto, imagem e documento — o conteúdo de imagem/documento não vem no
- * próprio webhook (só metadados), é buscado depois via fetchMediaBase64 usando `media.key`.
+ * Reconhece texto, imagem, documento e áudio — o conteúdo em si não vem no próprio
+ * webhook (só metadados), é buscado depois via fetchMediaBase64 usando `media.key`.
  */
 function extractIncomingMessage(body: unknown): IncomingMessage | null {
   if (!body || typeof body !== "object") return null;
@@ -46,6 +43,17 @@ function extractIncomingMessage(body: unknown): IncomingMessage | null {
     return { phone, text, name };
   }
 
+  const audioMessage = message?.audioMessage as Record<string, unknown> | undefined;
+  if (audioMessage && key && typeof audioMessage.mimetype === "string") {
+    const seconds = Number(audioMessage.seconds ?? 0) || 0;
+    return {
+      phone,
+      text: "🎤 Áudio recebido",
+      name,
+      media: { kind: "audio", mimeType: audioMessage.mimetype, seconds, key },
+    };
+  }
+
   const imageMessage = message?.imageMessage as Record<string, unknown> | undefined;
   const documentMessage = message?.documentMessage as Record<string, unknown> | undefined;
   const mediaMessage = imageMessage ?? documentMessage;
@@ -65,7 +73,7 @@ function extractIncomingMessage(body: unknown): IncomingMessage | null {
       phone,
       text: caption || (isImage ? "📷 Imagem recebida" : "📄 Documento recebido"),
       name,
-      media: { mimeType: mediaMessage.mimetype, fileName, sizeBytes, key },
+      media: { kind: isImage ? "image" : "document", mimeType: mediaMessage.mimetype, fileName, sizeBytes, key },
     };
   }
 
@@ -185,7 +193,11 @@ export async function POST(request: Request) {
   const { conversation } = await findOrCreateConversation(incoming.phone, incoming.name);
 
   if (conversation) {
-    let mediaData: { type: "ATTACHMENT"; mediaPath: string; mimeType: string; attachmentName: string; attachmentSize: string } | null = null;
+    type MediaData =
+      | { type: "ATTACHMENT"; mediaPath: string; mimeType: string; attachmentName: string; attachmentSize: string }
+      | { type: "AUDIO"; mediaPath: string; mimeType: string; audioDuration: string };
+
+    let mediaData: MediaData | null = null;
 
     if (incoming.media) {
       const base64 = await fetchMediaBase64(incoming.media.key);
@@ -194,18 +206,28 @@ export async function POST(request: Request) {
         : null;
 
       if (uploaded) {
-        mediaData = {
-          type: "ATTACHMENT",
-          mediaPath: uploaded.path,
-          mimeType: incoming.media.mimeType,
-          attachmentName: incoming.media.fileName,
-          attachmentSize: formatFileSize(uploaded.sizeBytes || incoming.media.sizeBytes),
-        };
+        mediaData =
+          incoming.media.kind === "audio"
+            ? {
+                type: "AUDIO",
+                mediaPath: uploaded.path,
+                mimeType: incoming.media.mimeType,
+                audioDuration: formatDuration(incoming.media.seconds),
+              }
+            : {
+                type: "ATTACHMENT",
+                mediaPath: uploaded.path,
+                mimeType: incoming.media.mimeType,
+                attachmentName: incoming.media.fileName,
+                attachmentSize: formatFileSize(uploaded.sizeBytes || incoming.media.sizeBytes),
+              };
       }
     }
 
     const failedMediaNotice = incoming.media && !mediaData
-      ? `⚠️ Não foi possível baixar o anexo recebido (${incoming.media.fileName}).`
+      ? incoming.media.kind === "audio"
+        ? "⚠️ Não foi possível baixar o áudio recebido."
+        : `⚠️ Não foi possível baixar o anexo recebido (${incoming.media.fileName}).`
       : null;
 
     await prisma.message.create({
@@ -214,15 +236,7 @@ export async function POST(request: Request) {
         direction: "INBOUND",
         content: failedMediaNotice ?? incoming.text,
         status: "DELIVERED",
-        ...(mediaData
-          ? {
-              type: mediaData.type,
-              mediaPath: mediaData.mediaPath,
-              mimeType: mediaData.mimeType,
-              attachmentName: mediaData.attachmentName,
-              attachmentSize: mediaData.attachmentSize,
-            }
-          : {}),
+        ...(mediaData ?? {}),
       },
     });
     await prisma.conversation.update({

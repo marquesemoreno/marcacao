@@ -29,6 +29,12 @@ export async function fetchMediaBase64(messageKey: Record<string, unknown>): Pro
   }
 }
 
+/** WhatsApp manda tipos com parâmetro de codec ("audio/ogg; codecs=opus") — não dá pra usar isso
+ * cru como extensão de arquivo nem sempre é bem aceito como Content-Type por outros serviços. */
+function stripMimeParams(mimeType: string): string {
+  return mimeType.split(";")[0].trim();
+}
+
 function extensionFromMimeType(mimeType: string): string {
   const map: Record<string, string> = {
     "image/jpeg": "jpg",
@@ -36,8 +42,13 @@ function extensionFromMimeType(mimeType: string): string {
     "image/webp": "webp",
     "image/gif": "gif",
     "application/pdf": "pdf",
+    "audio/ogg": "ogg",
+    "audio/mpeg": "mp3",
+    "audio/mp4": "m4a",
+    "audio/aac": "aac",
   };
-  return map[mimeType] ?? mimeType.split("/")[1] ?? "bin";
+  const base = stripMimeParams(mimeType);
+  return map[base] ?? base.split("/")[1] ?? "bin";
 }
 
 /** Tamanho legível ("284 KB", "1.4 MB") a partir de bytes — mesma unidade usada na UI. */
@@ -45,6 +56,14 @@ export function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+/** "M:SS" a partir de segundos inteiros — mesmo formato já usado no player de áudio da UI. */
+export function formatDuration(totalSeconds: number): string {
+  const seconds = Math.max(0, Math.round(totalSeconds));
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = seconds % 60;
+  return `${minutes}:${String(remainingSeconds).padStart(2, "0")}`;
 }
 
 /**
@@ -65,7 +84,7 @@ export async function uploadWhatsAppMedia(
   const path = `${conversationId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
 
   const { error } = await supabase.storage.from(WHATSAPP_MEDIA_BUCKET).upload(path, buffer, {
-    contentType: mimeType,
+    contentType: stripMimeParams(mimeType),
     upsert: false,
   });
 
