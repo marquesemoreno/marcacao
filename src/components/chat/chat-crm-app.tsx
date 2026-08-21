@@ -167,10 +167,13 @@ export function ChatCrmApp({ scope, basePath, view }: ChatCrmAppProps) {
       setMessages([]);
       return;
     }
-    const result = await actions.getChatMessages(selectedContactId);
+    // As duas chamadas são independentes (mensagens vs. histórico de agendamentos
+    // do contato) — rodar em paralelo evita pagar 2x a latência de rede/DB por ciclo.
+    const [result, history] = await Promise.all([
+      actions.getChatMessages(selectedContactId),
+      actions.getChatContactHistory(selectedContactId),
+    ]);
     setMessages(result);
-
-    const history = await actions.getChatContactHistory(selectedContactId);
     setContacts((prev) =>
       prev.map((c) => (c.id === selectedContactId ? { ...c, consultationHistory: history } : c))
     );
