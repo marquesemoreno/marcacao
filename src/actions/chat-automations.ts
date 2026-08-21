@@ -13,15 +13,17 @@ export async function listChatAutomations() {
 export async function createChatAutomation(input: ChatAutomationInput) {
   await requireAdminSession();
   const data = chatAutomationSchema.parse(input);
-  await prisma.chatAutomation.create({ data });
+  const automation = await prisma.chatAutomation.create({ data });
   revalidatePath("/admin/automacoes");
+  return automation;
 }
 
 export async function updateChatAutomation(id: string, input: ChatAutomationInput) {
   await requireAdminSession();
   const data = chatAutomationSchema.parse(input);
-  await prisma.chatAutomation.update({ where: { id }, data });
+  const automation = await prisma.chatAutomation.update({ where: { id }, data });
   revalidatePath("/admin/automacoes");
+  return automation;
 }
 
 export async function toggleChatAutomationActive(id: string, active: boolean) {

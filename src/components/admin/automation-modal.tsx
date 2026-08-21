@@ -6,11 +6,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { createChatAutomation, updateChatAutomation } from "@/actions/chat-automations";
 import { toast } from "sonner";
 
+type AutomationRecord = { id: string; keyword: string; responseText: string; active: boolean };
+
 type AutomationModalProps = {
-  automation?: { id: string; keyword: string; responseText: string };
+  automation?: AutomationRecord;
+  onSaved?: (automation: AutomationRecord) => void;
 };
 
-export function AutomationModal({ automation }: AutomationModalProps) {
+export function AutomationModal({ automation, onSaved }: AutomationModalProps) {
   const [open, setOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isEditing = Boolean(automation);
@@ -25,13 +28,11 @@ export function AutomationModal({ automation }: AutomationModalProps) {
     };
 
     try {
-      if (automation) {
-        await updateChatAutomation(automation.id, input);
-        toast.success("Automação atualizada com sucesso!");
-      } else {
-        await createChatAutomation(input);
-        toast.success("Automação criada com sucesso!");
-      }
+      const saved = automation
+        ? await updateChatAutomation(automation.id, input)
+        : await createChatAutomation(input);
+      toast.success(automation ? "Automação atualizada com sucesso!" : "Automação criada com sucesso!");
+      onSaved?.(saved);
       setOpen(false);
     } catch {
       toast.error("Erro ao salvar. Confira se essa palavra-chave já não está em uso.");

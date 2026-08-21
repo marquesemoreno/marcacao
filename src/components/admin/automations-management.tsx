@@ -36,6 +36,13 @@ export function AutomationsManagement({ automations: initialAutomations }: { aut
     }
   }
 
+  function handleSaved(saved: AutomationItem) {
+    setAutomations((prev) => {
+      const exists = prev.some((a) => a.id === saved.id);
+      return exists ? prev.map((a) => (a.id === saved.id ? saved : a)) : [saved, ...prev];
+    });
+  }
+
   async function handleDelete(id: string, keyword: string) {
     if (!window.confirm(`Excluir a automação da palavra-chave "${keyword}"? Essa ação não pode ser desfeita.`)) {
       return;
@@ -64,7 +71,7 @@ export function AutomationsManagement({ automations: initialAutomations }: { aut
           </p>
         </div>
 
-        <AutomationModal />
+        <AutomationModal onSaved={handleSaved} />
       </div>
 
       <div className="flex items-center gap-1.5 overflow-x-auto bg-white dark:bg-slate-900 p-3 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs">
@@ -158,7 +165,7 @@ export function AutomationsManagement({ automations: initialAutomations }: { aut
                   )}
                 </button>
 
-                <AutomationModal automation={automation} />
+                <AutomationModal automation={automation} onSaved={handleSaved} />
 
                 <button
                   type="button"
