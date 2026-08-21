@@ -14,6 +14,7 @@ import { notifyInboxRealtime } from "@/lib/supabase-server";
 
 const ALLOWED_MEDIA_MIME_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif", "application/pdf"];
 const MAX_MEDIA_SIZE_BYTES = 15 * 1024 * 1024; // 15 MB — mesma ordem de grandeza do limite de mídia do WhatsApp
+const MESSAGE_PAGE_SIZE = 50;
 import type { Department, FunnelStage, InboxFilter } from "@/types/chat-crm";
 import { applyMessageVariables, getBaseUrl } from "@/lib/format";
 import {
@@ -534,10 +535,55 @@ export async function listChatContacts(filter: InboxFilter, search?: string) {
   return conversations.map(toChatContact);
 }
 
+async function assertClinicOwnsConversation(conversationId: string, clinicId: string) {
+  const conversation = await prisma.conversation.findUnique({
+    where: { id: conversationId },
+    select: { clinicId: true },
+  });
+  if (!conversation || conversation.clinicId !== clinicId) {
+    throw new Error("Conversa não encontrada");
+  }
+}
+
+/** Só as `MESSAGE_PAGE_SIZE` mensagens mais recentes — o histórico completo de
+ * conversas antigas pode ter milhares de linhas, carregar tudo a cada poll de
+ * 5s é o gargalo que motivou essa paginação. Mais antigas via getOlderChatMessages. */
 export async function getChatMessages(conversationId: string) {
-  const conversation = await getConversation(conversationId);
-  const withMediaUrls = await attachSignedUrls(conversation.messages);
-  return withMediaUrls.map(toChatMessage);
+  const { clinicId } = await requireClinicSession();
+  await assertClinicOwnsConversation(conversationId, clinicId);
+
+  const latest = await prisma.message.findMany({
+    where: { conversationId },
+    orderBy: { createdAt: "desc" },
+    take: MESSAGE_PAGE_SIZE,
+    include: { senderUser: { select: { id: true, name: true } } },
+  });
+
+  const withMediaUrls = await attachSignedUrls(latest.reverse());
+  return { messages: withMediaUrls.map(toChatMessage), hasMore: latest.length === MESSAGE_PAGE_SIZE };
+}
+
+/** Página anterior (mais antiga) do histórico, a partir do id da mensagem mais
+ * antiga já carregada na tela — usado pelo botão "Carregar mensagens anteriores". */
+export async function getOlderChatMessages(conversationId: string, beforeMessageId: string) {
+  const { clinicId } = await requireClinicSession();
+  await assertClinicOwnsConversation(conversationId, clinicId);
+
+  const cursor = await prisma.message.findUnique({
+    where: { id: beforeMessageId },
+    select: { createdAt: true },
+  });
+  if (!cursor) return { messages: [], hasMore: false };
+
+  const older = await prisma.message.findMany({
+    where: { conversationId, createdAt: { lt: cursor.createdAt } },
+    orderBy: { createdAt: "desc" },
+    take: MESSAGE_PAGE_SIZE,
+    include: { senderUser: { select: { id: true, name: true } } },
+  });
+
+  const withMediaUrls = await attachSignedUrls(older.reverse());
+  return { messages: withMediaUrls.map(toChatMessage), hasMore: older.length === MESSAGE_PAGE_SIZE };
 }
 
 export async function listChatAgents() {

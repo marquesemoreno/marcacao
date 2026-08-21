@@ -36,6 +36,7 @@ import {
   Archive,
   Check,
   Paperclip,
+  Loader2,
 } from 'lucide-react';
 
 const MAX_MEDIA_SIZE_BYTES = 15 * 1024 * 1024; // 15 MB — mesmo limite validado no servidor
@@ -79,6 +80,9 @@ interface InboxLayoutProps {
   contacts: Contact[];
   agents: Agent[];
   messages: Message[];
+  hasMoreMessages?: boolean;
+  isLoadingOlderMessages?: boolean;
+  onLoadOlderMessages?: () => void;
   attendantCapacity?: { activeCount: number; maxLimit: number } | null;
   selectedContactId: string | null;
   onSelectContact: (id: string) => void;
@@ -104,6 +108,9 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
   contacts,
   agents,
   messages,
+  hasMoreMessages,
+  isLoadingOlderMessages,
+  onLoadOlderMessages,
   attendantCapacity,
   selectedContactId,
   onSelectContact,
@@ -714,7 +721,28 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
               {messages.length === 0 ? (
                 <p className="text-center text-xs text-slate-400 dark:text-slate-500 mt-8">Nenhuma mensagem ainda nesta conversa.</p>
               ) : (
-                messages.map((msg) => <MessageBubble key={msg.id} message={msg} />)
+                <>
+                  {hasMoreMessages && (
+                    <div className="flex justify-center pb-2">
+                      <button
+                        type="button"
+                        onClick={onLoadOlderMessages}
+                        disabled={isLoadingOlderMessages}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-60 disabled:cursor-not-allowed shadow-2xs"
+                      >
+                        {isLoadingOlderMessages ? (
+                          <>
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            <span>Carregando...</span>
+                          </>
+                        ) : (
+                          <span>Carregar mensagens anteriores</span>
+                        )}
+                      </button>
+                    </div>
+                  )}
+                  {messages.map((msg) => <MessageBubble key={msg.id} message={msg} />)}
+                </>
               )}
             </div>
 

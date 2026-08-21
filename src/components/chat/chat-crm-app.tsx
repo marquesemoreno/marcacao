@@ -6,6 +6,7 @@ import {
   listChatContacts,
   listChatAgents,
   getChatMessages,
+  getOlderChatMessages,
   getChatContactHistory,
   sendMessage,
   sendMediaMessage,
@@ -25,6 +26,7 @@ import {
   listChatContactsAdmin,
   listChatAgentsAdmin,
   getChatMessagesAdmin,
+  getOlderChatMessagesAdmin,
   getChatContactHistoryAdmin,
   sendMessageAdmin,
   sendMediaMessageAdmin,
@@ -61,6 +63,7 @@ const ACTIONS_BY_SCOPE = {
     listChatContacts: (filter: InboxFilter, search?: string) => listChatContacts(filter, search),
     listChatAgents: () => listChatAgents(),
     getChatMessages: (id: string) => getChatMessages(id),
+    getOlderChatMessages: (id: string, beforeId: string) => getOlderChatMessages(id, beforeId),
     getChatContactHistory: (id: string) => getChatContactHistory(id),
     sendMessage: (id: string, text: string, note?: boolean) => sendMessage(id, text, note),
     sendMediaMessage: (id: string, formData: FormData) => sendMediaMessage(id, formData),
@@ -76,6 +79,7 @@ const ACTIONS_BY_SCOPE = {
     listChatContacts: (filter: InboxFilter, search?: string) => listChatContactsAdmin(filter, search),
     listChatAgents: () => listChatAgentsAdmin(),
     getChatMessages: (id: string) => getChatMessagesAdmin(id),
+    getOlderChatMessages: (id: string, beforeId: string) => getOlderChatMessagesAdmin(id, beforeId),
     getChatContactHistory: (id: string) => getChatContactHistoryAdmin(id),
     sendMessage: (id: string, text: string, note?: boolean) => sendMessageAdmin(id, text, note),
     sendMediaMessage: (id: string, formData: FormData) => sendMediaMessageAdmin(id, formData),
@@ -107,6 +111,8 @@ export function ChatCrmApp({ scope, basePath, view }: ChatCrmAppProps) {
   const [quickReplies, setQuickReplies] = useState<{ id: string; shortcut: string; content: string }[]>([]);
   const [selectedContactId, setSelectedContactId] = useState<string | null>(searchParams.get("c"));
   const [messages, setMessages] = useState<Message[]>([]);
+  const [hasMoreMessages, setHasMoreMessages] = useState(false);
+  const [isLoadingOlderMessages, setIsLoadingOlderMessages] = useState(false);
 
   const totalUnreadRef = useRef(0);
   const isFirstLoadRef = useRef(true);
@@ -170,37 +176,67 @@ export function ChatCrmApp({ scope, basePath, view }: ChatCrmAppProps) {
   const refreshMessages = useCallback(async () => {
     if (!selectedContactId) {
       setMessages([]);
+      setHasMoreMessages(false);
       return;
     }
     // As duas chamadas são independentes (mensagens vs. histórico de agendamentos
     // do contato) — rodar em paralelo evita pagar 2x a latência de rede/DB por ciclo.
-    const [result, history] = await Promise.all([
+    const [{ messages: result, hasMore }, history] = await Promise.all([
       actions.getChatMessages(selectedContactId),
       actions.getChatContactHistory(selectedContactId),
     ]);
     setMessages((prev) => {
+      // O polling só traz a página mais recente (MESSAGE_PAGE_SIZE mensagens) —
+      // preserva quaisquer mensagens mais antigas já carregadas via "Carregar
+      // mensagens anteriores" em vez de descartá-las a cada ciclo.
+      const incomingIds = new Set(result.map((message) => message.id));
+      const olderAlreadyLoaded = prev.filter((message) => !incomingIds.has(message.id) && !message.id.startsWith("temp-"));
+
       // O polling gera uma URL assinada NOVA a cada ciclo pro mesmo arquivo de
       // mídia (o conteúdo nunca muda depois de criado) — se a `src` do <audio>/
       // <img> troca no meio de uma reprodução, o navegador reinicia a mídia do
       // zero. Mantém a URL já carregada em vez de trocar por outra igualmente
       // válida a cada 5s.
       const prevById = new Map(prev.map((message) => [message.id, message]));
-      return result.map((message) => {
+      const latestPage = result.map((message) => {
         const existing = prevById.get(message.id);
         return existing?.mediaUrl && message.mediaUrl
           ? { ...message, mediaUrl: existing.mediaUrl }
           : message;
       });
+      return [...olderAlreadyLoaded, ...latestPage];
     });
+    setHasMoreMessages(hasMore);
     setContacts((prev) =>
       prev.map((c) => (c.id === selectedContactId ? { ...c, consultationHistory: history } : c))
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [actions, selectedContactId]);
 
+  // Limpa a conversa anterior antes de carregar a nova — sem isso, o merge de
+  // "preserva mensagens antigas já carregadas" do refreshMessages acima juntaria
+  // mensagens da conversa ANTERIOR com a nova, por um ciclo, ao trocar de contato.
+  useEffect(() => {
+    setMessages([]);
+    setHasMoreMessages(false);
+  }, [selectedContactId]);
+
   useEffect(() => {
     refreshMessages();
   }, [refreshMessages]);
+
+  async function handleLoadOlderMessages() {
+    if (!selectedContactId || messages.length === 0 || isLoadingOlderMessages) return;
+    setIsLoadingOlderMessages(true);
+    try {
+      const oldestId = messages[0].id;
+      const { messages: older, hasMore } = await actions.getOlderChatMessages(selectedContactId, oldestId);
+      setMessages((prev) => [...older, ...prev]);
+      setHasMoreMessages(hasMore);
+    } finally {
+      setIsLoadingOlderMessages(false);
+    }
+  }
 
   useInboxRealtime(() => {
     refreshContacts();
@@ -392,6 +428,9 @@ export function ChatCrmApp({ scope, basePath, view }: ChatCrmAppProps) {
           contacts={contacts}
           agents={agents}
           messages={messages}
+          hasMoreMessages={hasMoreMessages}
+          isLoadingOlderMessages={isLoadingOlderMessages}
+          onLoadOlderMessages={handleLoadOlderMessages}
           attendantCapacity={attendantCapacity}
           selectedContactId={selectedContactId}
           onSelectContact={selectContact}

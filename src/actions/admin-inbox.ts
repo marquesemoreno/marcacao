@@ -18,6 +18,7 @@ import {
 
 const ALLOWED_MEDIA_MIME_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif", "application/pdf"];
 const MAX_MEDIA_SIZE_BYTES = 15 * 1024 * 1024; // 15 MB — mesma ordem de grandeza do limite de mídia do WhatsApp
+const MESSAGE_PAGE_SIZE = 50;
 
 const ACTIVE_STATUSES: ConversationStatus[] = [ConversationStatus.OPEN, ConversationStatus.PENDING];
 
@@ -91,16 +92,39 @@ export async function listChatAgentsAdmin() {
   }));
 }
 
+/** Só as `MESSAGE_PAGE_SIZE` mensagens mais recentes — ver getOlderChatMessagesAdmin
+ * pro histórico mais antigo, carregado sob demanda pelo botão na tela. */
 export async function getChatMessagesAdmin(conversationId: string) {
   await requireAdminSession();
-  const messages = await prisma.message.findMany({
+  const latest = await prisma.message.findMany({
     where: { conversationId },
-    orderBy: { createdAt: "asc" },
+    orderBy: { createdAt: "desc" },
+    take: MESSAGE_PAGE_SIZE,
     include: { senderUser: { select: { id: true, name: true } } },
   });
 
-  const withMediaUrls = await attachSignedUrls(messages);
-  return withMediaUrls.map(toChatMessage);
+  const withMediaUrls = await attachSignedUrls(latest.reverse());
+  return { messages: withMediaUrls.map(toChatMessage), hasMore: latest.length === MESSAGE_PAGE_SIZE };
+}
+
+export async function getOlderChatMessagesAdmin(conversationId: string, beforeMessageId: string) {
+  await requireAdminSession();
+
+  const cursor = await prisma.message.findUnique({
+    where: { id: beforeMessageId },
+    select: { createdAt: true },
+  });
+  if (!cursor) return { messages: [], hasMore: false };
+
+  const older = await prisma.message.findMany({
+    where: { conversationId, createdAt: { lt: cursor.createdAt } },
+    orderBy: { createdAt: "desc" },
+    take: MESSAGE_PAGE_SIZE,
+    include: { senderUser: { select: { id: true, name: true } } },
+  });
+
+  const withMediaUrls = await attachSignedUrls(older.reverse());
+  return { messages: withMediaUrls.map(toChatMessage), hasMore: older.length === MESSAGE_PAGE_SIZE };
 }
 
 export async function getChatContactHistoryAdmin(conversationId: string) {
