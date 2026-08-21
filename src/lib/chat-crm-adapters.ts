@@ -116,7 +116,14 @@ export function toChatContact(conversation: ConversationWithRelations): Contact 
     lastMessage: lastMessage
       ? lastMessage.type === "INTERNAL_NOTE"
         ? `🔒 Nota: ${lastMessage.content}`
-        : lastMessage.content
+        : lastMessage.content ||
+          (lastMessage.type === "ATTACHMENT"
+            ? lastMessage.mimeType?.startsWith("image/")
+              ? "📷 Imagem"
+              : "📄 Documento"
+            : lastMessage.type === "AUDIO"
+              ? "🎤 Áudio"
+              : lastMessage.content)
       : "Sem mensagens ainda.",
     lastMessageTime: lastMessage ? formatMessageTimestamp(lastMessage.createdAt) : "",
     statusTag: isResolved
