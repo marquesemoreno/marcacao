@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { sendAppointmentConfirmation, sendWhatsAppMessage, formatToWhatsAppNumber } from "@/lib/whatsapp";
 import { fetchMediaBase64, uploadWhatsAppMedia, formatDuration } from "@/lib/whatsapp-media";
 import { formatFileSize } from "@/lib/format";
+import { notifyInboxRealtime } from "@/lib/supabase-server";
 
 type IncomingMedia =
   | { kind: "image" | "document"; mimeType: string; fileName: string; sizeBytes: number; key: Record<string, unknown> }
@@ -264,6 +265,8 @@ export async function POST(request: Request) {
       });
       sendWhatsAppMessage(incoming.phone, matchedAutomation.responseText, "chat_automation.triggered").catch(() => {});
     }
+
+    notifyInboxRealtime().catch(() => {});
   }
 
   // =========================================================================

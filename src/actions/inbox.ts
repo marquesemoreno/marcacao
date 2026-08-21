@@ -10,6 +10,7 @@ import { toChatContact, toChatMessage, departmentToDb, funnelStageToDb } from "@
 import { attachSignedUrls, uploadWhatsAppMedia, getSignedMediaUrl } from "@/lib/whatsapp-media";
 import { sendWhatsAppMedia } from "@/lib/whatsapp";
 import { formatFileSize } from "@/lib/format";
+import { notifyInboxRealtime } from "@/lib/supabase-server";
 
 const ALLOWED_MEDIA_MIME_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif", "application/pdf"];
 const MAX_MEDIA_SIZE_BYTES = 15 * 1024 * 1024; // 15 MB — mesma ordem de grandeza do limite de mídia do WhatsApp
@@ -142,6 +143,7 @@ export async function sendMessage(conversationId: string, content: string, isInt
       data: { lastMessageAt: new Date() },
     });
     revalidatePath("/clinic/inbox");
+    notifyInboxRealtime().catch(() => {});
     return note;
   }
 
@@ -236,6 +238,7 @@ export async function sendMediaMessage(conversationId: string, formData: FormDat
 
   revalidatePath("/clinic/inbox");
   revalidatePath("/admin/inbox");
+  notifyInboxRealtime().catch(() => {});
   return message;
 }
 

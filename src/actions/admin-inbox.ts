@@ -9,6 +9,7 @@ import { toPlainClinicProcedureItem } from "@/lib/serialize";
 import { departmentToDb, funnelStageToDb, toChatContact, toChatMessage } from "@/lib/chat-crm-adapters";
 import { attachSignedUrls, uploadWhatsAppMedia, getSignedMediaUrl } from "@/lib/whatsapp-media";
 import { formatFileSize } from "@/lib/format";
+import { notifyInboxRealtime } from "@/lib/supabase-server";
 import type { Department, FunnelStage, InboxFilter } from "@/types/chat-crm";
 import {
   sendMessageSchema,
@@ -157,6 +158,7 @@ export async function sendMessageAdmin(conversationId: string, content: string, 
       data: { lastMessageAt: new Date() },
     });
     revalidatePath("/admin/inbox");
+    notifyInboxRealtime().catch(() => {});
     return note;
   }
 
@@ -186,6 +188,7 @@ export async function sendMessageAdmin(conversationId: string, content: string, 
   }).catch(() => {});
 
   revalidatePath("/admin/inbox");
+  notifyInboxRealtime().catch(() => {});
   return message;
 }
 
@@ -248,6 +251,7 @@ export async function sendMediaMessageAdmin(conversationId: string, formData: Fo
   }
 
   revalidatePath("/admin/inbox");
+  notifyInboxRealtime().catch(() => {});
   return message;
 }
 

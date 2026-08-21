@@ -10,11 +10,16 @@ const DEFAULT_POLL_INTERVAL_MS = 5000;
  *
  * 1. Polling (`setInterval`) — sempre ativo, é a base funcional real.
  *    Funciona hoje, sem depender de nenhuma configuração extra.
- * 2. Supabase Realtime (`postgres_changes` em `messages`/`conversations`)
- *    — só ativa se NEXT_PUBLIC_SUPABASE_URL/ANON_KEY estiverem definidas
- *    E existirem policies de RLS liberando leitura (não existem por
- *    padrão — ver src/lib/supabase-client.ts). Quando funcionar, chama
- *    `onUpdate` imediatamente ao invés de esperar o próximo poll.
+ * 2. Supabase Realtime Broadcast (canal "inbox-changes", evento "changed")
+ *    — só ativa se NEXT_PUBLIC_SUPABASE_URL/ANON_KEY estiverem definidas.
+ *    Deliberadamente NÃO usa `postgres_changes`: isso exigiria RLS liberando
+ *    leitura das tabelas messages/conversations pra role `anon` (que é
+ *    pública, embutida no bundle do navegador), vazando dado de saúde de
+ *    todos os pacientes pra qualquer um com a anon key. Broadcast não
+ *    depende de RLS — o servidor só manda um sinal vazio (ver
+ *    notifyInboxRealtime em src/lib/supabase-server.ts) e quem escuta
+ *    refaz a busca pela mesma Server Action de sempre. Quando o sinal
+ *    chega, chama `onUpdate` imediatamente ao invés de esperar o próximo poll.
  */
 export function useInboxRealtime(onUpdate: () => void, pollIntervalMs = DEFAULT_POLL_INTERVAL_MS) {
   const onUpdateRef = useRef(onUpdate);
@@ -30,12 +35,7 @@ export function useInboxRealtime(onUpdate: () => void, pollIntervalMs = DEFAULT_
 
     const channel = supabase
       .channel("inbox-changes")
-      .on("postgres_changes", { event: "*", schema: "public", table: "messages" }, () =>
-        onUpdateRef.current()
-      )
-      .on("postgres_changes", { event: "*", schema: "public", table: "conversations" }, () =>
-        onUpdateRef.current()
-      )
+      .on("broadcast", { event: "changed" }, () => onUpdateRef.current())
       .subscribe();
 
     return () => {
