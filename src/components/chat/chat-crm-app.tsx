@@ -55,34 +55,34 @@ type View = "inbox" | "crm";
 
 const ACTIONS_BY_SCOPE = {
   clinic: {
-    listChatContacts,
-    listChatAgents,
-    getChatMessages,
-    getChatContactHistory,
-    sendMessage,
-    updateConversationTags,
-    updateConversationFunnelStage,
-    assignConversationToUser,
-    resolveConversation,
-    reopenConversation,
-    listCannedResponses,
-    suggestIaReply,
+    listChatContacts: (filter: InboxFilter, search?: string) => listChatContacts(filter, search),
+    listChatAgents: () => listChatAgents(),
+    getChatMessages: (id: string) => getChatMessages(id),
+    getChatContactHistory: (id: string) => getChatContactHistory(id),
+    sendMessage: (id: string, text: string, note?: boolean) => sendMessage(id, text, note),
+    updateConversationTags: (id: string, tags: string[]) => updateConversationTags(id, tags),
+    updateConversationFunnelStage: (id: string, stage: FunnelStage) => updateConversationFunnelStage(id, stage),
+    assignConversationToUser: (id: string, userId: string | null) => assignConversationToUser(id, userId ?? ""),
+    resolveConversation: (id: string, data?: { reason: string; notes?: string }) => resolveConversation(id, data),
+    reopenConversation: (id: string) => reopenConversation(id),
+    listCannedResponses: () => listCannedResponses(),
+    suggestIaReply: (id: string) => suggestIaReply(id),
   },
   admin: {
-    listChatContacts: listChatContactsAdmin,
-    listChatAgents: listChatAgentsAdmin,
-    getChatMessages: getChatMessagesAdmin,
-    getChatContactHistory: getChatContactHistoryAdmin,
-    sendMessage: sendMessageAdmin,
-    updateConversationTags: updateConversationTagsAdmin,
-    updateConversationFunnelStage: updateConversationFunnelStageAdmin,
-    assignConversationToUser: assignConversationToUserAdmin,
-    resolveConversation: resolveConversationAdmin,
-    reopenConversation: reopenConversationAdmin,
-    listCannedResponses: listCannedResponsesAdmin,
-    suggestIaReply: suggestIaReplyAdmin,
+    listChatContacts: (filter: InboxFilter, search?: string) => listChatContactsAdmin(filter, search),
+    listChatAgents: () => listChatAgentsAdmin(),
+    getChatMessages: (id: string) => getChatMessagesAdmin(id),
+    getChatContactHistory: (id: string) => getChatContactHistoryAdmin(id),
+    sendMessage: (id: string, text: string, note?: boolean) => sendMessageAdmin(id, text, note),
+    updateConversationTags: (id: string, tags: string[]) => updateConversationTagsAdmin(id, tags),
+    updateConversationFunnelStage: (id: string, stage: FunnelStage) => updateConversationFunnelStageAdmin(id, stage),
+    assignConversationToUser: (id: string, userId: string | null) => assignConversationToUserAdmin(id, userId),
+    resolveConversation: (id: string, data?: { reason: string; notes?: string }) => resolveConversationAdmin(id, data),
+    reopenConversation: (id: string) => reopenConversationAdmin(id),
+    listCannedResponses: () => listCannedResponsesAdmin(),
+    suggestIaReply: (id: string) => suggestIaReplyAdmin(id),
   },
-} as const;
+};
 
 interface ChatCrmAppProps {
   scope: Scope;
@@ -144,7 +144,7 @@ export function ChatCrmApp({ scope, basePath, view }: ChatCrmAppProps) {
       return result[0]?.id ?? null;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [actions, filterTab, searchQuery]);
+  }, [actions, filterTab, searchQuery, scope, view]);
 
   useEffect(() => {
     requestNotificationPermission();
@@ -195,9 +195,35 @@ export function ChatCrmApp({ scope, basePath, view }: ChatCrmAppProps) {
 
   async function handleSendMessage(text: string, mode: "whatsapp" | "internal_note") {
     if (!selectedContactId) return;
-    await actions.sendMessage(selectedContactId, text, mode === "internal_note");
-    await refreshMessages();
-    await refreshContacts();
+
+    const tempId = `temp-${Date.now()}`;
+    const nowTime = new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit" }).format(new Date());
+
+    const optimisticMsg: Message = {
+      id: tempId,
+      sender: "agent",
+      senderName: "Você",
+      text,
+      timestamp: nowTime,
+      type: mode === "internal_note" ? "internal_note" : "text",
+    };
+
+    // 0ms Latência: Renderiza o balão de mensagem e atualiza o card do contato instantaneamente
+    setMessages((prev) => [...prev, optimisticMsg]);
+    setContacts((prev) =>
+      prev.map((c) =>
+        c.id === selectedContactId ? { ...c, lastMessage: text, lastMessageTime: nowTime } : c
+      )
+    );
+
+    try {
+      await actions.sendMessage(selectedContactId, text, mode === "internal_note");
+      refreshMessages();
+      refreshContacts();
+    } catch {
+      toast.error("Erro ao enviar mensagem.");
+      setMessages((prev) => prev.filter((m) => m.id !== tempId));
+    }
   }
 
   async function handleAddTag(tag: string) {
@@ -272,7 +298,7 @@ export function ChatCrmApp({ scope, basePath, view }: ChatCrmAppProps) {
     const claimFn = scope === "admin" ? claimConversationAdmin : claimConversation;
     const result = await claimFn(selectedContactId);
     if (!result.success) {
-      toast.error(result.message);
+      toast.error(result.message || "Não foi possível assumir a conversa.");
     } else {
       toast.success("Atendimento assumido por você com sucesso!");
       await refreshContacts();
@@ -285,7 +311,7 @@ export function ChatCrmApp({ scope, basePath, view }: ChatCrmAppProps) {
     const transferFn = scope === "admin" ? transferConversationAdmin : transferConversation;
     const result = await transferFn(selectedContactId, agentId);
     if (!result.success) {
-      toast.error(result.message);
+      toast.error((result as { success: boolean; message?: string }).message || "Não foi possível transferir.");
     } else {
       toast.success("Conversa transferida com sucesso!");
       await refreshContacts();
