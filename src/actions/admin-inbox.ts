@@ -4,15 +4,19 @@ import { revalidatePath } from "next/cache";
 import { ConversationStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireAdminSession } from "@/lib/session";
-import { whatsappService } from "@/lib/whatsapp";
+import { whatsappService, sendWhatsAppMedia } from "@/lib/whatsapp";
 import { toPlainClinicProcedureItem } from "@/lib/serialize";
 import { departmentToDb, funnelStageToDb, toChatContact, toChatMessage } from "@/lib/chat-crm-adapters";
-import { attachSignedUrls } from "@/lib/whatsapp-media";
+import { attachSignedUrls, uploadWhatsAppMedia, getSignedMediaUrl } from "@/lib/whatsapp-media";
+import { formatFileSize } from "@/lib/format";
 import type { Department, FunnelStage, InboxFilter } from "@/types/chat-crm";
 import {
   sendMessageSchema,
   updateTagsSchema,
 } from "@/lib/schemas/inbox";
+
+const ALLOWED_MEDIA_MIME_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif", "application/pdf"];
+const MAX_MEDIA_SIZE_BYTES = 15 * 1024 * 1024; // 15 MB — mesma ordem de grandeza do limite de mídia do WhatsApp
 
 const ACTIVE_STATUSES: ConversationStatus[] = [ConversationStatus.OPEN, ConversationStatus.PENDING];
 
@@ -180,6 +184,68 @@ export async function sendMessageAdmin(conversationId: string, content: string, 
       }).catch(() => {});
     }
   }).catch(() => {});
+
+  revalidatePath("/admin/inbox");
+  return message;
+}
+
+/** Atendente (admin) anexa uma imagem ou PDF pra enviar ao paciente pelo WhatsApp. */
+export async function sendMediaMessageAdmin(conversationId: string, formData: FormData) {
+  const { userId } = await requireAdminSession();
+
+  const file = formData.get("file");
+  if (!(file instanceof File)) throw new Error("Nenhum arquivo enviado");
+  if (!ALLOWED_MEDIA_MIME_TYPES.includes(file.type)) {
+    throw new Error("Tipo de arquivo não suportado. Envie uma imagem ou um PDF.");
+  }
+  if (file.size > MAX_MEDIA_SIZE_BYTES) {
+    throw new Error("Arquivo muito grande. O limite é 15 MB.");
+  }
+
+  const conversation = await prisma.conversation.findUnique({
+    where: { id: conversationId },
+    include: { contact: true },
+  });
+  if (!conversation) {
+    throw new Error("Conversa não encontrada");
+  }
+
+  const buffer = Buffer.from(await file.arrayBuffer());
+  const uploaded = await uploadWhatsAppMedia(conversationId, buffer, file.type);
+  if (!uploaded) {
+    throw new Error("Não foi possível processar o arquivo. Tente novamente.");
+  }
+
+  const message = await prisma.message.create({
+    data: {
+      conversationId,
+      direction: "OUTBOUND",
+      content: "",
+      status: "SENT",
+      type: "ATTACHMENT",
+      mediaPath: uploaded.path,
+      mimeType: file.type,
+      attachmentName: file.name,
+      attachmentSize: formatFileSize(uploaded.sizeBytes),
+      senderUserId: userId,
+    },
+  });
+
+  await prisma.conversation.update({
+    where: { id: conversationId },
+    data: { lastMessageAt: new Date(), status: "OPEN" },
+  });
+
+  const signedUrl = await getSignedMediaUrl(uploaded.path);
+  if (signedUrl) {
+    sendWhatsAppMedia(conversation.contact.phone, signedUrl, file.type, file.name, "", "chat.outbound_admin.media")
+      .then((result) => {
+        if (!result.success && !result.skipped) {
+          prisma.message.update({ where: { id: message.id }, data: { status: "FAILED" } }).catch(() => {});
+        }
+      })
+      .catch(() => {});
+  }
 
   revalidatePath("/admin/inbox");
   return message;

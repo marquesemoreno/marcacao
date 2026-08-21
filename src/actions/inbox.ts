@@ -7,7 +7,12 @@ import { requireClinicSession } from "@/lib/session";
 import { whatsappService } from "@/lib/whatsapp";
 import { toPlainClinicProcedureItem } from "@/lib/serialize";
 import { toChatContact, toChatMessage, departmentToDb, funnelStageToDb } from "@/lib/chat-crm-adapters";
-import { attachSignedUrls } from "@/lib/whatsapp-media";
+import { attachSignedUrls, uploadWhatsAppMedia, getSignedMediaUrl } from "@/lib/whatsapp-media";
+import { sendWhatsAppMedia } from "@/lib/whatsapp";
+import { formatFileSize } from "@/lib/format";
+
+const ALLOWED_MEDIA_MIME_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif", "application/pdf"];
+const MAX_MEDIA_SIZE_BYTES = 15 * 1024 * 1024; // 15 MB — mesma ordem de grandeza do limite de mídia do WhatsApp
 import type { Department, FunnelStage, InboxFilter } from "@/types/chat-crm";
 import { applyMessageVariables, getBaseUrl } from "@/lib/format";
 import {
@@ -164,6 +169,70 @@ export async function sendMessage(conversationId: string, content: string, isInt
       }).catch(() => {});
     }
   }).catch(() => {});
+
+  revalidatePath("/clinic/inbox");
+  revalidatePath("/admin/inbox");
+  return message;
+}
+
+/** Atendente anexa uma imagem ou PDF pra enviar ao paciente pelo WhatsApp. */
+export async function sendMediaMessage(conversationId: string, formData: FormData) {
+  const { clinicId, userId } = await requireClinicSession();
+
+  const file = formData.get("file");
+  if (!(file instanceof File)) throw new Error("Nenhum arquivo enviado");
+  if (!ALLOWED_MEDIA_MIME_TYPES.includes(file.type)) {
+    throw new Error("Tipo de arquivo não suportado. Envie uma imagem ou um PDF.");
+  }
+  if (file.size > MAX_MEDIA_SIZE_BYTES) {
+    throw new Error("Arquivo muito grande. O limite é 15 MB.");
+  }
+
+  const conversation = await prisma.conversation.findUnique({
+    where: { id: conversationId },
+    include: { contact: true },
+  });
+  if (!conversation || conversation.clinicId !== clinicId) {
+    throw new Error("Conversa não encontrada");
+  }
+
+  const buffer = Buffer.from(await file.arrayBuffer());
+  const uploaded = await uploadWhatsAppMedia(conversationId, buffer, file.type);
+  if (!uploaded) {
+    throw new Error("Não foi possível processar o arquivo. Tente novamente.");
+  }
+
+  const message = await prisma.message.create({
+    data: {
+      conversationId,
+      direction: "OUTBOUND",
+      content: "",
+      status: "SENT",
+      type: "ATTACHMENT",
+      mediaPath: uploaded.path,
+      mimeType: file.type,
+      attachmentName: file.name,
+      attachmentSize: formatFileSize(uploaded.sizeBytes),
+      senderUserId: userId,
+    },
+  });
+
+  await prisma.conversation.update({
+    where: { id: conversationId },
+    data: { lastMessageAt: new Date(), status: "OPEN" },
+  });
+
+  // Mesma URL assinada que a UI usa pra exibir — a Evolution API busca o arquivo nela.
+  const signedUrl = await getSignedMediaUrl(uploaded.path);
+  if (signedUrl) {
+    sendWhatsAppMedia(conversation.contact.phone, signedUrl, file.type, file.name, "", "chat.outbound.media")
+      .then((result) => {
+        if (!result.success && !result.skipped) {
+          prisma.message.update({ where: { id: message.id }, data: { status: "FAILED" } }).catch(() => {});
+        }
+      })
+      .catch(() => {});
+  }
 
   revalidatePath("/clinic/inbox");
   revalidatePath("/admin/inbox");

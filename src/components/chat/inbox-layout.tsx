@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   Contact,
   Message,
@@ -35,7 +35,10 @@ import {
   Copy,
   Archive,
   Check,
+  Paperclip,
 } from 'lucide-react';
+
+const MAX_MEDIA_SIZE_BYTES = 15 * 1024 * 1024; // 15 MB — mesmo limite validado no servidor
 
 const PRESET_TAGS: { label: string; classes: string }[] = [
   { label: '⚡ Prioritário', classes: 'bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-800' },
@@ -85,6 +88,7 @@ interface InboxLayoutProps {
   onSearchChange: (query: string) => void;
   quickReplies: { id: string; shortcut: string; content: string }[];
   onSendMessage: (text: string, mode: 'whatsapp' | 'internal_note') => Promise<void> | void;
+  onSendMedia: (file: File) => Promise<void> | void;
   onAddTag: (tag: string) => Promise<void> | void;
   onRemoveTag: (tag: string) => Promise<void> | void;
   onUpdateFunnelStage: (stage: FunnelStage) => Promise<void> | void;
@@ -109,6 +113,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
   onSearchChange,
   quickReplies,
   onSendMessage,
+  onSendMedia,
   onAddTag,
   onRemoveTag,
   onUpdateFunnelStage,
@@ -135,6 +140,8 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
   const [isAddingTag, setIsAddingTag] = useState(false);
   const [isGeneratingIa, setIsGeneratingIa] = useState(false);
   const [isSeedingDemo, setIsSeedingDemo] = useState(false);
+  const [isSendingMedia, setIsSendingMedia] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Modal de Motivo Obrigatório de Resolução
   const [isFinishModalOpen, setIsFinishModalOpen] = useState(false);
@@ -234,6 +241,28 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
     if (!inputText.trim() || !selectedContact) return;
     await onSendMessage(inputText.trim(), composerMode);
     setInputText('');
+  };
+
+  const handleFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // permite escolher o mesmo arquivo de novo depois
+    if (!file || !selectedContact) return;
+
+    if (!['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'application/pdf'].includes(file.type)) {
+      toast.error('Envie uma imagem (JPG, PNG, WEBP, GIF) ou um PDF.');
+      return;
+    }
+    if (file.size > MAX_MEDIA_SIZE_BYTES) {
+      toast.error('Arquivo muito grande. O limite é 15 MB.');
+      return;
+    }
+
+    setIsSendingMedia(true);
+    try {
+      await onSendMedia(file);
+    } finally {
+      setIsSendingMedia(false);
+    }
   };
 
   const handleAddTag = async () => {
@@ -793,6 +822,27 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
 
                   <div className="flex items-center justify-between px-3 py-2 border-t border-slate-200/40 dark:border-slate-800 bg-white/50 dark:bg-slate-900/50 rounded-b-2xl">
                     <div className="flex items-center gap-1.5">
+                      {composerMode === 'whatsapp' && (
+                        <>
+                          <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp,image/gif,application/pdf"
+                            onChange={handleFileSelected}
+                            className="hidden"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => fileInputRef.current?.click()}
+                            disabled={isSendingMedia}
+                            className="flex items-center justify-center w-7 h-7 text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors disabled:opacity-50"
+                            title="Anexar imagem ou PDF para enviar ao paciente"
+                          >
+                            <Paperclip className={`w-3.5 h-3.5 ${isSendingMedia ? 'animate-pulse' : ''}`} />
+                          </button>
+                        </>
+                      )}
+
                       <button
                         type="button"
                         onClick={() => setIsQuickReplyOpen(!isQuickReplyOpen)}

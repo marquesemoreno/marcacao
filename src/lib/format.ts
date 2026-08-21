@@ -167,3 +167,10 @@ export const affiliateStatusVariant: Record<
   PENDING: "secondary",
   SUSPENDED: "destructive",
 };
+
+/** Tamanho legível ("284 KB", "1.4 MB") — usado tanto no upload de mídia do WhatsApp (servidor) quanto na prévia do composer (cliente). */
+export function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}

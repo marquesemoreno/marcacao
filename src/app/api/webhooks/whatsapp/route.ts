@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import type { AppointmentStatus, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { sendAppointmentConfirmation, sendWhatsAppMessage, formatToWhatsAppNumber } from "@/lib/whatsapp";
-import { fetchMediaBase64, uploadWhatsAppMedia, formatFileSize, formatDuration } from "@/lib/whatsapp-media";
+import { fetchMediaBase64, uploadWhatsAppMedia, formatDuration } from "@/lib/whatsapp-media";
+import { formatFileSize } from "@/lib/format";
 
 type IncomingMedia =
   | { kind: "image" | "document"; mimeType: string; fileName: string; sizeBytes: number; key: Record<string, unknown> }
@@ -202,7 +203,7 @@ export async function POST(request: Request) {
     if (incoming.media) {
       const base64 = await fetchMediaBase64(incoming.media.key);
       const uploaded = base64
-        ? await uploadWhatsAppMedia(conversation.id, base64, incoming.media.mimeType)
+        ? await uploadWhatsAppMedia(conversation.id, Buffer.from(base64, "base64"), incoming.media.mimeType)
         : null;
 
       if (uploaded) {

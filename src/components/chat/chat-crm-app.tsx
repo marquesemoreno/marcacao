@@ -8,6 +8,7 @@ import {
   getChatMessages,
   getChatContactHistory,
   sendMessage,
+  sendMediaMessage,
   updateConversationTags,
   updateConversationFunnelStage,
   assignConversationToUser,
@@ -26,6 +27,7 @@ import {
   getChatMessagesAdmin,
   getChatContactHistoryAdmin,
   sendMessageAdmin,
+  sendMediaMessageAdmin,
   updateConversationTagsAdmin,
   updateConversationFunnelStageAdmin,
   assignConversationToUserAdmin,
@@ -41,6 +43,7 @@ import {
 import { toast } from "sonner";
 import { useInboxRealtime } from "@/hooks/use-inbox-realtime";
 import { playNotificationSound } from "@/lib/notification-sound";
+import { formatFileSize } from "@/lib/format";
 import {
   requestNotificationPermission,
   showDesktopNotification,
@@ -60,6 +63,7 @@ const ACTIONS_BY_SCOPE = {
     getChatMessages: (id: string) => getChatMessages(id),
     getChatContactHistory: (id: string) => getChatContactHistory(id),
     sendMessage: (id: string, text: string, note?: boolean) => sendMessage(id, text, note),
+    sendMediaMessage: (id: string, formData: FormData) => sendMediaMessage(id, formData),
     updateConversationTags: (id: string, tags: string[]) => updateConversationTags(id, tags),
     updateConversationFunnelStage: (id: string, stage: FunnelStage) => updateConversationFunnelStage(id, stage),
     assignConversationToUser: (id: string, userId: string | null) => assignConversationToUser(id, userId ?? ""),
@@ -74,6 +78,7 @@ const ACTIONS_BY_SCOPE = {
     getChatMessages: (id: string) => getChatMessagesAdmin(id),
     getChatContactHistory: (id: string) => getChatContactHistoryAdmin(id),
     sendMessage: (id: string, text: string, note?: boolean) => sendMessageAdmin(id, text, note),
+    sendMediaMessage: (id: string, formData: FormData) => sendMediaMessageAdmin(id, formData),
     updateConversationTags: (id: string, tags: string[]) => updateConversationTagsAdmin(id, tags),
     updateConversationFunnelStage: (id: string, stage: FunnelStage) => updateConversationFunnelStageAdmin(id, stage),
     assignConversationToUser: (id: string, userId: string | null) => assignConversationToUserAdmin(id, userId),
@@ -242,6 +247,51 @@ export function ChatCrmApp({ scope, basePath, view }: ChatCrmAppProps) {
     }
   }
 
+  async function handleSendMedia(file: File) {
+    if (!selectedContactId) return;
+
+    const tempId = `temp-${Date.now()}`;
+    const nowTime = new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit" }).format(new Date());
+    const isImage = file.type.startsWith("image/");
+    // Preview local instantâneo (0ms) via blob do próprio arquivo — trocado
+    // pela URL assinada de verdade assim que o upload/refreshMessages volta.
+    const localPreviewUrl = URL.createObjectURL(file);
+
+    const optimisticMsg: Message = {
+      id: tempId,
+      sender: "agent",
+      senderName: "Você",
+      timestamp: nowTime,
+      type: "attachment",
+      attachmentName: file.name,
+      attachmentSize: formatFileSize(file.size),
+      mediaUrl: localPreviewUrl,
+      mimeType: file.type,
+    };
+
+    setMessages((prev) => [...prev, optimisticMsg]);
+    setContacts((prev) =>
+      prev.map((c) =>
+        c.id === selectedContactId
+          ? { ...c, lastMessage: isImage ? "📷 Imagem" : "📄 Documento", lastMessageTime: nowTime }
+          : c
+      )
+    );
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      await actions.sendMediaMessage(selectedContactId, formData);
+      await refreshMessages();
+      refreshContacts();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Erro ao enviar arquivo.");
+      setMessages((prev) => prev.filter((m) => m.id !== tempId));
+    } finally {
+      URL.revokeObjectURL(localPreviewUrl);
+    }
+  }
+
   async function handleAddTag(tag: string) {
     if (!selectedContact) return;
     await actions.updateConversationTags(selectedContact.id, [...selectedContact.tags, tag]);
@@ -351,6 +401,7 @@ export function ChatCrmApp({ scope, basePath, view }: ChatCrmAppProps) {
           onSearchChange={setSearchQuery}
           quickReplies={quickReplies}
           onSendMessage={handleSendMessage}
+          onSendMedia={handleSendMedia}
           onAddTag={handleAddTag}
           onRemoveTag={handleRemoveTag}
           onUpdateFunnelStage={handleUpdateFunnelStage}

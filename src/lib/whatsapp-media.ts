@@ -51,13 +51,6 @@ function extensionFromMimeType(mimeType: string): string {
   return map[base] ?? base.split("/")[1] ?? "bin";
 }
 
-/** Tamanho legível ("284 KB", "1.4 MB") a partir de bytes — mesma unidade usada na UI. */
-export function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
 /** "M:SS" a partir de segundos inteiros — mesmo formato já usado no player de áudio da UI. */
 export function formatDuration(totalSeconds: number): string {
   const seconds = Math.max(0, Math.round(totalSeconds));
@@ -67,19 +60,20 @@ export function formatDuration(totalSeconds: number): string {
 }
 
 /**
- * Decodifica o base64 recebido da Evolution API e sobe pro bucket privado
- * do Supabase Storage. Retorna o caminho salvo (não a URL — é privado,
- * a URL assinada é gerada só na hora de exibir, ver getSignedMediaUrl).
+ * Sobe um arquivo pro bucket privado do Supabase Storage — usado tanto pra
+ * mídia recebida do paciente (decodificada de base64 da Evolution API)
+ * quanto pra mídia enviada pelo atendente (upload direto do navegador).
+ * Retorna o caminho salvo (não a URL — é privado, a URL assinada é gerada
+ * só na hora de exibir, ver getSignedMediaUrl).
  */
 export async function uploadWhatsAppMedia(
   conversationId: string,
-  base64: string,
+  buffer: Buffer,
   mimeType: string
 ): Promise<{ path: string; sizeBytes: number } | null> {
   const supabase = getSupabaseServerClient();
   if (!supabase) return null;
 
-  const buffer = Buffer.from(base64, "base64");
   const ext = extensionFromMimeType(mimeType);
   const path = `${conversationId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
 

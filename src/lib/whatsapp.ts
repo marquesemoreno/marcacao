@@ -130,6 +130,76 @@ export async function sendWhatsAppMessage(
   return { success: result.success, skipped: false, responseCode: result.responseCode };
 }
 
+/**
+ * Envio de mídia (imagem/documento) via Evolution API v2.
+ * POST ${EVOLUTION_API_URL}/message/sendMedia/${EVOLUTION_INSTANCE_NAME}
+ * `media` é uma URL (a assinada do Supabase Storage) — a Evolution API busca
+ * o arquivo nela, não precisa reenviar o base64 pra ela.
+ */
+export async function sendWhatsAppMedia(
+  to: string,
+  mediaUrl: string,
+  mimeType: string,
+  fileName: string,
+  caption: string,
+  event: string = "whatsapp.send_media"
+): Promise<{ success: boolean; skipped: boolean; responseCode?: number | null }> {
+  const { apiUrl, apiKey, instanceName } = getEvolutionConfig();
+  const target = formatToWhatsAppNumber(to);
+
+  if (!apiUrl || !apiKey || !instanceName) {
+    await prisma.webhookLog.create({
+      data: {
+        event,
+        payload: { phone: target, fileName },
+        status: "SKIPPED",
+        responseCode: null,
+      },
+    });
+    return { success: false, skipped: true };
+  }
+
+  const baseUrl = apiUrl.replace(/\/$/, "");
+  const targetUrl = `${baseUrl}/message/sendMedia/${instanceName}`;
+  const mediatype = mimeType.startsWith("image/") ? "image" : "document";
+
+  let result: SendAttemptResult = { success: false, responseCode: null };
+
+  try {
+    const response = await fetch(targetUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", apikey: apiKey },
+      body: JSON.stringify({
+        number: target,
+        mediatype,
+        mimetype: mimeType,
+        caption,
+        media: mediaUrl,
+        fileName,
+      }),
+      signal: AbortSignal.timeout(15000),
+    });
+    result = { success: response.ok, responseCode: response.status };
+  } catch (error) {
+    result = {
+      success: false,
+      responseCode: null,
+      error: error instanceof Error ? error.message : "Erro na conexão com Evolution API",
+    };
+  }
+
+  await prisma.webhookLog.create({
+    data: {
+      event,
+      payload: { provider: "evolution_v2", phone: target, fileName, mediatype, error: result.error ?? null },
+      status: result.success ? "SUCCESS" : "FAILED",
+      responseCode: result.responseCode,
+    },
+  });
+
+  return { success: result.success, skipped: false, responseCode: result.responseCode };
+}
+
 export type AppointmentWithRelations = Prisma.AppointmentGetPayload<{
   include: { clinicProcedure: { include: { clinic: true; procedure: true } } };
 }>;
