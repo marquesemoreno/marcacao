@@ -98,6 +98,8 @@ interface InboxLayoutProps {
   onUpdateFunnelStage: (stage: FunnelStage) => Promise<void> | void;
   onClaimConversation?: () => Promise<void> | void;
   onTransferAgent: (agentId: string, agentName: string) => Promise<void> | void;
+  availableClinics?: { id: string; tradeName: string }[];
+  onReassignClinic?: (clinicId: string) => Promise<void> | void;
   onFinishAttendance: (resolutionData?: { reason: string; notes?: string }) => Promise<void> | void;
   fetchProcedures: () => Promise<PlainClinicProcedureItem[]>;
   onScheduleConfirmed: (data: { appointmentId: string; specialty: string; doctor: string; date: string; time: string; price: string }) => void;
@@ -126,6 +128,8 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
   onUpdateFunnelStage,
   onClaimConversation,
   onTransferAgent,
+  availableClinics,
+  onReassignClinic,
   onFinishAttendance,
   fetchProcedures,
   onScheduleConfirmed,
@@ -136,6 +140,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
   const [selectedDept] = useState<'todos' | Department>('todos');
   const [selectedTagFilter, setSelectedTagFilter] = useState<string | null>(null);
   const [isTransferMenuOpen, setIsTransferMenuOpen] = useState(false);
+  const [isClinicMenuOpen, setIsClinicMenuOpen] = useState(false);
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
   const [isQuickReplyOpen, setIsQuickReplyOpen] = useState(false);
@@ -561,9 +566,41 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                       WhatsApp
                     </span>
                     {selectedContact.clinicName && (
-                      <span className="hidden sm:inline-flex items-center px-1.5 py-0.5 rounded bg-sky-50 dark:bg-sky-950/60 border border-sky-200 dark:border-sky-800 text-sky-700 dark:text-sky-300 text-[10px] font-medium truncate">
-                        {selectedContact.clinicName}
-                      </span>
+                      onReassignClinic && availableClinics && availableClinics.length > 0 ? (
+                        <div className="relative">
+                          <button
+                            type="button"
+                            onClick={() => setIsClinicMenuOpen((open) => !open)}
+                            title="Clique para corrigir a clínica desta conversa"
+                            className="hidden sm:inline-flex items-center px-1.5 py-0.5 rounded bg-sky-50 dark:bg-sky-950/60 border border-sky-200 dark:border-sky-800 text-sky-700 dark:text-sky-300 text-[10px] font-medium truncate hover:bg-sky-100 dark:hover:bg-sky-900 transition-colors"
+                          >
+                            {selectedContact.clinicName}
+                          </button>
+                          {isClinicMenuOpen && (
+                            <div className="absolute left-0 mt-1 w-56 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl py-2 z-50 animate-in fade-in zoom-in-95 text-xs font-medium max-h-64 overflow-y-auto">
+                              <div className="px-3 py-1 text-[10px] font-mono font-bold text-slate-400 dark:text-slate-500 uppercase border-b border-slate-100 dark:border-slate-800 mb-1">
+                                Corrigir Clínica Desta Conversa
+                              </div>
+                              {availableClinics.map((clinic) => (
+                                <button
+                                  key={clinic.id}
+                                  onClick={() => {
+                                    onReassignClinic(clinic.id);
+                                    setIsClinicMenuOpen(false);
+                                  }}
+                                  className="w-full px-3 py-2 text-left hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center gap-2 text-slate-700 dark:text-slate-200"
+                                >
+                                  <span className="truncate">{clinic.tradeName}</span>
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="hidden sm:inline-flex items-center px-1.5 py-0.5 rounded bg-sky-50 dark:bg-sky-950/60 border border-sky-200 dark:border-sky-800 text-sky-700 dark:text-sky-300 text-[10px] font-medium truncate">
+                          {selectedContact.clinicName}
+                        </span>
+                      )
                     )}
                   </div>
                   <p className="text-xs text-slate-500 dark:text-slate-400 font-mono truncate">{selectedContact.phone}</p>

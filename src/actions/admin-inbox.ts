@@ -76,6 +76,32 @@ export async function listChatContactsAdmin(filter: InboxFilter, search?: string
   );
 }
 
+/** Lista enxuta pro seletor de "trocar clínica da conversa" — ver updateConversationClinicAdmin. */
+export async function listClinicsForReassignment() {
+  await requireAdminSession();
+  return prisma.clinic.findMany({
+    where: { active: true },
+    select: { id: true, tradeName: true },
+    orderBy: { tradeName: "asc" },
+  });
+}
+
+/** Corrige a clínica de uma conversa que caiu na atribuição automática errada
+ * (webhook do WhatsApp usa a 1ª clínica cadastrada como fallback quando não
+ * acha agendamento pendente/confirmado pro telefone — ver route.ts). */
+export async function updateConversationClinicAdmin(conversationId: string, clinicId: string) {
+  await requireAdminSession();
+  const clinic = await prisma.clinic.findUnique({ where: { id: clinicId }, select: { id: true } });
+  if (!clinic) throw new Error("Clínica não encontrada");
+
+  await prisma.conversation.update({
+    where: { id: conversationId },
+    data: { clinicId },
+  });
+  revalidatePath("/admin/inbox");
+  notifyInboxRealtime().catch(() => {});
+}
+
 export async function listChatAgentsAdmin() {
   await requireAdminSession();
   const users = await prisma.user.findMany({

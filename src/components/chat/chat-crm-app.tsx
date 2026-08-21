@@ -41,6 +41,8 @@ import {
   listCannedResponsesAdmin,
   listClinicProceduresForAppointmentAdmin,
   suggestIaReplyAdmin,
+  listClinicsForReassignment,
+  updateConversationClinicAdmin,
 } from "@/actions/admin-inbox";
 import { toast } from "sonner";
 import { useInboxRealtime } from "@/hooks/use-inbox-realtime";
@@ -118,6 +120,7 @@ export function ChatCrmApp({ scope, basePath, view }: ChatCrmAppProps) {
   const isFirstLoadRef = useRef(true);
 
   const [attendantCapacity, setAttendantCapacity] = useState<{ activeCount: number; maxLimit: number } | null>(null);
+  const [availableClinics, setAvailableClinics] = useState<{ id: string; tradeName: string }[]>([]);
 
   const refreshContacts = useCallback(async () => {
     const capacityFn = scope === "admin" ? getAttendantCapacityAdmin : getAttendantCapacity;
@@ -172,6 +175,25 @@ export function ChatCrmApp({ scope, basePath, view }: ChatCrmAppProps) {
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [actions]);
+
+  useEffect(() => {
+    // Reatribuição de clínica só faz sentido pra quem enxerga todas (admin) — a
+    // clínica só vê a própria conversa, não teria pra onde transferir.
+    if (scope === "admin") {
+      listClinicsForReassignment().then(setAvailableClinics).catch(() => {});
+    }
+  }, [scope]);
+
+  async function handleReassignClinic(clinicId: string) {
+    if (!selectedContactId) return;
+    try {
+      await updateConversationClinicAdmin(selectedContactId, clinicId);
+      toast.success("Clínica da conversa atualizada com sucesso!");
+      await refreshContacts();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível trocar a clínica.");
+    }
+  }
 
   const refreshMessages = useCallback(async () => {
     if (!selectedContactId) {
@@ -446,6 +468,8 @@ export function ChatCrmApp({ scope, basePath, view }: ChatCrmAppProps) {
           onUpdateFunnelStage={handleUpdateFunnelStage}
           onClaimConversation={handleClaimConversation}
           onTransferAgent={handleTransferAgent}
+          availableClinics={scope === "admin" ? availableClinics : undefined}
+          onReassignClinic={scope === "admin" ? handleReassignClinic : undefined}
           onFinishAttendance={handleFinishAttendance}
           fetchProcedures={fetchProcedures}
           onScheduleConfirmed={handleScheduleConfirmed}
