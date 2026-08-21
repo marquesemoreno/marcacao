@@ -101,19 +101,31 @@ async function handleMessageStatusUpdate(data: Record<string, unknown>) {
   const keyId = data.keyId;
   const fromMe = Boolean(data.fromMe);
   const mapped = typeof data.status === "string" ? ACK_STATUS_MAP[data.status] : undefined;
-  if (!fromMe || typeof keyId !== "string" || !mapped) return;
+
+  if (!fromMe || typeof keyId !== "string" || !mapped) {
+    await logInbound({ kind: "message_status_update", ...data }, "IGNORED");
+    return;
+  }
 
   const message = await prisma.message.findUnique({
     where: { whatsappKeyId: keyId },
     select: { id: true, status: true },
   });
-  if (!message || STATUS_RANK[mapped] <= STATUS_RANK[message.status]) return;
+  if (!message) {
+    await logInbound({ kind: "message_status_update", ...data, mapped }, "IGNORED");
+    return;
+  }
+  if (STATUS_RANK[mapped] <= STATUS_RANK[message.status]) {
+    await logInbound({ kind: "message_status_update", ...data, mapped, currentStatus: message.status }, "SKIPPED");
+    return;
+  }
 
   await prisma.message.update({
     where: { id: message.id },
     data: { status: mapped, ...(mapped === "READ" ? { readAt: new Date() } : {}) },
   });
   notifyInboxRealtime().catch(() => {});
+  await logInbound({ kind: "message_status_update", ...data, mapped, messageDbId: message.id }, "SUCCESS");
 }
 
 function resolveStatusFromReply(text: string): AppointmentStatus | null {
