@@ -173,7 +173,20 @@ export function ChatCrmApp({ scope, basePath, view }: ChatCrmAppProps) {
       actions.getChatMessages(selectedContactId),
       actions.getChatContactHistory(selectedContactId),
     ]);
-    setMessages(result);
+    setMessages((prev) => {
+      // O polling gera uma URL assinada NOVA a cada ciclo pro mesmo arquivo de
+      // mídia (o conteúdo nunca muda depois de criado) — se a `src` do <audio>/
+      // <img> troca no meio de uma reprodução, o navegador reinicia a mídia do
+      // zero. Mantém a URL já carregada em vez de trocar por outra igualmente
+      // válida a cada 5s.
+      const prevById = new Map(prev.map((message) => [message.id, message]));
+      return result.map((message) => {
+        const existing = prevById.get(message.id);
+        return existing?.mediaUrl && message.mediaUrl
+          ? { ...message, mediaUrl: existing.mediaUrl }
+          : message;
+      });
+    });
     setContacts((prev) =>
       prev.map((c) => (c.id === selectedContactId ? { ...c, consultationHistory: history } : c))
     );
