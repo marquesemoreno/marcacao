@@ -1,6 +1,7 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { SignOutButton } from "@/components/sign-out-button";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { Logo } from "@/components/brand/logo";
 import { ClinicNav } from "@/components/clinic/clinic-nav";
 import { getClinicInfo } from "@/actions/clinic";
@@ -34,16 +35,17 @@ export default async function ClinicLayout({
 
         {/* Centro: Abas de Navegação */}
         <div className="flex-1 overflow-x-auto min-w-0 flex items-center justify-center">
-          <ClinicNav />
+          <ClinicNav exclusiveWhatsapp={Boolean(clinic.whatsappInstance)} />
         </div>
 
-        {/* Direita: Nome do Usuário + Sair */}
+        {/* Direita: Nome do Usuário + Tema + Sair */}
         <div className="flex shrink-0 items-center gap-3">
           {session?.user.name && (
             <span className="hidden text-xs font-bold text-slate-700 md:inline font-mono">
               {session.user.name}
             </span>
           )}
+          <ThemeToggle />
           <SignOutButton />
         </div>
       </header>

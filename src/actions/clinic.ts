@@ -16,7 +16,10 @@ import { notifyAppointmentStatus } from "@/lib/whatsapp";
 
 export async function getClinicInfo() {
   const { clinicId } = await requireClinicSession();
-  return prisma.clinic.findUniqueOrThrow({ where: { id: clinicId } });
+  return prisma.clinic.findUniqueOrThrow({
+    where: { id: clinicId },
+    include: { whatsappInstance: { select: { id: true } } },
+  });
 }
 
 export async function getClinicOverview() {

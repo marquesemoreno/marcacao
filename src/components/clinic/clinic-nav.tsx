@@ -3,15 +3,23 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-const navItems: { href: string; label: string; exact?: boolean }[] = [
+const fullNavItems: { href: string; label: string; exact?: boolean }[] = [
   { href: "/clinic/inbox", label: "💬 Chat / WhatsApp" },
   { href: "/clinic/crm", label: "📋 CRM (Funil de Leads)" },
   { href: "/clinic/agendamentos", label: "📅 Agendamentos de Hoje" },
   { href: "/clinic/precos", label: "💲 Tabela de Procedimentos" },
 ];
 
-export function ClinicNav() {
+// Clínicas com instância própria de WhatsApp (atendimento exclusivo, fora dos processos
+// de agendamento do marketplace) não usam agendamento/tabela de preços do Conecta Saúde.
+const exclusiveNavItems: { href: string; label: string; exact?: boolean }[] = [
+  { href: "/clinic/inbox", label: "💬 Chat / WhatsApp" },
+  { href: "/clinic/crm", label: "📋 CRM (Funil de Leads)" },
+];
+
+export function ClinicNav({ exclusiveWhatsapp = false }: { exclusiveWhatsapp?: boolean }) {
   const pathname = usePathname();
+  const navItems = exclusiveWhatsapp ? exclusiveNavItems : fullNavItems;
 
   return (
     <nav className="flex items-center gap-1 overflow-x-auto no-scrollbar py-0.5">
