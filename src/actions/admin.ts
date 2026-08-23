@@ -205,19 +205,18 @@ export async function createTeamMember(formData: FormData) {
     },
   });
 
-  await prisma.user.create({
-    data: {
-      name,
-      email,
-      passwordHash,
-      role: "CLINIC",
-      clinicId,
-      maxConcurrentChats: Math.max(1, Math.min(50, maxConcurrentChats)),
-    },
-  });
-
   revalidatePath("/admin/clinicas");
   revalidatePath("/admin/inbox");
+}
+
+/** Atendentes (role CLINIC) cadastrados numa clínica — pra exibir/gerenciar no painel admin. */
+export async function listClinicUsers(clinicId: string) {
+  await requireAdminSession();
+  return prisma.user.findMany({
+    where: { clinicId, role: "CLINIC" },
+    select: { id: true, name: true, email: true, maxConcurrentChats: true, createdAt: true },
+    orderBy: { name: "asc" },
+  });
 }
 
 export async function getAttendantPerformanceReport() {
