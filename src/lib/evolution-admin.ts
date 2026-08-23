@@ -13,6 +13,20 @@ function buildUrl(config: EvolutionInstanceConfig, path: string): string {
   return `${config.apiUrl.replace(/\/$/, "")}${path}`;
 }
 
+/** Extrai a mensagem de erro de qualquer formato que a Evolution API costuma usar
+ * ({message}, {error}, {response:{message}} como string ou array). */
+function extractErrorMessage(body: unknown, status: number, rawText: string): string {
+  if (body && typeof body === "object") {
+    const rec = body as Record<string, unknown>;
+    const nested = rec.response as Record<string, unknown> | undefined;
+    const candidate = rec.message ?? rec.error ?? nested?.message;
+    if (Array.isArray(candidate)) return `HTTP ${status}: ${candidate.join(", ")}`;
+    if (typeof candidate === "string" && candidate) return `HTTP ${status}: ${candidate}`;
+  }
+  const snippet = rawText.replace(/\s+/g, " ").trim().slice(0, 200);
+  return snippet ? `HTTP ${status}: ${snippet}` : `HTTP ${status}`;
+}
+
 async function evolutionFetch<T>(
   config: EvolutionInstanceConfig,
   path: string,
@@ -24,12 +38,18 @@ async function evolutionFetch<T>(
       headers: { "Content-Type": "application/json", apikey: config.apiKey, ...init.headers },
       signal: AbortSignal.timeout(15000),
     });
-    const body = await response.json().catch(() => null);
+    const rawText = await response.text();
+    const body = (() => {
+      try {
+        return JSON.parse(rawText);
+      } catch {
+        return null;
+      }
+    })();
     if (!response.ok) {
-      const message = (body && typeof body === "object" && "message" in body && String(body.message)) || `HTTP ${response.status}`;
-      return { success: false, error: message };
+      return { success: false, error: extractErrorMessage(body, response.status, rawText) };
     }
-    return { success: true, data: body as T };
+    return { success: true, data: (body ?? {}) as T };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : "Erro na conexão com a Evolution API" };
   }
