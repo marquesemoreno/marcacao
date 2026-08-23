@@ -47,7 +47,7 @@ function LoginForm() {
     } else if (session?.user.role === "ADMIN") {
       router.push("/admin");
     } else if (session?.user.role === "CLINIC") {
-      router.push("/clinic");
+      router.push("/clinic/inbox");
     } else {
       router.push("/");
     }

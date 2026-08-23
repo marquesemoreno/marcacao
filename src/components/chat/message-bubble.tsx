@@ -100,8 +100,8 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
         <div
           className={`max-w-md w-72 sm:w-80 rounded-2xl p-3 sm:p-3.5 shadow-2xs transition-all ${
             isAgent
-              ? 'bg-emerald-600 dark:bg-emerald-700 text-white rounded-tr-sm'
-              : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-tl-sm hover:border-slate-300 dark:hover:border-slate-600'
+              ? 'bg-emerald-600 dark:bg-emerald-700 text-white rounded-tr-xs'
+              : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-tl-xs hover:border-slate-300 dark:hover:border-slate-600'
           }`}
         >
           {hasRealAudio && (
@@ -201,8 +201,8 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
           <div
             className={`max-w-md rounded-2xl p-3.5 shadow-2xs transition-all ${hasRealFile ? 'cursor-pointer' : 'cursor-not-allowed opacity-80'} ${
               isAgent
-                ? 'bg-emerald-600 dark:bg-emerald-700 text-white rounded-tr-sm'
-                : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-tl-sm hover:border-slate-300 dark:hover:border-slate-600'
+                ? 'bg-emerald-600 dark:bg-emerald-700 text-white rounded-tr-xs'
+                : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-tl-xs hover:border-slate-300 dark:hover:border-slate-600'
             }`}
             onClick={() => hasRealFile && setIsLightboxOpen(true)}
           >
@@ -291,10 +291,10 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
       data-od-id={`chat-msg-${message.id}`}
     >
       <div
-        className={`relative max-w-[85%] sm:max-w-md md:max-w-lg rounded-2xl px-3.5 sm:px-4 py-2.5 sm:py-3 shadow-2xs text-sm leading-relaxed transition-all ${
+        className={`relative max-w-[85%] sm:max-w-md md:max-w-lg rounded-2xl p-3.5 shadow-sm text-sm leading-relaxed transition-all ${
           isAgent
-            ? 'bg-emerald-600 dark:bg-emerald-700 text-white rounded-tr-sm hover:bg-emerald-600/95 dark:hover:bg-emerald-700/95'
-            : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-tl-sm hover:border-slate-300 dark:hover:border-slate-600'
+            ? 'bg-emerald-600 dark:bg-emerald-700 text-white rounded-tr-xs hover:bg-emerald-600/95 dark:hover:bg-emerald-700/95'
+            : 'bg-white dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-tl-xs hover:border-slate-300 dark:hover:border-slate-600'
         }`}
       >
         <p className="whitespace-pre-wrap font-sans text-xs sm:text-[13.5px] leading-relaxed select-text">{message.text}</p>

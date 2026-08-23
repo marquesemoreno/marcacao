@@ -326,7 +326,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
           COLUNA 1: FILA DE ATENDIMENTO (320px em Desktop)
          ========================================================================= */}
       <aside
-        className={`w-full md:w-80 md:min-w-[320px] md:max-w-[320px] bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 shadow-sm flex-col h-full shrink-0 z-20 select-none ${
+        className={`w-full md:w-80 md:min-w-[320px] md:max-w-[320px] bg-slate-100/70 dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 shadow-sm flex-col h-full shrink-0 z-20 select-none ${
           mobileView === 'queue' ? 'flex' : 'hidden md:flex'
         }`}
         data-od-id="inbox-queue-column"
@@ -467,10 +467,10 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                 <div
                   key={c.id}
                   onClick={() => handleSelectContactMobile(c.id)}
-                  className={`px-3.5 py-3 transition-colors cursor-pointer relative flex gap-3 items-start border-l-2 ${
+                  className={`px-3.5 py-3 transition-colors cursor-pointer relative flex gap-3 items-start border-l-4 ${
                     isSelected
-                      ? 'bg-slate-50 dark:bg-slate-800/70 border-emerald-600'
-                      : 'hover:bg-slate-50/70 dark:hover:bg-slate-800/40 border-transparent'
+                      ? 'bg-white dark:bg-slate-800/70 border-emerald-600 shadow-sm'
+                      : 'hover:bg-slate-200/50 dark:hover:bg-slate-800/40 border-transparent'
                   }`}
                   data-od-id={`contact-card-${c.id}`}
                 >
@@ -484,11 +484,19 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                         <MessageSquare className="w-2 h-2 fill-current" />
                       </span>
                     )}
+                    {c.unreadCount > 0 && (
+                      <span
+                        className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-emerald-600 border-2 border-white dark:border-slate-900 text-white text-[9px] font-bold flex items-center justify-center"
+                        title={`${c.unreadCount} mensagem(ns) não lida(s)`}
+                      >
+                        {c.unreadCount > 9 ? '9+' : c.unreadCount}
+                      </span>
+                    )}
                   </div>
 
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between mb-0.5 gap-2">
-                      <h4 className="font-semibold text-xs sm:text-[13px] text-slate-900 dark:text-slate-100 truncate">
+                      <h4 className={`text-xs sm:text-[13px] truncate ${c.unreadCount > 0 ? 'font-bold text-slate-900 dark:text-slate-100' : 'font-semibold text-slate-900 dark:text-slate-100'}`}>
                         {c.name}
                       </h4>
                       <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium shrink-0">
@@ -578,7 +586,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
         ) : (
           <>
             {/* Header da Conversa */}
-            <header className="h-16 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-3 sm:px-5 flex items-center justify-between shrink-0 shadow-sm z-10">
+            <header className="h-16 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-3 sm:px-5 flex items-center justify-between shrink-0 shadow-xs z-10">
               <div className="flex items-center gap-2.5 min-w-0">
                 <button
                   onClick={() => setMobileView('queue')}
@@ -594,8 +602,11 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                     <h3 className="font-bold text-slate-900 dark:text-slate-100 text-xs sm:text-sm truncate">
                       {selectedContact.name}
                     </h3>
-                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 text-[10px] font-medium shrink-0">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                    <span
+                      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 text-[10px] font-medium shrink-0"
+                      title="WhatsApp Conectado"
+                    >
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
                       WhatsApp
                     </span>
                     {selectedContact.clinicName && (
@@ -786,7 +797,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
 
             {/* Área de Mensagens */}
             <div
-              className="flex-1 overflow-y-auto p-3 sm:p-6 space-y-3 bg-slate-50 dark:bg-slate-950/60"
+              className="flex-1 overflow-y-auto p-3 sm:p-6 space-y-3 bg-[#F1F5F9] dark:bg-slate-950/60"
               data-od-id="chat-messages-area"
             >
               {messages.length === 0 ? (
@@ -989,9 +1000,9 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
          ========================================================================= */}
       {selectedContact && (
         <aside
-          className={`w-full lg:w-[300px] lg:min-w-[300px] lg:max-w-[300px] bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 shadow-sm flex-col h-full shrink-0 overflow-y-auto ${
+          className={`w-full lg:w-[300px] lg:min-w-[300px] lg:max-w-[300px] bg-slate-50 dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 shadow-sm flex-col h-full shrink-0 overflow-y-auto ${
             mobileView === 'crm'
-              ? 'flex absolute inset-0 z-40 bg-white dark:bg-slate-900 animate-in slide-in-from-right duration-200'
+              ? 'flex absolute inset-0 z-40 bg-slate-50 dark:bg-slate-900 animate-in slide-in-from-right duration-200'
               : 'hidden lg:flex'
           }`}
           data-od-id="inbox-crm-column"
@@ -1009,19 +1020,36 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
             </button>
           </div>
 
-          <div className="p-4 space-y-5">
-            {/* Card com Dados Cadastrais + Edição Inline */}
-            <div className="bg-white dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/80 rounded-xl p-3.5 space-y-3 shadow-sm">
+          <div className="p-4 space-y-4">
+            {/* Card 1: Perfil do Contato */}
+            <div className="bg-white dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-700/80 rounded-xl p-4 space-y-3 shadow-sm">
               <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-700/60 pb-3">
-                <div className="flex items-center gap-3">
-                  <AvatarBadge name={selectedContact.name} size={40} className="ring-2 ring-white dark:ring-slate-900 shadow-sm" />
+                <div className="flex items-center gap-3 min-w-0">
+                  <AvatarBadge name={selectedContact.name} size={44} className="ring-2 ring-white dark:ring-slate-900 shadow-sm shrink-0" />
                   <div className="min-w-0">
                     <h4 className="font-bold text-slate-900 dark:text-slate-100 text-xs truncate">
                       {selectedContact.name}
                     </h4>
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium flex items-center gap-1">
-                      <Phone className="w-3 h-3" /> {selectedContact.phone}
-                    </p>
+                    <div className="flex items-center gap-1 mt-0.5">
+                      <a
+                        href={`tel:${selectedContact.phone}`}
+                        className="text-[11px] text-slate-500 dark:text-slate-400 font-medium flex items-center gap-1 hover:text-emerald-700 dark:hover:text-emerald-400"
+                        title="Ligar para o paciente"
+                      >
+                        <Phone className="w-3 h-3" /> {selectedContact.phone}
+                      </a>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(selectedContact.phone);
+                          toast.success("Telefone copiado!");
+                        }}
+                        className="p-0.5 text-slate-400 hover:text-emerald-700 dark:hover:text-emerald-400 rounded"
+                        title="Copiar telefone"
+                      >
+                        <Copy className="w-3 h-3" />
+                      </button>
+                    </div>
                   </div>
                 </div>
 
@@ -1031,7 +1059,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                     setEditPatientCpf(selectedContact.cpf || '');
                     setIsEditingPatient(!isEditingPatient);
                   }}
-                  className="p-1 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700"
+                  className="p-1 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 shrink-0"
                   title="Editar cadastro do paciente"
                 >
                   <Edit2 className="w-3.5 h-3.5" />
@@ -1074,15 +1102,15 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                     </div>
                   )}
                   <div className="flex justify-between">
-                    <span className="text-slate-400 font-medium">Cidade/Região:</span>
-                    <span className="font-semibold text-slate-800 dark:text-slate-200">Vitória da Conquista</span>
+                    <span className="text-slate-400 font-medium">Bairro/Região:</span>
+                    <span className="font-semibold text-slate-800 dark:text-slate-200">{selectedContact.neighborhood || 'Não informado'}</span>
                   </div>
                 </div>
               )}
             </div>
 
-            {/* Pipeline do Funil CRM: Stepper Conectado */}
-            <div className="space-y-2.5">
+            {/* Card 2: Pipeline do Funil CRM (Stepper Conectado) */}
+            <div className="bg-white dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-700/80 rounded-xl p-4 shadow-sm space-y-2.5">
               <label className="block text-[11px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500">
                 Etapa do Funil CRM
               </label>
@@ -1133,8 +1161,8 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
               </div>
             </div>
 
-            {/* Tags do Paciente: Chips Modernos */}
-            <div className="space-y-2">
+            {/* Card 3: Tags & Observações */}
+            <div className="bg-white dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-700/80 rounded-xl p-4 shadow-sm space-y-2">
               <div className="flex items-center justify-between">
                 <label className="text-[11px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500 flex items-center gap-1.5">
                   <Tag className="w-3.5 h-3.5 text-slate-400" /> Tags do Paciente
