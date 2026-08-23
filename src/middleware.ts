@@ -13,7 +13,13 @@ export default withAuth(
     if (isAdminRoute && role !== "ADMIN") {
       return NextResponse.redirect(new URL("/clinic/inbox", req.url));
     }
-    if (isClinicRoute && role !== "CLINIC" && role !== "ADMIN") {
+    // As páginas de /clinic/* exigem sessão CLINIC (requireClinicSession) e
+    // quebram sem tratamento se um admin tentar acessá-las direto — manda o
+    // admin pro equivalente dele em vez de deixar renderizar e estourar erro.
+    if (isClinicRoute && role === "ADMIN") {
+      return NextResponse.redirect(new URL("/admin/inbox", req.url));
+    }
+    if (isClinicRoute && role !== "CLINIC") {
       return NextResponse.redirect(new URL("/entrar", req.url));
     }
 
