@@ -162,8 +162,12 @@ async function findOrCreateConversation(phone: string, name: string | undefined,
     create: { phone: fullPhone, name: name ?? fullPhone },
   });
 
+  // Instância global: reaproveita qualquer conversa já existente do contato (comportamento
+  // original). Instância exclusiva: só reaproveita se já houver conversa DESSA clínica com
+  // esse contato — senão cria uma nova, em vez de herdar uma conversa antiga de outra clínica
+  // (ex: o mesmo telefone já ter escrito pro número compartilhado antes).
   const existingConversation = await prisma.conversation.findFirst({
-    where: { contactId: contact.id },
+    where: resolvedClinicId ? { contactId: contact.id, clinicId: resolvedClinicId } : { contactId: contact.id },
     orderBy: { createdAt: "desc" },
   });
   if (existingConversation) {
@@ -357,6 +361,9 @@ export async function POST(request: Request) {
         phone: incoming.phone,
         text: incoming.text,
         conversationId: conversation?.id ?? null,
+        clinicId: conversation?.clinicId ?? null,
+        instanceNameFromPayload: instanceNameFromPayload ?? null,
+        resolvedViaDedicatedInstance: Boolean(resolvedClinicId),
         reason: conversation ? "mensagem de chat recebida no inbox" : "sem clínica resolvida — só logado",
       },
       conversation ? "SUCCESS" : "IGNORED"
