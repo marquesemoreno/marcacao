@@ -61,16 +61,24 @@ const funnelStageBadgeVariant: Record<FunnelStage, Contact["statusTag"]["variant
   agendado: "purple",
 };
 
+// Roda no servidor (Vercel usa UTC) — sem fixar o fuso, "hoje"/"ontem" e o horário
+// exibido ficavam sempre 3h à frente do horário real do Brasil.
+const BR_TIMEZONE = "America/Sao_Paulo";
+
+function toBRDateKey(date: Date): string {
+  return date.toLocaleDateString("en-CA", { timeZone: BR_TIMEZONE });
+}
+
 function formatMessageTimestamp(date: Date) {
   const now = new Date();
-  const isSameDay = date.toDateString() === now.toDateString();
+  const isSameDay = toBRDateKey(date) === toBRDateKey(now);
   if (isSameDay) {
-    return date.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+    return date.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: BR_TIMEZONE });
   }
   const yesterday = new Date(now);
   yesterday.setDate(now.getDate() - 1);
-  if (date.toDateString() === yesterday.toDateString()) return "Ontem";
-  return date.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+  if (toBRDateKey(date) === toBRDateKey(yesterday)) return "Ontem";
+  return date.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", timeZone: BR_TIMEZONE });
 }
 
 type ConversationWithRelations = Conversation & {
