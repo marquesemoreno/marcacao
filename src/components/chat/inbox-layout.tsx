@@ -20,10 +20,12 @@ import {
   Send,
   Lock,
   ChevronLeft,
+  ChevronDown,
   UserPlus,
   CheckCircle2,
   Calendar,
   Tag,
+  Filter,
   Plus,
   X,
   Phone,
@@ -37,21 +39,30 @@ import {
   Check,
   Paperclip,
   Loader2,
+  User,
+  Clock,
 } from 'lucide-react';
 
 const MAX_MEDIA_SIZE_BYTES = 15 * 1024 * 1024; // 15 MB — mesmo limite validado no servidor
 
 const PRESET_TAGS: { label: string; classes: string }[] = [
-  { label: '⚡ Prioritário', classes: 'bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-800' },
-  { label: '🔬 Jejum', classes: 'bg-blue-100 dark:bg-blue-950/60 text-blue-800 dark:text-blue-300 border-blue-200 dark:border-blue-800' },
-  { label: '✅ Confirmado', classes: 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800' },
-  { label: 'Urologia', classes: 'bg-purple-100 dark:bg-purple-950/60 text-purple-800 dark:text-purple-300 border-purple-200 dark:border-purple-800' },
-  { label: 'Lead B2B', classes: 'bg-sky-100 dark:bg-sky-950/60 text-sky-800 dark:text-sky-300 border-sky-200 dark:border-sky-800' },
+  { label: '⚡ Prioritário', classes: 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800' },
+  { label: '🔬 Jejum', classes: 'bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800' },
+  { label: '✅ Confirmado', classes: 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800' },
+  { label: 'Urologia', classes: 'bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800' },
+  { label: 'Lead B2B', classes: 'bg-sky-50 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 border-sky-200 dark:border-sky-800' },
 ];
 
 function tagClasses(tag: string) {
-  return PRESET_TAGS.find((preset) => preset.label === tag)?.classes ?? 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700';
+  return PRESET_TAGS.find((preset) => preset.label === tag)?.classes ?? 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700';
 }
+
+const FUNNEL_STEPS: { id: FunnelStage; label: string }[] = [
+  { id: 'novos', label: 'Novo Lead' },
+  { id: 'triagem', label: 'Em Atendimento' },
+  { id: 'orcamento', label: 'Orçamento' },
+  { id: 'agendado', label: 'Agendado' },
+];
 
 const DEFAULT_CATEGORIZED_QUICK_REPLIES = [
   {
@@ -139,6 +150,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
   const [inputText, setInputText] = useState('');
   const [selectedDept] = useState<'todos' | Department>('todos');
   const [selectedTagFilter, setSelectedTagFilter] = useState<string | null>(null);
+  const [isTagFilterOpen, setIsTagFilterOpen] = useState(false);
   const [isTransferMenuOpen, setIsTransferMenuOpen] = useState(false);
   const [isClinicMenuOpen, setIsClinicMenuOpen] = useState(false);
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
@@ -306,13 +318,15 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
     setIsEditingPatient(false);
   };
 
+  const currentStageIndex = selectedContact ? FUNNEL_STEPS.findIndex((s) => s.id === selectedContact.funnelStage) : -1;
+
   return (
-    <div className="flex h-full w-full overflow-hidden bg-slate-100 dark:bg-slate-950 font-sans antialiased text-slate-800 dark:text-slate-100 relative">
+    <div className="flex h-full w-full overflow-hidden bg-[#F8FAFC] dark:bg-slate-950 font-sans antialiased text-slate-800 dark:text-slate-100 relative">
       {/* =========================================================================
           COLUNA 1: FILA DE ATENDIMENTO (320px em Desktop)
          ========================================================================= */}
       <aside
-        className={`w-full md:w-80 md:min-w-[320px] md:max-w-[320px] bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex-col h-full shrink-0 z-20 select-none ${
+        className={`w-full md:w-80 md:min-w-[320px] md:max-w-[320px] bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 shadow-sm flex-col h-full shrink-0 z-20 select-none ${
           mobileView === 'queue' ? 'flex' : 'hidden md:flex'
         }`}
         data-od-id="inbox-queue-column"
@@ -321,25 +335,26 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
         <div className="p-3.5 sm:p-4 border-b border-slate-100 dark:border-slate-800 space-y-3 bg-white dark:bg-slate-900">
           <div className="flex items-center justify-between gap-1">
             <h2 className="font-bold text-slate-900 dark:text-slate-100 text-sm tracking-tight flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shadow-xs"></span>
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
               Fila de Atendimento
             </h2>
             <div className="flex items-center gap-1.5">
               {attendantCapacity && (
                 <span
-                  className={`text-[10px] font-mono font-extrabold px-2 py-0.5 rounded-full border ${
+                  className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
                     attendantCapacity.activeCount >= attendantCapacity.maxLimit
-                      ? "bg-rose-100 dark:bg-rose-950/60 text-rose-800 dark:text-rose-300 border-rose-200 dark:border-rose-800 font-bold"
+                      ? "bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800"
                       : attendantCapacity.activeCount >= attendantCapacity.maxLimit - 1
-                      ? "bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-800"
-                      : "bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800"
+                      ? "bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800"
+                      : "bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800"
                   }`}
                   title="Seu limite de conversas ativas simultâneas"
                 >
-                  ⚡ {attendantCapacity.activeCount}/{attendantCapacity.maxLimit} ativos
+                  <Zap className="w-2.5 h-2.5" />
+                  {attendantCapacity.activeCount}/{attendantCapacity.maxLimit}
                 </span>
               )}
-              <span className="text-[11px] font-mono font-semibold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full border border-slate-200/60 dark:border-slate-700">
+              <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-300 bg-slate-50 dark:bg-slate-800 px-2 py-0.5 rounded-full border border-slate-200/70 dark:border-slate-700">
                 {filteredContacts.length}
               </span>
             </div>
@@ -357,23 +372,23 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
             />
           </div>
 
-          {/* Abas de Filtros */}
-          <div className="flex items-center gap-1 p-1 bg-slate-100/90 dark:bg-slate-800/90 rounded-xl text-xs font-medium border border-slate-200/50 dark:border-slate-700/50">
+          {/* Abas de Filtros: Segmented Control Compacto */}
+          <div className="flex items-center gap-0.5 p-0.5 bg-slate-100 dark:bg-slate-800/90 rounded-lg text-xs font-medium">
             {(
               [
                 { id: 'todas', label: 'Todas' },
                 { id: 'minhas', label: 'Minhas' },
-                { id: 'nao_atribuidas', label: 'Não Atribuídas' },
+                { id: 'nao_atribuidas', label: 'Não Atrib.' },
                 { id: 'finalizadas', label: 'Finalizadas' },
               ] as const
             ).map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => onFilterTabChange(tab.id)}
-                className={`flex-1 py-1 px-1.5 rounded-lg text-[11px] transition-all whitespace-nowrap text-center ${
+                className={`flex-1 py-1 px-1.5 rounded-md text-[11px] transition-all whitespace-nowrap text-center ${
                   filterTab === tab.id
-                    ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 font-bold shadow-2xs'
-                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-white/50 dark:hover:bg-slate-700/50'
+                    ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 font-semibold shadow-sm'
+                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
                 }`}
               >
                 {tab.label}
@@ -381,36 +396,54 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
             ))}
           </div>
 
-          {/* Filtro por Pílula de Tag */}
-          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pt-1">
+          {/* Filtro por Tag: Dropdown Compacto */}
+          <div className="relative">
             <button
-              onClick={() => setSelectedTagFilter(null)}
-              className={`px-2 py-0.5 rounded-lg text-[10px] font-bold border transition-colors shrink-0 ${
-                selectedTagFilter === null
-                  ? 'bg-slate-900 dark:bg-emerald-600 text-white border-slate-900 dark:border-emerald-600'
-                  : 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700'
-              }`}
+              type="button"
+              onClick={() => setIsTagFilterOpen((open) => !open)}
+              className="w-full flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-[11px] font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
             >
-              Todas Tags
+              <span className="flex items-center gap-1.5 truncate">
+                <Filter className="w-3 h-3 text-slate-400 shrink-0" />
+                <span className="truncate">{selectedTagFilter ?? 'Filtrar por Tag'}</span>
+              </span>
+              <ChevronDown className={`w-3 h-3 text-slate-400 shrink-0 transition-transform ${isTagFilterOpen ? 'rotate-180' : ''}`} />
             </button>
-            {PRESET_TAGS.map((preset) => (
-              <button
-                key={preset.label}
-                onClick={() => setSelectedTagFilter(selectedTagFilter === preset.label ? null : preset.label)}
-                className={`px-2 py-0.5 rounded-lg text-[10px] font-bold border transition-colors shrink-0 ${
-                  selectedTagFilter === preset.label
-                    ? 'bg-emerald-600 text-white border-emerald-600'
-                    : 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700'
-                }`}
-              >
-                {preset.label}
-              </button>
-            ))}
+
+            {isTagFilterOpen && (
+              <div className="absolute left-0 right-0 mt-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-lg py-1.5 z-30 animate-in fade-in zoom-in-95 duration-100 max-h-56 overflow-y-auto">
+                <button
+                  onClick={() => {
+                    setSelectedTagFilter(null);
+                    setIsTagFilterOpen(false);
+                  }}
+                  className={`w-full px-3 py-1.5 text-left text-[11px] font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 ${
+                    selectedTagFilter === null ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-600 dark:text-slate-300'
+                  }`}
+                >
+                  Todas as Tags
+                </button>
+                {PRESET_TAGS.map((preset) => (
+                  <button
+                    key={preset.label}
+                    onClick={() => {
+                      setSelectedTagFilter(selectedTagFilter === preset.label ? null : preset.label);
+                      setIsTagFilterOpen(false);
+                    }}
+                    className="w-full px-3 py-1.5 text-left hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center"
+                  >
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold border ${preset.classes} ${selectedTagFilter === preset.label ? 'ring-2 ring-emerald-500/30' : ''}`}>
+                      {preset.label}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
         {/* Lista de Conversas */}
-        <div className="flex-1 overflow-y-auto divide-y divide-slate-100/80 dark:divide-slate-800/80">
+        <div className="flex-1 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800/80">
           {filteredContacts.length === 0 ? (
             <div className="p-8 text-center text-xs text-slate-400 flex flex-col items-center justify-center gap-3">
               <MessageSquare className="w-8 h-8 text-slate-300 dark:text-slate-700" />
@@ -420,10 +453,10 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                   type="button"
                   onClick={handleSeedDemo}
                   disabled={isSeedingDemo}
-                  className="mt-1 inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 text-white border border-emerald-700 rounded-xl text-xs font-bold hover:bg-emerald-700 transition-colors shadow-2xs"
+                  className="mt-1 inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 text-white rounded-xl text-xs font-semibold hover:bg-emerald-700 transition-colors shadow-sm"
                 >
                   <Sparkles className={`w-3.5 h-3.5 ${isSeedingDemo ? 'animate-spin' : ''}`} />
-                  <span>🌱 Gerar Conversas Demo</span>
+                  <span>Gerar Conversas Demo</span>
                 </button>
               )}
             </div>
@@ -434,37 +467,37 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                 <div
                   key={c.id}
                   onClick={() => handleSelectContactMobile(c.id)}
-                  className={`p-3.5 transition-all cursor-pointer relative flex gap-3 items-start ${
+                  className={`px-3.5 py-3 transition-colors cursor-pointer relative flex gap-3 items-start border-l-2 ${
                     isSelected
-                      ? 'bg-emerald-50/70 dark:bg-slate-800/90 border-l-4 border-emerald-600'
-                      : 'hover:bg-slate-50 dark:hover:bg-slate-800/40 border-l-4 border-transparent active:bg-slate-100/80'
+                      ? 'bg-slate-50 dark:bg-slate-800/70 border-emerald-600'
+                      : 'hover:bg-slate-50/70 dark:hover:bg-slate-800/40 border-transparent'
                   }`}
                   data-od-id={`contact-card-${c.id}`}
                 >
                   <div className="relative shrink-0 mt-0.5">
-                    <AvatarBadge name={c.name} size={40} className="ring-2 ring-white dark:ring-slate-900 shadow-2xs" />
+                    <AvatarBadge name={c.name} size={38} className="ring-2 ring-white dark:ring-slate-900 shadow-sm" />
                     {c.channel === 'whatsapp' && (
                       <span
-                        className="absolute -bottom-1 -right-1 w-4 h-4 bg-emerald-500 border-2 border-white dark:border-slate-900 rounded-full flex items-center justify-center text-white shadow-2xs"
+                        className="absolute -bottom-1 -right-1 w-3.5 h-3.5 bg-emerald-500 border-2 border-white dark:border-slate-900 rounded-full flex items-center justify-center text-white"
                         title="Canal: WhatsApp"
                       >
-                        <MessageSquare className="w-2.5 h-2.5 fill-current" />
+                        <MessageSquare className="w-2 h-2 fill-current" />
                       </span>
                     )}
                   </div>
 
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between mb-0.5">
-                      <h4 className="font-bold text-xs sm:text-[13px] text-slate-900 dark:text-slate-100 truncate max-w-[140px]">
+                    <div className="flex items-center justify-between mb-0.5 gap-2">
+                      <h4 className="font-semibold text-xs sm:text-[13px] text-slate-900 dark:text-slate-100 truncate">
                         {c.name}
                       </h4>
-                      <span className="text-[10px] font-mono text-slate-400 dark:text-slate-500 font-medium">
+                      <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium shrink-0">
                         {c.lastMessageTime}
                       </span>
                     </div>
 
                     {c.clinicName && (
-                      <p className="text-[10px] font-bold text-sky-700 dark:text-sky-400 mb-0.5 truncate">{c.clinicName}</p>
+                      <p className="text-[10px] font-semibold text-sky-700 dark:text-sky-400 mb-0.5 truncate">{c.clinicName}</p>
                     )}
 
                     <p className="text-xs text-slate-500 dark:text-slate-400 truncate mb-1.5 leading-snug">
@@ -473,24 +506,24 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
 
                     <div className="flex items-center justify-between gap-1">
                       <span
-                        className={`text-[9.5px] font-semibold px-2 py-0.5 rounded-full ${
+                        className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md border ${
                           c.statusTag.variant === 'emerald'
-                            ? 'bg-emerald-100/90 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
+                            ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
                             : c.statusTag.variant === 'amber'
-                            ? 'bg-amber-100/90 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800'
-                            : 'bg-purple-100/90 dark:bg-purple-950/60 text-purple-800 dark:text-purple-300 border border-purple-200 dark:border-purple-800'
+                            ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800'
+                            : 'bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800'
                         }`}
                       >
                         {c.statusTag.label}
                       </span>
 
                       {c.responsibleAgent && c.responsibleAgent !== 'Não atribuído' ? (
-                        <span className="text-[9.5px] font-semibold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-1.5 py-0.5 rounded truncate max-w-[85px]" title={`Atribuído a ${c.responsibleAgent}`}>
-                          👤 {c.responsibleAgent.split(' ')[0]}
+                        <span className="inline-flex items-center gap-0.5 text-[10px] font-medium text-slate-500 dark:text-slate-300 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-1.5 py-0.5 rounded-md truncate max-w-[85px]" title={`Atribuído a ${c.responsibleAgent}`}>
+                          <User className="w-2.5 h-2.5 shrink-0" /> {c.responsibleAgent.split(' ')[0]}
                         </span>
                       ) : (
-                        <span className="text-[9.5px] font-bold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/60 border border-amber-200/80 dark:border-amber-800 px-1.5 py-0.5 rounded" title="Aguardando secretária">
-                          ⏳ Livre
+                        <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-800 px-1.5 py-0.5 rounded-md" title="Aguardando secretária">
+                          <Clock className="w-2.5 h-2.5" /> Livre
                         </span>
                       )}
                     </div>
@@ -506,20 +539,20 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
           COLUNA 2: JANELA DE CHAT CENTRAL
          ========================================================================= */}
       <main
-        className={`flex-1 flex flex-col h-full bg-[#f8fafc] dark:bg-slate-950 min-w-0 relative ${
+        className={`flex-1 flex flex-col h-full bg-[#F8FAFC] dark:bg-slate-950 min-w-0 relative ${
           mobileView === 'chat' ? 'flex' : 'hidden md:flex'
         }`}
         data-od-id="inbox-chat-column"
       >
         {!selectedContact ? (
           <div className="flex-1 flex flex-col items-center justify-center p-6 text-center text-slate-500 dark:text-slate-400 gap-4">
-            <div className="flex size-16 items-center justify-center rounded-3xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 shadow-2xs border border-emerald-100 dark:border-emerald-800">
+            <div className="flex size-16 items-center justify-center rounded-2xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-800">
               <MessageSquare className="w-8 h-8" />
             </div>
 
             {contacts.length === 0 ? (
-              <div className="max-w-md space-y-3 bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm">
-                <h3 className="text-base font-extrabold text-slate-900 dark:text-slate-100">
+              <div className="max-w-md space-y-3 bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
                   Nenhuma conversa aberta nesta caixa de entrada
                 </h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed font-medium">
@@ -530,10 +563,10 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                   type="button"
                   onClick={handleSeedDemo}
                   disabled={isSeedingDemo}
-                  className="mt-2 inline-flex items-center justify-center gap-2 h-11 px-5 w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-2xs transition-all active:scale-95 disabled:opacity-50"
+                  className="mt-2 inline-flex items-center justify-center gap-2 h-11 px-5 w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs rounded-xl shadow-sm transition-all active:scale-95 disabled:opacity-50"
                 >
                   <Sparkles className={`w-4 h-4 text-emerald-200 ${isSeedingDemo ? 'animate-spin' : ''}`} />
-                  <span>{isSeedingDemo ? "Gerando conversas..." : "🌱 Gerar Conversas de Demonstração no Banco"}</span>
+                  <span>{isSeedingDemo ? "Gerando conversas..." : "Gerar Conversas de Demonstração no Banco"}</span>
                 </button>
               </div>
             ) : (
@@ -545,7 +578,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
         ) : (
           <>
             {/* Header da Conversa */}
-            <header className="h-16 bg-white dark:bg-slate-900 border-b border-slate-200/90 dark:border-slate-800 px-3 sm:px-5 flex items-center justify-between shrink-0 shadow-2xs z-10">
+            <header className="h-16 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-3 sm:px-5 flex items-center justify-between shrink-0 shadow-sm z-10">
               <div className="flex items-center gap-2.5 min-w-0">
                 <button
                   onClick={() => setMobileView('queue')}
@@ -555,13 +588,13 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                   <ChevronLeft className="w-5 h-5" />
                 </button>
 
-                <AvatarBadge name={selectedContact.name} size={40} className="ring-2 ring-slate-100 dark:ring-slate-800 shadow-2xs shrink-0" />
+                <AvatarBadge name={selectedContact.name} size={38} className="ring-2 ring-slate-100 dark:ring-slate-800 shadow-sm shrink-0" />
                 <div className="min-w-0">
                   <div className="flex items-center gap-1.5 flex-wrap">
                     <h3 className="font-bold text-slate-900 dark:text-slate-100 text-xs sm:text-sm truncate">
                       {selectedContact.name}
                     </h3>
-                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 text-[10px] font-medium shrink-0">
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 text-[10px] font-medium shrink-0">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
                       WhatsApp
                     </span>
@@ -572,13 +605,13 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                             type="button"
                             onClick={() => setIsClinicMenuOpen((open) => !open)}
                             title="Clique para corrigir a clínica desta conversa"
-                            className="hidden sm:inline-flex items-center px-1.5 py-0.5 rounded bg-sky-50 dark:bg-sky-950/60 border border-sky-200 dark:border-sky-800 text-sky-700 dark:text-sky-300 text-[10px] font-medium truncate hover:bg-sky-100 dark:hover:bg-sky-900 transition-colors"
+                            className="hidden sm:inline-flex items-center px-1.5 py-0.5 rounded-md bg-sky-50 dark:bg-sky-950/60 border border-sky-200 dark:border-sky-800 text-sky-700 dark:text-sky-300 text-[10px] font-medium truncate hover:bg-sky-100 dark:hover:bg-sky-900 transition-colors"
                           >
                             {selectedContact.clinicName}
                           </button>
                           {isClinicMenuOpen && (
-                            <div className="absolute left-0 mt-1 w-56 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl py-2 z-50 animate-in fade-in zoom-in-95 text-xs font-medium max-h-64 overflow-y-auto">
-                              <div className="px-3 py-1 text-[10px] font-mono font-bold text-slate-400 dark:text-slate-500 uppercase border-b border-slate-100 dark:border-slate-800 mb-1">
+                            <div className="absolute left-0 mt-1 w-56 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-lg py-2 z-50 animate-in fade-in zoom-in-95 text-xs font-medium max-h-64 overflow-y-auto">
+                              <div className="px-3 py-1 text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase border-b border-slate-100 dark:border-slate-800 mb-1">
                                 Corrigir Clínica Desta Conversa
                               </div>
                               {availableClinics.map((clinic) => (
@@ -597,27 +630,27 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                           )}
                         </div>
                       ) : (
-                        <span className="hidden sm:inline-flex items-center px-1.5 py-0.5 rounded bg-sky-50 dark:bg-sky-950/60 border border-sky-200 dark:border-sky-800 text-sky-700 dark:text-sky-300 text-[10px] font-medium truncate">
+                        <span className="hidden sm:inline-flex items-center px-1.5 py-0.5 rounded-md bg-sky-50 dark:bg-sky-950/60 border border-sky-200 dark:border-sky-800 text-sky-700 dark:text-sky-300 text-[10px] font-medium truncate">
                           {selectedContact.clinicName}
                         </span>
                       )
                     )}
                   </div>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 font-mono truncate">{selectedContact.phone}</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{selectedContact.phone}</p>
                 </div>
               </div>
 
-              {/* Ações do Header */}
+              {/* Ações do Header: atendente, agendar (secundário) e menu */}
               <div className="flex items-center gap-1.5 sm:gap-2">
                 {(!selectedContact.responsibleAgent || selectedContact.responsibleAgent === "Não atribuído") ? (
                   onClaimConversation && (
                     <button
                       onClick={() => onClaimConversation()}
                       disabled={attendantCapacity ? attendantCapacity.activeCount >= attendantCapacity.maxLimit : false}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-extrabold rounded-xl transition-all shadow-md ${
+                      className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
                         attendantCapacity && attendantCapacity.activeCount >= attendantCapacity.maxLimit
-                          ? "bg-slate-300 dark:bg-slate-800 text-slate-500 cursor-not-allowed shadow-none"
-                          : "bg-emerald-600 hover:bg-emerald-700 text-white active:scale-95 animate-pulse"
+                          ? "bg-slate-100 dark:bg-slate-800 text-slate-400 cursor-not-allowed"
+                          : "bg-emerald-600 hover:bg-emerald-700 text-white active:scale-95"
                       }`}
                       title={
                         attendantCapacity && attendantCapacity.activeCount >= attendantCapacity.maxLimit
@@ -625,11 +658,11 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                           : "Assumir esta conversa para o seu atendimento"
                       }
                     >
-                      <UserPlus className="w-4 h-4" />
-                      <span>
+                      <UserPlus className="w-3.5 h-3.5" />
+                      <span className="hidden sm:inline">
                         {attendantCapacity && attendantCapacity.activeCount >= attendantCapacity.maxLimit
-                          ? "⚠️ Limite de Atendimentos Atingido"
-                          : "🙋‍♂️ Assumir Atendimento"}
+                          ? "Limite Atingido"
+                          : "Assumir Atendimento"}
                       </span>
                     </button>
                   )
@@ -637,16 +670,17 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                   <div className="relative">
                     <button
                       onClick={() => setIsTransferMenuOpen(!isTransferMenuOpen)}
-                      className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200/80 dark:border-slate-700 rounded-xl transition-colors shadow-2xs"
+                      className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-slate-700 dark:text-slate-200 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 rounded-lg transition-colors"
                       title="Clique para transferir a conversa"
                     >
                       <span className="text-slate-400 font-normal hidden sm:inline">Atendente:</span>
-                      <span className="font-bold text-slate-900 dark:text-slate-100 truncate max-w-[100px]">{selectedContact.responsibleAgent}</span>
+                      <span className="font-semibold text-slate-900 dark:text-slate-100 truncate max-w-[100px]">{selectedContact.responsibleAgent}</span>
+                      <ChevronDown className="w-3 h-3 text-slate-400" />
                     </button>
 
                     {isTransferMenuOpen && (
-                      <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl py-2 z-50 animate-in fade-in zoom-in-95 text-xs font-medium">
-                        <div className="px-3 py-1 text-[10px] font-mono font-bold text-slate-400 dark:text-slate-500 uppercase border-b border-slate-100 dark:border-slate-800 mb-1">
+                      <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-lg py-2 z-50 animate-in fade-in zoom-in-95 text-xs font-medium">
+                        <div className="px-3 py-1 text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase border-b border-slate-100 dark:border-slate-800 mb-1">
                           Transferir Atendimento Para
                         </div>
                         {agents.length === 0 ? (
@@ -661,8 +695,8 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                               }}
                               className="w-full px-3 py-2 text-left hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center justify-between text-slate-700 dark:text-slate-200"
                             >
-                              <span className="font-bold">{agent.name}</span>
-                              <span className="text-[10px] font-mono text-slate-400">{agent.role}</span>
+                              <span className="font-semibold">{agent.name}</span>
+                              <span className="text-[10px] text-slate-400">{agent.role}</span>
                             </button>
                           ))
                         )}
@@ -670,36 +704,36 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                     )}
                   </div>
                 )}
+
                 <button
                   onClick={() => setIsScheduleModalOpen(true)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-teal-600 hover:bg-teal-700 rounded-xl transition-all shadow-2xs"
+                  className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-emerald-700 dark:text-emerald-400 bg-white dark:bg-transparent hover:bg-emerald-50 dark:hover:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-lg transition-all"
                   title="Criar novo agendamento de consulta ou exame"
                 >
                   <Calendar className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">➕ Criar Agendamento</span>
-                </button>
-
-                <button
-                  onClick={() => setIsFinishModalOpen(true)}
-                  className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 rounded-xl transition-colors shadow-2xs"
-                  title="Encerrar protocolo atual"
-                >
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                  <span className="hidden sm:inline font-bold">Finalizar</span>
+                  <span>Agendar</span>
                 </button>
 
                 {/* Menu de Ações da Conversa (...) */}
                 <div className="relative">
                   <button
                     onClick={() => setIsMoreMenuOpen(!isMoreMenuOpen)}
-                    className="p-2 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 transition-colors"
+                    className="p-2 text-slate-500 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 transition-colors"
                     title="Menu de Ações do Atendimento"
                   >
                     <MoreVertical className="w-4 h-4" />
                   </button>
 
                   {isMoreMenuOpen && (
-                    <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl py-1.5 z-50 animate-in fade-in zoom-in-95 text-xs font-medium">
+                    <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-lg py-1.5 z-50 animate-in fade-in zoom-in-95 text-xs font-medium">
+                      <button
+                        onClick={() => setIsScheduleModalOpen(true)}
+                        className="sm:hidden w-full px-3 py-2 text-left hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center gap-2 text-slate-700 dark:text-slate-200"
+                      >
+                        <Calendar className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>Criar Agendamento</span>
+                      </button>
+
                       <button
                         onClick={() => {
                           toast.success("Conversa marcada como não lida!");
@@ -742,7 +776,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                         className="w-full px-3 py-2 text-left hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center gap-2 text-rose-600 border-t border-slate-100 dark:border-slate-800"
                       >
                         <Archive className="w-3.5 h-3.5" />
-                        <span>Arquivar Atendimento</span>
+                        <span>Finalizar Atendimento</span>
                       </button>
                     </div>
                   )}
@@ -752,7 +786,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
 
             {/* Área de Mensagens */}
             <div
-              className="flex-1 overflow-y-auto p-3 sm:p-6 space-y-3 bg-[radial-gradient(#cbd5e1_1px,transparent_1px)] dark:bg-[radial-gradient(#334155_1px,transparent_1px)] [background-size:20px_20px] bg-slate-50/70 dark:bg-slate-950/70"
+              className="flex-1 overflow-y-auto p-3 sm:p-6 space-y-3 bg-slate-50 dark:bg-slate-950/60"
               data-od-id="chat-messages-area"
             >
               {messages.length === 0 ? (
@@ -765,7 +799,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                         type="button"
                         onClick={onLoadOlderMessages}
                         disabled={isLoadingOlderMessages}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-60 disabled:cursor-not-allowed shadow-2xs"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-60 disabled:cursor-not-allowed shadow-sm"
                       >
                         {isLoadingOlderMessages ? (
                           <>
@@ -783,57 +817,19 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
               )}
             </div>
 
-            {/* Barra de Envio Inferior */}
-            <footer className="p-2.5 sm:p-3.5 bg-white dark:bg-slate-900 border-t border-slate-200/90 dark:border-slate-800 shrink-0 shadow-sm">
-              <div className="flex items-center justify-between mb-2 px-1">
-                <div className="flex items-center gap-2">
-                  <div className="inline-flex p-0.5 bg-slate-100 dark:bg-slate-800 rounded-lg text-xs font-medium border border-slate-200/60 dark:border-slate-700">
-                    <button
-                      type="button"
-                      onClick={() => setComposerMode('whatsapp')}
-                      className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-md text-xs transition-all ${
-                        composerMode === 'whatsapp'
-                          ? 'bg-emerald-600 text-white font-semibold shadow-2xs'
-                          : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                      }`}
-                    >
-                      <MessageSquare className="w-3.5 h-3.5" />
-                      <span>WhatsApp</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setComposerMode('internal_note')}
-                      className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-md text-xs transition-all ${
-                        composerMode === 'internal_note'
-                          ? 'bg-amber-500 text-white font-bold shadow-2xs'
-                          : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                      }`}
-                    >
-                      <Lock className="w-3.5 h-3.5" />
-                      <span>Nota Interna</span>
-                    </button>
-                  </div>
-
-                  {composerMode === 'internal_note' && (
-                    <span className="text-[11px] text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-800 px-2 py-0.5 rounded-md hidden sm:flex items-center gap-1 font-medium">
-                      🔒 Visível apenas para a equipe da clínica
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              {/* Form de Digitação */}
-              <form onSubmit={handleSendMessage} className="space-y-2 relative">
+            {/* Barra de Envio Inferior: toggle integrado no topo do input */}
+            <footer className="p-2.5 sm:p-3.5 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 shrink-0">
+              <form onSubmit={handleSendMessage} className="relative">
                 {isQuickReplyOpen && (
-                  <div className="absolute bottom-full left-0 mb-2 w-full max-w-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl py-2 z-30 max-h-64 overflow-y-auto animate-in fade-in slide-in-from-bottom-2 duration-150">
+                  <div className="absolute bottom-full left-0 mb-2 w-full max-w-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-lg py-2 z-30 max-h-64 overflow-y-auto animate-in fade-in slide-in-from-bottom-2 duration-150">
                     <div className="flex items-center justify-between px-3 py-1.5 border-b border-slate-100 dark:border-slate-800">
-                      <span className="text-[10px] font-mono uppercase font-bold text-slate-400 dark:text-slate-500">
+                      <span className="text-[10px] uppercase font-bold text-slate-400 dark:text-slate-500">
                         Respostas Rápidas Categorizadas
                       </span>
                       <button
                         type="button"
                         onClick={() => setIsNewQuickReplyModalOpen(true)}
-                        className="text-[10px] font-bold text-teal-700 dark:text-teal-400 hover:text-teal-800 flex items-center gap-1"
+                        className="text-[10px] font-semibold text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 flex items-center gap-1"
                       >
                         <Plus className="w-3 h-3" />
                         Nova Resposta Rápida
@@ -851,8 +847,8 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                         className="w-full px-3.5 py-2 text-left hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors border-b border-slate-50 dark:border-slate-800 last:border-0"
                       >
                         <div className="flex items-center justify-between">
-                          <p className="font-bold text-teal-700 dark:text-teal-400 text-xs">{reply.shortcut}</p>
-                          <span className="text-[10px] text-slate-400 font-mono">{reply.category}</span>
+                          <p className="font-semibold text-emerald-700 dark:text-emerald-400 text-xs">{reply.shortcut}</p>
+                          <span className="text-[10px] text-slate-400">{reply.category}</span>
                         </div>
                         <p className="text-slate-600 dark:text-slate-300 text-xs truncate mt-0.5">{reply.content}</p>
                       </button>
@@ -861,12 +857,48 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                 )}
 
                 <div
-                  className={`rounded-2xl border transition-all ${
+                  className={`rounded-xl border overflow-hidden transition-colors ${
                     composerMode === 'internal_note'
-                      ? 'bg-amber-50/40 dark:bg-amber-950/20 border-amber-300 dark:border-amber-800 focus-within:border-amber-500 focus-within:ring-2 focus-within:ring-amber-200'
+                      ? 'bg-amber-50/40 dark:bg-amber-950/20 border-amber-300 dark:border-amber-800 focus-within:ring-2 focus-within:ring-amber-200'
                       : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-100'
                   }`}
                 >
+                  {/* Toggle de Modo: integrado no topo do card do input */}
+                  <div className="flex items-center justify-between px-2 py-1.5 border-b border-slate-200/70 dark:border-slate-800 bg-white/60 dark:bg-slate-900/40">
+                    <div className="inline-flex p-0.5 bg-slate-100 dark:bg-slate-800 rounded-lg text-xs font-medium">
+                      <button
+                        type="button"
+                        onClick={() => setComposerMode('whatsapp')}
+                        className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-md text-xs transition-all ${
+                          composerMode === 'whatsapp'
+                            ? 'bg-emerald-600 text-white font-semibold shadow-sm'
+                            : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white'
+                        }`}
+                      >
+                        <MessageSquare className="w-3.5 h-3.5" />
+                        <span>WhatsApp</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setComposerMode('internal_note')}
+                        className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-md text-xs transition-all ${
+                          composerMode === 'internal_note'
+                            ? 'bg-amber-500 text-white font-semibold shadow-sm'
+                            : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white'
+                        }`}
+                      >
+                        <Lock className="w-3.5 h-3.5" />
+                        <span>Nota Interna</span>
+                      </button>
+                    </div>
+
+                    {composerMode === 'internal_note' && (
+                      <span className="text-[10px] text-amber-700 dark:text-amber-300 hidden sm:flex items-center gap-1 font-medium">
+                        <Lock className="w-2.5 h-2.5" /> Visível só para a equipe
+                      </span>
+                    )}
+                  </div>
+
                   <textarea
                     rows={2}
                     value={inputText}
@@ -885,7 +917,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                     className="w-full p-3 bg-transparent text-xs sm:text-sm text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none resize-none"
                   />
 
-                  <div className="flex items-center justify-between px-3 py-2 border-t border-slate-200/40 dark:border-slate-800 bg-white/50 dark:bg-slate-900/50 rounded-b-2xl">
+                  <div className="flex items-center justify-between px-3 py-2 border-t border-slate-200/60 dark:border-slate-800">
                     <div className="flex items-center gap-1.5">
                       {composerMode === 'whatsapp' && (
                         <>
@@ -900,7 +932,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                             type="button"
                             onClick={() => fileInputRef.current?.click()}
                             disabled={isSendingMedia}
-                            className="flex items-center justify-center w-7 h-7 text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors disabled:opacity-50"
+                            className="flex items-center justify-center w-7 h-7 text-slate-500 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors disabled:opacity-50"
                             title="Anexar imagem ou PDF para enviar ao paciente"
                           >
                             <Paperclip className={`w-3.5 h-3.5 ${isSendingMedia ? 'animate-pulse' : ''}`} />
@@ -911,7 +943,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                       <button
                         type="button"
                         onClick={() => setIsQuickReplyOpen(!isQuickReplyOpen)}
-                        className="flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors font-mono"
+                        className="flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold text-slate-600 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors"
                         title="Abrir menu de respostas rápidas"
                       >
                         <Zap className="w-3.5 h-3.5 text-amber-500" />
@@ -922,18 +954,18 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                         type="button"
                         onClick={handleGenerateIaReply}
                         disabled={isGeneratingIa}
-                        className="flex items-center gap-1.5 px-3 py-1 text-[11px] font-bold text-teal-800 dark:text-teal-300 bg-teal-50 dark:bg-teal-950/60 hover:bg-teal-100 dark:hover:bg-teal-900 border border-teal-200/80 dark:border-teal-800 rounded-lg transition-all shadow-2xs font-mono"
+                        className="flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-semibold text-slate-500 dark:text-slate-300 hover:text-emerald-700 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 rounded-lg transition-all"
                         title="Sugerir resposta com IA baseada no contexto do paciente"
                       >
-                        <Sparkles className={`w-3.5 h-3.5 text-teal-600 dark:text-teal-400 ${isGeneratingIa ? 'animate-spin' : ''}`} />
-                        <span>{isGeneratingIa ? 'Gerando...' : '✨ Sugerir Resposta com IA'}</span>
+                        <Sparkles className={`w-3.5 h-3.5 ${isGeneratingIa ? 'animate-spin text-emerald-600' : ''}`} />
+                        <span>{isGeneratingIa ? 'Gerando...' : 'Melhorar com IA'}</span>
                       </button>
                     </div>
 
                     <button
                       type="submit"
                       disabled={!inputText.trim()}
-                      className={`flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-xs font-bold shadow-2xs transition-all active:scale-95 ${
+                      className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-semibold shadow-sm transition-all active:scale-95 ${
                         !inputText.trim()
                           ? 'bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-600 cursor-not-allowed'
                           : composerMode === 'internal_note'
@@ -957,7 +989,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
          ========================================================================= */}
       {selectedContact && (
         <aside
-          className={`w-full lg:w-[300px] lg:min-w-[300px] lg:max-w-[300px] bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 flex-col h-full shrink-0 overflow-y-auto ${
+          className={`w-full lg:w-[300px] lg:min-w-[300px] lg:max-w-[300px] bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 shadow-sm flex-col h-full shrink-0 overflow-y-auto ${
             mobileView === 'crm'
               ? 'flex absolute inset-0 z-40 bg-white dark:bg-slate-900 animate-in slide-in-from-right duration-200'
               : 'hidden lg:flex'
@@ -979,15 +1011,15 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
 
           <div className="p-4 space-y-5">
             {/* Card com Dados Cadastrais + Edição Inline */}
-            <div className="bg-slate-50 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl p-4 space-y-3">
-              <div className="flex items-center justify-between border-b border-slate-200/60 dark:border-slate-700/60 pb-3">
+            <div className="bg-white dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/80 rounded-xl p-3.5 space-y-3 shadow-sm">
+              <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-700/60 pb-3">
                 <div className="flex items-center gap-3">
-                  <AvatarBadge name={selectedContact.name} size={42} className="ring-2 ring-white dark:ring-slate-900 shadow-2xs" />
+                  <AvatarBadge name={selectedContact.name} size={40} className="ring-2 ring-white dark:ring-slate-900 shadow-sm" />
                   <div className="min-w-0">
-                    <h4 className="font-extrabold text-slate-900 dark:text-slate-100 text-xs truncate">
+                    <h4 className="font-bold text-slate-900 dark:text-slate-100 text-xs truncate">
                       {selectedContact.name}
                     </h4>
-                    <p className="text-[11px] text-emerald-700 dark:text-emerald-400 font-semibold font-mono flex items-center gap-1">
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium flex items-center gap-1">
                       <Phone className="w-3 h-3" /> {selectedContact.phone}
                     </p>
                   </div>
@@ -999,7 +1031,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                     setEditPatientCpf(selectedContact.cpf || '');
                     setIsEditingPatient(!isEditingPatient);
                   }}
-                  className="p-1 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded-lg hover:bg-slate-200/60 dark:hover:bg-slate-700"
+                  className="p-1 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700"
                   title="Editar cadastro do paciente"
                 >
                   <Edit2 className="w-3.5 h-3.5" />
@@ -1009,7 +1041,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
               {isEditingPatient ? (
                 <div className="space-y-2 pt-1">
                   <div>
-                    <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400">Nome:</label>
+                    <label className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">Nome:</label>
                     <input
                       type="text"
                       value={editPatientName}
@@ -1018,7 +1050,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                     />
                   </div>
                   <div>
-                    <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400">CPF:</label>
+                    <label className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">CPF:</label>
                     <input
                       type="text"
                       value={editPatientCpf}
@@ -1028,7 +1060,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                   </div>
                   <button
                     onClick={handleSavePatientEdits}
-                    className="w-full py-1.5 bg-slate-900 dark:bg-emerald-600 text-white font-bold text-xs rounded-lg mt-1"
+                    className="w-full py-1.5 bg-emerald-600 text-white font-semibold text-xs rounded-lg mt-1 hover:bg-emerald-700"
                   >
                     Salvar Alterações
                   </button>
@@ -1038,7 +1070,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                   {selectedContact.cpf && (
                     <div className="flex justify-between">
                       <span className="text-slate-400 font-medium">CPF:</span>
-                      <span className="font-mono text-slate-800 dark:text-slate-200 font-semibold">{selectedContact.cpf}</span>
+                      <span className="text-slate-800 dark:text-slate-200 font-semibold">{selectedContact.cpf}</span>
                     </div>
                   )}
                   <div className="flex justify-between">
@@ -1049,48 +1081,68 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
               )}
             </div>
 
-            {/* Seletor de Etapa do Funil CRM */}
-            <div className="space-y-2">
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 font-mono">
+            {/* Pipeline do Funil CRM: Stepper Conectado */}
+            <div className="space-y-2.5">
+              <label className="block text-[11px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500">
                 Etapa do Funil CRM
               </label>
-              <div className="grid grid-cols-2 gap-1.5">
-                {(
-                  [
-                    { id: 'novos', label: 'Novo Lead' },
-                    { id: 'triagem', label: 'Em Atendimento' },
-                    { id: 'orcamento', label: 'Orçamento' },
-                    { id: 'agendado', label: 'Agendado' },
-                  ] as const
-                ).map((stage) => {
+              <div>
+                {FUNNEL_STEPS.map((stage, idx) => {
                   const isActive = selectedContact.funnelStage === stage.id;
+                  const isCompleted = currentStageIndex > idx;
+                  const isLast = idx === FUNNEL_STEPS.length - 1;
                   return (
                     <button
                       key={stage.id}
+                      type="button"
                       onClick={() => onUpdateFunnelStage(stage.id)}
-                      className={`py-1.5 px-2 rounded-xl text-xs font-medium transition-all text-center border ${
-                        isActive
-                          ? 'bg-emerald-600 text-white border-emerald-600 font-bold shadow-2xs'
-                          : 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 border-slate-200 dark:border-slate-700'
-                      }`}
+                      className="relative flex items-start gap-3 w-full text-left pb-3.5 last:pb-0 group"
                     >
-                      {stage.label}
+                      {!isLast && (
+                        <span
+                          className={`absolute left-[9px] top-5 bottom-0 w-0.5 ${
+                            isCompleted ? 'bg-emerald-400' : 'bg-slate-200 dark:bg-slate-700'
+                          }`}
+                        />
+                      )}
+                      <span
+                        className={`relative z-10 flex items-center justify-center w-5 h-5 rounded-full border-2 shrink-0 transition-colors ${
+                          isActive
+                            ? 'bg-emerald-600 border-emerald-600 text-white'
+                            : isCompleted
+                            ? 'bg-emerald-100 dark:bg-emerald-900 border-emerald-400 dark:border-emerald-700 text-emerald-700 dark:text-emerald-300'
+                            : 'bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 text-slate-400 group-hover:border-slate-400'
+                        }`}
+                      >
+                        {isActive || isCompleted ? <Check className="w-3 h-3" /> : <span className="text-[9px] font-bold">{idx + 1}</span>}
+                      </span>
+                      <span
+                        className={`text-xs pt-0.5 transition-colors ${
+                          isActive
+                            ? 'font-bold text-emerald-700 dark:text-emerald-400'
+                            : isCompleted
+                            ? 'font-semibold text-slate-600 dark:text-slate-300'
+                            : 'font-medium text-slate-400 dark:text-slate-500 group-hover:text-slate-600'
+                        }`}
+                      >
+                        {stage.label}
+                      </span>
                     </button>
                   );
                 })}
               </div>
             </div>
 
-            {/* Tags do Paciente */}
+            {/* Tags do Paciente: Chips Modernos */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 font-mono flex items-center gap-1.5">
+                <label className="text-[11px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500 flex items-center gap-1.5">
                   <Tag className="w-3.5 h-3.5 text-slate-400" /> Tags do Paciente
                 </label>
                 {!isAddingTag && (
                   <button
                     onClick={() => setIsAddingTag(true)}
-                    className="text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 text-xs font-semibold flex items-center gap-0.5"
+                    className="text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 text-[11px] font-semibold flex items-center gap-0.5"
                   >
                     <Plus className="w-3.5 h-3.5" /> Adicionar
                   </button>
@@ -1098,10 +1150,13 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
               </div>
 
               <div className="flex flex-wrap gap-1.5">
+                {selectedContact.tags.length === 0 && !isAddingTag && (
+                  <span className="text-[11px] text-slate-400 dark:text-slate-500">Nenhuma tag ainda.</span>
+                )}
                 {selectedContact.tags.map((tag) => (
                   <span
                     key={tag}
-                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold border ${tagClasses(tag)}`}
+                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold border ${tagClasses(tag)}`}
                   >
                     {tag}
                     <button onClick={() => onRemoveTag(tag)} className="hover:text-slate-900 dark:hover:text-white">
@@ -1129,28 +1184,16 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                 </div>
               )}
             </div>
-
-            {/* Botão Verde Destacado: Criar Agendamento Conecta Saúde */}
-            <div className="pt-2">
-              <button
-                onClick={() => setIsScheduleModalOpen(true)}
-                className="w-full py-3 px-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-2xl text-xs sm:text-sm flex items-center justify-center gap-2 shadow-2xs transition-all hover:shadow-md active:scale-[0.99]"
-                data-od-id="btn-create-schedule"
-              >
-                <Calendar className="w-4 h-4" />
-                ➕ Criar Agendamento Conecta Saúde
-              </button>
-            </div>
           </div>
         </aside>
       )}
 
       {/* Modal de Nova Resposta Rápida */}
       {isNewQuickReplyModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/80 backdrop-blur-xs p-4">
-          <form onSubmit={handleSaveNewQuickReply} className="max-w-md w-full bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-2xl space-y-4 border border-slate-200 dark:border-slate-800">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 backdrop-blur-xs p-4">
+          <form onSubmit={handleSaveNewQuickReply} className="max-w-md w-full bg-white dark:bg-slate-900 rounded-2xl p-6 shadow-xl space-y-4 border border-slate-200 dark:border-slate-800">
             <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
-              <h3 className="font-extrabold text-slate-900 dark:text-slate-100 text-sm flex items-center gap-2">
+              <h3 className="font-bold text-slate-900 dark:text-slate-100 text-sm flex items-center gap-2">
                 <Zap className="w-4 h-4 text-amber-500" />
                 Nova Resposta Rápida
               </h3>
@@ -1161,26 +1204,26 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
 
             <div className="space-y-3">
               <div>
-                <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Atalho (ex: /horarios):</label>
+                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Atalho (ex: /horarios):</label>
                 <input
                   type="text"
                   required
                   placeholder="/atalho"
                   value={newShortcut}
                   onChange={(e) => setNewShortcut(e.target.value)}
-                  className="w-full px-3 py-2 text-xs border border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50 dark:bg-slate-950 font-mono text-slate-900 dark:text-slate-100 mt-1"
+                  className="w-full px-3 py-2 text-xs border border-slate-200 dark:border-slate-800 rounded-lg bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 mt-1"
                 />
               </div>
 
               <div>
-                <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Texto da Resposta:</label>
+                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Texto da Resposta:</label>
                 <textarea
                   required
                   rows={3}
                   placeholder="Escreva a resposta pré-definida..."
                   value={newShortcutContent}
                   onChange={(e) => setNewShortcutContent(e.target.value)}
-                  className="w-full px-3 py-2 text-xs border border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 mt-1 resize-none"
+                  className="w-full px-3 py-2 text-xs border border-slate-200 dark:border-slate-800 rounded-lg bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 mt-1 resize-none"
                 />
               </div>
             </div>
@@ -1188,7 +1231,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
             <div className="flex justify-end gap-2 pt-2">
               <button
                 type="submit"
-                className="px-5 py-2.5 bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs rounded-xl shadow-2xs"
+                className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs rounded-lg shadow-sm"
               >
                 Cadastrar Atalho
               </button>
@@ -1210,11 +1253,11 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
 
       {/* Modal de Motivo Obrigatório de Resolução */}
       {isFinishModalOpen && selectedContact && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/80 backdrop-blur-xs p-4 animate-in fade-in duration-200">
-          <div className="max-w-md w-full bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-2xl space-y-4 border border-slate-200 dark:border-slate-800">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 backdrop-blur-xs p-4 animate-in fade-in duration-200">
+          <div className="max-w-md w-full bg-white dark:bg-slate-900 rounded-2xl p-6 shadow-xl space-y-4 border border-slate-200 dark:border-slate-800">
             <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
               <div>
-                <h3 className="font-extrabold text-slate-900 dark:text-slate-100 text-sm flex items-center gap-2">
+                <h3 className="font-bold text-slate-900 dark:text-slate-100 text-sm flex items-center gap-2">
                   <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
                   Finalizar Atendimento do Paciente
                 </h3>
@@ -1228,25 +1271,25 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
             </div>
 
             <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block">
+              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block">
                 Motivo do Encerramento (Obrigatório):
               </label>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {[
-                  { id: "AGENDAMENTO_CONCLUIDO", label: "🎟️ Agendamento Concluído" },
-                  { id: "DUVIDA_ESCLARECIDA", label: "💡 Dúvida Esclarecida" },
-                  { id: "ORCAMENTO_ENVIADO", label: "💲 Orçamento Enviado" },
-                  { id: "SEM_RESPOSTA", label: "⏳ Paciente Não Respondeu" },
-                  { id: "CANCELAMENTO", label: "❌ Cancelamento / Desistência" },
-                  { id: "ENCAMINHADO", label: "🔄 Encaminhado a Outro Setor" },
+                  { id: "AGENDAMENTO_CONCLUIDO", label: "Agendamento Concluído" },
+                  { id: "DUVIDA_ESCLARECIDA", label: "Dúvida Esclarecida" },
+                  { id: "ORCAMENTO_ENVIADO", label: "Orçamento Enviado" },
+                  { id: "SEM_RESPOSTA", label: "Paciente Não Respondeu" },
+                  { id: "CANCELAMENTO", label: "Cancelamento / Desistência" },
+                  { id: "ENCAMINHADO", label: "Encaminhado a Outro Setor" },
                 ].map((option) => (
                   <button
                     key={option.id}
                     type="button"
                     onClick={() => setSelectedReason(option.id)}
-                    className={`p-3 rounded-2xl text-left text-xs font-bold transition-all border flex items-center gap-2 ${
+                    className={`p-3 rounded-xl text-left text-xs font-semibold transition-all border flex items-center gap-2 ${
                       selectedReason === option.id
-                        ? "bg-emerald-50 dark:bg-emerald-950/60 border-emerald-600 text-emerald-900 dark:text-emerald-200 shadow-2xs"
+                        ? "bg-emerald-50 dark:bg-emerald-950/60 border-emerald-500 text-emerald-800 dark:text-emerald-200"
                         : "bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700"
                     }`}
                   >
@@ -1257,7 +1300,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
             </div>
 
             <div>
-              <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block mb-1">
+              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">
                 Observação Final da Equipe (Opcional):
               </label>
               <textarea
@@ -1265,7 +1308,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                 value={finishNotes}
                 onChange={(e) => setFinishNotes(e.target.value)}
                 placeholder="Ex: Paciente agendou consulta para a próxima semana..."
-                className="w-full p-2.5 text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                className="w-full p-2.5 text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
               />
             </div>
 
@@ -1273,7 +1316,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
               <button
                 type="button"
                 onClick={() => setIsFinishModalOpen(false)}
-                className="px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl"
+                className="px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg"
               >
                 Cancelar
               </button>
@@ -1287,7 +1330,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                   setSelectedReason(null);
                   setFinishNotes("");
                 }}
-                className={`px-5 py-2.5 font-bold text-xs rounded-xl shadow-2xs transition-all ${
+                className={`px-5 py-2.5 font-semibold text-xs rounded-lg shadow-sm transition-all ${
                   !selectedReason
                     ? "bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-600 cursor-not-allowed"
                     : "bg-emerald-600 hover:bg-emerald-700 text-white active:scale-95"
