@@ -5,6 +5,7 @@ import { Search, MapPin, Phone, MessageSquare, Percent, Save } from "lucide-reac
 import { updateClinicCommission, toggleClinicActive } from "@/actions/admin";
 import { CreateClinicModal } from "./create-clinic-modal";
 import { ViewProceduresModal } from "./view-procedures-modal";
+import { WhatsappInstanceModal } from "./whatsapp-instance-modal";
 import { toast } from "sonner";
 
 export type ClinicItem = {
@@ -302,11 +303,14 @@ export function ClinicsManagement({ clinics: initialClinics }: { clinics: Clinic
 
                 {/* BOTÕES DE AÇÃO RÁPIDA */}
                 <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
-                  <ViewProceduresModal
-                    clinicId={clinic.id}
-                    clinicName={clinic.tradeName}
-                    totalProceduresCount={clinic._count?.clinicProcedures || 0}
-                  />
+                  <div className="flex items-center gap-2">
+                    <ViewProceduresModal
+                      clinicId={clinic.id}
+                      clinicName={clinic.tradeName}
+                      totalProceduresCount={clinic._count?.clinicProcedures || 0}
+                    />
+                    <WhatsappInstanceModal clinicId={clinic.id} clinicName={clinic.tradeName} />
+                  </div>
 
                   {whatsappUrl && (
                     <a

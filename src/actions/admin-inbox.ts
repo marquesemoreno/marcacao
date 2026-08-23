@@ -228,7 +228,7 @@ export async function sendMessageAdmin(conversationId: string, content: string, 
   });
 
   // Disparo assíncrono não-bloqueante para a Evolution API em segundo plano com timeout de 4s
-  whatsappService.sendMessage(conversation.contact.phone, data.content, "chat.outbound_admin").then((result) => {
+  whatsappService.sendMessage(conversation.contact.phone, data.content, "chat.outbound_admin", conversation.clinicId).then((result) => {
     if (!result.success && !result.skipped) {
       prisma.message.update({
         where: { id: message.id },
@@ -296,7 +296,7 @@ export async function sendMediaMessageAdmin(conversationId: string, formData: Fo
 
   const signedUrl = await getSignedMediaUrl(uploaded.path);
   if (signedUrl) {
-    sendWhatsAppMedia(conversation.contact.phone, signedUrl, file.type, file.name, "", "chat.outbound_admin.media")
+    sendWhatsAppMedia(conversation.contact.phone, signedUrl, file.type, file.name, "", "chat.outbound_admin.media", conversation.clinicId)
       .then((result) => {
         if (!result.success && !result.skipped) {
           prisma.message.update({ where: { id: message.id }, data: { status: "FAILED" } }).catch(() => {});

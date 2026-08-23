@@ -164,7 +164,7 @@ export async function sendMessage(conversationId: string, content: string, isInt
   });
 
   // Dispara o envio ao WhatsApp via Evolution API em segundo plano (assíncrono), liberando a interface instantaneamente
-  whatsappService.sendMessage(conversation.contact.phone, data.content, "chat.outbound").then((result) => {
+  whatsappService.sendMessage(conversation.contact.phone, data.content, "chat.outbound", clinicId).then((result) => {
     if (!result.success && !result.skipped) {
       prisma.message.update({
         where: { id: message.id },
@@ -234,7 +234,7 @@ export async function sendMediaMessage(conversationId: string, formData: FormDat
   // Mesma URL assinada que a UI usa pra exibir — a Evolution API busca o arquivo nela.
   const signedUrl = await getSignedMediaUrl(uploaded.path);
   if (signedUrl) {
-    sendWhatsAppMedia(conversation.contact.phone, signedUrl, file.type, file.name, "", "chat.outbound.media")
+    sendWhatsAppMedia(conversation.contact.phone, signedUrl, file.type, file.name, "", "chat.outbound.media", clinicId)
       .then((result) => {
         if (!result.success && !result.skipped) {
           prisma.message.update({ where: { id: message.id }, data: { status: "FAILED" } }).catch(() => {});

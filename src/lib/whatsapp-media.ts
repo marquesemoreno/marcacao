@@ -1,14 +1,19 @@
 import "server-only";
-import { getEvolutionConfig } from "@/lib/whatsapp";
 import { getSupabaseServerClient, WHATSAPP_MEDIA_BUCKET } from "@/lib/supabase-server";
+
+type EvolutionConfig = { apiUrl?: string; apiKey?: string; instanceName?: string };
 
 /**
  * O webhook da Evolution API manda só metadados da mídia (mimetype, key da
  * mensagem) — o conteúdo em si (já decriptado) precisa ser buscado à parte
  * neste endpoint. Ver docs Evolution API v2: /chat/getBase64FromMediaMessage.
+ * `config` já vem resolvido por quem chama (instância global ou exclusiva da clínica).
  */
-export async function fetchMediaBase64(messageKey: Record<string, unknown>): Promise<string | null> {
-  const { apiUrl, apiKey, instanceName } = getEvolutionConfig();
+export async function fetchMediaBase64(
+  messageKey: Record<string, unknown>,
+  config: EvolutionConfig
+): Promise<string | null> {
+  const { apiUrl, apiKey, instanceName } = config;
   if (!apiUrl || !apiKey || !instanceName) return null;
 
   const baseUrl = apiUrl.replace(/\/$/, "");

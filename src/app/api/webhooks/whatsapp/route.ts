@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { AppointmentStatus, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { sendAppointmentConfirmation, sendWhatsAppMessage, formatToWhatsAppNumber } from "@/lib/whatsapp";
+import { sendAppointmentConfirmation, sendWhatsAppMessage, formatToWhatsAppNumber, getEvolutionConfig } from "@/lib/whatsapp";
 import { fetchMediaBase64, uploadWhatsAppMedia, formatDuration } from "@/lib/whatsapp-media";
 import { formatFileSize } from "@/lib/format";
 import { notifyInboxRealtime } from "@/lib/supabase-server";
@@ -148,8 +148,11 @@ async function logInbound(payload: Prisma.InputJsonValue, status: string) {
 
 /**
  * Garante um Contact para o telefone e uma Conversation aberta no painel de atendimento.
+ * `resolvedClinicId` já vem definido quando a mensagem chegou por uma instância exclusiva
+ * de clínica (ver resolução por `instance` no POST) — nesse caso pula direto o fallback
+ * de casar por Appointment/clínica-mais-antiga, que é só pra instância global compartilhada.
  */
-async function findOrCreateConversation(phone: string, name: string | undefined) {
+async function findOrCreateConversation(phone: string, name: string | undefined, resolvedClinicId?: string) {
   const fullPhone = formatToWhatsAppNumber(phone);
   const phoneSuffix = fullPhone.slice(-11);
 
@@ -167,16 +170,19 @@ async function findOrCreateConversation(phone: string, name: string | undefined)
     return { contact, conversation: existingConversation };
   }
 
-  const appointment = await prisma.appointment.findFirst({
-    where: {
-      patientPhone: { endsWith: phoneSuffix },
-      status: { in: ["PENDING", "CONFIRMED"] },
-    },
-    orderBy: { createdAt: "desc" },
-    select: { clinicProcedure: { select: { clinicId: true } } },
-  });
+  let clinicId = resolvedClinicId;
 
-  let clinicId = appointment?.clinicProcedure.clinicId;
+  if (!clinicId) {
+    const appointment = await prisma.appointment.findFirst({
+      where: {
+        patientPhone: { endsWith: phoneSuffix },
+        status: { in: ["PENDING", "CONFIRMED"] },
+      },
+      orderBy: { createdAt: "desc" },
+      select: { clinicProcedure: { select: { clinicId: true } } },
+    });
+    clinicId = appointment?.clinicProcedure.clinicId;
+  }
 
   if (!clinicId) {
     const defaultClinic = await prisma.clinic.findFirst({
@@ -219,6 +225,22 @@ export async function POST(request: Request) {
   const dataPayload = bodyRec?.data as Record<string, unknown> | undefined;
 
   // =========================================================================
+  // -1. RESOLUÇÃO DE INSTÂNCIA: a Evolution API manda o nome da instância que
+  // originou o evento em `body.instance`. Se bater com uma instância exclusiva
+  // de clínica (painel admin → WhatsApp), toda a mensagem já nasce vinculada
+  // àquela clínica — sem depender do fallback por Appointment/clínica-padrão,
+  // que continua existindo só pra instância global compartilhada.
+  // =========================================================================
+  const instanceNameFromPayload = typeof bodyRec.instance === "string" ? bodyRec.instance : undefined;
+  const dedicatedInstance = instanceNameFromPayload
+    ? await prisma.whatsappInstance.findUnique({ where: { instanceName: instanceNameFromPayload } })
+    : null;
+  const resolvedClinicId = dedicatedInstance?.clinicId;
+  const evolutionConfig = dedicatedInstance
+    ? { apiUrl: dedicatedInstance.apiUrl, apiKey: dedicatedInstance.apiKey, instanceName: dedicatedInstance.instanceName }
+    : await getEvolutionConfig();
+
+  // =========================================================================
   // 0. ACK DE ENTREGA/LEITURA: evento separado, tratado antes da trava anti-loop
   // (que ignoraria fromMe:true e descartaria justamente os acks das nossas mensagens)
   // =========================================================================
@@ -248,7 +270,7 @@ export async function POST(request: Request) {
   // =========================================================================
   // 2. REGISTRO E APRESENTAÇÃO NA CAIXA DE ENTRADA DO CHAT (/admin/inbox)
   // =========================================================================
-  const { conversation } = await findOrCreateConversation(incoming.phone, incoming.name);
+  const { conversation } = await findOrCreateConversation(incoming.phone, incoming.name, resolvedClinicId);
 
   if (conversation) {
     type MediaData =
@@ -258,7 +280,7 @@ export async function POST(request: Request) {
     let mediaData: MediaData | null = null;
 
     if (incoming.media) {
-      const base64 = await fetchMediaBase64(incoming.media.key);
+      const base64 = await fetchMediaBase64(incoming.media.key, evolutionConfig);
       const uploaded = base64
         ? await uploadWhatsAppMedia(conversation.id, Buffer.from(base64, "base64"), incoming.media.mimeType)
         : null;
@@ -319,7 +341,7 @@ export async function POST(request: Request) {
           status: "DELIVERED",
         },
       });
-      sendWhatsAppMessage(incoming.phone, matchedAutomation.responseText, "chat_automation.triggered").catch(() => {});
+      sendWhatsAppMessage(incoming.phone, matchedAutomation.responseText, "chat_automation.triggered", resolvedClinicId).catch(() => {});
     }
 
     notifyInboxRealtime().catch(() => {});

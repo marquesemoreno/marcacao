@@ -167,8 +167,36 @@ model Clinic {
   clinicProcedures ClinicProcedure[]
   conversations    Conversation[]
   cannedResponses  CannedResponse[]
+  whatsappInstance WhatsappInstance?
 
   @@map("clinics")
+}
+
+enum WhatsappInstanceStatus {
+  DISCONNECTED
+  CONNECTING
+  CONNECTED
+
+  @@map("whatsapp_instance_status")
+}
+
+/// Instância Evolution API exclusiva de uma clínica (ex: Santa Clara) — usada só
+/// no atendimento humano via chat, nunca nas automações de agendamento do
+/// marketplace (que continuam sempre na instância global via env vars).
+model WhatsappInstance {
+  id            String                 @id @default(cuid())
+  clinicId      String                 @unique @map("clinic_id")
+  apiUrl        String                 @map("api_url")
+  apiKey        String                 @map("api_key")
+  instanceName  String                 @unique @map("instance_name")
+  status        WhatsappInstanceStatus @default(DISCONNECTED)
+  lastCheckedAt DateTime?              @map("last_checked_at")
+  createdAt     DateTime               @default(now()) @map("created_at")
+  updatedAt     DateTime               @updatedAt @map("updated_at")
+
+  clinic Clinic @relation(fields: [clinicId], references: [id])
+
+  @@map("whatsapp_instances")
 }
 
 model Specialty {

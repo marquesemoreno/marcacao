@@ -50,15 +50,31 @@ export function formatWhatsAppNumber(phone: string): string {
   return formatToWhatsAppNumber(phone);
 }
 
-export function getEvolutionConfig() {
+function getGlobalEvolutionConfig() {
   const apiUrl = process.env.EVOLUTION_API_URL || process.env.WHATSAPP_API_URL || "https://evolution.tivdc.com.br";
   const apiKey = process.env.EVOLUTION_API_KEY || process.env.WHATSAPP_API_KEY;
   const instanceName = process.env.EVOLUTION_INSTANCE_NAME || process.env.WHATSAPP_INSTANCE_NAME || "TIVDC";
   return { apiUrl, apiKey, instanceName };
 }
 
+/**
+ * Resolve a config da Evolution API a usar: se `clinicId` tiver uma instância própria
+ * cadastrada (ver WhatsappInstance / painel admin), usa ela — canal exclusivo daquela
+ * clínica. Sem `clinicId`, ou se a clínica não tiver instância própria, cai na instância
+ * global (env vars) — comportamento idêntico ao de antes desse recurso existir.
+ */
+export async function getEvolutionConfig(clinicId?: string) {
+  if (clinicId) {
+    const dedicated = await prisma.whatsappInstance.findUnique({ where: { clinicId } });
+    if (dedicated) {
+      return { apiUrl: dedicated.apiUrl, apiKey: dedicated.apiKey, instanceName: dedicated.instanceName };
+    }
+  }
+  return getGlobalEvolutionConfig();
+}
+
 export function isWhatsAppConfigured(): boolean {
-  const { apiUrl, apiKey, instanceName } = getEvolutionConfig();
+  const { apiUrl, apiKey, instanceName } = getGlobalEvolutionConfig();
   return Boolean(apiUrl && apiKey && instanceName);
 }
 
@@ -71,9 +87,10 @@ export function isWhatsAppConfigured(): boolean {
 export async function sendWhatsAppMessage(
   to: string,
   text: string,
-  event: string = "whatsapp.send"
+  event: string = "whatsapp.send",
+  clinicId?: string
 ): Promise<{ success: boolean; skipped: boolean; responseCode?: number | null; keyId?: string }> {
-  const { apiUrl, apiKey, instanceName } = getEvolutionConfig();
+  const { apiUrl, apiKey, instanceName } = await getEvolutionConfig(clinicId);
   const target = formatToWhatsAppNumber(to);
   console.log('[WhatsApp Envio] Disparando para:', target);
 
@@ -156,9 +173,10 @@ export async function sendWhatsAppMedia(
   mimeType: string,
   fileName: string,
   caption: string,
-  event: string = "whatsapp.send_media"
+  event: string = "whatsapp.send_media",
+  clinicId?: string
 ): Promise<{ success: boolean; skipped: boolean; responseCode?: number | null; keyId?: string }> {
-  const { apiUrl, apiKey, instanceName } = getEvolutionConfig();
+  const { apiUrl, apiKey, instanceName } = await getEvolutionConfig(clinicId);
   const target = formatToWhatsAppNumber(to);
 
   if (!apiUrl || !apiKey || !instanceName) {
@@ -275,7 +293,8 @@ Por favor, responda com uma das opções abaixo:
 
 /* Compatibilidade com código legado e Server Actions */
 export const whatsappService = {
-  sendMessage: (phone: string, text: string, event: string) => sendWhatsAppMessage(phone, text, event),
+  sendMessage: (phone: string, text: string, event: string, clinicId?: string) =>
+    sendWhatsAppMessage(phone, text, event, clinicId),
   isConfigured: () => isWhatsAppConfigured(),
 };
 
