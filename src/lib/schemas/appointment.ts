@@ -14,6 +14,9 @@ export const createAppointmentSchema = z.object({
   date: z.string().min(1, "Escolha uma data"),
   timeSlot: z.string().optional(),
   notes: z.string().optional(),
+  /** Só usado no fluxo de integração hospitalar (Santa Clara/bridge) — clínicas do
+   * marketplace não têm conceito de médico específico no agendamento rápido. */
+  medicoId: z.string().optional(),
 });
 
 export type CreateAppointmentInput = z.input<typeof createAppointmentSchema>;

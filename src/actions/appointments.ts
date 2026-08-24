@@ -53,6 +53,8 @@ export async function createAppointment(input: CreateAppointmentInput) {
       patientPhone: data.patientPhone,
       clinicProcedureId: data.clinicProcedureId,
       date: data.date,
+      timeSlot: data.timeSlot,
+      medicoId: data.medicoId,
     });
   }
 

@@ -3,10 +3,21 @@
 import React, { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { Contact } from '@/types/chat-crm';
-import { X, Calendar, Clock, Stethoscope, DollarSign, CheckCircle2 } from 'lucide-react';
+import { X, Calendar, Clock, Stethoscope, DollarSign, CheckCircle2, UserRound } from 'lucide-react';
 import { createAppointment } from '@/actions/appointments';
 import { formatCurrency, appointmentTypeLabels } from '@/lib/format';
 import type { PlainClinicProcedureItem } from '@/lib/serialize';
+
+type BridgeDoctor = { id: number; nome: string; crm: string };
+
+/** Máscara visual de CPF enquanto digita — "000.000.000-00". */
+function formatCpfMask(value: string): string {
+  const digits = value.replace(/\D/g, '').slice(0, 11);
+  return digits
+    .replace(/(\d{3})(\d)/, '$1.$2')
+    .replace(/(\d{3})(\d)/, '$1.$2')
+    .replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+}
 
 interface ScheduleModalProps {
   contact: Contact;
@@ -14,6 +25,8 @@ interface ScheduleModalProps {
   onClose: () => void;
   /** Clínica-scoped usa a clínica da sessão; Admin passa o clinicId da conversa selecionada. */
   fetchProcedures: () => Promise<PlainClinicProcedureItem[]>;
+  /** Só clínicas com integração hospitalar (Santa Clara) retornam médicos — vazio pras demais. */
+  fetchDoctors?: () => Promise<BridgeDoctor[]>;
   onConfirmSchedule: (scheduleData: {
     appointmentId: string;
     specialty: string;
@@ -29,11 +42,14 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
   isOpen,
   onClose,
   fetchProcedures,
+  fetchDoctors,
   onConfirmSchedule,
 }) => {
   const [procedures, setProcedures] = useState<PlainClinicProcedureItem[]>([]);
   const [loadingProcedures, setLoadingProcedures] = useState(false);
   const [procedureId, setProcedureId] = useState('');
+  const [doctors, setDoctors] = useState<BridgeDoctor[]>([]);
+  const [doctorId, setDoctorId] = useState('');
   const [cpf, setCpf] = useState(contact.cpf || '');
   const [date, setDate] = useState('');
   const [time, setTime] = useState('');
@@ -44,6 +60,7 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
     if (!isOpen) return;
     setCpf(contact.cpf || '');
     setProcedureId('');
+    setDoctorId('');
     setDate('');
     setTime('');
     setIsSuccess(false);
@@ -51,17 +68,20 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
     fetchProcedures()
       .then(setProcedures)
       .finally(() => setLoadingProcedures(false));
-    // fetchProcedures é recriada a cada render do pai — só precisamos rodar quando o modal abre.
+    fetchDoctors?.().then(setDoctors).catch(() => setDoctors([]));
+    // fetchProcedures/fetchDoctors são recriadas a cada render do pai — só precisamos rodar quando o modal abre.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, contact.cpf]);
 
   if (!isOpen) return null;
 
   const selectedProcedure = procedures.find((p) => p.id === procedureId);
+  const requiresDoctor = doctors.length > 0;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!procedureId || !date || !selectedProcedure) return;
+    if (requiresDoctor && !doctorId) return;
 
     setSubmitting(true);
     try {
@@ -72,6 +92,7 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
         clinicProcedureId: procedureId,
         date,
         timeSlot: time || undefined,
+        medicoId: doctorId || undefined,
       });
 
       setIsSuccess(true);
@@ -128,6 +149,27 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="p-5 sm:p-6 space-y-4">
+            {requiresDoctor && (
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5 flex items-center gap-1.5 font-mono">
+                  <UserRound className="w-3.5 h-3.5 text-emerald-600" /> Médico / Especialista
+                </label>
+                <select
+                  value={doctorId}
+                  onChange={(e) => setDoctorId(e.target.value)}
+                  className="w-full text-xs sm:text-sm border border-slate-200 rounded-xl px-3.5 py-2.5 bg-slate-50/50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-medium"
+                  required
+                >
+                  <option value="" disabled>Escolha um médico...</option>
+                  {doctors.map((doctor) => (
+                    <option key={doctor.id} value={doctor.id}>
+                      Dr(a). {doctor.nome} (CRM: {doctor.crm})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
             <div>
               <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5 flex items-center gap-1.5 font-mono">
                 <Stethoscope className="w-3.5 h-3.5 text-emerald-600" /> Procedimento Médico
@@ -192,9 +234,11 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
                 </label>
                 <input
                   type="text"
+                  inputMode="numeric"
                   value={cpf}
-                  onChange={(e) => setCpf(e.target.value)}
+                  onChange={(e) => setCpf(formatCpfMask(e.target.value))}
                   placeholder="000.000.000-00"
+                  maxLength={14}
                   className="w-full text-xs sm:text-sm border border-slate-200 rounded-xl px-3 py-2.5 bg-slate-50/50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-mono"
                   required
                 />
@@ -211,7 +255,7 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
               </button>
               <button
                 type="submit"
-                disabled={submitting || !procedureId || !date}
+                disabled={submitting || !procedureId || !date || (requiresDoctor && !doctorId)}
                 className="px-5 py-2.5 text-xs sm:text-sm font-semibold bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white rounded-xl shadow-xs hover:shadow-md transition-all active:scale-[0.99] flex items-center gap-2 min-h-[44px]"
               >
                 {submitting ? 'Criando...' : 'Confirmar Agendamento'}

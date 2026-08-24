@@ -9,7 +9,7 @@ import { toPlainClinicProcedureItem } from "@/lib/serialize";
 import { toChatContact, toChatMessage, departmentToDb, funnelStageToDb } from "@/lib/chat-crm-adapters";
 import { attachSignedUrls, uploadWhatsAppMedia, getSignedMediaUrl, formatDuration } from "@/lib/whatsapp-media";
 import { sendWhatsAppMedia, sendWhatsAppAudio } from "@/lib/whatsapp";
-import { hasSantaClaraBridgeIntegration, fetchSantaClaraProcedures, adaptBridgeProcedureToPlainItem } from "@/lib/santa-clara-bridge";
+import { hasSantaClaraBridgeIntegration, fetchSantaClaraConsultationProcedures, fetchSantaClaraDoctors, adaptBridgeProcedureToPlainItem } from "@/lib/santa-clara-bridge";
 import { formatFileSize } from "@/lib/format";
 import { notifyInboxRealtime } from "@/lib/supabase-server";
 
@@ -574,7 +574,7 @@ export async function listClinicProceduresForAppointment() {
   const { clinicId } = await requireClinicSession();
 
   if (await hasSantaClaraBridgeIntegration(clinicId)) {
-    const bridgeProcedures = await fetchSantaClaraProcedures();
+    const bridgeProcedures = await fetchSantaClaraConsultationProcedures();
     return bridgeProcedures.map((p) => adaptBridgeProcedureToPlainItem(clinicId, p));
   }
 
@@ -584,6 +584,14 @@ export async function listClinicProceduresForAppointment() {
     orderBy: { procedure: { name: "asc" } },
   });
   return items.map(toPlainClinicProcedureItem);
+}
+
+/** Só clínicas com integração hospitalar (Santa Clara/bridge) têm médico específico
+ * no agendamento rápido — as demais do marketplace não têm esse conceito, retorna vazio. */
+export async function listClinicDoctorsForAppointment() {
+  const { clinicId } = await requireClinicSession();
+  if (!(await hasSantaClaraBridgeIntegration(clinicId))) return [];
+  return fetchSantaClaraDoctors();
 }
 
 export async function listCannedResponses() {

@@ -11,6 +11,7 @@ import type { PlainClinicProcedureItem, PlainAppointment } from "@/lib/serialize
 const BRIDGE_ID_PREFIX = "bridge:santa-clara:";
 
 type BridgeProcedure = { id: number; codigo: string; nome: string; valor: number };
+type BridgeDoctor = { id: number; nome: string; crm: string };
 
 function getBridgeConfig() {
   const apiUrl = process.env.SANTA_CLARA_API_URL;
@@ -62,6 +63,31 @@ export async function fetchSantaClaraProcedures(): Promise<BridgeProcedure[]> {
   }
 }
 
+/** O catálogo da bridge traz consultas e exames juntos — a bridge não expõe uma
+ * categoria dedicada, então filtra pelo nome (todas as consultas médicas de lá
+ * seguem o padrão "Consulta - ..."). Ajustar aqui se a bridge ganhar um campo próprio. */
+export async function fetchSantaClaraConsultationProcedures(): Promise<BridgeProcedure[]> {
+  const procedures = await fetchSantaClaraProcedures();
+  return procedures.filter((p) => p.nome.trim().toLowerCase().startsWith("consulta"));
+}
+
+export async function fetchSantaClaraDoctors(): Promise<BridgeDoctor[]> {
+  const config = getBridgeConfig();
+  if (!config) return [];
+  try {
+    const response = await fetch(`${config.apiUrl}/api/medicos`, {
+      headers: { "x-api-token": config.apiToken },
+      signal: AbortSignal.timeout(10000),
+      cache: "no-store",
+    });
+    if (!response.ok) return [];
+    const data = await response.json();
+    return Array.isArray(data) ? data : [];
+  } catch {
+    return [];
+  }
+}
+
 export function adaptBridgeProcedureToPlainItem(clinicId: string, proc: BridgeProcedure): PlainClinicProcedureItem {
   const now = new Date();
   const id = toBridgeProcedureId(proc.id);
@@ -94,6 +120,8 @@ export async function createSantaClaraBridgeAppointment(input: {
   patientPhone: string;
   clinicProcedureId: string;
   date: string;
+  timeSlot?: string;
+  medicoId?: string;
 }): Promise<PlainAppointment> {
   const config = getBridgeConfig();
   if (!config) throw new Error("Integração com a Santa Clara não está configurada.");
@@ -110,7 +138,9 @@ export async function createSantaClaraBridgeAppointment(input: {
       paciente_nome: input.patientName,
       paciente_cpf: input.patientCpf,
       servico_id: servicoId,
+      medico_id: input.medicoId ? Number(input.medicoId) : undefined,
       data: input.date,
+      hora: input.timeSlot || undefined,
     }),
     signal: AbortSignal.timeout(15000),
   });
@@ -133,7 +163,7 @@ export async function createSantaClaraBridgeAppointment(input: {
     patientPhone: input.patientPhone,
     clinicProcedureId: procedureId,
     date: new Date(`${input.date}T00:00:00Z`),
-    timeSlot: null,
+    timeSlot: input.timeSlot || null,
     status: "PENDING",
     paymentMethod: null,
     notes: null,

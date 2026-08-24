@@ -20,6 +20,7 @@ import {
   reopenConversation,
   listCannedResponses,
   listClinicProceduresForAppointment,
+  listClinicDoctorsForAppointment,
   suggestIaReply,
 } from "@/actions/inbox";
 import {
@@ -40,6 +41,7 @@ import {
   reopenConversationAdmin,
   listCannedResponsesAdmin,
   listClinicProceduresForAppointmentAdmin,
+  listClinicDoctorsForAppointmentAdmin,
   suggestIaReplyAdmin,
   listClinicsForReassignment,
   updateConversationClinicAdmin,
@@ -390,6 +392,15 @@ export function ChatCrmApp({ scope, basePath, view }: ChatCrmAppProps) {
     await refreshContacts();
   }
 
+  const fetchDoctors = useCallback(async () => {
+    if (scope === "admin") {
+      if (!selectedContact?.clinicId) return [];
+      return listClinicDoctorsForAppointmentAdmin(selectedContact.clinicId);
+    }
+    return listClinicDoctorsForAppointment();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scope, selectedContact?.clinicId]);
+
   const fetchProcedures = useCallback(async () => {
     if (scope === "admin") {
       if (!selectedContact?.clinicId) return [];
@@ -477,6 +488,7 @@ export function ChatCrmApp({ scope, basePath, view }: ChatCrmAppProps) {
           onReassignClinic={scope === "admin" ? handleReassignClinic : undefined}
           onFinishAttendance={handleFinishAttendance}
           fetchProcedures={fetchProcedures}
+          fetchDoctors={fetchDoctors}
           onScheduleConfirmed={handleScheduleConfirmed}
           onSuggestIaReply={async () => {
             if (!selectedContactId) return "";
