@@ -114,7 +114,7 @@ export function ChatCrmApp({ scope, basePath, view }: ChatCrmAppProps) {
   const searchParams = useSearchParams();
   const actions = ACTIONS_BY_SCOPE[scope];
 
-  const [filterTab, setFilterTab] = useState<InboxFilter>("todas");
+  const [filterTab, setFilterTab] = useState<InboxFilter>("nao_atribuidas");
   const [searchQuery, setSearchQuery] = useState("");
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [agents, setAgents] = useState<Agent[]>([]);

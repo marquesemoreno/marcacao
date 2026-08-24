@@ -48,7 +48,7 @@ export const funnelStageToDb: Record<FunnelStage, ConversationFunnelStage> = {
 };
 
 const funnelStageLabels: Record<FunnelStage, string> = {
-  novos: "Novo Lead",
+  novos: "Novo",
   triagem: "Em Atendimento",
   orcamento: "Orçamento Enviado",
   agendado: "Agendado",
