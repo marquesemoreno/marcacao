@@ -109,8 +109,8 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
         setIsSuccess(false);
         onClose();
       }, 1200);
-    } catch {
-      toast.error('Não foi possível criar o agendamento. Confira os dados (CPF precisa ter 11 dígitos).');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Não foi possível criar o agendamento.');
     } finally {
       setSubmitting(false);
     }
