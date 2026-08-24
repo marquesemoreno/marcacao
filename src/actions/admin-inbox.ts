@@ -5,7 +5,7 @@ import { ConversationStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireAdminSession } from "@/lib/session";
 import { whatsappService, sendWhatsAppMedia } from "@/lib/whatsapp";
-import { hasSantaClaraBridgeIntegration, fetchSantaClaraConsultationProcedures, fetchSantaClaraDoctors, adaptBridgeProcedureToPlainItem } from "@/lib/santa-clara-bridge";
+import { hasSantaClaraBridgeIntegration, fetchSantaClaraProcedures, fetchSantaClaraDoctors, adaptBridgeProcedureToPlainItem } from "@/lib/santa-clara-bridge";
 import { toPlainClinicProcedureItem } from "@/lib/serialize";
 import { departmentToDb, funnelStageToDb, toChatContact, toChatMessage } from "@/lib/chat-crm-adapters";
 import { attachSignedUrls, uploadWhatsAppMedia, getSignedMediaUrl } from "@/lib/whatsapp-media";
@@ -430,7 +430,7 @@ export async function listClinicProceduresForAppointmentAdmin(clinicId: string) 
   await requireAdminSession();
 
   if (await hasSantaClaraBridgeIntegration(clinicId)) {
-    const bridgeProcedures = await fetchSantaClaraConsultationProcedures();
+    const bridgeProcedures = await fetchSantaClaraProcedures();
     return bridgeProcedures.map((p) => adaptBridgeProcedureToPlainItem(clinicId, p));
   }
 

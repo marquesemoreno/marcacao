@@ -63,14 +63,6 @@ export async function fetchSantaClaraProcedures(): Promise<BridgeProcedure[]> {
   }
 }
 
-/** O catálogo da bridge traz consultas e exames juntos — a bridge não expõe uma
- * categoria dedicada, então filtra pelo nome (todas as consultas médicas de lá
- * seguem o padrão "Consulta - ..."). Ajustar aqui se a bridge ganhar um campo próprio. */
-export async function fetchSantaClaraConsultationProcedures(): Promise<BridgeProcedure[]> {
-  const procedures = await fetchSantaClaraProcedures();
-  return procedures.filter((p) => p.nome.trim().toLowerCase().startsWith("consulta"));
-}
-
 export async function fetchSantaClaraDoctors(): Promise<BridgeDoctor[]> {
   const config = getBridgeConfig();
   if (!config) return [];

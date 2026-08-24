@@ -672,10 +672,10 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                       }
                     >
                       <UserPlus className="w-3.5 h-3.5" />
-                      <span className="hidden sm:inline">
+                      <span>
                         {attendantCapacity && attendantCapacity.activeCount >= attendantCapacity.maxLimit
                           ? "Limite Atingido"
-                          : "Assumir Atendimento"}
+                          : "Atribuir pra Mim"}
                       </span>
                     </button>
                   )
