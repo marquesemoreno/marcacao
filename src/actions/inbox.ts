@@ -7,8 +7,9 @@ import { requireClinicSession } from "@/lib/session";
 import { whatsappService } from "@/lib/whatsapp";
 import { toPlainClinicProcedureItem } from "@/lib/serialize";
 import { toChatContact, toChatMessage, departmentToDb, funnelStageToDb } from "@/lib/chat-crm-adapters";
-import { attachSignedUrls, uploadWhatsAppMedia, getSignedMediaUrl } from "@/lib/whatsapp-media";
-import { sendWhatsAppMedia } from "@/lib/whatsapp";
+import { attachSignedUrls, uploadWhatsAppMedia, getSignedMediaUrl, formatDuration } from "@/lib/whatsapp-media";
+import { sendWhatsAppMedia, sendWhatsAppAudio } from "@/lib/whatsapp";
+import { hasSantaClaraBridgeIntegration, fetchSantaClaraProcedures, adaptBridgeProcedureToPlainItem } from "@/lib/santa-clara-bridge";
 import { formatFileSize } from "@/lib/format";
 import { notifyInboxRealtime } from "@/lib/supabase-server";
 
@@ -235,6 +236,72 @@ export async function sendMediaMessage(conversationId: string, formData: FormDat
   const signedUrl = await getSignedMediaUrl(uploaded.path);
   if (signedUrl) {
     sendWhatsAppMedia(conversation.contact.phone, signedUrl, file.type, file.name, "", "chat.outbound.media", clinicId)
+      .then((result) => {
+        if (!result.success && !result.skipped) {
+          prisma.message.update({ where: { id: message.id }, data: { status: "FAILED" } }).catch(() => {});
+        } else if (result.keyId) {
+          prisma.message.update({ where: { id: message.id }, data: { whatsappKeyId: result.keyId } }).catch(() => {});
+        }
+      })
+      .catch(() => {});
+  }
+
+  revalidatePath("/clinic/inbox");
+  revalidatePath("/admin/inbox");
+  notifyInboxRealtime().catch(() => {});
+  return message;
+}
+
+/** Atendente grava um áudio no navegador e envia como mensagem de voz (PTT) real do WhatsApp. */
+export async function sendAudioMessage(conversationId: string, formData: FormData) {
+  const { clinicId, userId } = await requireClinicSession();
+
+  const file = formData.get("file");
+  if (!(file instanceof File)) throw new Error("Nenhum áudio enviado");
+  if (!file.type.startsWith("audio/")) {
+    throw new Error("Arquivo inválido. Envie um áudio.");
+  }
+  if (file.size > MAX_MEDIA_SIZE_BYTES) {
+    throw new Error("Áudio muito grande. O limite é 15 MB.");
+  }
+  const durationSeconds = Number(formData.get("duration")) || 0;
+
+  const conversation = await prisma.conversation.findUnique({
+    where: { id: conversationId },
+    include: { contact: true },
+  });
+  if (!conversation || conversation.clinicId !== clinicId) {
+    throw new Error("Conversa não encontrada");
+  }
+
+  const buffer = Buffer.from(await file.arrayBuffer());
+  const uploaded = await uploadWhatsAppMedia(conversationId, buffer, file.type);
+  if (!uploaded) {
+    throw new Error("Não foi possível processar o áudio. Tente novamente.");
+  }
+
+  const message = await prisma.message.create({
+    data: {
+      conversationId,
+      direction: "OUTBOUND",
+      content: "",
+      status: "SENT",
+      type: "AUDIO",
+      mediaPath: uploaded.path,
+      mimeType: file.type,
+      audioDuration: formatDuration(durationSeconds),
+      senderUserId: userId,
+    },
+  });
+
+  await prisma.conversation.update({
+    where: { id: conversationId },
+    data: { lastMessageAt: new Date(), status: "OPEN" },
+  });
+
+  const signedUrl = await getSignedMediaUrl(uploaded.path);
+  if (signedUrl) {
+    sendWhatsAppAudio(conversation.contact.phone, signedUrl, "chat.outbound.audio", clinicId)
       .then((result) => {
         if (!result.success && !result.skipped) {
           prisma.message.update({ where: { id: message.id }, data: { status: "FAILED" } }).catch(() => {});
@@ -505,6 +572,12 @@ export async function updateConversationTags(conversationId: string, tags: strin
  * "Criar Agendamento" no painel do contato — chamado direto do client. */
 export async function listClinicProceduresForAppointment() {
   const { clinicId } = await requireClinicSession();
+
+  if (await hasSantaClaraBridgeIntegration(clinicId)) {
+    const bridgeProcedures = await fetchSantaClaraProcedures();
+    return bridgeProcedures.map((p) => adaptBridgeProcedureToPlainItem(clinicId, p));
+  }
+
   const items = await prisma.clinicProcedure.findMany({
     where: { clinicId },
     include: { procedure: true },

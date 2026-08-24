@@ -407,10 +407,15 @@ export function ChatCrmApp({ scope, basePath, view }: ChatCrmAppProps) {
     price: string;
   }) {
     if (!selectedContactId) return;
-    const guideLink = `${window.location.origin}/comprovante/${data.appointmentId}`;
+    // Agendamentos gravados no sistema hospitalar da Santa Clara (via bridge) não têm
+    // guia/QR Code no Postgres do Conecta Saúde — não faz sentido mandar esse link.
+    const isBridgeAppointment = data.appointmentId.startsWith("bridge:");
+    const guideLine = isBridgeAppointment
+      ? ""
+      : `\n\n📎 Guia com QR Code enviada ao paciente pelo WhatsApp: ${window.location.origin}/comprovante/${data.appointmentId}`;
     await actions.sendMessage(
       selectedContactId,
-      `✅ Consulta confirmada!\n${data.specialty} — ${data.doctor}\nData: ${data.date} às ${data.time}\nValor: ${data.price}\n\n📎 Guia com QR Code enviada ao paciente pelo WhatsApp: ${guideLink}`,
+      `✅ Consulta confirmada!\n${data.specialty} — ${data.doctor}\nData: ${data.date} às ${data.time}\nValor: ${data.price}${guideLine}`,
       true
     );
     await handleUpdateFunnelStage("agendado");
