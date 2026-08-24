@@ -3,18 +3,24 @@ import { getSupabaseServerClient, WHATSAPP_MEDIA_BUCKET } from "@/lib/supabase-s
 
 type EvolutionConfig = { apiUrl?: string; apiKey?: string; instanceName?: string };
 
+export type FetchMediaResult = { success: true; base64: string } | { success: false; error: string };
+
 /**
  * O webhook da Evolution API manda só metadados da mídia (mimetype, key da
  * mensagem) — o conteúdo em si (já decriptado) precisa ser buscado à parte
  * neste endpoint. Ver docs Evolution API v2: /chat/getBase64FromMediaMessage.
  * `config` já vem resolvido por quem chama (instância global ou exclusiva da clínica).
+ * Devolve o motivo real da falha (em vez de só null) pra dar pra logar e diagnosticar —
+ * documentos (PDF) costumam ser maiores/mais lentos que imagem, por isso o timeout maior.
  */
 export async function fetchMediaBase64(
   messageKey: Record<string, unknown>,
   config: EvolutionConfig
-): Promise<string | null> {
+): Promise<FetchMediaResult> {
   const { apiUrl, apiKey, instanceName } = config;
-  if (!apiUrl || !apiKey || !instanceName) return null;
+  if (!apiUrl || !apiKey || !instanceName) {
+    return { success: false, error: "Configuração da Evolution API ausente para esta instância." };
+  }
 
   const baseUrl = apiUrl.replace(/\/$/, "");
   const targetUrl = `${baseUrl}/chat/getBase64FromMediaMessage/${instanceName}`;
@@ -24,13 +30,19 @@ export async function fetchMediaBase64(
       method: "POST",
       headers: { "Content-Type": "application/json", apikey: apiKey },
       body: JSON.stringify({ message: { key: messageKey }, convertToMp4: false }),
-      signal: AbortSignal.timeout(15000),
+      signal: AbortSignal.timeout(30000),
     });
-    if (!response.ok) return null;
-    const data = (await response.json()) as { base64?: string };
-    return data.base64 ?? null;
-  } catch {
-    return null;
+    const rawText = await response.text();
+    if (!response.ok) {
+      return { success: false, error: `HTTP ${response.status}: ${rawText.slice(0, 300)}` };
+    }
+    const data = JSON.parse(rawText) as { base64?: string };
+    if (!data.base64) {
+      return { success: false, error: `Resposta sem base64: ${rawText.slice(0, 300)}` };
+    }
+    return { success: true, base64: data.base64 };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Erro desconhecido ao buscar mídia" };
   }
 }
 

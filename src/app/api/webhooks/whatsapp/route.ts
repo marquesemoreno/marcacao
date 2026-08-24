@@ -284,10 +284,23 @@ export async function POST(request: Request) {
     let mediaData: MediaData | null = null;
 
     if (incoming.media) {
-      const base64 = await fetchMediaBase64(incoming.media.key, evolutionConfig);
-      const uploaded = base64
-        ? await uploadWhatsAppMedia(conversation.id, Buffer.from(base64, "base64"), incoming.media.mimeType)
+      const mediaResult = await fetchMediaBase64(incoming.media.key, evolutionConfig);
+      const uploaded = mediaResult.success
+        ? await uploadWhatsAppMedia(conversation.id, Buffer.from(mediaResult.base64, "base64"), incoming.media.mimeType)
         : null;
+
+      const incomingFileName = "fileName" in incoming.media ? incoming.media.fileName : null;
+      if (!mediaResult.success) {
+        await logInbound(
+          { kind: "media_download_failed", fileName: incomingFileName, mimeType: incoming.media.mimeType, error: mediaResult.error },
+          "FAILED"
+        );
+      } else if (!uploaded) {
+        await logInbound(
+          { kind: "media_upload_failed", fileName: incomingFileName, mimeType: incoming.media.mimeType },
+          "FAILED"
+        );
+      }
 
       if (uploaded) {
         mediaData =
