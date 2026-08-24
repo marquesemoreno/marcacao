@@ -527,7 +527,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                         {c.statusTag.label}
                       </span>
 
-                      {c.responsibleAgent && c.responsibleAgent !== 'Não atribuído' ? (
+                      {c.responsibleAgent && c.responsibleAgent !== 'Não Atribuído' ? (
                         <span className="inline-flex items-center gap-0.5 text-[10px] font-medium text-slate-500 dark:text-slate-300 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-1.5 py-0.5 rounded-md truncate max-w-[85px]" title={`Atribuído a ${c.responsibleAgent}`}>
                           <User className="w-2.5 h-2.5 shrink-0" /> {c.responsibleAgent.split(' ')[0]}
                         </span>
@@ -655,7 +655,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
 
               {/* Ações do Header: atendente, agendar (secundário) e menu */}
               <div className="flex items-center gap-1.5 sm:gap-2">
-                {(!selectedContact.responsibleAgent || selectedContact.responsibleAgent === "Não atribuído") ? (
+                {(!selectedContact.responsibleAgent || selectedContact.responsibleAgent === "Não Atribuído") ? (
                   onClaimConversation && (
                     <button
                       onClick={() => onClaimConversation()}

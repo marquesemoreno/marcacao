@@ -15,6 +15,7 @@ export default async function ClinicLayout({
   children: React.ReactNode;
 }>) {
   const [clinic, session] = await Promise.all([getClinicInfo(), getServerSession(authOptions)]);
+  const isExclusive = Boolean(clinic.whatsappInstance);
 
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-slate-50">
@@ -22,7 +23,7 @@ export default async function ClinicLayout({
       <header className="flex h-14 shrink-0 items-center justify-between gap-4 border-b border-slate-200/80 bg-white px-4">
         {/* Esquerda: Logo + Nome da Clínica + Badge */}
         <div className="flex shrink-0 items-center gap-2.5">
-          <Logo variant="full" size="sm" />
+          <Logo variant={isExclusive ? "icon-only" : "full"} size="sm" />
           <div className="hidden sm:flex items-center gap-1.5 border-l border-slate-200 pl-2.5">
             <span className="font-extrabold text-xs text-slate-900 truncate max-w-[140px] sm:max-w-[180px]">
               {clinic.tradeName}
@@ -35,7 +36,7 @@ export default async function ClinicLayout({
 
         {/* Centro: Abas de Navegação */}
         <div className="flex-1 overflow-x-auto min-w-0 flex items-center justify-center">
-          <ClinicNav exclusiveWhatsapp={Boolean(clinic.whatsappInstance)} />
+          <ClinicNav exclusiveWhatsapp={isExclusive} />
         </div>
 
         {/* Direita: Nome do Usuário + Tema + Sair */}
