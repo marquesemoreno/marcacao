@@ -102,6 +102,7 @@ interface InboxLayoutProps {
   searchQuery: string;
   onSearchChange: (query: string) => void;
   quickReplies: { id: string; shortcut: string; content: string }[];
+  onSaveQuickReply?: (shortcut: string, content: string) => Promise<void>;
   onSendMessage: (text: string, mode: 'whatsapp' | 'internal_note') => Promise<void> | void;
   onSendMedia: (file: File) => Promise<void> | void;
   onAddTag: (tag: string) => Promise<void> | void;
@@ -133,6 +134,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
   searchQuery,
   onSearchChange,
   quickReplies,
+  onSaveQuickReply,
   onSendMessage,
   onSendMedia,
   onAddTag,
@@ -161,6 +163,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
   const [isNewQuickReplyModalOpen, setIsNewQuickReplyModalOpen] = useState(false);
   const [newShortcut, setNewShortcut] = useState('');
   const [newShortcutContent, setNewShortcutContent] = useState('');
+  const [isSavingQuickReply, setIsSavingQuickReply] = useState(false);
 
   const [newTagInput, setNewTagInput] = useState('');
   const [isAddingTag, setIsAddingTag] = useState(false);
@@ -301,18 +304,21 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
     setIsAddingTag(false);
   };
 
-  const handleSaveNewQuickReply = (e: React.FormEvent) => {
+  const handleSaveNewQuickReply = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newShortcut || !newShortcutContent) return;
-    quickReplies.push({
-      id: String(Date.now()),
-      shortcut: newShortcut.startsWith('/') ? newShortcut : `/${newShortcut}`,
-      content: newShortcutContent,
-    });
-    toast.success("Novo atalho cadastrado com sucesso!");
-    setNewShortcut('');
-    setNewShortcutContent('');
-    setIsNewQuickReplyModalOpen(false);
+    if (!newShortcut || !newShortcutContent || !onSaveQuickReply) return;
+    setIsSavingQuickReply(true);
+    try {
+      await onSaveQuickReply(newShortcut, newShortcutContent);
+      toast.success("Novo atalho cadastrado com sucesso!");
+      setNewShortcut('');
+      setNewShortcutContent('');
+      setIsNewQuickReplyModalOpen(false);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível cadastrar o atalho.");
+    } finally {
+      setIsSavingQuickReply(false);
+    }
   };
 
   const handleSavePatientEdits = () => {
@@ -1261,9 +1267,10 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
             <div className="flex justify-end gap-2 pt-2">
               <button
                 type="submit"
-                className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs rounded-lg shadow-sm"
+                disabled={isSavingQuickReply}
+                className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-semibold text-xs rounded-lg shadow-sm"
               >
-                Cadastrar Atalho
+                {isSavingQuickReply ? "Salvando..." : "Cadastrar Atalho"}
               </button>
             </div>
           </form>

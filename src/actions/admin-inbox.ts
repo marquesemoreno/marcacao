@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { ConversationStatus } from "@prisma/client";
+import { ConversationStatus, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireAdminSession } from "@/lib/session";
 import { whatsappService, sendWhatsAppMedia } from "@/lib/whatsapp";
@@ -424,6 +424,28 @@ export async function listCannedResponsesAdmin() {
   return prisma.cannedResponse.findMany({
     orderBy: { shortcut: "asc" },
   });
+}
+
+/** Atalho criado pelo admin fica global (clinicId null) — visível em todas as clínicas,
+ * já que essa tela não tem seletor de clínica específica. */
+export async function createCannedResponseAdmin(shortcut: string, content: string) {
+  await requireAdminSession();
+  const normalizedShortcut = shortcut.trim().startsWith("/") ? shortcut.trim() : `/${shortcut.trim()}`;
+  const trimmedContent = content.trim();
+  if (normalizedShortcut === "/" || !trimmedContent) {
+    throw new Error("Preencha o atalho e o texto da resposta.");
+  }
+
+  try {
+    return await prisma.cannedResponse.create({
+      data: { clinicId: null, shortcut: normalizedShortcut, content: trimmedContent },
+    });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      throw new Error(`Já existe uma resposta rápida com o atalho "${normalizedShortcut}".`);
+    }
+    throw error;
+  }
 }
 
 export async function listClinicProceduresForAppointmentAdmin(clinicId: string) {

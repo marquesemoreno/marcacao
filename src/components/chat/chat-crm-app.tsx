@@ -19,6 +19,7 @@ import {
   resolveConversation,
   reopenConversation,
   listCannedResponses,
+  createCannedResponse,
   listClinicProceduresForAppointment,
   listClinicDoctorsForAppointment,
   suggestIaReply,
@@ -40,6 +41,7 @@ import {
   resolveConversationAdmin,
   reopenConversationAdmin,
   listCannedResponsesAdmin,
+  createCannedResponseAdmin,
   listClinicProceduresForAppointmentAdmin,
   listClinicDoctorsForAppointmentAdmin,
   suggestIaReplyAdmin,
@@ -77,6 +79,7 @@ const ACTIONS_BY_SCOPE = {
     resolveConversation: (id: string, data?: { reason: string; notes?: string }) => resolveConversation(id, data),
     reopenConversation: (id: string) => reopenConversation(id),
     listCannedResponses: () => listCannedResponses(),
+    createCannedResponse: (shortcut: string, content: string) => createCannedResponse(shortcut, content),
     suggestIaReply: (id: string) => suggestIaReply(id),
   },
   admin: {
@@ -93,6 +96,7 @@ const ACTIONS_BY_SCOPE = {
     resolveConversation: (id: string, data?: { reason: string; notes?: string }) => resolveConversationAdmin(id, data),
     reopenConversation: (id: string) => reopenConversationAdmin(id),
     listCannedResponses: () => listCannedResponsesAdmin(),
+    createCannedResponse: (shortcut: string, content: string) => createCannedResponseAdmin(shortcut, content),
     suggestIaReply: (id: string) => suggestIaReplyAdmin(id),
   },
 };
@@ -170,13 +174,22 @@ export function ChatCrmApp({ scope, basePath, view }: ChatCrmAppProps) {
     refreshContacts();
   }, [refreshContacts]);
 
-  useEffect(() => {
-    actions.listChatAgents().then(setAgents);
-    actions.listCannedResponses().then((responses) =>
-      setQuickReplies(responses.map((r) => ({ id: r.id, shortcut: r.shortcut, content: r.content })))
-    );
+  const refreshQuickReplies = useCallback(async () => {
+    const responses = await actions.listCannedResponses();
+    setQuickReplies(responses.map((r) => ({ id: r.id, shortcut: r.shortcut, content: r.content })));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [actions]);
+
+  useEffect(() => {
+    actions.listChatAgents().then(setAgents);
+    refreshQuickReplies();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [actions]);
+
+  async function handleSaveQuickReply(shortcut: string, content: string) {
+    await actions.createCannedResponse(shortcut, content);
+    await refreshQuickReplies();
+  }
 
   useEffect(() => {
     // Reatribuição de clínica só faz sentido pra quem enxerga todas (admin) — a
@@ -477,6 +490,7 @@ export function ChatCrmApp({ scope, basePath, view }: ChatCrmAppProps) {
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
           quickReplies={quickReplies}
+          onSaveQuickReply={handleSaveQuickReply}
           onSendMessage={handleSendMessage}
           onSendMedia={handleSendMedia}
           onAddTag={handleAddTag}

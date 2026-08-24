@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { ConversationStatus } from "@prisma/client";
+import { ConversationStatus, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireClinicSession } from "@/lib/session";
 import { whatsappService } from "@/lib/whatsapp";
@@ -600,6 +600,27 @@ export async function listCannedResponses() {
     where: { OR: [{ clinicId }, { clinicId: null }] },
     orderBy: { shortcut: "asc" },
   });
+}
+
+/** Cadastra um atalho de resposta rápida pra essa clínica (ex: "/horarios"). */
+export async function createCannedResponse(shortcut: string, content: string) {
+  const { clinicId } = await requireClinicSession();
+  const normalizedShortcut = shortcut.trim().startsWith("/") ? shortcut.trim() : `/${shortcut.trim()}`;
+  const trimmedContent = content.trim();
+  if (normalizedShortcut === "/" || !trimmedContent) {
+    throw new Error("Preencha o atalho e o texto da resposta.");
+  }
+
+  try {
+    return await prisma.cannedResponse.create({
+      data: { clinicId, shortcut: normalizedShortcut, content: trimmedContent },
+    });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      throw new Error(`Já existe uma resposta rápida com o atalho "${normalizedShortcut}".`);
+    }
+    throw error;
+  }
 }
 
 const INBOX_FILTER_TO_CONVERSATION_FILTER: Record<InboxFilter, ConversationFilter> = {
