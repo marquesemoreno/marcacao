@@ -20,6 +20,7 @@ import {
   reopenConversation,
   listCannedResponses,
   createCannedResponse,
+  createContact,
   listClinicProceduresForAppointment,
   listClinicDoctorsForAppointment,
   suggestIaReply,
@@ -42,6 +43,7 @@ import {
   reopenConversationAdmin,
   listCannedResponsesAdmin,
   createCannedResponseAdmin,
+  createContactAdmin,
   listClinicProceduresForAppointmentAdmin,
   listClinicDoctorsForAppointmentAdmin,
   suggestIaReplyAdmin,
@@ -208,6 +210,16 @@ export function ChatCrmApp({ scope, basePath, view }: ChatCrmAppProps) {
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Não foi possível trocar a clínica.");
     }
+  }
+
+  /** scope=admin exige escolher a clínica (ele não está preso a uma só); scope=clinic
+   * usa sempre a da sessão logada — por isso não dá pra passar isso por `actions`
+   * genérico, as duas versões têm assinaturas diferentes. */
+  async function handleCreateContact(name: string, phone: string, clinicId?: string) {
+    const conversationId =
+      scope === "admin" ? await createContactAdmin(name, phone, clinicId ?? "") : await createContact(name, phone);
+    await refreshContacts();
+    selectContact(conversationId);
   }
 
   const refreshMessages = useCallback(async () => {
@@ -500,6 +512,7 @@ export function ChatCrmApp({ scope, basePath, view }: ChatCrmAppProps) {
           onTransferAgent={handleTransferAgent}
           availableClinics={scope === "admin" ? availableClinics : undefined}
           onReassignClinic={scope === "admin" ? handleReassignClinic : undefined}
+          onCreateContact={handleCreateContact}
           onFinishAttendance={handleFinishAttendance}
           fetchProcedures={fetchProcedures}
           fetchDoctors={fetchDoctors}

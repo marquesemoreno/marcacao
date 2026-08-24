@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { ConversationStatus, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireAdminSession } from "@/lib/session";
-import { whatsappService, sendWhatsAppMedia } from "@/lib/whatsapp";
+import { whatsappService, sendWhatsAppMedia, formatToWhatsAppNumber } from "@/lib/whatsapp";
 import { hasSantaClaraBridgeIntegration, fetchSantaClaraProcedures, fetchSantaClaraDoctors, adaptBridgeProcedureToPlainItem } from "@/lib/santa-clara-bridge";
 import { toPlainClinicProcedureItem } from "@/lib/serialize";
 import { departmentToDb, funnelStageToDb, toChatContact, toChatMessage } from "@/lib/chat-crm-adapters";
@@ -85,6 +85,44 @@ export async function listClinicsForReassignment() {
     select: { id: true, tradeName: true },
     orderBy: { tradeName: "asc" },
   });
+}
+
+/** Mesma ideia de createContact (inbox.ts), mas o admin escolhe a clínica na hora,
+ * já que ele não está vinculado a uma só. */
+export async function createContactAdmin(name: string, phone: string, clinicId: string) {
+  await requireAdminSession();
+
+  const clinic = await prisma.clinic.findUnique({ where: { id: clinicId }, select: { id: true } });
+  if (!clinic) throw new Error("Clínica não encontrada");
+
+  const trimmedName = name.trim();
+  if (trimmedName.length < 2) {
+    throw new Error("Informe o nome do contato.");
+  }
+  const fullPhone = formatToWhatsAppNumber(phone);
+  if (fullPhone.length < 12) {
+    throw new Error("Telefone inválido. Informe com DDD (ex: 77999998888).");
+  }
+
+  const contact = await prisma.contact.upsert({
+    where: { phone: fullPhone },
+    update: {},
+    create: { phone: fullPhone, name: trimmedName },
+  });
+
+  let conversation = await prisma.conversation.findFirst({
+    where: { contactId: contact.id, clinicId },
+  });
+
+  if (!conversation) {
+    conversation = await prisma.conversation.create({
+      data: { clinicId, contactId: contact.id, status: "OPEN", lastMessageAt: new Date() },
+    });
+  }
+
+  revalidatePath("/admin/inbox");
+  notifyInboxRealtime().catch(() => {});
+  return conversation.id;
 }
 
 /** Corrige a clínica de uma conversa que caiu na atribuição automática errada

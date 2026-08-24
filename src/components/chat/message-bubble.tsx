@@ -266,6 +266,22 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
 
               {/* Actions */}
               <div className="flex items-center justify-end gap-2 pt-2">
+                {!isImage && (
+                  // Sem o atributo "download": deixa o navegador abrir o PDF no
+                  // visualizador nativo dele em vez de forçar baixar o arquivo
+                  // (o "download" é ignorado de formas inconsistentes em URL
+                  // cross-origin — em vários navegadores/celulares simplesmente
+                  // não abria nada, então o botão de baixar era a única opção).
+                  <a
+                    href={message.mediaUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center justify-center gap-2 h-10 px-4 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold text-xs rounded-xl shadow-2xs"
+                  >
+                    <FileText className="w-4 h-4" />
+                    <span>Abrir Documento</span>
+                  </a>
+                )}
                 <a
                   href={message.mediaUrl}
                   download={fileName}

@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { ConversationStatus, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireClinicSession } from "@/lib/session";
-import { whatsappService } from "@/lib/whatsapp";
+import { whatsappService, formatToWhatsAppNumber } from "@/lib/whatsapp";
 import { toPlainClinicProcedureItem } from "@/lib/serialize";
 import { toChatContact, toChatMessage, departmentToDb, funnelStageToDb } from "@/lib/chat-crm-adapters";
 import { attachSignedUrls, uploadWhatsAppMedia, getSignedMediaUrl, formatDuration } from "@/lib/whatsapp-media";
@@ -25,6 +25,42 @@ import {
 } from "@/lib/schemas/inbox";
 
 const ACTIVE_STATUSES: ConversationStatus[] = [ConversationStatus.OPEN, ConversationStatus.PENDING];
+
+/** Cadastra um contato novo (ou reaproveita um já existente pelo telefone) e garante
+ * uma conversa aberta dessa clínica com ele — pra atendente iniciar contato proativo,
+ * sem precisar esperar o paciente mandar mensagem primeiro. */
+export async function createContact(name: string, phone: string) {
+  const { clinicId } = await requireClinicSession();
+
+  const trimmedName = name.trim();
+  if (trimmedName.length < 2) {
+    throw new Error("Informe o nome do contato.");
+  }
+  const fullPhone = formatToWhatsAppNumber(phone);
+  if (fullPhone.length < 12) {
+    throw new Error("Telefone inválido. Informe com DDD (ex: 77999998888).");
+  }
+
+  const contact = await prisma.contact.upsert({
+    where: { phone: fullPhone },
+    update: {},
+    create: { phone: fullPhone, name: trimmedName },
+  });
+
+  let conversation = await prisma.conversation.findFirst({
+    where: { contactId: contact.id, clinicId },
+  });
+
+  if (!conversation) {
+    conversation = await prisma.conversation.create({
+      data: { clinicId, contactId: contact.id, status: "OPEN", lastMessageAt: new Date() },
+    });
+  }
+
+  revalidatePath("/clinic/inbox");
+  notifyInboxRealtime().catch(() => {});
+  return conversation.id;
+}
 
 export async function listConversations(filter: ConversationFilter, search?: string) {
   const { clinicId, userId } = await requireClinicSession();
