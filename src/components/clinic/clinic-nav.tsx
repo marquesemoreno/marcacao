@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 const fullNavItems: { href: string; label: string; exact?: boolean }[] = [
   { href: "/clinic/inbox", label: "💬 Chat / WhatsApp" },
   { href: "/clinic/crm", label: "📋 CRM (Funil de Leads)" },
+  { href: "/clinic/contatos", label: "👥 Contatos" },
   { href: "/clinic/agendamentos", label: "📅 Agendamentos de Hoje" },
   { href: "/clinic/precos", label: "💲 Tabela de Procedimentos" },
 ];
@@ -15,6 +16,7 @@ const fullNavItems: { href: string; label: string; exact?: boolean }[] = [
 const exclusiveNavItems: { href: string; label: string; exact?: boolean }[] = [
   { href: "/clinic/inbox", label: "💬 Chat / WhatsApp" },
   { href: "/clinic/crm", label: "📋 CRM (Funil de Leads)" },
+  { href: "/clinic/contatos", label: "👥 Contatos" },
 ];
 
 export function ClinicNav({ exclusiveWhatsapp = false }: { exclusiveWhatsapp?: boolean }) {

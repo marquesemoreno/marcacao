@@ -62,6 +62,39 @@ export async function createContact(name: string, phone: string) {
   return conversation.id;
 }
 
+/** Uma linha por contato já cadastrado nesta clínica (cada um tem no máximo uma
+ * conversa por clínica) — usado na aba "Contatos" pra buscar por nome/telefone/CPF. */
+export async function listAllContacts(search?: string) {
+  const { clinicId } = await requireClinicSession();
+
+  const conversations = await prisma.conversation.findMany({
+    where: {
+      clinicId,
+      ...(search
+        ? {
+            contact: {
+              OR: [
+                { name: { contains: search, mode: "insensitive" } },
+                { phone: { contains: search } },
+                { cpf: { contains: search } },
+              ],
+            },
+          }
+        : {}),
+    },
+    include: { contact: true },
+    orderBy: { contact: { name: "asc" } },
+  });
+
+  return conversations.map((conversation) => ({
+    conversationId: conversation.id,
+    name: conversation.contact.name,
+    phone: conversation.contact.phone,
+    cpf: conversation.contact.cpf,
+    status: conversation.status,
+  }));
+}
+
 export async function listConversations(filter: ConversationFilter, search?: string) {
   const { clinicId, userId } = await requireClinicSession();
 

@@ -23,6 +23,37 @@ const MESSAGE_PAGE_SIZE = 50;
 
 const ACTIVE_STATUSES: ConversationStatus[] = [ConversationStatus.OPEN, ConversationStatus.PENDING];
 
+/** Uma linha por contato cadastrado em qualquer clínica — usado na aba "Contatos"
+ * do admin pra buscar por nome/telefone/CPF e ver de qual clínica é. */
+export async function listAllContactsAdmin(search?: string) {
+  await requireAdminSession();
+
+  const conversations = await prisma.conversation.findMany({
+    where: search
+      ? {
+          contact: {
+            OR: [
+              { name: { contains: search, mode: "insensitive" } },
+              { phone: { contains: search } },
+              { cpf: { contains: search } },
+            ],
+          },
+        }
+      : {},
+    include: { contact: true, clinic: { select: { tradeName: true } } },
+    orderBy: { contact: { name: "asc" } },
+  });
+
+  return conversations.map((conversation) => ({
+    conversationId: conversation.id,
+    name: conversation.contact.name,
+    phone: conversation.contact.phone,
+    cpf: conversation.contact.cpf,
+    status: conversation.status,
+    clinicName: conversation.clinic.tradeName,
+  }));
+}
+
 export async function listChatContactsAdmin(filter: InboxFilter, search?: string) {
   await requireAdminSession();
 

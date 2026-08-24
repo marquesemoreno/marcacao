@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 const navItems: { href: string; label: string; exact?: boolean }[] = [
   { href: "/admin", label: "📊 Início", exact: true },
   { href: "/admin/inbox", label: "💬 Chat / WhatsApp" },
+  { href: "/admin/contatos", label: "👥 Contatos" },
   { href: "/admin/automacoes", label: "🤖 Automações" },
   { href: "/admin/crm", label: "📋 CRM" },
   { href: "/admin/clinicas", label: "🏥 Clínicas" },
