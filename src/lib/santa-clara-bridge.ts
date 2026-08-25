@@ -123,19 +123,28 @@ export async function createSantaClaraBridgeAppointment(input: {
   const procedure = procedures.find((p) => p.id === servicoId);
   if (!procedure) throw new Error("Procedimento não encontrado no sistema da clínica.");
 
-  const response = await fetch(`${config.apiUrl}/api/agendamentos`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "x-api-token": config.apiToken },
-    body: JSON.stringify({
-      paciente_nome: input.patientName,
-      paciente_cpf: input.patientCpf,
-      servico_id: servicoId,
-      medico_id: input.medicoId ? Number(input.medicoId) : undefined,
-      data: input.date,
-      hora: input.timeSlot || undefined,
-    }),
-    signal: AbortSignal.timeout(15000),
-  });
+  // Erro de rede/timeout aqui é `TypeError`/`AbortError` cru do fetch, não um Error
+  // nosso — sem esse try/catch ele sobe direto da Server Action e o Next exibe só a
+  // mensagem genérica de erro de produção, escondendo o motivo real do usuário.
+  let response: Response;
+  try {
+    response = await fetch(`${config.apiUrl}/api/agendamentos`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-api-token": config.apiToken },
+      body: JSON.stringify({
+        paciente_nome: input.patientName,
+        paciente_cpf: input.patientCpf,
+        servico_id: servicoId,
+        medico_id: input.medicoId ? Number(input.medicoId) : undefined,
+        data: input.date,
+        hora: input.timeSlot || undefined,
+      }),
+      signal: AbortSignal.timeout(15000),
+    });
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : "erro desconhecido";
+    throw new Error(`Não foi possível falar com o sistema da clínica (${reason}). Tente novamente.`);
+  }
   const body = await response.json().catch(() => null);
   if (!response.ok || !body?.success) {
     throw new Error(body?.message || `Não foi possível registrar o agendamento (HTTP ${response.status}).`);

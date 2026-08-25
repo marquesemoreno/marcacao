@@ -42,7 +42,14 @@ export async function listUpcomingAppointments(clinicId: string) {
 }
 
 export async function createAppointment(input: CreateAppointmentInput) {
-  const data = createAppointmentSchema.parse(input);
+  // ZodError não chega legível no client (o Next redige o erro em produção e
+  // mostra só uma mensagem genérica) — converte pra um Error simples com o
+  // motivo real antes de propagar pra Server Action.
+  const parsed = createAppointmentSchema.safeParse(input);
+  if (!parsed.success) {
+    throw new Error(parsed.error.issues[0]?.message || "Dados do agendamento inválidos.");
+  }
+  const data = parsed.data;
 
   // Procedimento veio do sistema hospitalar da Santa Clara (Firebird via bridge),
   // não do catálogo de ClinicProcedure do marketplace — grava lá em vez de aqui.
