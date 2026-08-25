@@ -57,8 +57,11 @@ export async function listAllContactsAdmin(search?: string) {
 export async function listChatContactsAdmin(filter: InboxFilter, search?: string) {
   await requireAdminSession();
 
-  const where =
-    filter === "minhas"
+  // Com busca ativa, ignora o filtro de aba e procura em todas as conversas —
+  // ver o mesmo comentário em listConversations (inbox.ts).
+  const where = search
+    ? {}
+    : filter === "minhas"
       ? { status: { in: ACTIVE_STATUSES } }
       : filter === "nao_atribuidas"
         ? { assignedUserId: null, status: { in: ACTIVE_STATUSES } }
@@ -75,6 +78,7 @@ export async function listChatContactsAdmin(filter: InboxFilter, search?: string
               OR: [
                 { name: { contains: search, mode: "insensitive" } },
                 { phone: { contains: search } },
+                { cpf: { contains: search } },
               ],
             },
           }
@@ -175,7 +179,7 @@ export async function updateConversationClinicAdmin(conversationId: string, clin
 export async function listChatAgentsAdmin() {
   await requireAdminSession();
   const users = await prisma.user.findMany({
-    where: { role: { in: ["ADMIN", "CLINIC"] } },
+    where: { role: { in: ["ADMIN", "CLINIC"] }, active: true },
     select: { id: true, name: true, role: true },
     orderBy: { name: "asc" },
   });

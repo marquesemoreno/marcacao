@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Search, Users, MessageCircle } from "lucide-react";
-import { listAllContacts } from "@/actions/inbox";
-import { listAllContactsAdmin } from "@/actions/admin-inbox";
+import { Search, Users, MessageCircle, UserPlus, X } from "lucide-react";
+import { toast } from "sonner";
+import { listAllContacts, createContact } from "@/actions/inbox";
+import { listAllContactsAdmin, createContactAdmin, listClinicsForReassignment } from "@/actions/admin-inbox";
 import { formatPhone } from "@/lib/format";
 
 type Scope = "clinic" | "admin";
@@ -44,32 +45,77 @@ export function ContactsApp({ scope, basePath }: { scope: Scope; basePath: strin
   const [contacts, setContacts] = useState<ContactRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [newPhone, setNewPhone] = useState("");
+  const [newClinicId, setNewClinicId] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+  const [availableClinics, setAvailableClinics] = useState<{ id: string; tradeName: string }[]>([]);
+
+  const fetchContacts = useCallback(async () => {
+    const result =
+      scope === "admin" ? await listAllContactsAdmin(search || undefined) : await listAllContacts(search || undefined);
+    setContacts(result);
+  }, [scope, search]);
+
   useEffect(() => {
     let cancelled = false;
     setIsLoading(true);
     const timeout = setTimeout(async () => {
-      const result =
-        scope === "admin" ? await listAllContactsAdmin(search || undefined) : await listAllContacts(search || undefined);
-      if (!cancelled) {
-        setContacts(result);
-        setIsLoading(false);
-      }
+      await fetchContacts();
+      if (!cancelled) setIsLoading(false);
     }, 300);
     return () => {
       cancelled = true;
       clearTimeout(timeout);
     };
-  }, [scope, search]);
+  }, [fetchContacts]);
+
+  useEffect(() => {
+    if (scope === "admin") {
+      listClinicsForReassignment().then(setAvailableClinics).catch(() => {});
+    }
+  }, [scope]);
+
+  async function handleSaveNewContact(event: React.FormEvent) {
+    event.preventDefault();
+    if (!newName.trim() || !newPhone.trim()) return;
+    if (scope === "admin" && availableClinics.length > 0 && !newClinicId) return;
+
+    setIsSaving(true);
+    try {
+      const conversationId =
+        scope === "admin" ? await createContactAdmin(newName, newPhone, newClinicId) : await createContact(newName, newPhone);
+      toast.success("Contato cadastrado com sucesso!");
+      setNewName("");
+      setNewPhone("");
+      setNewClinicId("");
+      setIsModalOpen(false);
+      router.push(`${basePath}/inbox?c=${conversationId}`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível cadastrar o contato.");
+    } finally {
+      setIsSaving(false);
+    }
+  }
 
   return (
     <div className="flex-1 space-y-5 overflow-y-auto p-4 sm:p-6 font-sans text-slate-900 dark:text-slate-100">
-      <div className="flex flex-col gap-1">
-        <h1 className="flex items-center gap-2 text-2xl font-bold">
-          <Users className="size-6 text-slate-500" /> Contatos
-        </h1>
-        <p className="text-sm text-slate-500 dark:text-slate-400">
-          Busque por nome, telefone ou CPF para encontrar um contato já cadastrado e abrir a conversa dele.
-        </p>
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex flex-col gap-1">
+          <h1 className="flex items-center gap-2 text-2xl font-bold">
+            <Users className="size-6 text-slate-500" /> Contatos
+          </h1>
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            Busque por nome, telefone ou CPF para encontrar um contato já cadastrado e abrir a conversa dele.
+          </p>
+        </div>
+        <button
+          onClick={() => setIsModalOpen(true)}
+          className="flex shrink-0 items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 px-3.5 py-2 text-xs font-bold text-white transition-all shadow-2xs"
+        >
+          <UserPlus className="size-4" /> Novo Contato
+        </button>
       </div>
 
       <div className="relative max-w-md">
@@ -146,6 +192,78 @@ export function ContactsApp({ scope, basePath }: { scope: Scope; basePath: strin
           </tbody>
         </table>
       </div>
+
+      {isModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 backdrop-blur-xs p-4">
+          <form
+            onSubmit={handleSaveNewContact}
+            className="max-w-md w-full bg-white dark:bg-slate-900 rounded-2xl p-6 shadow-xl space-y-4 border border-slate-200 dark:border-slate-800"
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+              <h3 className="font-bold text-slate-900 dark:text-slate-100 text-sm flex items-center gap-2">
+                <UserPlus className="w-4 h-4 text-emerald-600" />
+                Novo Contato
+              </h3>
+              <button type="button" onClick={() => setIsModalOpen(false)}>
+                <X className="w-5 h-5 text-slate-400" />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Nome:</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Nome do paciente"
+                  value={newName}
+                  onChange={(event) => setNewName(event.target.value)}
+                  className="w-full px-3 py-2 text-xs border border-slate-200 dark:border-slate-800 rounded-lg bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 mt-1"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">WhatsApp (com DDD):</label>
+                <input
+                  type="tel"
+                  required
+                  placeholder="77999998888"
+                  value={newPhone}
+                  onChange={(event) => setNewPhone(event.target.value)}
+                  className="w-full px-3 py-2 text-xs border border-slate-200 dark:border-slate-800 rounded-lg bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 mt-1 font-mono"
+                />
+              </div>
+
+              {scope === "admin" && availableClinics.length > 0 && (
+                <div>
+                  <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Clínica:</label>
+                  <select
+                    required
+                    value={newClinicId}
+                    onChange={(event) => setNewClinicId(event.target.value)}
+                    className="w-full px-3 py-2 text-xs border border-slate-200 dark:border-slate-800 rounded-lg bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 mt-1"
+                  >
+                    <option value="" disabled>Escolha a clínica...</option>
+                    {availableClinics.map((clinic) => (
+                      <option key={clinic.id} value={clinic.id}>{clinic.tradeName}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="submit"
+                disabled={isSaving}
+                className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-semibold text-xs rounded-lg shadow-sm"
+              >
+                {isSaving ? "Salvando..." : "Cadastrar Contato"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
     </div>
   );
 }

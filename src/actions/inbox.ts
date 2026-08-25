@@ -98,8 +98,12 @@ export async function listAllContacts(search?: string) {
 export async function listConversations(filter: ConversationFilter, search?: string) {
   const { clinicId, userId } = await requireClinicSession();
 
-  const where =
-    filter === "mine"
+  // Com busca ativa, ignora o filtro de aba (fila) e procura em todas as
+  // conversas da clínica — senão um contato salvo some da busca só por estar
+  // finalizado ou atribuído a outro atendente, fora da aba selecionada.
+  const where = search
+    ? { clinicId }
+    : filter === "mine"
       ? { clinicId, assignedUserId: userId, status: { in: ACTIVE_STATUSES } }
       : filter === "unassigned"
         ? { clinicId, assignedUserId: null, status: { in: ACTIVE_STATUSES } }
@@ -116,6 +120,7 @@ export async function listConversations(filter: ConversationFilter, search?: str
               OR: [
                 { name: { contains: search, mode: "insensitive" } },
                 { phone: { contains: search } },
+                { cpf: { contains: search } },
               ],
             },
           }
@@ -760,7 +765,7 @@ export async function getOlderChatMessages(conversationId: string, beforeMessage
 export async function listChatAgents() {
   const { clinicId } = await requireClinicSession();
   const users = await prisma.user.findMany({
-    where: { clinicId, role: "CLINIC" },
+    where: { clinicId, role: "CLINIC", active: true },
     select: { id: true, name: true },
     orderBy: { name: "asc" },
   });
