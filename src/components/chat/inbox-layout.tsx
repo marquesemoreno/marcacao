@@ -14,7 +14,7 @@ import { ScheduleModal } from './schedule-modal';
 import { AvatarBadge } from './avatar-badge';
 import type { PlainClinicProcedureItem } from '@/lib/serialize';
 import { seedDemoConversations } from '@/actions/inbox';
-import { useDialogA11y } from '@/hooks/use-dialog-a11y';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { toast } from "sonner";
 import {
   Search,
@@ -190,10 +190,6 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
   const [selectedReason, setSelectedReason] = useState<string | null>(null);
   const [finishNotes, setFinishNotes] = useState('');
 
-  // Acessibilidade dos modais (foco preso, Esc fecha, foco volta pra quem abriu)
-  const quickReplyDialogRef = useDialogA11y<HTMLFormElement>(isNewQuickReplyModalOpen, () => setIsNewQuickReplyModalOpen(false));
-  const newContactDialogRef = useDialogA11y<HTMLFormElement>(isNewContactModalOpen, () => setIsNewContactModalOpen(false));
-  const finishDialogRef = useDialogA11y<HTMLDivElement>(isFinishModalOpen, () => setIsFinishModalOpen(false));
 
   // Edição inline de dados do paciente
   const [isEditingPatient, setIsEditingPatient] = useState(false);
@@ -1303,32 +1299,16 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
       )}
 
       {/* Modal de Nova Resposta Rápida */}
-      {isNewQuickReplyModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 backdrop-blur-xs p-4">
-          <form
-            ref={quickReplyDialogRef}
-            onSubmit={handleSaveNewQuickReply}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="quick-reply-modal-title"
-            tabIndex={-1}
-            className="max-w-md w-full bg-white dark:bg-slate-900 rounded-2xl p-6 shadow-xl space-y-4 border border-slate-200 dark:border-slate-800 outline-none"
-          >
-            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
-              <h3 id="quick-reply-modal-title" className="font-bold text-slate-900 dark:text-slate-100 text-sm flex items-center gap-2">
-                <Zap className="w-4 h-4 text-amber-500" />
-                Nova Resposta Rápida
-              </h3>
-              <button
-                type="button"
-                onClick={() => setIsNewQuickReplyModalOpen(false)}
-                aria-label="Fechar"
-                className="p-1.5 -m-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
+      <Dialog open={isNewQuickReplyModalOpen} onOpenChange={(open) => !open && setIsNewQuickReplyModalOpen(false)}>
+        <DialogContent className="max-w-md rounded-2xl p-6">
+          <DialogHeader>
+            <DialogTitle className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+              <Zap className="w-4 h-4 text-amber-500" />
+              Nova Resposta Rápida
+            </DialogTitle>
+          </DialogHeader>
 
+          <form onSubmit={handleSaveNewQuickReply} className="space-y-4 mt-2">
             <div className="space-y-3">
               <div>
                 <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Atalho (ex: /horarios):</label>
@@ -1365,36 +1345,20 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
               </button>
             </div>
           </form>
-        </div>
-      )}
+        </DialogContent>
+      </Dialog>
 
       {/* Modal de Novo Contato */}
-      {isNewContactModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 backdrop-blur-xs p-4">
-          <form
-            ref={newContactDialogRef}
-            onSubmit={handleSaveNewContact}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="new-contact-modal-title"
-            tabIndex={-1}
-            className="max-w-md w-full bg-white dark:bg-slate-900 rounded-2xl p-6 shadow-xl space-y-4 border border-slate-200 dark:border-slate-800 outline-none"
-          >
-            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
-              <h3 id="new-contact-modal-title" className="font-bold text-slate-900 dark:text-slate-100 text-sm flex items-center gap-2">
-                <UserPlus className="w-4 h-4 text-emerald-600" />
-                Novo Contato
-              </h3>
-              <button
-                type="button"
-                onClick={() => setIsNewContactModalOpen(false)}
-                aria-label="Fechar"
-                className="p-1.5 -m-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
+      <Dialog open={isNewContactModalOpen} onOpenChange={(open) => !open && setIsNewContactModalOpen(false)}>
+        <DialogContent className="max-w-md rounded-2xl p-6">
+          <DialogHeader>
+            <DialogTitle className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+              <UserPlus className="w-4 h-4 text-emerald-600" />
+              Novo Contato
+            </DialogTitle>
+          </DialogHeader>
 
+          <form onSubmit={handleSaveNewContact} className="space-y-4 mt-2">
             <div className="space-y-3">
               <div>
                 <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Nome:</label>
@@ -1448,8 +1412,8 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
               </button>
             </div>
           </form>
-        </div>
-      )}
+        </DialogContent>
+      </Dialog>
 
       {/* Modal de Agendamento */}
       {selectedContact && (
@@ -1464,36 +1428,20 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
       )}
 
       {/* Modal de Motivo Obrigatório de Resolução */}
-      {isFinishModalOpen && selectedContact && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 backdrop-blur-xs p-4 animate-in fade-in duration-200">
-          <div
-            ref={finishDialogRef}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="finish-modal-title"
-            tabIndex={-1}
-            className="max-w-md w-full bg-white dark:bg-slate-900 rounded-2xl p-6 shadow-xl space-y-4 border border-slate-200 dark:border-slate-800 outline-none"
-          >
-            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
-              <div>
-                <h3 id="finish-modal-title" className="font-bold text-slate-900 dark:text-slate-100 text-sm flex items-center gap-2">
-                  <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-                  Finalizar Atendimento do Paciente
-                </h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-0.5">
-                  Selecione o desfecho obrigatório deste atendimento para {selectedContact.name}.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsFinishModalOpen(false)}
-                aria-label="Fechar"
-                className="p-1.5 -m-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shrink-0"
-              >
-                <X className="w-5 h-5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200" />
-              </button>
-            </div>
+      {selectedContact && (
+      <Dialog open={isFinishModalOpen} onOpenChange={(open) => !open && setIsFinishModalOpen(false)}>
+        <DialogContent className="max-w-md rounded-2xl p-6">
+          <DialogHeader>
+            <DialogTitle className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+              <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+              Finalizar Atendimento do Paciente
+            </DialogTitle>
+            <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
+              Selecione o desfecho obrigatório deste atendimento para {selectedContact.name}.
+            </p>
+          </DialogHeader>
 
+          <div className="space-y-4 mt-2">
             <div className="space-y-2">
               <label id="finish-reason-label" className="text-xs font-semibold text-slate-700 dark:text-slate-300 block">
                 Motivo do Encerramento (Obrigatório):
@@ -1567,7 +1515,8 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
               </button>
             </div>
           </div>
-        </div>
+        </DialogContent>
+      </Dialog>
       )}
     </div>
   );
