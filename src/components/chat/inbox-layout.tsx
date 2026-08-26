@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import {
   Contact,
   Message,
@@ -287,6 +287,14 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
 
   const selectedContact = contacts.find((c) => c.id === selectedContactId) ?? null;
 
+  const availableTagFilters = useMemo(() => {
+    const presetLabels = PRESET_TAGS.map((preset) => preset.label);
+    const customTags = Array.from(new Set(contacts.flatMap((contact) => contact.tags))).filter(
+      (tag) => !presetLabels.includes(tag)
+    );
+    return [...PRESET_TAGS, ...customTags.map((label) => ({ label, classes: tagClasses(label) }))];
+  }, [contacts]);
+
   const filteredContacts = contacts.filter((contact) => {
     if (selectedDept !== 'todos' && contact.department !== selectedDept) return false;
     if (selectedTagFilter && !contact.tags.includes(selectedTagFilter)) return false;
@@ -496,7 +504,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                 >
                   Todas as Tags
                 </button>
-                {PRESET_TAGS.map((preset) => (
+                {availableTagFilters.map((preset) => (
                   <button
                     key={preset.label}
                     onClick={() => {
