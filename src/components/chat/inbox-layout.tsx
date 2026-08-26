@@ -65,6 +65,23 @@ const FUNNEL_STEPS: { id: FunnelStage; label: string }[] = [
   { id: 'agendado', label: 'Agendado' },
 ];
 
+/** Fonte única do estado visual do stepper — antes o dot e o label repetiam o
+ * mesmo ternário isActive/isCompleted separadamente, arriscando os dois saírem
+ * de sincronia numa edição futura. */
+type FunnelStepState = 'active' | 'completed' | 'upcoming';
+
+const FUNNEL_STEP_DOT_CLASSES: Record<FunnelStepState, string> = {
+  active: 'bg-emerald-600 border-emerald-600 text-white',
+  completed: 'bg-emerald-100 dark:bg-emerald-900 border-emerald-400 dark:border-emerald-700 text-emerald-700 dark:text-emerald-300',
+  upcoming: 'bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 text-slate-400 group-hover:border-slate-400',
+};
+
+const FUNNEL_STEP_LABEL_CLASSES: Record<FunnelStepState, string> = {
+  active: 'font-bold text-emerald-700 dark:text-emerald-400',
+  completed: 'font-semibold text-slate-600 dark:text-slate-300',
+  upcoming: 'font-medium text-slate-500 dark:text-slate-400 group-hover:text-slate-600',
+};
+
 const DEFAULT_CATEGORIZED_QUICK_REPLIES = [
   {
     category: '📋 Preparo de Exames',
@@ -1136,6 +1153,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                   const isActive = selectedContact.funnelStage === stage.id;
                   const isCompleted = currentStageIndex > idx;
                   const isLast = idx === FUNNEL_STEPS.length - 1;
+                  const stepState: FunnelStepState = isActive ? 'active' : isCompleted ? 'completed' : 'upcoming';
                   return (
                     <button
                       key={stage.id}
@@ -1151,25 +1169,11 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                         />
                       )}
                       <span
-                        className={`relative z-10 flex items-center justify-center w-5 h-5 rounded-full border-2 shrink-0 transition-colors ${
-                          isActive
-                            ? 'bg-emerald-600 border-emerald-600 text-white'
-                            : isCompleted
-                            ? 'bg-emerald-100 dark:bg-emerald-900 border-emerald-400 dark:border-emerald-700 text-emerald-700 dark:text-emerald-300'
-                            : 'bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 text-slate-400 group-hover:border-slate-400'
-                        }`}
+                        className={`relative z-10 flex items-center justify-center w-5 h-5 rounded-full border-2 shrink-0 transition-colors ${FUNNEL_STEP_DOT_CLASSES[stepState]}`}
                       >
-                        {isActive || isCompleted ? <Check className="w-3 h-3" /> : <span className="text-[9px] font-bold">{idx + 1}</span>}
+                        {stepState !== 'upcoming' ? <Check className="w-3 h-3" /> : <span className="text-[9px] font-bold">{idx + 1}</span>}
                       </span>
-                      <span
-                        className={`text-xs pt-0.5 transition-colors ${
-                          isActive
-                            ? 'font-bold text-emerald-700 dark:text-emerald-400'
-                            : isCompleted
-                            ? 'font-semibold text-slate-600 dark:text-slate-300'
-                            : 'font-medium text-slate-500 dark:text-slate-400 group-hover:text-slate-600'
-                        }`}
-                      >
+                      <span className={`text-xs pt-0.5 transition-colors ${FUNNEL_STEP_LABEL_CLASSES[stepState]}`}>
                         {stage.label}
                       </span>
                     </button>
