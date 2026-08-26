@@ -33,8 +33,8 @@ export function ClinicNav({ exclusiveWhatsapp = false }: { exclusiveWhatsapp?: b
             href={item.href}
             className={`flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl px-3.5 py-1.5 text-xs font-bold transition-all ${
               isActive
-                ? "bg-slate-900 text-white shadow-2xs"
-                : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                ? "bg-slate-900 dark:bg-emerald-600 text-white shadow-2xs"
+                : "text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white"
             }`}
           >
             {item.label}
