@@ -216,15 +216,26 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
   const [editPatientName, setEditPatientName] = useState('');
   const [editPatientCpf, setEditPatientCpf] = useState('');
 
+  // Confirmação de transferência de atendimento — reatribuir um paciente pra outro
+  // atendente é tão irreversível quanto finalizar o atendimento, mas antes bastava
+  // 1 clique sem chance de voltar atrás.
+  const [pendingTransferAgentId, setPendingTransferAgentId] = useState<string | null>(null);
+
   async function handleGenerateIaReply() {
     if (!onSuggestIaReply || isGeneratingIa) return;
+    // Guarda a conversa de origem: se o atendente trocar de conversa antes da IA
+    // terminar, a sugestão não pode ir parar na caixa de texto do paciente errado.
+    const requestedContactId = selectedContactId;
     setIsGeneratingIa(true);
     try {
       const suggestion = await onSuggestIaReply();
-      if (suggestion) {
-        setInputText(suggestion);
-        toast.success("Rascunho de IA inserido na resposta!");
+      if (!suggestion) return;
+      if (requestedContactId !== selectedContactId) {
+        toast('Sugestão de IA descartada: a conversa foi trocada antes de terminar de gerar.', { icon: '⚠️' });
+        return;
       }
+      setInputText(suggestion);
+      toast.success("Rascunho de IA inserido na resposta!");
     } catch {
       toast.error("Não foi possível gerar sugestão de IA.");
     } finally {
@@ -262,6 +273,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
       return '';
     });
     setComposerMode('whatsapp');
+    setPendingTransferAgentId(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedContactId]);
 
@@ -652,6 +664,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                   onClick={() => setMobileView('queue')}
                   className="md:hidden p-1.5 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
                   title="Voltar para a fila"
+                  aria-label="Voltar para a fila"
                 >
                   <ChevronLeft className="w-5 h-5" />
                 </button>
@@ -764,6 +777,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                     onClick={() => setIsMoreMenuOpen(!isMoreMenuOpen)}
                     className="p-2 text-slate-500 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 transition-colors"
                     title="Menu de Ações do Atendimento"
+                    aria-label="Menu de Ações do Atendimento"
                   >
                     <MoreVertical className="w-4 h-4" />
                   </button>
@@ -986,6 +1000,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                             disabled={isSendingMedia}
                             className="flex items-center justify-center w-9 h-9 text-slate-500 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors disabled:opacity-50"
                             title="Anexar imagem ou PDF para enviar ao paciente"
+                            aria-label="Anexar imagem ou PDF para enviar ao paciente"
                           >
                             <Paperclip className={`w-4 h-4 ${isSendingMedia ? 'animate-pulse' : ''}`} />
                           </button>
@@ -1215,10 +1230,46 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                 <div className="space-y-1">
                   {agents.map((agent) => {
                     const isCurrent = agent.name === selectedContact.responsibleAgent;
+
+                    if (pendingTransferAgentId === agent.id) {
+                      return (
+                        <div key={agent.id} className="rounded-lg border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/40 p-2 space-y-1.5">
+                          <p className="text-[11px] font-medium text-amber-800 dark:text-amber-300">
+                            Transferir para {agent.name}?
+                          </p>
+                          <div className="flex gap-1.5">
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                try {
+                                  await onTransferAgent(agent.id, agent.name);
+                                  toast.success(`Atendimento transferido para ${agent.name}.`);
+                                } catch (error) {
+                                  toast.error(error instanceof Error ? error.message : "Não foi possível transferir o atendimento.");
+                                } finally {
+                                  setPendingTransferAgentId(null);
+                                }
+                              }}
+                              className="flex-1 px-2 py-1.5 rounded-md bg-emerald-600 text-white text-[11px] font-semibold hover:bg-emerald-700"
+                            >
+                              Confirmar
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setPendingTransferAgentId(null)}
+                              className="flex-1 px-2 py-1.5 rounded-md border border-slate-300 dark:border-slate-600 text-[11px] font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+                            >
+                              Cancelar
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    }
+
                     return (
                       <button
                         key={agent.id}
-                        onClick={() => onTransferAgent(agent.id, agent.name)}
+                        onClick={() => setPendingTransferAgentId(agent.id)}
                         disabled={isCurrent}
                         className={`w-full px-3 py-2 rounded-lg text-left flex items-center justify-between text-xs transition-colors ${
                           isCurrent
@@ -1517,11 +1568,16 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                 disabled={!selectedReason}
                 onClick={async () => {
                   if (!selectedReason) return;
-                  await onFinishAttendance({ reason: selectedReason, notes: finishNotes });
-                  setIsFinishModalOpen(false);
-                  setSelectedReason(null);
-                  setFinishNotes("");
-                  setInputText("");
+                  try {
+                    await onFinishAttendance({ reason: selectedReason, notes: finishNotes });
+                    toast.success("Atendimento finalizado com sucesso!");
+                    setIsFinishModalOpen(false);
+                    setSelectedReason(null);
+                    setFinishNotes("");
+                    setInputText("");
+                  } catch (error) {
+                    toast.error(error instanceof Error ? error.message : "Não foi possível finalizar o atendimento.");
+                  }
                 }}
                 className={`px-5 py-2.5 font-semibold text-xs rounded-lg shadow-sm transition-all ${
                   !selectedReason
