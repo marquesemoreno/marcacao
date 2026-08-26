@@ -136,7 +136,7 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
             </div>
             <div>
               <h3 id="schedule-modal-title" className="font-bold text-slate-900 dark:text-slate-100 text-sm sm:text-base">Novo Agendamento Rápido</h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400 truncate max-w-[220px] sm:max-w-xs">Paciente: {contact.name}</p>
+              <p className="text-xs text-slate-600 dark:text-slate-400 truncate max-w-[220px] sm:max-w-xs">Paciente: {contact.name}</p>
             </div>
           </div>
           <button
@@ -208,7 +208,7 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
                 })}
               </select>
               {selectedProcedure && (
-                <p className="mt-1.5 text-[11px] text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 p-2 rounded-lg border border-slate-100 dark:border-slate-700">
+                <p className="mt-1.5 text-[11px] text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 p-2 rounded-lg border border-slate-100 dark:border-slate-700">
                   <span className="font-semibold text-slate-700 dark:text-slate-300">{appointmentTypeLabels[selectedProcedure.appointmentType]}</span>
                   {selectedProcedure.procedure.preparationInstructions &&
                     ` · Preparo: ${selectedProcedure.procedure.preparationInstructions}`}

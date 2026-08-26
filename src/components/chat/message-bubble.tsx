@@ -277,7 +277,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry }
                 <div className="flex flex-col items-center justify-center p-8 bg-slate-50 dark:bg-slate-950 border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl space-y-3">
                   <ImageIcon className="w-16 h-16 text-teal-500" />
                   <p className="text-xs font-bold text-slate-700 dark:text-slate-200">{fileName}</p>
-                  {fileSize && <span className="text-[11px] text-slate-400 font-mono">{fileSize}</span>}
+                  {fileSize && <span className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">{fileSize}</span>}
                 </div>
               )}
 
@@ -333,7 +333,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry }
         <p className="whitespace-pre-wrap font-sans text-xs sm:text-[13.5px] leading-relaxed select-text">{message.text}</p>
         <div
           className={`flex items-center justify-end gap-1.5 text-[10px] font-mono mt-1 ${
-            isAgent ? 'text-emerald-100/90' : 'text-slate-400 dark:text-slate-400'
+            isAgent ? 'text-emerald-100/90' : 'text-slate-500 dark:text-slate-400'
           }`}
         >
           <span>{message.timestamp}</span>

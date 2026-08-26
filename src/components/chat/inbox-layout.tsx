@@ -512,7 +512,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
         {/* Lista de Conversas */}
         <div className="flex-1 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800/80">
           {filteredContacts.length === 0 ? (
-            <div className="p-8 text-center text-xs text-slate-400 flex flex-col items-center justify-center gap-3">
+            <div className="p-8 text-center text-xs text-slate-500 dark:text-slate-400 flex flex-col items-center justify-center gap-3">
               <MessageSquare className="w-8 h-8 text-slate-300 dark:text-slate-700" />
               <span>Nenhuma conversa encontrada nesta lista.</span>
               {contacts.length === 0 && (
@@ -566,7 +566,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                       <h4 className={`text-xs sm:text-[13px] truncate ${c.unreadCount > 0 ? 'font-bold text-slate-900 dark:text-slate-100' : 'font-semibold text-slate-900 dark:text-slate-100'}`}>
                         {c.name}
                       </h4>
-                      <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium shrink-0">
+                      <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium shrink-0">
                         {c.lastMessageTime}
                       </span>
                     </div>
@@ -689,7 +689,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                           </button>
                           {isClinicMenuOpen && (
                             <div className="absolute left-0 mt-1 w-56 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-lg py-2 z-50 animate-in fade-in zoom-in-95 text-xs font-medium max-h-64 overflow-y-auto">
-                              <div className="px-3 py-1 text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase border-b border-slate-100 dark:border-slate-800 mb-1">
+                              <div className="px-3 py-1 text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase border-b border-slate-100 dark:border-slate-800 mb-1">
                                 Corrigir Clínica Desta Conversa
                               </div>
                               {availableClinics.map((clinic) => (
@@ -751,7 +751,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                     className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-slate-700 dark:text-slate-200 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg"
                     title="Veja em Perfil & CRM, na lateral, para transferir"
                   >
-                    <span className="text-slate-400 font-normal hidden sm:inline">Atendente:</span>
+                    <span className="text-slate-500 dark:text-slate-400 font-normal hidden sm:inline">Atendente:</span>
                     <span className="font-semibold text-slate-900 dark:text-slate-100 truncate max-w-[100px]">{selectedContact.responsibleAgent}</span>
                   </span>
                 )}
@@ -847,7 +847,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
               data-od-id="chat-messages-area"
             >
               {messages.length === 0 ? (
-                <p className="text-center text-xs text-slate-400 dark:text-slate-500 mt-8">Nenhuma mensagem ainda nesta conversa.</p>
+                <p className="text-center text-xs text-slate-500 dark:text-slate-400 mt-8">Nenhuma mensagem ainda nesta conversa.</p>
               ) : (
                 <>
                   {hasMoreMessages && (
@@ -882,7 +882,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                 {isQuickReplyOpen && (
                   <div className="absolute bottom-full left-0 mb-2 w-full max-w-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-lg py-2 z-30 max-h-64 overflow-y-auto animate-in fade-in slide-in-from-bottom-2 duration-150">
                     <div className="flex items-center justify-between px-3 py-1.5 border-b border-slate-100 dark:border-slate-800">
-                      <span className="text-[10px] uppercase font-bold text-slate-400 dark:text-slate-500">
+                      <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400">
                         Respostas Rápidas Categorizadas
                       </span>
                       <button
@@ -907,7 +907,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                       >
                         <div className="flex items-center justify-between">
                           <p className="font-semibold text-emerald-700 dark:text-emerald-400 text-xs">{reply.shortcut}</p>
-                          <span className="text-[10px] text-slate-400">{reply.category}</span>
+                          <span className="text-[10px] text-slate-500 dark:text-slate-400">{reply.category}</span>
                         </div>
                         <p className="text-slate-600 dark:text-slate-300 text-xs truncate mt-0.5">{reply.content}</p>
                       </button>
@@ -1145,12 +1145,12 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                 <div className="space-y-1.5 text-xs text-slate-600 dark:text-slate-300">
                   {selectedContact.cpf && (
                     <div className="flex justify-between">
-                      <span className="text-slate-400 font-medium">CPF:</span>
+                      <span className="text-slate-500 dark:text-slate-400 font-medium">CPF:</span>
                       <span className="text-slate-800 dark:text-slate-200 font-semibold">{selectedContact.cpf}</span>
                     </div>
                   )}
                   <div className="flex justify-between">
-                    <span className="text-slate-400 font-medium">Bairro/Região:</span>
+                    <span className="text-slate-500 dark:text-slate-400 font-medium">Bairro/Região:</span>
                     <span className="font-semibold text-slate-800 dark:text-slate-200">{selectedContact.neighborhood || 'Não informado'}</span>
                   </div>
                 </div>
@@ -1159,7 +1159,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
 
             {/* Card 2: Pipeline do Funil CRM (Stepper Conectado) */}
             <div className="bg-white dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-700/80 rounded-xl p-4 shadow-sm space-y-2.5">
-              <label className="block text-[11px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500">
+              <label className="block text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                 Etapa do Funil CRM
               </label>
               <div>
@@ -1198,7 +1198,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                             ? 'font-bold text-emerald-700 dark:text-emerald-400'
                             : isCompleted
                             ? 'font-semibold text-slate-600 dark:text-slate-300'
-                            : 'font-medium text-slate-400 dark:text-slate-500 group-hover:text-slate-600'
+                            : 'font-medium text-slate-500 dark:text-slate-400 group-hover:text-slate-600'
                         }`}
                       >
                         {stage.label}
@@ -1212,7 +1212,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
             {/* Card 3: Tags & Observações */}
             <div className="bg-white dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-700/80 rounded-xl p-4 shadow-sm space-y-2">
               <div className="flex items-center justify-between">
-                <label className="text-[11px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500 flex items-center gap-1.5">
+                <label className="text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
                   <Tag className="w-3.5 h-3.5 text-slate-400" /> Tags do Paciente
                 </label>
                 {!isAddingTag && (
@@ -1227,7 +1227,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
 
               <div className="flex flex-wrap gap-1.5">
                 {selectedContact.tags.length === 0 && !isAddingTag && (
-                  <span className="text-[11px] text-slate-400 dark:text-slate-500">Nenhuma tag ainda.</span>
+                  <span className="text-[11px] text-slate-500 dark:text-slate-400">Nenhuma tag ainda.</span>
                 )}
                 {selectedContact.tags.map((tag) => (
                   <span
@@ -1263,11 +1263,11 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
 
             {/* Card 4: Transferir Atendimento — movido da barra do chat pra cá */}
             <div className="bg-white dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-700/80 rounded-xl p-4 shadow-sm space-y-2">
-              <label className="text-[11px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500 flex items-center gap-1.5">
+              <label className="text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
                 <UserPlus className="w-3.5 h-3.5 text-slate-400" /> Transferir Atendimento Para
               </label>
               {agents.length === 0 ? (
-                <p className="text-[11px] text-slate-400 dark:text-slate-500">Nenhum outro atendente disponível.</p>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400">Nenhum outro atendente disponível.</p>
               ) : (
                 <div className="space-y-1">
                   {agents.map((agent) => {
@@ -1286,7 +1286,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                         <span className={`font-semibold ${isCurrent ? 'text-emerald-800 dark:text-emerald-300' : 'text-slate-700 dark:text-slate-200'}`}>
                           {agent.name}
                         </span>
-                        <span className="text-[10px] text-slate-400">{isCurrent ? 'Atual' : agent.role}</span>
+                        <span className="text-[10px] text-slate-500 dark:text-slate-400">{isCurrent ? 'Atual' : agent.role}</span>
                       </button>
                     );
                   })}
