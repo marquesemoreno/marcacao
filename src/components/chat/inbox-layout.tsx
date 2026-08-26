@@ -14,7 +14,7 @@ import { ScheduleModal } from './schedule-modal';
 import { AvatarBadge } from './avatar-badge';
 import type { PlainClinicProcedureItem } from '@/lib/serialize';
 import { seedDemoConversations } from '@/actions/inbox';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from '@/components/ui/dialog';
 import { toast } from "sonner";
 import {
   Search,
@@ -1299,7 +1299,13 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
 
       {/* Modal de Nova Resposta Rápida */}
       <Dialog open={isNewQuickReplyModalOpen} onOpenChange={(open) => !open && setIsNewQuickReplyModalOpen(false)}>
-        <DialogContent className="max-w-md rounded-2xl p-6">
+        <DialogContent className="max-w-md rounded-2xl p-6" showCloseButton={false}>
+          <DialogClose
+            aria-label="Fechar"
+            render={<button className="absolute top-2 right-2 size-11 flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors" />}
+          >
+            <X className="w-5 h-5" />
+          </DialogClose>
           <DialogHeader>
             <DialogTitle className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
               <Zap className="w-4 h-4 text-amber-500" />
@@ -1349,7 +1355,13 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
 
       {/* Modal de Novo Contato */}
       <Dialog open={isNewContactModalOpen} onOpenChange={(open) => !open && setIsNewContactModalOpen(false)}>
-        <DialogContent className="max-w-md rounded-2xl p-6">
+        <DialogContent className="max-w-md rounded-2xl p-6" showCloseButton={false}>
+          <DialogClose
+            aria-label="Fechar"
+            render={<button className="absolute top-2 right-2 size-11 flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors" />}
+          >
+            <X className="w-5 h-5" />
+          </DialogClose>
           <DialogHeader>
             <DialogTitle className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
               <UserPlus className="w-4 h-4 text-emerald-600" />
@@ -1429,7 +1441,13 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
       {/* Modal de Motivo Obrigatório de Resolução */}
       {selectedContact && (
       <Dialog open={isFinishModalOpen} onOpenChange={(open) => !open && setIsFinishModalOpen(false)}>
-        <DialogContent className="max-w-md rounded-2xl p-6">
+        <DialogContent className="max-w-md rounded-2xl p-6" showCloseButton={false}>
+          <DialogClose
+            aria-label="Fechar"
+            render={<button className="absolute top-2 right-2 size-11 flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors" />}
+          >
+            <X className="w-5 h-5" />
+          </DialogClose>
           <DialogHeader>
             <DialogTitle className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
               <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />

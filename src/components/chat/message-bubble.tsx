@@ -2,9 +2,9 @@
 
 import React, { useRef, useState } from 'react';
 import { Message } from '@/types/chat-crm';
-import { Play, Pause, Lock, CheckCheck, FileText, Copy, Check, Download, ZoomIn, Image as ImageIcon, Clock, AlertCircle } from 'lucide-react';
+import { Play, Pause, Lock, CheckCheck, FileText, Copy, Check, Download, ZoomIn, X, Image as ImageIcon, Clock, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from '@/components/ui/dialog';
 
 interface MessageBubbleProps {
   message: Message;
@@ -254,7 +254,13 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry }
 
         {/* Lightbox Visualizador de Mídias e Pedidos Médicos */}
         <Dialog open={isLightboxOpen && hasRealFile} onOpenChange={(open) => !open && setIsLightboxOpen(false)}>
-          <DialogContent className="max-w-2xl rounded-3xl p-6">
+          <DialogContent className="max-w-2xl rounded-3xl p-6" showCloseButton={false}>
+            <DialogClose
+              aria-label="Fechar"
+              render={<button className="absolute top-2 right-2 size-11 flex items-center justify-center rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors" />}
+            >
+              <X className="w-5 h-5" />
+            </DialogClose>
             <DialogHeader>
               <DialogTitle className="text-sm font-extrabold text-slate-900 dark:text-slate-100 flex items-center gap-2">
                 <FileText className="w-5 h-5 text-teal-600 dark:text-teal-400" />
