@@ -68,7 +68,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry }
     }
   };
 
-  // 1. Nota Interna Privada
+  // 1. Nota Interna
   if (message.type === 'internal_note') {
     return (
       <div className="flex justify-center my-3.5 w-full px-2 sm:px-4 animate-in fade-in slide-in-from-bottom-2 duration-200" data-od-id={`internal-note-${message.id}`}>
@@ -76,7 +76,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry }
           <div className="flex items-center justify-between pb-2 border-b border-amber-200/70 dark:border-amber-800/60">
             <span className="inline-flex items-center gap-1.5 font-bold text-[11px] text-amber-800 dark:text-amber-300 bg-amber-100/90 dark:bg-amber-900/60 px-2.5 py-0.5 rounded-full uppercase tracking-wider font-mono">
               <Lock className="w-3 h-3 text-amber-700 dark:text-amber-400" />
-              🔒 Nota Privada (Equipe)
+              🔒 Nota Interna (Equipe)
             </span>
             <div className="flex items-center gap-2">
               <button
