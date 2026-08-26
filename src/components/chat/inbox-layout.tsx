@@ -14,6 +14,7 @@ import { ScheduleModal } from './schedule-modal';
 import { AvatarBadge } from './avatar-badge';
 import type { PlainClinicProcedureItem } from '@/lib/serialize';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from '@/components/ui/dialog';
+import { useClickOutside } from '@/hooks/use-click-outside';
 import { toast } from "sonner";
 import {
   Search,
@@ -163,8 +164,11 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
   const [selectedDept] = useState<'todos' | Department>('todos');
   const [selectedTagFilter, setSelectedTagFilter] = useState<string | null>(null);
   const [isTagFilterOpen, setIsTagFilterOpen] = useState(false);
+  const tagFilterRef = useClickOutside<HTMLDivElement>(isTagFilterOpen, () => setIsTagFilterOpen(false));
   const [isClinicMenuOpen, setIsClinicMenuOpen] = useState(false);
+  const clinicMenuRef = useClickOutside<HTMLDivElement>(isClinicMenuOpen, () => setIsClinicMenuOpen(false));
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
+  const moreMenuRef = useClickOutside<HTMLDivElement>(isMoreMenuOpen, () => setIsMoreMenuOpen(false));
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
   const [isNewContactModalOpen, setIsNewContactModalOpen] = useState(false);
   const [newContactName, setNewContactName] = useState('');
@@ -172,6 +176,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
   const [newContactClinicId, setNewContactClinicId] = useState('');
   const [isSavingContact, setIsSavingContact] = useState(false);
   const [isQuickReplyOpen, setIsQuickReplyOpen] = useState(false);
+  const quickReplyRef = useClickOutside<HTMLFormElement>(isQuickReplyOpen, () => setIsQuickReplyOpen(false));
   const [isNewQuickReplyModalOpen, setIsNewQuickReplyModalOpen] = useState(false);
   const [newShortcut, setNewShortcut] = useState('');
   const [newShortcutContent, setNewShortcutContent] = useState('');
@@ -448,7 +453,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
           </div>
 
           {/* Filtro por Tag: Dropdown Compacto */}
-          <div className="relative">
+          <div className="relative" ref={tagFilterRef}>
             <button
               type="button"
               onClick={() => setIsTagFilterOpen((open) => !open)}
@@ -641,7 +646,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                     </span>
                     {selectedContact.clinicName && (
                       onReassignClinic && availableClinics && availableClinics.length > 0 ? (
-                        <div className="relative">
+                        <div className="relative" ref={clinicMenuRef}>
                           <button
                             type="button"
                             onClick={() => setIsClinicMenuOpen((open) => !open)}
@@ -729,7 +734,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                 </button>
 
                 {/* Menu de Ações da Conversa (...) */}
-                <div className="relative">
+                <div className="relative" ref={moreMenuRef}>
                   <button
                     onClick={() => setIsMoreMenuOpen(!isMoreMenuOpen)}
                     className="p-2 text-slate-500 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 transition-colors"
@@ -841,7 +846,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
 
             {/* Barra de Envio Inferior: toggle integrado no topo do input */}
             <footer className="p-2.5 sm:p-3.5 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 shrink-0">
-              <form onSubmit={handleSendMessage} className="relative">
+              <form ref={quickReplyRef} onSubmit={handleSendMessage} className="relative">
                 {isQuickReplyOpen && (
                   <div className="absolute bottom-full left-0 mb-2 w-full max-w-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-lg py-2 z-30 max-h-64 overflow-y-auto animate-in fade-in slide-in-from-bottom-2 duration-150">
                     <div className="flex items-center justify-between px-3 py-1.5 border-b border-slate-100 dark:border-slate-800">
