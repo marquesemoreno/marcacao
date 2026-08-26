@@ -1151,46 +1151,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
               )}
             </div>
 
-            {/* Card 2: Pipeline do Funil CRM (Stepper Conectado) */}
-            <div className="bg-white dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-700/80 rounded-xl p-4 shadow-sm space-y-2.5">
-              <label className="block text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                Etapa do Atendimento
-              </label>
-              <div>
-                {FUNNEL_STEPS.map((stage, idx) => {
-                  const isActive = selectedContact.funnelStage === stage.id;
-                  const isCompleted = currentStageIndex > idx;
-                  const isLast = idx === FUNNEL_STEPS.length - 1;
-                  const stepState: FunnelStepState = isActive ? 'active' : isCompleted ? 'completed' : 'upcoming';
-                  return (
-                    <button
-                      key={stage.id}
-                      type="button"
-                      onClick={() => onUpdateFunnelStage(stage.id)}
-                      className="relative flex items-start gap-3 w-full text-left pb-3.5 last:pb-0 group"
-                    >
-                      {!isLast && (
-                        <span
-                          className={`absolute left-[9px] top-5 bottom-0 w-0.5 ${
-                            isCompleted ? 'bg-emerald-400' : 'bg-slate-200 dark:bg-slate-700'
-                          }`}
-                        />
-                      )}
-                      <span
-                        className={`relative z-10 flex items-center justify-center w-5 h-5 rounded-full border-2 shrink-0 transition-colors ${FUNNEL_STEP_DOT_CLASSES[stepState]}`}
-                      >
-                        {stepState !== 'upcoming' ? <Check className="w-3 h-3" /> : <span className="text-[9px] font-bold">{idx + 1}</span>}
-                      </span>
-                      <span className={`text-xs pt-0.5 transition-colors ${FUNNEL_STEP_LABEL_CLASSES[stepState]}`}>
-                        {stage.label}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Card 3: Tags & Observações */}
+            {/* Card 2: Tags & Observações */}
             <div className="bg-white dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-700/80 rounded-xl p-4 shadow-sm space-y-2">
               <div className="flex items-center justify-between">
                 <label className="text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
@@ -1243,7 +1204,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
               )}
             </div>
 
-            {/* Card 4: Transferir Atendimento — movido da barra do chat pra cá */}
+            {/* Card 3: Transferir Atendimento — movido da barra do chat pra cá */}
             <div className="bg-white dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-700/80 rounded-xl p-4 shadow-sm space-y-2">
               <label className="text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
                 <UserPlus className="w-3.5 h-3.5 text-slate-400" /> Transferir Atendimento Para
@@ -1274,6 +1235,45 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                   })}
                 </div>
               )}
+            </div>
+
+            {/* Card 4: Pipeline do Funil CRM (Stepper Conectado) */}
+            <div className="bg-white dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-700/80 rounded-xl p-4 shadow-sm space-y-2.5">
+              <label className="block text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                Etapa do Atendimento
+              </label>
+              <div>
+                {FUNNEL_STEPS.map((stage, idx) => {
+                  const isActive = selectedContact.funnelStage === stage.id;
+                  const isCompleted = currentStageIndex > idx;
+                  const isLast = idx === FUNNEL_STEPS.length - 1;
+                  const stepState: FunnelStepState = isActive ? 'active' : isCompleted ? 'completed' : 'upcoming';
+                  return (
+                    <button
+                      key={stage.id}
+                      type="button"
+                      onClick={() => onUpdateFunnelStage(stage.id)}
+                      className="relative flex items-start gap-3 w-full text-left pb-3.5 last:pb-0 group"
+                    >
+                      {!isLast && (
+                        <span
+                          className={`absolute left-[9px] top-5 bottom-0 w-0.5 ${
+                            isCompleted ? 'bg-emerald-400' : 'bg-slate-200 dark:bg-slate-700'
+                          }`}
+                        />
+                      )}
+                      <span
+                        className={`relative z-10 flex items-center justify-center w-5 h-5 rounded-full border-2 shrink-0 transition-colors ${FUNNEL_STEP_DOT_CLASSES[stepState]}`}
+                      >
+                        {stepState !== 'upcoming' ? <Check className="w-3 h-3" /> : <span className="text-[9px] font-bold">{idx + 1}</span>}
+                      </span>
+                      <span className={`text-xs pt-0.5 transition-colors ${FUNNEL_STEP_LABEL_CLASSES[stepState]}`}>
+                        {stage.label}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
         </aside>
