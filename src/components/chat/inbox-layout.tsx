@@ -1146,7 +1146,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
             {/* Card 2: Pipeline do Funil CRM (Stepper Conectado) */}
             <div className="bg-white dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-700/80 rounded-xl p-4 shadow-sm space-y-2.5">
               <label className="block text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                Etapa do Funil CRM
+                Etapa do Atendimento
               </label>
               <div>
                 {FUNNEL_STEPS.map((stage, idx) => {
