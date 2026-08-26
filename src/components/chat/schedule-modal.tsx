@@ -3,10 +3,11 @@
 import React, { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { Contact } from '@/types/chat-crm';
-import { X, Calendar, Clock, Stethoscope, DollarSign, CheckCircle2, UserRound } from 'lucide-react';
+import { X, Calendar, Clock, Stethoscope, IdCard, CheckCircle2, UserRound } from 'lucide-react';
 import { createAppointment } from '@/actions/appointments';
 import { formatCurrency, appointmentTypeLabels } from '@/lib/format';
 import type { PlainClinicProcedureItem } from '@/lib/serialize';
+import { useDialogA11y } from '@/hooks/use-dialog-a11y';
 
 type BridgeDoctor = { id: number; nome: string; crm: string };
 
@@ -73,6 +74,8 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, contact.cpf]);
 
+  const dialogRef = useDialogA11y<HTMLDivElement>(isOpen, onClose);
+
   if (!isOpen) return null;
 
   const selectedProcedure = procedures.find((p) => p.id === procedureId);
@@ -118,20 +121,28 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden border border-slate-100 animate-in slide-in-from-bottom-6 sm:zoom-in-95 duration-200">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 bg-slate-50/70">
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="schedule-modal-title"
+        tabIndex={-1}
+        className="bg-white dark:bg-slate-900 rounded-t-2xl sm:rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden border border-slate-100 dark:border-slate-800 animate-in slide-in-from-bottom-6 sm:zoom-in-95 duration-200 outline-none"
+      >
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/40">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold shadow-2xs">
+            <div className="w-8 h-8 rounded-xl bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 flex items-center justify-center font-bold shadow-2xs">
               <Calendar className="w-4 h-4" />
             </div>
             <div>
-              <h3 className="font-bold text-slate-900 text-sm sm:text-base">Novo Agendamento Rápido</h3>
-              <p className="text-xs text-slate-500 truncate max-w-[220px] sm:max-w-xs">Paciente: {contact.name}</p>
+              <h3 id="schedule-modal-title" className="font-bold text-slate-900 dark:text-slate-100 text-sm sm:text-base">Novo Agendamento Rápido</h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 truncate max-w-[220px] sm:max-w-xs">Paciente: {contact.name}</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="text-slate-400 hover:text-slate-600 p-2 rounded-xl hover:bg-slate-100 transition-colors"
+            aria-label="Fechar"
+            className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
@@ -139,11 +150,11 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
 
         {isSuccess ? (
           <div className="p-8 text-center flex flex-col items-center justify-center gap-3 animate-in zoom-in-95 duration-300">
-            <div className="w-14 h-14 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center animate-bounce shadow-xs">
+            <div className="w-14 h-14 bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 rounded-full flex items-center justify-center shadow-xs">
               <CheckCircle2 className="w-8 h-8" />
             </div>
-            <h4 className="text-lg font-bold text-slate-900">Agendamento Confirmado!</h4>
-            <p className="text-xs sm:text-sm text-slate-600 max-w-xs leading-relaxed">
+            <h4 className="text-lg font-bold text-slate-900 dark:text-slate-100">Agendamento Confirmado!</h4>
+            <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 max-w-xs leading-relaxed">
               A consulta foi integrada à agenda médica e a confirmação foi enviada ao paciente pelo WhatsApp.
             </p>
           </div>
@@ -151,13 +162,13 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
           <form onSubmit={handleSubmit} className="p-5 sm:p-6 space-y-4">
             {requiresDoctor && (
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5 flex items-center gap-1.5 font-mono">
-                  <UserRound className="w-3.5 h-3.5 text-emerald-600" /> Médico / Especialista
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5 flex items-center gap-1.5 font-mono">
+                  <UserRound className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" /> Médico / Especialista
                 </label>
                 <select
                   value={doctorId}
                   onChange={(e) => setDoctorId(e.target.value)}
-                  className="w-full text-xs sm:text-sm border border-slate-200 rounded-xl px-3.5 py-2.5 bg-slate-50/50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-medium"
+                  className="w-full text-xs sm:text-sm border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 bg-slate-50/50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-medium"
                   required
                 >
                   <option value="" disabled>Escolha um médico...</option>
@@ -171,13 +182,13 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
             )}
 
             <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5 flex items-center gap-1.5 font-mono">
-                <Stethoscope className="w-3.5 h-3.5 text-emerald-600" /> Procedimento Médico
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5 flex items-center gap-1.5 font-mono">
+                <Stethoscope className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" /> Procedimento Médico
               </label>
               <select
                 value={procedureId}
                 onChange={(e) => setProcedureId(e.target.value)}
-                className="w-full text-xs sm:text-sm border border-slate-200 rounded-xl px-3.5 py-2.5 bg-slate-50/50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-medium"
+                className="w-full text-xs sm:text-sm border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 bg-slate-50/50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-medium"
                 required
                 disabled={loadingProcedures}
               >
@@ -197,8 +208,8 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
                 })}
               </select>
               {selectedProcedure && (
-                <p className="mt-1.5 text-[11px] text-slate-500 bg-slate-50 p-2 rounded-lg border border-slate-100">
-                  <span className="font-semibold text-slate-700">{appointmentTypeLabels[selectedProcedure.appointmentType]}</span>
+                <p className="mt-1.5 text-[11px] text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 p-2 rounded-lg border border-slate-100 dark:border-slate-700">
+                  <span className="font-semibold text-slate-700 dark:text-slate-300">{appointmentTypeLabels[selectedProcedure.appointmentType]}</span>
                   {selectedProcedure.procedure.preparationInstructions &&
                     ` · Preparo: ${selectedProcedure.procedure.preparationInstructions}`}
                 </p>
@@ -207,36 +218,36 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5 flex items-center gap-1.5 font-mono">
-                  <Calendar className="w-3.5 h-3.5 text-emerald-600" /> Data
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5 flex items-center gap-1.5 font-mono">
+                  <Calendar className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" /> Data
                 </label>
                 <input
                   type="date"
                   value={date}
                   onChange={(e) => setDate(e.target.value)}
                   min={new Date().toISOString().slice(0, 10)}
-                  className="w-full text-xs sm:text-sm border border-slate-200 rounded-xl px-3 py-2.5 bg-slate-50/50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+                  className="w-full text-xs sm:text-sm border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 bg-slate-50/50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
                   required
                 />
               </div>
 
               {selectedProcedure?.appointmentType === 'SCHEDULED' && (
                 <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5 flex items-center gap-1.5 font-mono">
-                    <Clock className="w-3.5 h-3.5 text-emerald-600" /> Horário
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5 flex items-center gap-1.5 font-mono">
+                    <Clock className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" /> Horário
                   </label>
                   <input
                     type="time"
                     value={time}
                     onChange={(e) => setTime(e.target.value)}
-                    className="w-full text-xs sm:text-sm border border-slate-200 rounded-xl px-3 py-2.5 bg-slate-50/50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+                    className="w-full text-xs sm:text-sm border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 bg-slate-50/50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
                   />
                 </div>
               )}
 
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5 flex items-center gap-1.5 font-mono">
-                  <DollarSign className="w-3.5 h-3.5 text-emerald-600" /> CPF
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5 flex items-center gap-1.5 font-mono">
+                  <IdCard className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" /> CPF
                 </label>
                 <input
                   type="text"
@@ -245,17 +256,17 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
                   onChange={(e) => setCpf(formatCpfMask(e.target.value))}
                   placeholder="000.000.000-00"
                   maxLength={14}
-                  className="w-full text-xs sm:text-sm border border-slate-200 rounded-xl px-3 py-2.5 bg-slate-50/50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-mono"
+                  className="w-full text-xs sm:text-sm border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 bg-slate-50/50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-mono"
                   required
                 />
               </div>
             </div>
 
-            <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
+            <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-end gap-2.5">
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2.5 text-xs sm:text-sm font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors min-h-[44px]"
+                className="px-4 py-2.5 text-xs sm:text-sm font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors min-h-[44px]"
               >
                 Cancelar
               </button>

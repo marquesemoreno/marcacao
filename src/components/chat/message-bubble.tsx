@@ -4,6 +4,7 @@ import React, { useRef, useState } from 'react';
 import { Message } from '@/types/chat-crm';
 import { Play, Pause, Lock, CheckCheck, FileText, Copy, Check, Download, ZoomIn, X, Image as ImageIcon, Clock, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
+import { useDialogA11y } from '@/hooks/use-dialog-a11y';
 
 interface MessageBubbleProps {
   message: Message;
@@ -41,6 +42,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry }
   const [copied, setCopied] = useState(false);
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
+  const lightboxDialogRef = useDialogA11y<HTMLDivElement>(isLightboxOpen, () => setIsLightboxOpen(false));
 
   const handleCopyText = (text: string) => {
     navigator.clipboard.writeText(text);
@@ -254,14 +256,22 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry }
         {/* Lightbox Visualizador de Mídias e Pedidos Médicos */}
         {isLightboxOpen && hasRealFile && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-            <div className="relative max-w-2xl w-full bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-2xl space-y-4 border border-slate-200 dark:border-slate-800">
+            <div
+              ref={lightboxDialogRef}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="lightbox-modal-title"
+              tabIndex={-1}
+              className="relative max-w-2xl w-full bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-2xl space-y-4 border border-slate-200 dark:border-slate-800 outline-none"
+            >
               <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
                 <div className="flex items-center gap-2">
                   <FileText className="w-5 h-5 text-teal-600 dark:text-teal-400" />
-                  <h3 className="font-extrabold text-slate-900 dark:text-slate-100 text-sm">{fileName}</h3>
+                  <h3 id="lightbox-modal-title" className="font-extrabold text-slate-900 dark:text-slate-100 text-sm">{fileName}</h3>
                 </div>
                 <button
                   onClick={() => setIsLightboxOpen(false)}
+                  aria-label="Fechar"
                   className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800"
                 >
                   <X className="w-5 h-5" />
