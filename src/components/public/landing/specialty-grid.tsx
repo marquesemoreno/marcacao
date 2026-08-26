@@ -165,10 +165,15 @@ export function SpecialtyGrid({
                       {label}
                     </h3>
 
-                    {/* Selo de preço real (ou aviso honesto quando ainda não há cobertura) */}
+                    {/* Selo de preço real (ou aviso honesto quando o preço ainda não foi
+                        cadastrado, ou quando não há clínica nenhuma pra essa especialidade) */}
                     {startingPrice !== undefined ? (
                       <div className="mt-2.5 inline-flex items-center gap-1.5 rounded-full border border-emerald-200/80 bg-emerald-50/90 px-3 py-1 text-xs font-bold text-emerald-800 shadow-2xs">
                         <span>A partir de {formatCurrency(startingPrice)}</span>
+                      </div>
+                    ) : clinicCount > 0 ? (
+                      <div className="mt-2.5 inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-500">
+                        <span>💬 Valor sob consulta</span>
                       </div>
                     ) : (
                       <div className="mt-2.5 inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-500">

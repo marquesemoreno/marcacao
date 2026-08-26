@@ -138,10 +138,12 @@ export async function getSpecialtyClinicCounts() {
 /** Menor preço credenciado por especialidade e por procedimento — usado pro
  * selo "a partir de R$X" na home. Antes a home so tinha a contagem de clínicas
  * aqui em cima e nenhum preço de verdade era buscado, apesar do card prometer
- * "valores transparentes". */
+ * "valores transparentes". price = 0 significa "clínica ainda não cadastrou
+ * o valor" (convenção já usada em outras partes do sistema), não "grátis" —
+ * essas linhas são ignoradas aqui pra não mostrar "a partir de R$0,00". */
 export async function getSpecialtyStartingPrices() {
   const rows = await prisma.clinicProcedure.findMany({
-    where: { clinic: { active: true } },
+    where: { clinic: { active: true }, price: { gt: 0 } },
     select: {
       price: true,
       procedure: { select: { name: true, specialty: { select: { name: true } } } },

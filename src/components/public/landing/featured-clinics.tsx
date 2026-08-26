@@ -58,7 +58,8 @@ export function FeaturedClinics({ clinics }: { clinics: FeaturedClinic[] }) {
         {/* Clinics Grid */}
         <div className="mt-12 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {clinics.map((clinic, index) => {
-            const procedurePrices = clinic.clinicProcedures?.map((cp) => Number(cp.price)) ?? [];
+            // price = 0 significa que a clínica ainda não cadastrou o valor, não que é grátis.
+            const procedurePrices = clinic.clinicProcedures?.map((cp) => Number(cp.price)).filter((p) => p > 0) ?? [];
             const startingPrice = procedurePrices.length > 0 ? Math.min(...procedurePrices) : undefined;
 
             return (
