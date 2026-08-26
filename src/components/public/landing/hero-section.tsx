@@ -4,7 +4,7 @@ import { HeroSearch } from "@/components/public/landing/hero-search";
 const trustBadges = [
   { label: "+30 Clínicas Credenciadas", icon: Award },
   { label: "Zero Mensalidade", icon: ShieldCheck },
-  { label: "Confirmação no WhatsApp em 2 min", icon: Clock },
+  { label: "Resposta em 2 min", icon: Clock },
 ];
 
 export function HeroSection() {
@@ -42,7 +42,7 @@ export function HeroSection() {
         {/* Imposing Title & Subtitle */}
         <h1 className="max-w-4xl text-balance text-3xl font-extrabold tracking-tight text-slate-900 sm:text-5xl lg:text-6xl lg:leading-[1.12]">
           Marque suas consultas e exames com{" "}
-          <span className="bg-gradient-to-r from-sky-600 via-teal-600 to-emerald-600 bg-clip-text text-transparent">
+          <span className="text-teal-600">
             agilidade e preços acessíveis
           </span>
         </h1>
@@ -57,13 +57,13 @@ export function HeroSection() {
         </div>
 
         {/* Trust Badges */}
-        <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-3 pt-4 text-xs sm:text-sm font-medium text-slate-600">
+        <div className="flex flex-wrap items-center justify-center gap-x-2.5 gap-y-2 pt-4 text-xs sm:gap-x-8 sm:gap-y-3 sm:text-sm font-medium text-slate-600">
           {trustBadges.map(({ label, icon: Icon }) => (
             <span
               key={label}
-              className="inline-flex items-center gap-2 rounded-full bg-white/70 px-3.5 py-1.5 border border-slate-200/70 shadow-2xs backdrop-blur-xs text-slate-700 font-semibold"
+              className="inline-flex items-center gap-1.5 rounded-full bg-white/70 px-2.5 py-1 border border-slate-200/70 shadow-2xs backdrop-blur-xs text-slate-700 font-semibold text-[11px] sm:gap-2 sm:px-3.5 sm:py-1.5 sm:text-sm"
             >
-              <Icon className="size-4 text-teal-600" />
+              <Icon className="size-3.5 text-teal-600 sm:size-4" />
               {label}
             </span>
           ))}

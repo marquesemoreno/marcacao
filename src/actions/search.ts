@@ -108,7 +108,7 @@ export async function getClinicProcedureDetail(id: string) {
 }
 
 /** Número de clínicas credenciadas disponíveis por especialidade e por procedimento. */
-export async function getSpecialtyStartingPrices() {
+export async function getSpecialtyClinicCounts() {
   const rows = await prisma.clinicProcedure.findMany({
     where: { clinic: { active: true } },
     select: {
@@ -135,6 +135,34 @@ export async function getSpecialtyStartingPrices() {
   return result;
 }
 
+/** Menor preço credenciado por especialidade e por procedimento — usado pro
+ * selo "a partir de R$X" na home. Antes a home so tinha a contagem de clínicas
+ * aqui em cima e nenhum preço de verdade era buscado, apesar do card prometer
+ * "valores transparentes". */
+export async function getSpecialtyStartingPrices() {
+  const rows = await prisma.clinicProcedure.findMany({
+    where: { clinic: { active: true } },
+    select: {
+      price: true,
+      procedure: { select: { name: true, specialty: { select: { name: true } } } },
+    },
+  });
+
+  const result: Record<string, number> = {};
+  for (const row of rows) {
+    const price = Number(row.price);
+    const keys = [row.procedure.name, row.procedure.specialty?.name].filter(
+      (key): key is string => Boolean(key)
+    );
+    for (const key of keys) {
+      if (result[key] === undefined || price < result[key]) {
+        result[key] = price;
+      }
+    }
+  }
+  return result;
+}
+
 export async function getFeaturedClinics(limit = 12) {
   return prisma.clinic.findMany({
     where: { active: true },
@@ -152,7 +180,7 @@ export async function getFeaturedClinics(limit = 12) {
       clinicProcedures: {
         take: 6,
         orderBy: { procedure: { name: "asc" } },
-        select: { procedure: { select: { name: true, category: true } } },
+        select: { price: true, procedure: { select: { name: true, category: true } } },
       },
     },
   });

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { formatCurrency } from "@/lib/format";
 import {
   Stethoscope,
   HeartPulse,
@@ -98,7 +99,13 @@ const specialties: SpecialtyItem[] = [
   },
 ];
 
-export function SpecialtyGrid({ prices }: { prices: Record<string, number> }) {
+export function SpecialtyGrid({
+  clinicCounts,
+  startingPrices,
+}: {
+  clinicCounts: Record<string, number>;
+  startingPrices: Record<string, number>;
+}) {
   return (
     <section id="especialidades" className="relative bg-white py-16 sm:py-24">
       <div className="relative mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
@@ -130,7 +137,8 @@ export function SpecialtyGrid({ prices }: { prices: Record<string, number> }) {
               iconColor,
               borderHover,
             }) => {
-              const clinicCount = prices[query] ?? prices[label] ?? 1;
+              const clinicCount = clinicCounts[query] ?? clinicCounts[label] ?? 0;
+              const startingPrice = startingPrices[query] ?? startingPrices[label];
 
               return (
                 <Link
@@ -157,17 +165,25 @@ export function SpecialtyGrid({ prices }: { prices: Record<string, number> }) {
                       {label}
                     </h3>
 
-                    {/* Under Consultation Pill Badge */}
-                    <div className="mt-2.5 inline-flex items-center gap-1.5 rounded-full border border-emerald-200/80 bg-emerald-50/90 px-3 py-1 text-xs font-bold text-emerald-800 shadow-2xs">
-                      <span>💬 Valor sob consulta</span>
-                    </div>
+                    {/* Selo de preço real (ou aviso honesto quando ainda não há cobertura) */}
+                    {startingPrice !== undefined ? (
+                      <div className="mt-2.5 inline-flex items-center gap-1.5 rounded-full border border-emerald-200/80 bg-emerald-50/90 px-3 py-1 text-xs font-bold text-emerald-800 shadow-2xs">
+                        <span>A partir de {formatCurrency(startingPrice)}</span>
+                      </div>
+                    ) : (
+                      <div className="mt-2.5 inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-500">
+                        <span>Em breve nesta região</span>
+                      </div>
+                    )}
                   </div>
 
                   {/* Footer: Availability & Action Arrow */}
                   <div className="mt-5 flex items-center justify-between border-t border-slate-100 pt-3 text-xs">
                     <span className="flex items-center gap-1.5 font-semibold text-slate-600">
-                      <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                      {clinicCount} {clinicCount === 1 ? "clínica credenciada" : "clínicas credenciadas"}
+                      {clinicCount > 0 && <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />}
+                      {clinicCount > 0
+                        ? `${clinicCount} ${clinicCount === 1 ? "clínica credenciada" : "clínicas credenciadas"}`
+                        : "Nenhuma clínica ainda"}
                     </span>
 
                     <span className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-50 text-slate-400 transition-colors group-hover:bg-teal-600 group-hover:text-white">

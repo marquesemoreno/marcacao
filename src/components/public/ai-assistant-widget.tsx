@@ -101,17 +101,18 @@ export function AIAssistantWidget() {
   }
 
   return (
-    <div className="fixed bottom-5 right-5 z-50 flex flex-col items-end print:hidden font-sans">
-      {/* Floating Widget Trigger Button */}
+    <div className="fixed bottom-4 right-4 sm:bottom-5 sm:right-5 z-50 flex flex-col items-end print:hidden font-sans">
+      {/* Floating Widget Trigger Button — menor no mobile pra cobrir menos
+          conteúdo da página quando o botão fica sobre um parágrafo ao rolar. */}
       {!isOpen && (
         <button
           type="button"
           onClick={() => setIsOpen(true)}
-          className="group relative flex items-center gap-3 rounded-full bg-gradient-to-r from-teal-600 to-emerald-600 p-3.5 text-white shadow-2xl transition-all duration-300 hover:scale-105 hover:shadow-teal-600/40 active:scale-95 cursor-pointer"
+          className="group relative flex items-center gap-3 rounded-full bg-gradient-to-r from-teal-600 to-emerald-600 p-2.5 sm:p-3.5 text-white shadow-2xl transition-all duration-300 hover:scale-105 hover:shadow-teal-600/40 active:scale-95 cursor-pointer"
           aria-label="Abrir Atendimento Conecta Saúde"
         >
-          <div className="relative flex h-8 w-8 items-center justify-center rounded-full bg-white/20 backdrop-blur-xs">
-            <MessageCircleHeart className="h-5 w-5 text-white" />
+          <div className="relative flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-full bg-white/20 backdrop-blur-xs">
+            <MessageCircleHeart className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
             <span className="absolute -top-1 -right-1 flex h-3 w-3">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
               <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-400" />

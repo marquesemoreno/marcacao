@@ -3,6 +3,7 @@ import { MapPin, CheckCircle2, ShieldCheck, ArrowRight, MessageCircle } from "lu
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { RatingStars } from "@/components/public/rating-stars";
+import { formatCurrency } from "@/lib/format";
 import type { getFeaturedClinics } from "@/actions/search";
 
 type FeaturedClinic = Awaited<ReturnType<typeof getFeaturedClinics>>[number];
@@ -16,7 +17,24 @@ const clinicPhotos = [
 ];
 
 export function FeaturedClinics({ clinics }: { clinics: FeaturedClinic[] }) {
-  if (!clinics || clinics.length === 0) return null;
+  if (!clinics || clinics.length === 0) {
+    return (
+      <section id="clinicas" className="relative bg-slate-50/70 py-16 sm:py-24 border-t border-b border-slate-200/70">
+        <div className="mx-auto max-w-2xl px-4 text-center sm:px-6 lg:px-8">
+          <div className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200/80 bg-emerald-50/90 px-3.5 py-1 text-xs font-semibold uppercase tracking-wider text-emerald-800 shadow-2xs font-mono">
+            <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
+            <span>Rede Credenciada por Região</span>
+          </div>
+          <h2 className="mt-4 text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">
+            Estamos credenciando clínicas na sua região
+          </h2>
+          <p className="mt-3 text-base text-slate-600 leading-relaxed">
+            Ainda não temos uma clínica parceira cadastrada aqui, mas fale com a gente no WhatsApp que ajudamos a encontrar um atendimento.
+          </p>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section id="clinicas" className="relative bg-slate-50/70 py-16 sm:py-24 border-t border-b border-slate-200/70">
@@ -39,7 +57,11 @@ export function FeaturedClinics({ clinics }: { clinics: FeaturedClinic[] }) {
 
         {/* Clinics Grid */}
         <div className="mt-12 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {clinics.map((clinic, index) => (
+          {clinics.map((clinic, index) => {
+            const procedurePrices = clinic.clinicProcedures?.map((cp) => Number(cp.price)) ?? [];
+            const startingPrice = procedurePrices.length > 0 ? Math.min(...procedurePrices) : undefined;
+
+            return (
             <div
               key={clinic.id}
               className="group relative flex flex-col justify-between overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1.5 hover:border-emerald-300/60 hover:shadow-xl"
@@ -81,10 +103,16 @@ export function FeaturedClinics({ clinics }: { clinics: FeaturedClinic[] }) {
                 <div className="mt-4 flex items-center justify-between border-y border-slate-100 py-3">
                   <RatingStars rating={clinic.rating} reviewCount={clinic.reviewCount} />
 
-                  <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-lg">
-                    <MessageCircle className="h-3 w-3 text-emerald-600" />
-                    Valor sob consulta
-                  </span>
+                  {startingPrice !== undefined ? (
+                    <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-lg">
+                      <MessageCircle className="h-3 w-3 text-emerald-600" />
+                      A partir de {formatCurrency(startingPrice)}
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500 bg-slate-50 px-2.5 py-1 rounded-lg">
+                      Valor sob consulta
+                    </span>
+                  )}
                 </div>
 
                 {/* Procedures List */}
@@ -128,7 +156,8 @@ export function FeaturedClinics({ clinics }: { clinics: FeaturedClinic[] }) {
                 </Button>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
 
         {/* Footer CTA: Ver todas as clínicas */}

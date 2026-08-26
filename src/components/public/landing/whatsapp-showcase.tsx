@@ -38,7 +38,7 @@ export function WhatsAppShowcase() {
           </div>
 
           <h2 className="text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl lg:text-4xl leading-tight">
-            Do agendamento ao atendimento <span className="bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">direto no seu WhatsApp</span>
+            Do agendamento ao atendimento <span className="text-emerald-600">direto no seu WhatsApp</span>
           </h2>
 
           <p className="text-base leading-relaxed text-slate-600 sm:text-lg">
