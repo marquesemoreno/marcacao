@@ -1433,29 +1433,48 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
               <label id="finish-reason-label" className="text-xs font-semibold text-slate-700 dark:text-slate-300 block">
                 Motivo do Encerramento (Obrigatório):
               </label>
-              <div role="radiogroup" aria-labelledby="finish-reason-label" className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <div role="radiogroup" aria-labelledby="finish-reason-label" className="space-y-2.5">
                 {[
-                  { id: "AGENDAMENTO_CONCLUIDO", label: "Agendamento Concluído" },
-                  { id: "DUVIDA_ESCLARECIDA", label: "Dúvida Esclarecida" },
-                  { id: "ORCAMENTO_ENVIADO", label: "Orçamento Enviado" },
-                  { id: "SEM_RESPOSTA", label: "Paciente Não Respondeu" },
-                  { id: "CANCELAMENTO", label: "Cancelamento / Desistência" },
-                  { id: "ENCAMINHADO", label: "Encaminhado a Outro Setor" },
-                ].map((option) => (
-                  <button
-                    key={option.id}
-                    type="button"
-                    role="radio"
-                    aria-checked={selectedReason === option.id}
-                    onClick={() => setSelectedReason(option.id)}
-                    className={`p-3 rounded-xl text-left text-xs font-semibold transition-all border flex items-center gap-2 ${
-                      selectedReason === option.id
-                        ? "bg-emerald-50 dark:bg-emerald-950/60 border-emerald-500 text-emerald-800 dark:text-emerald-200"
-                        : "bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700"
-                    }`}
-                  >
-                    <span>{option.label}</span>
-                  </button>
+                  {
+                    group: "Com retorno positivo",
+                    options: [
+                      { id: "AGENDAMENTO_CONCLUIDO", label: "Agendamento Concluído" },
+                      { id: "ORCAMENTO_ENVIADO", label: "Orçamento Enviado" },
+                      { id: "DUVIDA_ESCLARECIDA", label: "Dúvida Esclarecida" },
+                    ],
+                  },
+                  {
+                    group: "Sem conversão",
+                    options: [
+                      { id: "SEM_RESPOSTA", label: "Paciente Não Respondeu" },
+                      { id: "CANCELAMENTO", label: "Cancelamento / Desistência" },
+                      { id: "ENCAMINHADO", label: "Encaminhado a Outro Setor" },
+                    ],
+                  },
+                ].map((section) => (
+                  <div key={section.group} className="space-y-1">
+                    <p className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+                      {section.group}
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      {section.options.map((option) => (
+                        <button
+                          key={option.id}
+                          type="button"
+                          role="radio"
+                          aria-checked={selectedReason === option.id}
+                          onClick={() => setSelectedReason(option.id)}
+                          className={`p-3 rounded-xl text-left text-xs font-semibold transition-all border flex items-center gap-2 ${
+                            selectedReason === option.id
+                              ? "bg-emerald-50 dark:bg-emerald-950/60 border-emerald-500 text-emerald-800 dark:text-emerald-200"
+                              : "bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700"
+                          }`}
+                        >
+                          <span>{option.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 ))}
               </div>
             </div>
