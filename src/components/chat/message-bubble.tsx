@@ -81,7 +81,8 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry }
             <div className="flex items-center gap-2">
               <button
                 onClick={() => message.text && handleCopyText(message.text)}
-                className="opacity-0 group-hover:opacity-100 p-1 text-amber-700 dark:text-amber-300 hover:text-amber-900 dark:hover:text-amber-100 transition-opacity rounded"
+                aria-label="Copiar nota"
+                className="opacity-0 group-hover:opacity-100 p-2 -m-1 text-amber-700 dark:text-amber-300 hover:text-amber-900 dark:hover:text-amber-100 transition-opacity rounded"
                 title="Copiar nota"
               >
                 {copied ? <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}

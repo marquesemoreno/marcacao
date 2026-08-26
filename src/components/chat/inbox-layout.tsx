@@ -402,10 +402,10 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                 <button
                   type="button"
                   onClick={() => setIsNewContactModalOpen(true)}
-                  className="flex items-center justify-center w-6 h-6 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white transition-colors"
+                  className="flex items-center justify-center w-8 h-8 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white transition-colors"
                   title="Cadastrar novo contato e iniciar conversa"
                 >
-                  <UserPlus className="w-3.5 h-3.5" />
+                  <UserPlus className="w-4 h-4" />
                 </button>
               )}
               {attendantCapacity && (
@@ -991,10 +991,10 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                             type="button"
                             onClick={() => fileInputRef.current?.click()}
                             disabled={isSendingMedia}
-                            className="flex items-center justify-center w-7 h-7 text-slate-500 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors disabled:opacity-50"
+                            className="flex items-center justify-center w-9 h-9 text-slate-500 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors disabled:opacity-50"
                             title="Anexar imagem ou PDF para enviar ao paciente"
                           >
-                            <Paperclip className={`w-3.5 h-3.5 ${isSendingMedia ? 'animate-pulse' : ''}`} />
+                            <Paperclip className={`w-4 h-4 ${isSendingMedia ? 'animate-pulse' : ''}`} />
                           </button>
                         </>
                       )}
@@ -1062,7 +1062,8 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
             </h3>
             <button
               onClick={() => setMobileView('chat')}
-              className="lg:hidden p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+              aria-label="Fechar painel"
+              className="lg:hidden size-11 -mr-2.5 flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
             >
               <X className="w-5 h-5" />
             </button>
@@ -1092,7 +1093,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                           navigator.clipboard.writeText(selectedContact.phone);
                           toast.success("Telefone copiado!");
                         }}
-                        className="p-0.5 text-slate-400 hover:text-emerald-700 dark:hover:text-emerald-400 rounded"
+                        className="p-1.5 -m-1 text-slate-400 hover:text-emerald-700 dark:hover:text-emerald-400 rounded"
                         title="Copiar telefone"
                       >
                         <Copy className="w-3 h-3" />
@@ -1107,7 +1108,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                     setEditPatientCpf(selectedContact.cpf || '');
                     setIsEditingPatient(!isEditingPatient);
                   }}
-                  className="p-1 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 shrink-0"
+                  className="p-2.5 -m-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 shrink-0"
                   title="Editar cadastro do paciente"
                 >
                   <Edit2 className="w-3.5 h-3.5" />
@@ -1235,7 +1236,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                     className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold border ${tagClasses(tag)}`}
                   >
                     {tag}
-                    <button onClick={() => onRemoveTag(tag)} className="hover:text-slate-900 dark:hover:text-white">
+                    <button onClick={() => onRemoveTag(tag)} aria-label={`Remover tag ${tag}`} className="p-1 -m-1 hover:text-slate-900 dark:hover:text-white">
                       <X className="w-3 h-3" />
                     </button>
                   </span>
@@ -1253,7 +1254,8 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                   />
                   <button
                     onClick={handleAddTag}
-                    className="p-1 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700"
+                    aria-label="Confirmar nova tag"
+                    className="p-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700"
                   >
                     <Check className="w-4 h-4" />
                   </button>
