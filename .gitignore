@@ -36,3 +36,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# impeccable local tooling state (ephemeral live-server pid/port/token)
+.impeccable/live/
