@@ -13,7 +13,6 @@ import { MessageBubble } from './message-bubble';
 import { ScheduleModal } from './schedule-modal';
 import { AvatarBadge } from './avatar-badge';
 import type { PlainClinicProcedureItem } from '@/lib/serialize';
-import { seedDemoConversations } from '@/actions/inbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from '@/components/ui/dialog';
 import { toast } from "sonner";
 import {
@@ -181,7 +180,6 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
   const [newTagInput, setNewTagInput] = useState('');
   const [isAddingTag, setIsAddingTag] = useState(false);
   const [isGeneratingIa, setIsGeneratingIa] = useState(false);
-  const [isSeedingDemo, setIsSeedingDemo] = useState(false);
   const [isSendingMedia, setIsSendingMedia] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -209,20 +207,6 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
       toast.error("Não foi possível gerar sugestão de IA.");
     } finally {
       setIsGeneratingIa(false);
-    }
-  }
-
-  async function handleSeedDemo() {
-    if (isSeedingDemo) return;
-    setIsSeedingDemo(true);
-    try {
-      await seedDemoConversations();
-      toast.success("Conversas de demonstração geradas no banco com sucesso!");
-      window.location.reload();
-    } catch {
-      toast.error("Não foi possível gerar conversas de demonstração.");
-    } finally {
-      setIsSeedingDemo(false);
     }
   }
 
@@ -515,17 +499,6 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
             <div className="p-8 text-center text-xs text-slate-500 dark:text-slate-400 flex flex-col items-center justify-center gap-3">
               <MessageSquare className="w-8 h-8 text-slate-300 dark:text-slate-700" />
               <span>Nenhuma conversa encontrada nesta lista.</span>
-              {contacts.length === 0 && (
-                <button
-                  type="button"
-                  onClick={handleSeedDemo}
-                  disabled={isSeedingDemo}
-                  className="mt-1 inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 text-white rounded-xl text-xs font-semibold hover:bg-emerald-700 transition-colors shadow-sm"
-                >
-                  <Sparkles className={`w-3.5 h-3.5 ${isSeedingDemo ? 'animate-spin' : ''}`} />
-                  <span>Gerar Conversas Demo</span>
-                </button>
-              )}
             </div>
           ) : (
             filteredContacts.map((c) => {
@@ -626,23 +599,13 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
             </div>
 
             {contacts.length === 0 ? (
-              <div className="max-w-md space-y-3 bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+              <div className="max-w-md space-y-1.5 bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
                 <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
                   Nenhuma conversa aberta nesta caixa de entrada
                 </h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed font-medium">
-                  Deseja popular a fila com conversas reais de demonstração (pacientes com dúvidas de urologia, ultrassom e lead B2B)?
+                  Assim que um paciente mandar uma mensagem pelo WhatsApp, a conversa aparece aqui.
                 </p>
-
-                <button
-                  type="button"
-                  onClick={handleSeedDemo}
-                  disabled={isSeedingDemo}
-                  className="mt-2 inline-flex items-center justify-center gap-2 h-11 px-5 w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs rounded-xl shadow-sm transition-all active:scale-95 disabled:opacity-50"
-                >
-                  <Sparkles className={`w-4 h-4 text-emerald-200 ${isSeedingDemo ? 'animate-spin' : ''}`} />
-                  <span>{isSeedingDemo ? "Gerando conversas..." : "Gerar Conversas de Demonstração no Banco"}</span>
-                </button>
               </div>
             ) : (
               <p className="text-sm font-medium text-slate-500 dark:text-slate-400">
