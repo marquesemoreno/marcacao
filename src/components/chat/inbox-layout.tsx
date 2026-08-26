@@ -125,6 +125,7 @@ interface InboxLayoutProps {
   onSendMedia: (file: File) => Promise<void> | void;
   onAddTag: (tag: string) => Promise<void> | void;
   onRemoveTag: (tag: string) => Promise<void> | void;
+  onUpdatePatient: (data: { name: string; cpf?: string }) => Promise<void> | void;
   onUpdateFunnelStage: (stage: FunnelStage) => Promise<void> | void;
   onClaimConversation?: () => Promise<void> | void;
   onMarkUnread?: () => Promise<void> | void;
@@ -162,6 +163,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
   onSendMedia,
   onAddTag,
   onRemoveTag,
+  onUpdatePatient,
   onUpdateFunnelStage,
   onClaimConversation,
   onMarkUnread,
@@ -215,6 +217,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
   const [isEditingPatient, setIsEditingPatient] = useState(false);
   const [editPatientName, setEditPatientName] = useState('');
   const [editPatientCpf, setEditPatientCpf] = useState('');
+  const [isSavingPatientEdits, setIsSavingPatientEdits] = useState(false);
 
   // Confirmação de transferência de atendimento — reatribuir um paciente pra outro
   // atendente é tão irreversível quanto finalizar o atendimento, mas antes bastava
@@ -377,9 +380,18 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
     }
   };
 
-  const handleSavePatientEdits = () => {
-    toast.success("Dados do paciente atualizados com sucesso!");
-    setIsEditingPatient(false);
+  const handleSavePatientEdits = async () => {
+    if (!editPatientName.trim()) return;
+    setIsSavingPatientEdits(true);
+    try {
+      await onUpdatePatient({ name: editPatientName, cpf: editPatientCpf || undefined });
+      toast.success("Dados do paciente atualizados com sucesso!");
+      setIsEditingPatient(false);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível atualizar os dados do paciente.");
+    } finally {
+      setIsSavingPatientEdits(false);
+    }
   };
 
   const handleSaveNewContact = async (e: React.FormEvent) => {
@@ -1145,9 +1157,10 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                   </div>
                   <button
                     onClick={handleSavePatientEdits}
-                    className="w-full py-1.5 bg-emerald-600 text-white font-semibold text-xs rounded-lg mt-1 hover:bg-emerald-700"
+                    disabled={isSavingPatientEdits || !editPatientName.trim()}
+                    className="w-full py-1.5 bg-emerald-600 text-white font-semibold text-xs rounded-lg mt-1 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    Salvar Alterações
+                    {isSavingPatientEdits ? "Salvando..." : "Salvar Alterações"}
                   </button>
                 </div>
               ) : (
@@ -1241,14 +1254,8 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                             <button
                               type="button"
                               onClick={async () => {
-                                try {
-                                  await onTransferAgent(agent.id, agent.name);
-                                  toast.success(`Atendimento transferido para ${agent.name}.`);
-                                } catch (error) {
-                                  toast.error(error instanceof Error ? error.message : "Não foi possível transferir o atendimento.");
-                                } finally {
-                                  setPendingTransferAgentId(null);
-                                }
+                                await onTransferAgent(agent.id, agent.name);
+                                setPendingTransferAgentId(null);
                               }}
                               className="flex-1 px-2 py-1.5 rounded-md bg-emerald-600 text-white text-[11px] font-semibold hover:bg-emerald-700"
                             >
@@ -1568,16 +1575,11 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                 disabled={!selectedReason}
                 onClick={async () => {
                   if (!selectedReason) return;
-                  try {
-                    await onFinishAttendance({ reason: selectedReason, notes: finishNotes });
-                    toast.success("Atendimento finalizado com sucesso!");
-                    setIsFinishModalOpen(false);
-                    setSelectedReason(null);
-                    setFinishNotes("");
-                    setInputText("");
-                  } catch (error) {
-                    toast.error(error instanceof Error ? error.message : "Não foi possível finalizar o atendimento.");
-                  }
+                  await onFinishAttendance({ reason: selectedReason, notes: finishNotes });
+                  setIsFinishModalOpen(false);
+                  setSelectedReason(null);
+                  setFinishNotes("");
+                  setInputText("");
                 }}
                 className={`px-5 py-2.5 font-semibold text-xs rounded-lg shadow-sm transition-all ${
                   !selectedReason

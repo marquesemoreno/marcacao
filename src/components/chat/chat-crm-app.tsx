@@ -12,6 +12,7 @@ import {
   sendMediaMessage,
   updateConversationTags,
   updateConversationFunnelStage,
+  updateContactInfo,
   assignConversationToUser,
   claimConversation,
   transferConversation,
@@ -37,6 +38,7 @@ import {
   sendMediaMessageAdmin,
   updateConversationTagsAdmin,
   updateConversationFunnelStageAdmin,
+  updateContactInfoAdmin,
   assignConversationToUserAdmin,
   claimConversationAdmin,
   transferConversationAdmin,
@@ -81,6 +83,7 @@ const ACTIONS_BY_SCOPE = {
     sendMediaMessage: (id: string, formData: FormData) => sendMediaMessage(id, formData),
     updateConversationTags: (id: string, tags: string[]) => updateConversationTags(id, tags),
     updateConversationFunnelStage: (id: string, stage: FunnelStage) => updateConversationFunnelStage(id, stage),
+    updateContactInfo: (id: string, data: { name: string; cpf?: string }) => updateContactInfo(id, data),
     assignConversationToUser: (id: string, userId: string | null) => assignConversationToUser(id, userId ?? ""),
     resolveConversation: (id: string, data?: { reason: string; notes?: string }) => resolveConversation(id, data),
     reopenConversation: (id: string) => reopenConversation(id),
@@ -100,6 +103,7 @@ const ACTIONS_BY_SCOPE = {
     sendMediaMessage: (id: string, formData: FormData) => sendMediaMessageAdmin(id, formData),
     updateConversationTags: (id: string, tags: string[]) => updateConversationTagsAdmin(id, tags),
     updateConversationFunnelStage: (id: string, stage: FunnelStage) => updateConversationFunnelStageAdmin(id, stage),
+    updateContactInfo: (id: string, data: { name: string; cpf?: string }) => updateContactInfoAdmin(id, data),
     assignConversationToUser: (id: string, userId: string | null) => assignConversationToUserAdmin(id, userId),
     resolveConversation: (id: string, data?: { reason: string; notes?: string }) => resolveConversationAdmin(id, data),
     reopenConversation: (id: string) => reopenConversationAdmin(id),
@@ -397,6 +401,12 @@ export function ChatCrmApp({ scope, basePath, view }: ChatCrmAppProps) {
     await refreshContacts();
   }
 
+  async function handleUpdatePatient(data: { name: string; cpf?: string }) {
+    if (!selectedContact) return;
+    await actions.updateContactInfo(selectedContact.id, data);
+    await refreshContacts();
+  }
+
   async function handleUpdateFunnelStage(stage: FunnelStage) {
     if (!selectedContactId) return;
     await actions.updateConversationFunnelStage(selectedContactId, stage);
@@ -531,6 +541,7 @@ export function ChatCrmApp({ scope, basePath, view }: ChatCrmAppProps) {
           onSendMedia={handleSendMedia}
           onAddTag={handleAddTag}
           onRemoveTag={handleRemoveTag}
+          onUpdatePatient={handleUpdatePatient}
           onUpdateFunnelStage={handleUpdateFunnelStage}
           onClaimConversation={handleClaimConversation}
           onMarkUnread={handleMarkUnread}

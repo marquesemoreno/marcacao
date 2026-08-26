@@ -725,6 +725,32 @@ export async function updateConversationTags(conversationId: string, tags: strin
   revalidatePath("/clinic/inbox");
 }
 
+/** Corrige nome/CPF do paciente a partir do painel do chat — o Contact é
+ * compartilhado entre clínicas (chave é o telefone), então a checagem de posse
+ * é feita pela conversa (clinicId) e não pelo Contact em si. */
+export async function updateContactInfo(conversationId: string, data: { name: string; cpf?: string }) {
+  const { clinicId } = await requireClinicSession();
+
+  const trimmedName = data.name.trim();
+  if (trimmedName.length < 2) {
+    throw new Error("Informe o nome do paciente.");
+  }
+
+  const conversation = await prisma.conversation.findUnique({
+    where: { id: conversationId },
+    select: { clinicId: true, contactId: true },
+  });
+  if (!conversation || conversation.clinicId !== clinicId) {
+    throw new Error("Conversa não encontrada");
+  }
+
+  await prisma.contact.update({
+    where: { id: conversation.contactId },
+    data: { name: trimmedName, cpf: data.cpf?.trim() || null },
+  });
+  revalidatePath("/clinic/inbox");
+}
+
 /** Versão "achatada" (sem Decimal) de listClinicProcedures, para o atalho
  * "Criar Agendamento" no painel do contato — chamado direto do client. */
 export async function listClinicProceduresForAppointment() {

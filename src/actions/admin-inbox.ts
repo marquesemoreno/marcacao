@@ -513,6 +513,29 @@ export async function updateConversationTagsAdmin(conversationId: string, tags: 
   revalidatePath("/admin/inbox");
 }
 
+export async function updateContactInfoAdmin(conversationId: string, data: { name: string; cpf?: string }) {
+  await requireAdminSession();
+
+  const trimmedName = data.name.trim();
+  if (trimmedName.length < 2) {
+    throw new Error("Informe o nome do paciente.");
+  }
+
+  const conversation = await prisma.conversation.findUnique({
+    where: { id: conversationId },
+    select: { contactId: true },
+  });
+  if (!conversation) {
+    throw new Error("Conversa não encontrada");
+  }
+
+  await prisma.contact.update({
+    where: { id: conversation.contactId },
+    data: { name: trimmedName, cpf: data.cpf?.trim() || null },
+  });
+  revalidatePath("/admin/inbox");
+}
+
 export async function updateConversationFunnelStageAdmin(conversationId: string, stage: FunnelStage) {
   await requireAdminSession();
   await prisma.conversation.update({
