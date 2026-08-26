@@ -1597,7 +1597,13 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
               />
             </div>
 
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+            <div className="flex flex-col items-end gap-1.5 pt-2 border-t border-slate-100 dark:border-slate-800">
+              {!selectedReason && (
+                <p className="text-[10px] text-amber-600 dark:text-amber-400 font-medium">
+                  Selecione o motivo do encerramento acima para continuar.
+                </p>
+              )}
+              <div className="flex items-center justify-end gap-2">
               <button
                 type="button"
                 onClick={() => setIsFinishModalOpen(false)}
@@ -1624,6 +1630,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
               >
                 Confirmar e Finalizar Atendimento
               </button>
+              </div>
             </div>
           </div>
         </DialogContent>

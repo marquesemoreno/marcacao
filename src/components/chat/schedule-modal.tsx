@@ -80,6 +80,11 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
 
   const selectedProcedure = procedures.find((p) => p.id === procedureId);
   const requiresDoctor = doctors.length > 0;
+  const missingFields = [
+    !procedureId && "procedimento",
+    !date && "data",
+    requiresDoctor && !doctorId && "médico",
+  ].filter((field): field is string => Boolean(field));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -262,21 +267,28 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
               </div>
             </div>
 
-            <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-end gap-2.5">
-              <button
-                type="button"
-                onClick={onClose}
-                className="px-4 py-2.5 text-xs sm:text-sm font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors min-h-[44px]"
-              >
-                Cancelar
-              </button>
-              <button
-                type="submit"
-                disabled={submitting || !procedureId || !date || (requiresDoctor && !doctorId)}
-                className="px-5 py-2.5 text-xs sm:text-sm font-semibold bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white rounded-xl shadow-xs hover:shadow-md transition-all active:scale-[0.99] flex items-center gap-2 min-h-[44px]"
-              >
-                {submitting ? 'Criando...' : 'Confirmar Agendamento'}
-              </button>
+            <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex flex-col items-end gap-1.5">
+              {!submitting && missingFields.length > 0 && (
+                <p className="text-[10px] text-amber-600 dark:text-amber-400 font-medium">
+                  Falta preencher: {missingFields.join(", ")}
+                </p>
+              )}
+              <div className="flex items-center gap-2.5">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="px-4 py-2.5 text-xs sm:text-sm font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors min-h-[44px]"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting || missingFields.length > 0}
+                  className="px-5 py-2.5 text-xs sm:text-sm font-semibold bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white rounded-xl shadow-xs hover:shadow-md transition-all active:scale-[0.99] flex items-center gap-2 min-h-[44px]"
+                >
+                  {submitting ? 'Criando...' : 'Confirmar Agendamento'}
+                </button>
+              </div>
             </div>
           </form>
         )}

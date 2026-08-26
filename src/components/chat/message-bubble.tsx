@@ -28,11 +28,14 @@ const FailedSendNotice: React.FC<{ onRetry?: () => void }> = ({ onRetry }) => (
 /** Tiques de status real de entrega (WhatsApp): relógio (pendente), 1 tique (enviado),
  * 2 tiques cinza (entregue), 2 tiques azuis (lido), alerta (falhou). */
 const MessageStatusTicks: React.FC<{ status?: Message['deliveryStatus'] }> = ({ status }) => {
-  if (status === 'failed') return <AlertCircle className="w-3.5 h-3.5 text-red-300" />;
-  if (status === 'read') return <CheckCheck className="w-3.5 h-3.5 text-sky-300" />;
-  if (status === 'delivered') return <CheckCheck className="w-3.5 h-3.5 text-emerald-200" />;
-  if (status === 'sent') return <Check className="w-3.5 h-3.5 text-emerald-200" />;
-  return <Clock className="w-3 h-3 text-emerald-200/80" />;
+  // aria-label existe porque "entregue" e "lida" só se diferenciam pela cor do
+  // ícone (verde vs. azul, mesmo CheckCheck) — sem texto, fica invisível pra
+  // leitor de tela e difícil de distinguir por daltonismo.
+  if (status === 'failed') return <AlertCircle className="w-3.5 h-3.5 text-red-300" aria-label="Falha ao enviar" />;
+  if (status === 'read') return <CheckCheck className="w-3.5 h-3.5 text-sky-300" aria-label="Lida pelo paciente" />;
+  if (status === 'delivered') return <CheckCheck className="w-3.5 h-3.5 text-emerald-200" aria-label="Entregue" />;
+  if (status === 'sent') return <Check className="w-3.5 h-3.5 text-emerald-200" aria-label="Enviada" />;
+  return <Clock className="w-3 h-3 text-emerald-200/80" aria-label="Enviando..." />;
 };
 
 export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry }) => {
