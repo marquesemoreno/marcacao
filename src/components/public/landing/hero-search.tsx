@@ -17,11 +17,14 @@ const cityOptions = [
   { value: "Itambé", label: "Itambé" },
 ];
 
+// Query de cada filtro verificada contra o catálogo real (searchClinicProcedures)
+// antes de entrar aqui — "Ultrassom Abdominal" e "Oftalmologia" não batiam com
+// nenhum procedimento cadastrado e levavam a busca sem nenhum resultado.
 const quickFilters = [
   { label: "⚡ Atendimento Hoje", query: "Clínico Geral", category: "CONSULTATION" as Category },
-  { label: "🔬 Ultrassom com Jejum", query: "Ultrassom Abdominal", category: "EXAM" as Category },
+  { label: "🔬 Ultrassom com Jejum", query: "Ultrassonografia Abdominal", category: "EXAM" as Category },
   { label: "🩺 Clínico Centro", query: "Clínico Geral", category: "CONSULTATION" as Category, neighborhood: "Centro" },
-  { label: "👁️ Oftalmo", query: "Oftalmologia", category: "CONSULTATION" as Category },
+  { label: "🩺 Urologia", query: "Urologia", category: "CONSULTATION" as Category },
 ];
 
 export function HeroSearch() {

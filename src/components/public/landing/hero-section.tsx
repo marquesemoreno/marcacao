@@ -36,7 +36,7 @@ export function HeroSection() {
             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
             <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
           </span>
-          <span>🟢 Agendamento em tempo real • Sem mensalidade • Escolha sua cidade</span>
+          <span>🟢 Agendamento em tempo real • Escolha sua cidade</span>
         </div>
 
         {/* Imposing Title & Subtitle */}

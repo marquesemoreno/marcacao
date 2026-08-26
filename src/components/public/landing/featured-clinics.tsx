@@ -83,7 +83,7 @@ export function FeaturedClinics({ clinics }: { clinics: FeaturedClinic[] }) {
                 {/* Clinic Header: Nome + Verified */}
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="truncate font-bold text-slate-900 text-lg group-hover:text-teal-700 transition-colors">
+                    <p className="line-clamp-2 font-bold text-slate-900 text-lg leading-snug group-hover:text-teal-700 transition-colors">
                       {clinic.tradeName}
                     </p>
                     <div className="mt-0.5 flex items-center gap-1 text-xs text-slate-500 font-medium">

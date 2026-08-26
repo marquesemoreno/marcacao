@@ -57,7 +57,7 @@ export function WhatsAppShowcase() {
                 <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-xs">
                   <Search className="size-5" />
                 </div>
-                <div className="space-y-1">
+                <div className="space-y-1 pr-10 sm:pr-0">
                   <div className="flex items-center gap-2">
                     <span className="text-[11px] font-bold uppercase tracking-wider font-mono text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200/60">
                       Passo 01
@@ -75,7 +75,7 @@ export function WhatsAppShowcase() {
                 <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-500 to-teal-600 text-white shadow-xs">
                   <Clock className="size-5" />
                 </div>
-                <div className="space-y-1">
+                <div className="space-y-1 pr-10 sm:pr-0">
                   <div className="flex items-center gap-2">
                     <span className="text-[11px] font-bold uppercase tracking-wider font-mono text-sky-700 bg-sky-50 px-2 py-0.5 rounded-md border border-sky-200/60">
                       Passo 02
@@ -93,7 +93,7 @@ export function WhatsAppShowcase() {
                 <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-teal-500 to-emerald-600 text-white shadow-xs">
                   <QrCode className="size-5" />
                 </div>
-                <div className="space-y-1">
+                <div className="space-y-1 pr-10 sm:pr-0">
                   <div className="flex items-center gap-2">
                     <span className="text-[11px] font-bold uppercase tracking-wider font-mono text-teal-700 bg-teal-50 px-2 py-0.5 rounded-md border border-teal-200/60">
                       Passo 03
