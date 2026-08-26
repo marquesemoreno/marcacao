@@ -447,7 +447,6 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
               [
                 { id: 'minhas', label: 'Minhas' },
                 { id: 'nao_atribuidas', label: 'Não Atribuídas' },
-                { id: 'finalizadas', label: 'Finalizadas' },
               ] as const
             ).map((tab) => (
               <button
