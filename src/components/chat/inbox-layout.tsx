@@ -109,6 +109,8 @@ interface InboxLayoutProps {
   onRemoveTag: (tag: string) => Promise<void> | void;
   onUpdateFunnelStage: (stage: FunnelStage) => Promise<void> | void;
   onClaimConversation?: () => Promise<void> | void;
+  onMarkUnread?: () => Promise<void> | void;
+  onRetryMessage?: (messageId: string) => Promise<void> | void;
   onTransferAgent: (agentId: string, agentName: string) => Promise<void> | void;
   availableClinics?: { id: string; tradeName: string }[];
   onReassignClinic?: (clinicId: string) => Promise<void> | void;
@@ -144,6 +146,8 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
   onRemoveTag,
   onUpdateFunnelStage,
   onClaimConversation,
+  onMarkUnread,
+  onRetryMessage,
   onTransferAgent,
   availableClinics,
   onReassignClinic,
@@ -239,10 +243,18 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
 
   // Limpa o rascunho da caixa de digitação ao trocar de conversa — sem isso, um texto
   // gerado (ex: pelo "Melhorar com IA") e nunca enviado ficava ali e podia sair sem
-  // querer numa conversa diferente, ou muito depois, sem ninguém perceber.
+  // querer numa conversa diferente, ou muito depois, sem ninguém perceber. Avisa quando
+  // havia texto de verdade, pra quem foi interrompido no meio de uma resposta não perder
+  // o rascunho sem nenhum sinal.
   React.useEffect(() => {
-    setInputText('');
+    setInputText((prev) => {
+      if (prev.trim()) {
+        toast('Rascunho descartado ao trocar de conversa.', { icon: '📝' });
+      }
+      return '';
+    });
     setComposerMode('whatsapp');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedContactId]);
 
   const quickReplyQuery = inputText.startsWith('/') ? inputText.slice(1).toLowerCase() : '';
@@ -579,7 +591,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                         {c.statusTag.label}
                       </span>
 
-                      {c.responsibleAgent && c.responsibleAgent !== 'Não Atribuído' ? (
+                      {c.responsibleAgent && c.responsibleAgent.toLowerCase() !== 'não atribuído' ? (
                         <span className="inline-flex items-center gap-0.5 text-[10px] font-medium text-slate-500 dark:text-slate-300 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-1.5 py-0.5 rounded-md truncate max-w-[85px]" title={`Atribuído a ${c.responsibleAgent}`}>
                           <User className="w-2.5 h-2.5 shrink-0" /> {c.responsibleAgent.split(' ')[0]}
                         </span>
@@ -707,7 +719,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
 
               {/* Ações do Header: atendente, agendar (secundário) e menu */}
               <div className="flex items-center gap-1.5 sm:gap-2">
-                {(!selectedContact.responsibleAgent || selectedContact.responsibleAgent === "Não Atribuído") ? (
+                {(!selectedContact.responsibleAgent || selectedContact.responsibleAgent.toLowerCase() === "não atribuído") ? (
                   onClaimConversation && (
                     <button
                       onClick={() => onClaimConversation()}
@@ -773,9 +785,15 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                       </button>
 
                       <button
-                        onClick={() => {
-                          toast.success("Conversa marcada como não lida!");
+                        onClick={async () => {
                           setIsMoreMenuOpen(false);
+                          if (!onMarkUnread) return;
+                          try {
+                            await onMarkUnread();
+                            toast.success("Conversa marcada como não lida!");
+                          } catch (error) {
+                            toast.error(error instanceof Error ? error.message : "Não foi possível marcar como não lida.");
+                          }
                         }}
                         className="w-full px-3 py-2 text-left hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center gap-2 text-slate-700 dark:text-slate-200"
                       >
@@ -850,7 +868,9 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                       </button>
                     </div>
                   )}
-                  {messages.map((msg) => <MessageBubble key={msg.id} message={msg} />)}
+                  {messages.map((msg) => (
+                    <MessageBubble key={msg.id} message={msg} onRetry={onRetryMessage ? () => onRetryMessage(msg.id) : undefined} />
+                  ))}
                 </>
               )}
             </div>

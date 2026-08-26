@@ -191,6 +191,29 @@ export async function markConversationRead(conversationId: string) {
   revalidatePath("/clinic/inbox");
 }
 
+/** Reabre a mensagem mais recente do paciente como não lida — usada quando o
+ * atendente quer lembrar de voltar nessa conversa depois. */
+export async function markConversationUnread(conversationId: string) {
+  const { clinicId } = await requireClinicSession();
+
+  const conversation = await prisma.conversation.findUnique({
+    where: { id: conversationId },
+    select: { clinicId: true },
+  });
+  if (!conversation || conversation.clinicId !== clinicId) {
+    throw new Error("Conversa não encontrada");
+  }
+
+  const lastInbound = await prisma.message.findFirst({
+    where: { conversationId, direction: "INBOUND" },
+    orderBy: { createdAt: "desc" },
+  });
+  if (lastInbound) {
+    await prisma.message.update({ where: { id: lastInbound.id }, data: { readAt: null } });
+  }
+  revalidatePath("/clinic/inbox");
+}
+
 export async function sendMessage(conversationId: string, content: string, isInternalNote = false) {
   const { clinicId, userId } = await requireClinicSession();
   const data = sendMessageSchema.parse({ conversationId, content });
@@ -390,6 +413,66 @@ export async function sendAudioMessage(conversationId: string, formData: FormDat
   revalidatePath("/admin/inbox");
   notifyInboxRealtime().catch(() => {});
   return message;
+}
+
+/** Reenvia uma mensagem OUTBOUND que falhou (texto, anexo ou áudio) — usa o mesmo
+ * conteúdo/arquivo já salvo, sem precisar que o atendente redigite ou reanexe nada. */
+export async function resendMessage(messageId: string) {
+  const { clinicId } = await requireClinicSession();
+
+  const message = await prisma.message.findUnique({
+    where: { id: messageId },
+    include: { conversation: { include: { contact: true } } },
+  });
+  if (!message || message.conversation.clinicId !== clinicId) {
+    throw new Error("Mensagem não encontrada");
+  }
+  if (message.direction !== "OUTBOUND" || message.type === "INTERNAL_NOTE") {
+    throw new Error("Essa mensagem não pode ser reenviada.");
+  }
+
+  await prisma.message.update({ where: { id: messageId }, data: { status: "SENT" } });
+  const phone = message.conversation.contact.phone;
+
+  if (message.type === "ATTACHMENT" || message.type === "AUDIO") {
+    if (!message.mediaPath) throw new Error("Arquivo original não encontrado para reenviar.");
+    const signedUrl = await getSignedMediaUrl(message.mediaPath);
+    if (!signedUrl) throw new Error("Não foi possível gerar o link do arquivo.");
+
+    const result =
+      message.type === "AUDIO"
+        ? await sendWhatsAppAudio(phone, signedUrl, "chat.retry.audio", clinicId)
+        : await sendWhatsAppMedia(
+            phone,
+            signedUrl,
+            message.mimeType || "application/octet-stream",
+            message.attachmentName || "arquivo",
+            "",
+            "chat.retry.media",
+            clinicId
+          );
+
+    if (!result.success && !result.skipped) {
+      await prisma.message.update({ where: { id: messageId }, data: { status: "FAILED" } });
+      throw new Error("Falha ao reenviar. Tente novamente em instantes.");
+    }
+    if (result.keyId) {
+      await prisma.message.update({ where: { id: messageId }, data: { whatsappKeyId: result.keyId } });
+    }
+  } else {
+    const result = await whatsappService.sendMessage(phone, message.content, "chat.retry", clinicId);
+    if (!result.success && !result.skipped) {
+      await prisma.message.update({ where: { id: messageId }, data: { status: "FAILED" } });
+      throw new Error("Falha ao reenviar. Tente novamente em instantes.");
+    }
+    if (result.keyId) {
+      await prisma.message.update({ where: { id: messageId }, data: { whatsappKeyId: result.keyId } });
+    }
+  }
+
+  revalidatePath("/clinic/inbox");
+  revalidatePath("/admin/inbox");
+  notifyInboxRealtime().catch(() => {});
 }
 
 export async function getAttendantCapacity() {

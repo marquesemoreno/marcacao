@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { ConversationStatus, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireAdminSession } from "@/lib/session";
-import { whatsappService, sendWhatsAppMedia, formatToWhatsAppNumber } from "@/lib/whatsapp";
+import { whatsappService, sendWhatsAppMedia, sendWhatsAppAudio, formatToWhatsAppNumber } from "@/lib/whatsapp";
 import { hasSantaClaraBridgeIntegration, fetchSantaClaraProcedures, fetchSantaClaraDoctors, adaptBridgeProcedureToPlainItem } from "@/lib/santa-clara-bridge";
 import { toPlainClinicProcedureItem } from "@/lib/serialize";
 import { departmentToDb, funnelStageToDb, toChatContact, toChatMessage } from "@/lib/chat-crm-adapters";
@@ -386,6 +386,63 @@ export async function sendMediaMessageAdmin(conversationId: string, formData: Fo
   return message;
 }
 
+/** Reenvia uma mensagem OUTBOUND que falhou (texto, anexo ou áudio) — ver resendMessage (inbox.ts). */
+export async function resendMessageAdmin(messageId: string) {
+  await requireAdminSession();
+
+  const message = await prisma.message.findUnique({
+    where: { id: messageId },
+    include: { conversation: { include: { contact: true } } },
+  });
+  if (!message) throw new Error("Mensagem não encontrada");
+  if (message.direction !== "OUTBOUND" || message.type === "INTERNAL_NOTE") {
+    throw new Error("Essa mensagem não pode ser reenviada.");
+  }
+
+  await prisma.message.update({ where: { id: messageId }, data: { status: "SENT" } });
+  const phone = message.conversation.contact.phone;
+  const clinicId = message.conversation.clinicId;
+
+  if (message.type === "ATTACHMENT" || message.type === "AUDIO") {
+    if (!message.mediaPath) throw new Error("Arquivo original não encontrado para reenviar.");
+    const signedUrl = await getSignedMediaUrl(message.mediaPath);
+    if (!signedUrl) throw new Error("Não foi possível gerar o link do arquivo.");
+
+    const result =
+      message.type === "AUDIO"
+        ? await sendWhatsAppAudio(phone, signedUrl, "chat.retry.audio", clinicId)
+        : await sendWhatsAppMedia(
+            phone,
+            signedUrl,
+            message.mimeType || "application/octet-stream",
+            message.attachmentName || "arquivo",
+            "",
+            "chat.retry.media",
+            clinicId
+          );
+
+    if (!result.success && !result.skipped) {
+      await prisma.message.update({ where: { id: messageId }, data: { status: "FAILED" } });
+      throw new Error("Falha ao reenviar. Tente novamente em instantes.");
+    }
+    if (result.keyId) {
+      await prisma.message.update({ where: { id: messageId }, data: { whatsappKeyId: result.keyId } });
+    }
+  } else {
+    const result = await whatsappService.sendMessage(phone, message.content, "chat.retry_admin", clinicId);
+    if (!result.success && !result.skipped) {
+      await prisma.message.update({ where: { id: messageId }, data: { status: "FAILED" } });
+      throw new Error("Falha ao reenviar. Tente novamente em instantes.");
+    }
+    if (result.keyId) {
+      await prisma.message.update({ where: { id: messageId }, data: { whatsappKeyId: result.keyId } });
+    }
+  }
+
+  revalidatePath("/admin/inbox");
+  notifyInboxRealtime().catch(() => {});
+}
+
 export async function getAttendantCapacityAdmin() {
   const { userId } = await requireAdminSession();
   const user = await prisma.user.findUnique({
@@ -490,6 +547,19 @@ export async function reopenConversationAdmin(conversationId: string) {
   });
   revalidatePath("/admin/inbox");
   revalidatePath("/admin/crm");
+}
+
+/** Reabre a mensagem mais recente do paciente como não lida — ver markConversationUnread (inbox.ts). */
+export async function markConversationUnreadAdmin(conversationId: string) {
+  await requireAdminSession();
+  const lastInbound = await prisma.message.findFirst({
+    where: { conversationId, direction: "INBOUND" },
+    orderBy: { createdAt: "desc" },
+  });
+  if (lastInbound) {
+    await prisma.message.update({ where: { id: lastInbound.id }, data: { readAt: null } });
+  }
+  revalidatePath("/admin/inbox");
 }
 
 export async function listCannedResponsesAdmin() {

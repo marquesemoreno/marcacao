@@ -7,7 +7,22 @@ import { toast } from 'sonner';
 
 interface MessageBubbleProps {
   message: Message;
+  /** Reenvia essa mensagem (só relevante quando deliveryStatus === 'failed'). */
+  onRetry?: () => void;
 }
+
+/** Aviso + botão de reenviar pra mensagens que falharam ao sair — sem isso o
+ * atendente só via um ícone vermelho sem explicação nem como corrigir. */
+const FailedSendNotice: React.FC<{ onRetry?: () => void }> = ({ onRetry }) => (
+  <div className="mt-1 flex items-center justify-end gap-1.5 text-[10.5px] font-semibold text-red-100">
+    <span>Falha ao enviar.</span>
+    {onRetry && (
+      <button onClick={onRetry} className="underline decoration-red-100/70 hover:text-white" type="button">
+        Reenviar
+      </button>
+    )}
+  </div>
+);
 
 /** Tiques de status real de entrega (WhatsApp): relógio (pendente), 1 tique (enviado),
  * 2 tiques cinza (entregue), 2 tiques azuis (lido), alerta (falhou). */
@@ -19,7 +34,7 @@ const MessageStatusTicks: React.FC<{ status?: Message['deliveryStatus'] }> = ({ 
   return <Clock className="w-3 h-3 text-emerald-200/80" />;
 };
 
-export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
+export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   const [playbackSpeed, setPlaybackSpeed] = useState<'1x' | '1.5x' | '2x'>('1x');
@@ -232,6 +247,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
               <span>{message.timestamp}</span>
               {isAgent && <MessageStatusTicks status={message.deliveryStatus} />}
             </div>
+            {isAgent && message.deliveryStatus === 'failed' && <FailedSendNotice onRetry={onRetry} />}
           </div>
         </div>
 
@@ -322,6 +338,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
           <span>{message.timestamp}</span>
           {isAgent && <MessageStatusTicks status={message.deliveryStatus} />}
         </div>
+        {isAgent && message.deliveryStatus === 'failed' && <FailedSendNotice onRetry={onRetry} />}
       </div>
     </div>
   );

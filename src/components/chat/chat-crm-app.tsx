@@ -24,6 +24,8 @@ import {
   listClinicProceduresForAppointment,
   listClinicDoctorsForAppointment,
   suggestIaReply,
+  markConversationUnread,
+  resendMessage,
 } from "@/actions/inbox";
 import {
   listChatContactsAdmin,
@@ -49,6 +51,8 @@ import {
   suggestIaReplyAdmin,
   listClinicsForReassignment,
   updateConversationClinicAdmin,
+  markConversationUnreadAdmin,
+  resendMessageAdmin,
 } from "@/actions/admin-inbox";
 import { toast } from "sonner";
 import { useInboxRealtime } from "@/hooks/use-inbox-realtime";
@@ -83,6 +87,8 @@ const ACTIONS_BY_SCOPE = {
     listCannedResponses: () => listCannedResponses(),
     createCannedResponse: (shortcut: string, content: string) => createCannedResponse(shortcut, content),
     suggestIaReply: (id: string) => suggestIaReply(id),
+    markConversationUnread: (id: string) => markConversationUnread(id),
+    resendMessage: (id: string) => resendMessage(id),
   },
   admin: {
     listChatContacts: (filter: InboxFilter, search?: string) => listChatContactsAdmin(filter, search),
@@ -100,6 +106,8 @@ const ACTIONS_BY_SCOPE = {
     listCannedResponses: () => listCannedResponsesAdmin(),
     createCannedResponse: (shortcut: string, content: string) => createCannedResponseAdmin(shortcut, content),
     suggestIaReply: (id: string) => suggestIaReplyAdmin(id),
+    markConversationUnread: (id: string) => markConversationUnreadAdmin(id),
+    resendMessage: (id: string) => resendMessageAdmin(id),
   },
 };
 
@@ -471,6 +479,22 @@ export function ChatCrmApp({ scope, basePath, view }: ChatCrmAppProps) {
     }
   }
 
+  async function handleMarkUnread() {
+    if (!selectedContactId) return;
+    await actions.markConversationUnread(selectedContactId);
+    await refreshContacts();
+  }
+
+  async function handleRetryMessage(messageId: string) {
+    try {
+      await actions.resendMessage(messageId);
+      toast.success("Mensagem reenviada!");
+      await refreshMessages();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível reenviar a mensagem.");
+    }
+  }
+
   async function handleTransferAgent(agentId: string) {
     if (!selectedContactId) return;
     const transferFn = scope === "admin" ? transferConversationAdmin : transferConversation;
@@ -509,6 +533,8 @@ export function ChatCrmApp({ scope, basePath, view }: ChatCrmAppProps) {
           onRemoveTag={handleRemoveTag}
           onUpdateFunnelStage={handleUpdateFunnelStage}
           onClaimConversation={handleClaimConversation}
+          onMarkUnread={handleMarkUnread}
+          onRetryMessage={handleRetryMessage}
           onTransferAgent={handleTransferAgent}
           availableClinics={scope === "admin" ? availableClinics : undefined}
           onReassignClinic={scope === "admin" ? handleReassignClinic : undefined}
