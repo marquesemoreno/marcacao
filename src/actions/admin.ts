@@ -46,6 +46,23 @@ export async function toggleClinicActive(clinicId: string, active: boolean) {
   return { success: true };
 }
 
+/** Clínica "só CRM": usa o chat/WhatsApp normalmente (Fila, CRM, Contatos),
+ * mas some da vitrine pública (home, busca, /clinicas) — modelo de parceria
+ * onde a Conecta Saúde fornece a ferramenta sem cobrar mensalidade e ganha
+ * comissão só sobre os agendamentos concluídos que vierem por ela. */
+export async function toggleClinicMarketplaceListing(clinicId: string, listedInMarketplace: boolean) {
+  await requireAdminSession();
+  await prisma.clinic.update({
+    where: { id: clinicId },
+    data: { listedInMarketplace },
+  });
+  revalidatePath("/admin/clinicas");
+  revalidatePath("/");
+  revalidatePath("/clinicas");
+  revalidatePath("/procedimentos");
+  return { success: true };
+}
+
 export async function getClinicProceduresAdmin(clinicId: string) {
   await requireAdminSession();
   const procedures = await prisma.clinicProcedure.findMany({

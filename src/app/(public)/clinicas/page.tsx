@@ -48,6 +48,7 @@ export default async function ClinicasCredenciadasPage({ searchParams }: Clinica
   const dbClinics = await prisma.clinic.findMany({
     where: {
       active: true,
+      listedInMarketplace: true,
       ...(params.cidade ? { city: { equals: params.cidade, mode: "insensitive" } } : {}),
       ...(params.bairro ? { neighborhood: { equals: params.bairro, mode: "insensitive" } } : {}),
       ...(params.q

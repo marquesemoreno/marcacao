@@ -76,6 +76,7 @@ export async function searchClinicProcedures(filters: SearchFilters) {
   const where: Prisma.ClinicProcedureWhereInput = {
     clinic: {
       active: true,
+      listedInMarketplace: true,
       ...(clinicId ? { id: clinicId } : {}),
       ...(clinicName ? { tradeName: { contains: clinicName, mode: "insensitive" } } : {}),
       ...(minRating ? { rating: { gte: minRating } } : {}),
@@ -110,7 +111,7 @@ export async function getClinicProcedureDetail(id: string) {
 /** Número de clínicas credenciadas disponíveis por especialidade e por procedimento. */
 export async function getSpecialtyClinicCounts() {
   const rows = await prisma.clinicProcedure.findMany({
-    where: { clinic: { active: true } },
+    where: { clinic: { active: true, listedInMarketplace: true } },
     select: {
       clinicId: true,
       procedure: { select: { name: true, specialty: { select: { name: true } } } },
@@ -143,7 +144,7 @@ export async function getSpecialtyClinicCounts() {
  * essas linhas são ignoradas aqui pra não mostrar "a partir de R$0,00". */
 export async function getSpecialtyStartingPrices() {
   const rows = await prisma.clinicProcedure.findMany({
-    where: { clinic: { active: true }, price: { gt: 0 } },
+    where: { clinic: { active: true, listedInMarketplace: true }, price: { gt: 0 } },
     select: {
       price: true,
       procedure: { select: { name: true, specialty: { select: { name: true } } } },
@@ -167,7 +168,7 @@ export async function getSpecialtyStartingPrices() {
 
 export async function getFeaturedClinics(limit = 12) {
   return prisma.clinic.findMany({
-    where: { active: true },
+    where: { active: true, listedInMarketplace: true },
     orderBy: { rating: "desc" },
     take: limit,
     select: {
@@ -192,6 +193,7 @@ export async function getAllClinics(city?: string, neighborhood?: string) {
   return prisma.clinic.findMany({
     where: {
       active: true,
+      listedInMarketplace: true,
       ...(city ? { city: { equals: city, mode: "insensitive" } } : {}),
       ...(neighborhood ? { neighborhood: { contains: neighborhood, mode: "insensitive" } } : {}),
     },

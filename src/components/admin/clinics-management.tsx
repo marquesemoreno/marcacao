@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Search, MapPin, Phone, MessageSquare, Percent, Save } from "lucide-react";
-import { updateClinicCommission, toggleClinicActive } from "@/actions/admin";
+import { Search, MapPin, Phone, MessageSquare, Percent, Save, Store, MessagesSquare } from "lucide-react";
+import { updateClinicCommission, toggleClinicActive, toggleClinicMarketplaceListing } from "@/actions/admin";
 import { CreateClinicModal } from "./create-clinic-modal";
 import { ViewProceduresModal } from "./view-procedures-modal";
 import { WhatsappInstanceModal } from "./whatsapp-instance-modal";
@@ -20,6 +20,7 @@ export type ClinicItem = {
   neighborhood: string;
   city: string;
   active: boolean;
+  listedInMarketplace: boolean;
   commissionRate: number;
   _count?: {
     clinicProcedures: number;
@@ -86,6 +87,22 @@ export function ClinicsManagement({ clinics: initialClinics }: { clinics: Clinic
     } catch {
       setClinics((prev) => prev.map((c) => (c.id === clinicId ? { ...c, active: currentActive } : c)));
       toast.error("Erro ao alterar status da clínica.");
+    }
+  }
+
+  async function handleToggleMarketplaceListing(clinicId: string, currentlyListed: boolean) {
+    const nextState = !currentlyListed;
+    setClinics((prev) => prev.map((c) => (c.id === clinicId ? { ...c, listedInMarketplace: nextState } : c)));
+    try {
+      await toggleClinicMarketplaceListing(clinicId, nextState);
+      toast.success(
+        nextState
+          ? "Clínica volta a aparecer no site (busca, home, /clinicas)."
+          : "Clínica escondida do site — continua usando o chat/CRM normalmente."
+      );
+    } catch {
+      setClinics((prev) => prev.map((c) => (c.id === clinicId ? { ...c, listedInMarketplace: currentlyListed } : c)));
+      toast.error("Erro ao alterar a visibilidade da clínica no marketplace.");
     }
   }
 
@@ -219,28 +236,53 @@ export function ClinicsManagement({ clinics: initialClinics }: { clinics: Clinic
                   </div>
 
                   {/* TOGGLE / BADGE STATUS */}
-                  <button
-                    type="button"
-                    onClick={() => handleToggleActive(clinic.id, clinic.active)}
-                    className={`px-2.5 py-1 rounded-full text-[11px] font-bold transition-all flex items-center gap-1.5 border ${
-                      clinic.active
-                        ? "bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100"
-                        : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:bg-slate-200"
-                    }`}
-                    title="Clique para alternar o status operacional da clínica na rede"
-                  >
-                    {clinic.active ? (
-                      <>
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                        <span>Ativa</span>
-                      </>
-                    ) : (
-                      <>
-                        <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
-                        <span>Pausada</span>
-                      </>
-                    )}
-                  </button>
+                  <div className="flex flex-col items-end gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => handleToggleActive(clinic.id, clinic.active)}
+                      className={`px-2.5 py-1 rounded-full text-[11px] font-bold transition-all flex items-center gap-1.5 border ${
+                        clinic.active
+                          ? "bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100"
+                          : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:bg-slate-200"
+                      }`}
+                      title="Clique para alternar o status operacional da clínica na rede"
+                    >
+                      {clinic.active ? (
+                        <>
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                          <span>Ativa</span>
+                        </>
+                      ) : (
+                        <>
+                          <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                          <span>Pausada</span>
+                        </>
+                      )}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleToggleMarketplaceListing(clinic.id, clinic.listedInMarketplace)}
+                      className={`px-2.5 py-1 rounded-full text-[11px] font-bold transition-all flex items-center gap-1.5 border ${
+                        clinic.listedInMarketplace
+                          ? "bg-sky-50 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 border-sky-200 dark:border-sky-800 hover:bg-sky-100"
+                          : "bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800 hover:bg-purple-100"
+                      }`}
+                      title="Clique para alternar se a clínica aparece no site (busca, home, /clinicas) — o chat/CRM continua funcionando dos dois jeitos"
+                    >
+                      {clinic.listedInMarketplace ? (
+                        <>
+                          <Store className="w-3 h-3" />
+                          <span>No Site</span>
+                        </>
+                      ) : (
+                        <>
+                          <MessagesSquare className="w-3 h-3" />
+                          <span>Só CRM</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
                 </div>
 
                 {/* DETALHES DE LOCALIZAÇÃO E CONTATO */}

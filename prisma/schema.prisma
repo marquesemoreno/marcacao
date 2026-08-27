@@ -157,6 +157,10 @@ model Clinic {
   neighborhood   String
   city           String
   active         Boolean  @default(true)
+  /// Clínicas parceiras que usam só o CRM/WhatsApp (ex: modelo "ferramenta
+  /// grátis + comissão por agendamento concluído") mas não têm vitrine no
+  /// marketplace público — não aparecem em busca, home ou /clinicas.
+  listedInMarketplace Boolean @default(true) @map("listed_in_marketplace")
   commissionRate Decimal  @map("commission_rate") @db.Decimal(5, 2)
   rating         Float    @default(0)
   reviewCount    Int      @default(0) @map("review_count")
