@@ -14,11 +14,13 @@ export function WelcomeMessageModal({
   clinicName,
   initialEnabled,
   initialText,
+  onSaved,
 }: {
   clinicId: string;
   clinicName: string;
   initialEnabled: boolean;
   initialText: string;
+  onSaved: (enabled: boolean, text: string) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [enabled, setEnabled] = useState(initialEnabled);
@@ -41,6 +43,7 @@ export function WelcomeMessageModal({
     setSaving(true);
     try {
       await saveClinicWelcomeMessage(clinicId, enabled, text);
+      onSaved(enabled && text.trim().length > 0, text.trim());
       toast.success(enabled ? "Mensagem de boas-vindas ativada." : "Mensagem de boas-vindas desativada.");
       setOpen(false);
     } catch {

@@ -362,6 +362,13 @@ export function ClinicsManagement({ clinics: initialClinics }: { clinics: Clinic
                       clinicName={clinic.tradeName}
                       initialEnabled={clinic.welcomeMessageEnabled}
                       initialText={clinic.welcomeMessageText ?? ""}
+                      onSaved={(enabled, text) =>
+                        setClinics((prev) =>
+                          prev.map((c) =>
+                            c.id === clinic.id ? { ...c, welcomeMessageEnabled: enabled, welcomeMessageText: text } : c
+                          )
+                        )
+                      }
                     />
                   </div>
 
