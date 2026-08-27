@@ -8,6 +8,7 @@ import { createAppointment } from '@/actions/appointments';
 import { formatCurrency, appointmentTypeLabels } from '@/lib/format';
 import type { PlainClinicProcedureItem } from '@/lib/serialize';
 import { useDialogA11y } from '@/hooks/use-dialog-a11y';
+import { useClickOutside } from '@/hooks/use-click-outside';
 
 type BridgeDoctor = { id: number; nome: string; crm: string };
 
@@ -28,6 +29,8 @@ interface ScheduleModalProps {
   fetchProcedures: () => Promise<PlainClinicProcedureItem[]>;
   /** Só clínicas com integração hospitalar (Santa Clara) retornam médicos — vazio pras demais. */
   fetchDoctors?: () => Promise<BridgeDoctor[]>;
+  /** Idem — só quando há integração hospitalar dá pra ver a agenda antes de marcar. */
+  fetchAgenda?: (medicoId: number, date: string) => Promise<string[]>;
   onConfirmSchedule: (scheduleData: {
     appointmentId: string;
     specialty: string;
@@ -44,6 +47,7 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
   onClose,
   fetchProcedures,
   fetchDoctors,
+  fetchAgenda,
   onConfirmSchedule,
 }) => {
   const [procedures, setProcedures] = useState<PlainClinicProcedureItem[]>([]);
@@ -56,6 +60,11 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
   const [time, setTime] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [occupiedTimes, setOccupiedTimes] = useState<string[]>([]);
+  const [loadingAgenda, setLoadingAgenda] = useState(false);
+  const [doctorQuery, setDoctorQuery] = useState('');
+  const [isDoctorDropdownOpen, setIsDoctorDropdownOpen] = useState(false);
+  const doctorDropdownRef = useClickOutside<HTMLDivElement>(isDoctorDropdownOpen, () => setIsDoctorDropdownOpen(false));
 
   useEffect(() => {
     if (!isOpen) return;
@@ -65,6 +74,9 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
     setDate('');
     setTime('');
     setIsSuccess(false);
+    setOccupiedTimes([]);
+    setDoctorQuery('');
+    setIsDoctorDropdownOpen(false);
     setLoadingProcedures(true);
     fetchProcedures()
       .then(setProcedures)
@@ -74,12 +86,43 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, contact.cpf]);
 
+  // Busca a agenda do médico assim que ele e a data estiverem escolhidos —
+  // mostra o que já está ocupado antes do atendente digitar um horário às cegas.
+  useEffect(() => {
+    if (!isOpen || !fetchAgenda || !doctorId || !date) {
+      setOccupiedTimes([]);
+      return;
+    }
+    let cancelled = false;
+    setLoadingAgenda(true);
+    fetchAgenda(Number(doctorId), date)
+      .then((horarios) => {
+        if (!cancelled) setOccupiedTimes(horarios);
+      })
+      .catch(() => {
+        if (!cancelled) setOccupiedTimes([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingAgenda(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, fetchAgenda, doctorId, date]);
+
   const dialogRef = useDialogA11y<HTMLDivElement>(isOpen, onClose);
 
   if (!isOpen) return null;
 
   const selectedProcedure = procedures.find((p) => p.id === procedureId);
   const requiresDoctor = doctors.length > 0;
+  const selectedDoctor = doctors.find((d) => String(d.id) === doctorId);
+  const normalizedDoctorQuery = doctorQuery.trim().toLowerCase();
+  const filteredDoctors = normalizedDoctorQuery
+    ? doctors.filter(
+        (d) => d.nome.toLowerCase().includes(normalizedDoctorQuery) || d.crm.toLowerCase().includes(normalizedDoctorQuery)
+      )
+    : doctors;
   const missingFields = [
     !procedureId && "procedimento",
     !date && "data",
@@ -166,23 +209,55 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
         ) : (
           <form onSubmit={handleSubmit} className="p-5 sm:p-6 space-y-4">
             {requiresDoctor && (
-              <div>
+              <div className="relative" ref={doctorDropdownRef}>
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5 flex items-center gap-1.5 font-mono">
                   <UserRound className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" /> Médico / Especialista
                 </label>
-                <select
-                  value={doctorId}
-                  onChange={(e) => setDoctorId(e.target.value)}
+                <input
+                  type="text"
+                  value={isDoctorDropdownOpen ? doctorQuery : selectedDoctor ? `Dr(a). ${selectedDoctor.nome} (CRM: ${selectedDoctor.crm})` : doctorQuery}
+                  onChange={(e) => {
+                    setDoctorQuery(e.target.value);
+                    setDoctorId('');
+                  }}
+                  onFocus={() => {
+                    setDoctorQuery('');
+                    setIsDoctorDropdownOpen(true);
+                  }}
+                  placeholder="Digite pra buscar um médico..."
                   className="w-full text-xs sm:text-sm border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 bg-slate-50/50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-medium"
+                  autoComplete="off"
                   required
-                >
-                  <option value="" disabled>Escolha um médico...</option>
-                  {doctors.map((doctor) => (
-                    <option key={doctor.id} value={doctor.id}>
-                      Dr(a). {doctor.nome} (CRM: {doctor.crm})
-                    </option>
-                  ))}
-                </select>
+                />
+                {isDoctorDropdownOpen && (
+                  <div className="absolute left-0 right-0 mt-1 max-h-56 overflow-y-auto bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-lg py-1.5 z-50 animate-in fade-in zoom-in-95 duration-100">
+                    {filteredDoctors.length === 0 ? (
+                      <p className="px-3 py-2 text-xs text-slate-500 dark:text-slate-400">Nenhum médico encontrado.</p>
+                    ) : (
+                      <>
+                        {filteredDoctors.slice(0, 50).map((doctor) => (
+                          <button
+                            key={doctor.id}
+                            type="button"
+                            onClick={() => {
+                              setDoctorId(String(doctor.id));
+                              setDoctorQuery('');
+                              setIsDoctorDropdownOpen(false);
+                            }}
+                            className="w-full px-3 py-2 text-left text-xs sm:text-sm hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200"
+                          >
+                            Dr(a). {doctor.nome} <span className="text-slate-400 dark:text-slate-500">(CRM: {doctor.crm})</span>
+                          </button>
+                        ))}
+                        {filteredDoctors.length > 50 && (
+                          <p className="px-3 py-1.5 text-[10px] text-slate-400 dark:text-slate-500 border-t border-slate-100 dark:border-slate-800 mt-1">
+                            +{filteredDoctors.length - 50} médicos — digite pra refinar a busca.
+                          </p>
+                        )}
+                      </>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 
@@ -247,6 +322,11 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
                     onChange={(e) => setTime(e.target.value)}
                     className="w-full text-xs sm:text-sm border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 bg-slate-50/50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
                   />
+                  {time && occupiedTimes.includes(time) && (
+                    <p className="mt-1 text-[10px] text-amber-600 dark:text-amber-400 font-semibold">
+                      ⚠️ Esse médico já tem uma marcação às {time} nesse dia.
+                    </p>
+                  )}
                 </div>
               )}
 
@@ -266,6 +346,34 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
                 />
               </div>
             </div>
+
+            {fetchAgenda && doctorId && date && (
+              <div className="rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/60 p-2.5">
+                {loadingAgenda ? (
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">Consultando agenda do médico...</p>
+                ) : occupiedTimes.length > 0 ? (
+                  <div className="space-y-1">
+                    <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 font-mono">
+                      Horários já ocupados nesse dia:
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {occupiedTimes.map((hora) => (
+                        <span
+                          key={hora}
+                          className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-mono font-semibold bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800"
+                        >
+                          {hora}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-[11px] text-emerald-700 dark:text-emerald-400 font-semibold">
+                    ✓ Nenhum horário ocupado nesse dia pra esse médico.
+                  </p>
+                )}
+              </div>
+            )}
 
             <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex flex-col items-end gap-1.5">
               {!submitting && missingFields.length > 0 && (

@@ -80,6 +80,30 @@ export async function fetchSantaClaraDoctors(): Promise<BridgeDoctor[]> {
   }
 }
 
+/** Horários já ocupados de um médico num dia, direto do sistema da clínica —
+ * pra atendente ver a agenda antes de marcar, em vez de digitar um horário às
+ * cegas. Ver comentário do endpoint no bridge: conta qualquer marcação
+ * existente como ocupada, sem distinguir cancelada de confirmada. */
+export async function fetchSantaClaraAgenda(medicoId: number, date: string): Promise<string[]> {
+  const config = getBridgeConfig();
+  if (!config) return [];
+  try {
+    const response = await fetch(
+      `${config.apiUrl}/api/agenda?medico_id=${encodeURIComponent(medicoId)}&data=${encodeURIComponent(date)}`,
+      {
+        headers: { "x-api-token": config.apiToken },
+        signal: AbortSignal.timeout(10000),
+        cache: "no-store",
+      }
+    );
+    if (!response.ok) return [];
+    const data = await response.json();
+    return Array.isArray(data?.horariosOcupados) ? data.horariosOcupados : [];
+  } catch {
+    return [];
+  }
+}
+
 export function adaptBridgeProcedureToPlainItem(clinicId: string, proc: BridgeProcedure): PlainClinicProcedureItem {
   const now = new Date();
   const id = toBridgeProcedureId(proc.id);

@@ -9,7 +9,7 @@ import { toPlainClinicProcedureItem } from "@/lib/serialize";
 import { toChatContact, toChatMessage, departmentToDb, funnelStageToDb } from "@/lib/chat-crm-adapters";
 import { attachSignedUrls, uploadWhatsAppMedia, getSignedMediaUrl, formatDuration } from "@/lib/whatsapp-media";
 import { sendWhatsAppMedia, sendWhatsAppAudio } from "@/lib/whatsapp";
-import { hasSantaClaraBridgeIntegration, fetchSantaClaraProcedures, fetchSantaClaraDoctors, adaptBridgeProcedureToPlainItem } from "@/lib/santa-clara-bridge";
+import { hasSantaClaraBridgeIntegration, fetchSantaClaraProcedures, fetchSantaClaraDoctors, fetchSantaClaraAgenda, adaptBridgeProcedureToPlainItem } from "@/lib/santa-clara-bridge";
 import { formatFileSize } from "@/lib/format";
 import { notifyInboxRealtime } from "@/lib/supabase-server";
 
@@ -808,6 +808,13 @@ export async function listClinicDoctorsForAppointment() {
   const { clinicId } = await requireClinicSession();
   if (!(await hasSantaClaraBridgeIntegration(clinicId))) return [];
   return fetchSantaClaraDoctors();
+}
+
+/** Só pra clínicas com integração hospitalar — as demais não têm agenda por médico aqui. */
+export async function getClinicDoctorAgenda(medicoId: number, date: string) {
+  const { clinicId } = await requireClinicSession();
+  if (!(await hasSantaClaraBridgeIntegration(clinicId))) return [];
+  return fetchSantaClaraAgenda(medicoId, date);
 }
 
 export async function listCannedResponses() {

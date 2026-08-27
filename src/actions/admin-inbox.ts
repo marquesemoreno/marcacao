@@ -5,7 +5,7 @@ import { ConversationStatus, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireAdminSession } from "@/lib/session";
 import { whatsappService, sendWhatsAppMedia, sendWhatsAppAudio, formatToWhatsAppNumber, fetchWhatsAppProfilePicture } from "@/lib/whatsapp";
-import { hasSantaClaraBridgeIntegration, fetchSantaClaraProcedures, fetchSantaClaraDoctors, adaptBridgeProcedureToPlainItem } from "@/lib/santa-clara-bridge";
+import { hasSantaClaraBridgeIntegration, fetchSantaClaraProcedures, fetchSantaClaraDoctors, fetchSantaClaraAgenda, adaptBridgeProcedureToPlainItem } from "@/lib/santa-clara-bridge";
 import { toPlainClinicProcedureItem } from "@/lib/serialize";
 import { departmentToDb, funnelStageToDb, toChatContact, toChatMessage } from "@/lib/chat-crm-adapters";
 import { attachSignedUrls, uploadWhatsAppMedia, getSignedMediaUrl } from "@/lib/whatsapp-media";
@@ -661,6 +661,12 @@ export async function listClinicDoctorsForAppointmentAdmin(clinicId: string) {
   await requireAdminSession();
   if (!(await hasSantaClaraBridgeIntegration(clinicId))) return [];
   return fetchSantaClaraDoctors();
+}
+
+export async function getClinicDoctorAgendaAdmin(clinicId: string, medicoId: number, date: string) {
+  await requireAdminSession();
+  if (!(await hasSantaClaraBridgeIntegration(clinicId))) return [];
+  return fetchSantaClaraAgenda(medicoId, date);
 }
 
 export async function suggestIaReplyAdmin(conversationId: string) {
