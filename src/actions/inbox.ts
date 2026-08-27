@@ -18,7 +18,7 @@ const MAX_MEDIA_SIZE_BYTES = 15 * 1024 * 1024; // 15 MB — mesma ordem de grand
 const MESSAGE_PAGE_SIZE = 50;
 const CONTACT_PHOTO_CACHE_DAYS = 30;
 import type { Department, FunnelStage, InboxFilter } from "@/types/chat-crm";
-import { applyMessageVariables, getBaseUrl } from "@/lib/format";
+import { applyMessageVariables } from "@/lib/format";
 import {
   sendMessageSchema,
   updateTagsSchema,
@@ -1037,12 +1037,9 @@ export async function updateConversationFunnelStage(conversationId: string, stag
 
     const patientFirstName = conversation.contact.name.split(" ")[0];
     const clinicName = conversation.clinic.tradeName;
-    const procedureName = appointment?.clinicProcedure.procedure.name || "Consulta/Exame";
-    const guideUrl = appointment
-      ? `${getBaseUrl()}/comprovante/${appointment.id}`
-      : `${getBaseUrl()}/procedimentos`;
+    const procedureName = appointment?.clinicProcedure.procedure.name || "Consulta";
 
-    const rawTemplate = "✅ *Agendamento Confirmado!* 👋 Olá, {{nome}}! Seu agendamento para *{{procedimento}}* na clínica *{{clinica}}* foi confirmado com sucesso!\n\n📎 Guia Oficial com QR Code: " + guideUrl;
+    const rawTemplate = "✅ *Agendamento Realizado!* 👋 Olá, {{nome}}! Seu agendamento para *{{procedimento}}* na clínica *{{clinica}}* foi realizado com sucesso!";
     const confirmMessage = applyMessageVariables(rawTemplate, {
       nome: patientFirstName,
       clinica: clinicName,
