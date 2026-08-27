@@ -575,7 +575,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                   data-od-id={`contact-card-${c.id}`}
                 >
                   <div className="relative shrink-0 mt-0.5">
-                    <AvatarBadge name={c.name} size={38} className="ring-2 ring-white dark:ring-slate-900 shadow-sm" />
+                    <AvatarBadge name={c.name} photoUrl={c.avatar} size={38} className="ring-2 ring-white dark:ring-slate-900 shadow-sm" />
                     {c.channel === 'whatsapp' && (
                       <span
                         className="absolute -bottom-1 -right-1 w-3.5 h-3.5 bg-emerald-500 border-2 border-white dark:border-slate-900 rounded-full flex items-center justify-center text-white"
@@ -687,7 +687,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                   <ChevronLeft className="w-5 h-5" />
                 </button>
 
-                <AvatarBadge name={selectedContact.name} size={38} className="ring-2 ring-slate-100 dark:ring-slate-800 shadow-sm shrink-0" />
+                <AvatarBadge name={selectedContact.name} photoUrl={selectedContact.avatar} size={38} className="ring-2 ring-slate-100 dark:ring-slate-800 shadow-sm shrink-0" />
                 <div className="min-w-0">
                   <div className="flex items-center gap-1.5 flex-wrap">
                     <h3 className="font-bold text-slate-900 dark:text-slate-100 text-xs sm:text-sm truncate">
@@ -1100,7 +1100,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
             <div className="bg-white dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-700/80 rounded-xl p-4 space-y-3 shadow-sm">
               <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-700/60 pb-3">
                 <div className="flex items-center gap-3 min-w-0">
-                  <AvatarBadge name={selectedContact.name} size={44} className="ring-2 ring-white dark:ring-slate-900 shadow-sm shrink-0" />
+                  <AvatarBadge name={selectedContact.name} photoUrl={selectedContact.avatar} size={44} className="ring-2 ring-white dark:ring-slate-900 shadow-sm shrink-0" />
                   <div className="min-w-0">
                     <h4 className="font-bold text-slate-900 dark:text-slate-100 text-xs truncate">
                       {selectedContact.name}

@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { ConversationStatus, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireAdminSession } from "@/lib/session";
-import { whatsappService, sendWhatsAppMedia, sendWhatsAppAudio, formatToWhatsAppNumber } from "@/lib/whatsapp";
+import { whatsappService, sendWhatsAppMedia, sendWhatsAppAudio, formatToWhatsAppNumber, fetchWhatsAppProfilePicture } from "@/lib/whatsapp";
 import { hasSantaClaraBridgeIntegration, fetchSantaClaraProcedures, fetchSantaClaraDoctors, adaptBridgeProcedureToPlainItem } from "@/lib/santa-clara-bridge";
 import { toPlainClinicProcedureItem } from "@/lib/serialize";
 import { departmentToDb, funnelStageToDb, toChatContact, toChatMessage } from "@/lib/chat-crm-adapters";
@@ -20,6 +20,7 @@ import {
 const ALLOWED_MEDIA_MIME_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif", "application/pdf"];
 const MAX_MEDIA_SIZE_BYTES = 15 * 1024 * 1024; // 15 MB — mesma ordem de grandeza do limite de mídia do WhatsApp
 const MESSAGE_PAGE_SIZE = 50;
+const CONTACT_PHOTO_CACHE_DAYS = 30;
 
 const ACTIVE_STATUSES: ConversationStatus[] = [ConversationStatus.OPEN, ConversationStatus.PENDING];
 
@@ -534,6 +535,31 @@ export async function updateContactInfoAdmin(conversationId: string, data: { nam
     data: { name: trimmedName, cpf: data.cpf?.trim() || null },
   });
   revalidatePath("/admin/inbox");
+}
+
+export async function refreshContactPhotoAdmin(conversationId: string) {
+  await requireAdminSession();
+
+  const conversation = await prisma.conversation.findUnique({
+    where: { id: conversationId },
+    select: { clinicId: true, contact: { select: { id: true, phone: true, photoUrl: true, photoUpdatedAt: true } } },
+  });
+  if (!conversation) {
+    throw new Error("Conversa não encontrada");
+  }
+
+  const { contact } = conversation;
+  const cacheAgeMs = contact.photoUpdatedAt ? Date.now() - contact.photoUpdatedAt.getTime() : Infinity;
+  if (cacheAgeMs < CONTACT_PHOTO_CACHE_DAYS * 24 * 60 * 60 * 1000) {
+    return contact.photoUrl;
+  }
+
+  const photoUrl = await fetchWhatsAppProfilePicture(contact.phone, conversation.clinicId);
+  await prisma.contact.update({
+    where: { id: contact.id },
+    data: { photoUrl, photoUpdatedAt: new Date() },
+  });
+  return photoUrl;
 }
 
 export async function updateConversationFunnelStageAdmin(conversationId: string, stage: FunnelStage) {

@@ -13,6 +13,7 @@ import {
   updateConversationTags,
   updateConversationFunnelStage,
   updateContactInfo,
+  refreshContactPhoto,
   assignConversationToUser,
   claimConversation,
   transferConversation,
@@ -39,6 +40,7 @@ import {
   updateConversationTagsAdmin,
   updateConversationFunnelStageAdmin,
   updateContactInfoAdmin,
+  refreshContactPhotoAdmin,
   assignConversationToUserAdmin,
   claimConversationAdmin,
   transferConversationAdmin,
@@ -84,6 +86,7 @@ const ACTIONS_BY_SCOPE = {
     updateConversationTags: (id: string, tags: string[]) => updateConversationTags(id, tags),
     updateConversationFunnelStage: (id: string, stage: FunnelStage) => updateConversationFunnelStage(id, stage),
     updateContactInfo: (id: string, data: { name: string; cpf?: string }) => updateContactInfo(id, data),
+    refreshContactPhoto: (id: string) => refreshContactPhoto(id),
     assignConversationToUser: (id: string, userId: string | null) => assignConversationToUser(id, userId ?? ""),
     resolveConversation: (id: string, data?: { reason: string; notes?: string }) => resolveConversation(id, data),
     reopenConversation: (id: string) => reopenConversation(id),
@@ -104,6 +107,7 @@ const ACTIONS_BY_SCOPE = {
     updateConversationTags: (id: string, tags: string[]) => updateConversationTagsAdmin(id, tags),
     updateConversationFunnelStage: (id: string, stage: FunnelStage) => updateConversationFunnelStageAdmin(id, stage),
     updateContactInfo: (id: string, data: { name: string; cpf?: string }) => updateContactInfoAdmin(id, data),
+    refreshContactPhoto: (id: string) => refreshContactPhotoAdmin(id),
     assignConversationToUser: (id: string, userId: string | null) => assignConversationToUserAdmin(id, userId),
     resolveConversation: (id: string, data?: { reason: string; notes?: string }) => resolveConversationAdmin(id, data),
     reopenConversation: (id: string) => reopenConversationAdmin(id),
@@ -138,6 +142,7 @@ export function ChatCrmApp({ scope, basePath, view }: ChatCrmAppProps) {
 
   const totalUnreadRef = useRef(0);
   const isFirstLoadRef = useRef(true);
+  const attemptedPhotoFetchRef = useRef<Set<string>>(new Set());
 
   const [attendantCapacity, setAttendantCapacity] = useState<{ activeCount: number; maxLimit: number } | null>(null);
   const [availableClinics, setAvailableClinics] = useState<{ id: string; tradeName: string }[]>([]);
@@ -187,6 +192,27 @@ export function ChatCrmApp({ scope, basePath, view }: ChatCrmAppProps) {
   useEffect(() => {
     refreshContacts();
   }, [refreshContacts]);
+
+  // Busca a foto de perfil do WhatsApp só pra contatos que ainda não têm (uma
+  // vez por contato, marcado no ref pra não repetir a cada ciclo de polling)
+  // — evita bater na Evolution API pra toda a fila a cada 5s, só faz isso
+  // pontualmente até cada contato ter sua foto (ou "sem foto") cacheada.
+  useEffect(() => {
+    const pending = contacts.filter((c) => !c.avatar && !attemptedPhotoFetchRef.current.has(c.id));
+    if (pending.length === 0) return;
+
+    pending.forEach((contact) => {
+      attemptedPhotoFetchRef.current.add(contact.id);
+      actions
+        .refreshContactPhoto(contact.id)
+        .then((photoUrl) => {
+          if (!photoUrl) return;
+          setContacts((prev) => prev.map((c) => (c.id === contact.id ? { ...c, avatar: photoUrl } : c)));
+        })
+        .catch(() => {});
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contacts]);
 
   const refreshQuickReplies = useCallback(async () => {
     const responses = await actions.listCannedResponses();

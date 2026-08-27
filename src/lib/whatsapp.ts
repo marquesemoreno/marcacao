@@ -79,6 +79,36 @@ export function isWhatsAppConfigured(): boolean {
 }
 
 /**
+ * Busca a URL da foto de perfil pública do WhatsApp de um número via Evolution API v2.
+ * POST ${EVOLUTION_API_URL}/chat/fetchProfilePictureUrl/${EVOLUTION_INSTANCE_NAME}
+ * Retorna null (não lança erro) quando o contato não tem foto pública, tem a
+ * privacidade restrita, ou a instância não está configurada — tudo isso é
+ * esperado e deve só cair de volta pro avatar de iniciais, não travar a UI.
+ */
+export async function fetchWhatsAppProfilePicture(phone: string, clinicId?: string): Promise<string | null> {
+  const { apiUrl, apiKey, instanceName } = await getEvolutionConfig(clinicId);
+  if (!apiUrl || !apiKey || !instanceName) return null;
+
+  const target = formatToWhatsAppNumber(phone);
+  const baseUrl = apiUrl.replace(/\/$/, "");
+  const targetUrl = `${baseUrl}/chat/fetchProfilePictureUrl/${instanceName}`;
+
+  try {
+    const response = await fetch(targetUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", apikey: apiKey },
+      body: JSON.stringify({ number: target }),
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!response.ok) return null;
+    const body = await response.json();
+    return typeof body?.profilePictureUrl === "string" ? body.profilePictureUrl : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Serviço oficial de disparo de mensagens via Evolution API v2.
  * POST ${EVOLUTION_API_URL}/message/sendText/${EVOLUTION_INSTANCE_NAME}
  * Headers: { "apikey": EVOLUTION_API_KEY, "Content-Type": "application/json" }

@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { ConversationStatus, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireClinicSession } from "@/lib/session";
-import { whatsappService, formatToWhatsAppNumber } from "@/lib/whatsapp";
+import { whatsappService, formatToWhatsAppNumber, fetchWhatsAppProfilePicture } from "@/lib/whatsapp";
 import { toPlainClinicProcedureItem } from "@/lib/serialize";
 import { toChatContact, toChatMessage, departmentToDb, funnelStageToDb } from "@/lib/chat-crm-adapters";
 import { attachSignedUrls, uploadWhatsAppMedia, getSignedMediaUrl, formatDuration } from "@/lib/whatsapp-media";
@@ -16,6 +16,7 @@ import { notifyInboxRealtime } from "@/lib/supabase-server";
 const ALLOWED_MEDIA_MIME_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif", "application/pdf"];
 const MAX_MEDIA_SIZE_BYTES = 15 * 1024 * 1024; // 15 MB — mesma ordem de grandeza do limite de mídia do WhatsApp
 const MESSAGE_PAGE_SIZE = 50;
+const CONTACT_PHOTO_CACHE_DAYS = 30;
 import type { Department, FunnelStage, InboxFilter } from "@/types/chat-crm";
 import { applyMessageVariables, getBaseUrl } from "@/lib/format";
 import {
@@ -749,6 +750,38 @@ export async function updateContactInfo(conversationId: string, data: { name: st
     data: { name: trimmedName, cpf: data.cpf?.trim() || null },
   });
   revalidatePath("/clinic/inbox");
+}
+
+/** Busca (e cacheia) a foto de perfil do WhatsApp do contato dessa conversa.
+ * Chamada sob demanda pelo client pra cada contato sem foto ainda — não faz
+ * parte de listChatContacts pra não travar o carregamento da fila numa
+ * chamada de rede por contato. Se já tiver uma foto cacheada há menos de
+ * CONTACT_PHOTO_CACHE_DAYS, retorna ela direto sem bater na Evolution API de
+ * novo (foto de perfil raramente muda, e "sem foto" também fica cacheado
+ * pra não tentar de novo a cada render). */
+export async function refreshContactPhoto(conversationId: string) {
+  const { clinicId } = await requireClinicSession();
+
+  const conversation = await prisma.conversation.findUnique({
+    where: { id: conversationId },
+    select: { clinicId: true, contact: { select: { id: true, phone: true, photoUrl: true, photoUpdatedAt: true } } },
+  });
+  if (!conversation || conversation.clinicId !== clinicId) {
+    throw new Error("Conversa não encontrada");
+  }
+
+  const { contact } = conversation;
+  const cacheAgeMs = contact.photoUpdatedAt ? Date.now() - contact.photoUpdatedAt.getTime() : Infinity;
+  if (cacheAgeMs < CONTACT_PHOTO_CACHE_DAYS * 24 * 60 * 60 * 1000) {
+    return contact.photoUrl;
+  }
+
+  const photoUrl = await fetchWhatsAppProfilePicture(contact.phone, clinicId);
+  await prisma.contact.update({
+    where: { id: contact.id },
+    data: { photoUrl, photoUpdatedAt: new Date() },
+  });
+  return photoUrl;
 }
 
 /** Versão "achatada" (sem Decimal) de listClinicProcedures, para o atalho

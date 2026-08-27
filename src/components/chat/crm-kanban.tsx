@@ -250,7 +250,7 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
                         >
                           <div className="flex items-start justify-between gap-2">
                             <div className="flex items-center gap-2.5 min-w-0">
-                              <AvatarBadge name={contact.name} size={36} className="ring-2 ring-slate-100 dark:ring-slate-800 shrink-0" />
+                              <AvatarBadge name={contact.name} photoUrl={contact.avatar} size={36} className="ring-2 ring-slate-100 dark:ring-slate-800 shrink-0" />
                               <div className="min-w-0">
                                 <h4 className="font-bold text-xs text-slate-900 dark:text-slate-100 truncate">
                                   {contact.name}

@@ -114,7 +114,7 @@ export function toChatContact(conversation: ConversationWithRelations): Contact 
     phone: conversation.contact.phone,
     cpf: conversation.contact.cpf ?? "",
     neighborhood: "",
-    avatar: "",
+    avatar: conversation.contact.photoUrl ?? "",
     clinicId: conversation.clinic?.id,
     clinicName: conversation.clinic?.tradeName,
     responsibleAgent: conversation.assignedUser?.name ?? "Não Atribuído",
