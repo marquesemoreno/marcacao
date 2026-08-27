@@ -201,16 +201,32 @@ export function ChatCrmApp({ scope, basePath, view }: ChatCrmAppProps) {
     const pending = contacts.filter((c) => !c.avatar && !attemptedPhotoFetchRef.current.has(c.id));
     if (pending.length === 0) return;
 
-    pending.forEach((contact) => {
-      attemptedPhotoFetchRef.current.add(contact.id);
-      actions
-        .refreshContactPhoto(contact.id)
-        .then((photoUrl) => {
-          if (!photoUrl) return;
-          setContacts((prev) => prev.map((c) => (c.id === contact.id ? { ...c, avatar: photoUrl } : c)));
-        })
-        .catch(() => {});
-    });
+    let cancelled = false;
+    (async () => {
+      // Sequencial e com intervalo entre chamadas de propósito: no primeiro
+      // carregamento (nenhum contato ainda tem foto cacheada), o admin pode
+      // ver dezenas de contatos de uma vez — disparar tudo de uma rajada só
+      // pra Evolution API se parece com scraping e arrisca a instância de
+      // WhatsApp. Um a cada 400ms é bem mais gentil, e é só um custo único
+      // (próximos carregamentos já vêm com a foto cacheada no banco).
+      for (const contact of pending) {
+        if (cancelled) break;
+        attemptedPhotoFetchRef.current.add(contact.id);
+        try {
+          const photoUrl = await actions.refreshContactPhoto(contact.id);
+          if (photoUrl && !cancelled) {
+            setContacts((prev) => prev.map((c) => (c.id === contact.id ? { ...c, avatar: photoUrl } : c)));
+          }
+        } catch {
+          // sem foto: mantém o fallback de iniciais
+        }
+        await new Promise((resolve) => setTimeout(resolve, 400));
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [contacts]);
 
