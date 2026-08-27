@@ -42,6 +42,7 @@ import {
   Loader2,
   User,
   Clock,
+  Trash2,
 } from 'lucide-react';
 
 const MAX_MEDIA_SIZE_BYTES = 15 * 1024 * 1024; // 15 MB — mesmo limite validado no servidor
@@ -82,28 +83,6 @@ const FUNNEL_STEP_LABEL_CLASSES: Record<FunnelStepState, string> = {
   upcoming: 'font-medium text-slate-500 dark:text-slate-400 group-hover:text-slate-600',
 };
 
-const DEFAULT_CATEGORIZED_QUICK_REPLIES = [
-  {
-    category: '📋 Preparo de Exames',
-    shortcut: '/preparo-jejum',
-    content: '📌 Orientação de Jejum: Recomenda-se jejum absoluto de 8h a 12h para exames de ultrassonografia abdominal e exames de sangue gerais.',
-  },
-  {
-    category: '📍 Endereço e Localização',
-    shortcut: '/localizacao',
-    content: '📍 Nossas clínicas parceiras estão situadas nos bairros Centro, Recreio e Candeias em Vitória da Conquista, Barra do Choça e Planalto.',
-  },
-  {
-    category: '💳 Formas de Pagamento e PIX',
-    shortcut: '/pix',
-    content: '💳 O pagamento é realizado diretamente na clínica no dia do atendimento via PIX, cartão de débito/crédito em até 3x sem juros.',
-  },
-  {
-    category: '🩺 Confirmação e Agendamento',
-    shortcut: '/confirmacao',
-    content: '🩺 Por favor, responda *1* para CONFIRMAR seu horário pré-agendado ou *2* para CANCELAR/REAGENDAR.',
-  },
-];
 
 interface InboxLayoutProps {
   contacts: Contact[];
@@ -121,6 +100,8 @@ interface InboxLayoutProps {
   onSearchChange: (query: string) => void;
   quickReplies: { id: string; shortcut: string; content: string }[];
   onSaveQuickReply?: (shortcut: string, content: string) => Promise<void>;
+  onUpdateQuickReply?: (id: string, shortcut: string, content: string) => Promise<void>;
+  onDeleteQuickReply?: (id: string) => Promise<void>;
   onSendMessage: (text: string, mode: 'whatsapp' | 'internal_note') => Promise<void> | void;
   onSendMedia: (file: File) => Promise<void> | void;
   onAddTag: (tag: string) => Promise<void> | void;
@@ -160,6 +141,8 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
   onSearchChange,
   quickReplies,
   onSaveQuickReply,
+  onUpdateQuickReply,
+  onDeleteQuickReply,
   onSendMessage,
   onSendMedia,
   onAddTag,
@@ -202,6 +185,11 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
   const [newShortcut, setNewShortcut] = useState('');
   const [newShortcutContent, setNewShortcutContent] = useState('');
   const [isSavingQuickReply, setIsSavingQuickReply] = useState(false);
+  const [editingReplyId, setEditingReplyId] = useState<string | null>(null);
+  const [editShortcut, setEditShortcut] = useState('');
+  const [editContent, setEditContent] = useState('');
+  const [isSavingEditedReply, setIsSavingEditedReply] = useState(false);
+  const [pendingDeleteReplyId, setPendingDeleteReplyId] = useState<string | null>(null);
 
   const [newTagInput, setNewTagInput] = useState('');
   const [isAddingTag, setIsAddingTag] = useState(false);
@@ -289,15 +277,9 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
   }, [selectedContactId]);
 
   const quickReplyQuery = inputText.startsWith('/') ? inputText.slice(1).toLowerCase() : '';
-  const mergedQuickReplies = [...DEFAULT_CATEGORIZED_QUICK_REPLIES, ...quickReplies.map(r => ({
-    category: '⚡ Atalhos Personalizados',
-    shortcut: r.shortcut,
-    content: r.content,
-  }))];
-
   const filteredQuickReplies = quickReplyQuery
-    ? mergedQuickReplies.filter((reply) => reply.shortcut.toLowerCase().includes(quickReplyQuery))
-    : mergedQuickReplies;
+    ? quickReplies.filter((reply) => reply.shortcut.toLowerCase().includes(quickReplyQuery))
+    : quickReplies;
 
   const handleInputChange = (value: string) => {
     setInputText(value);
@@ -385,6 +367,38 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
       toast.error(error instanceof Error ? error.message : "Não foi possível cadastrar o atalho.");
     } finally {
       setIsSavingQuickReply(false);
+    }
+  };
+
+  const startEditingQuickReply = (reply: { id: string; shortcut: string; content: string }) => {
+    setEditingReplyId(reply.id);
+    setEditShortcut(reply.shortcut);
+    setEditContent(reply.content);
+  };
+
+  const handleSaveEditedQuickReply = async () => {
+    if (!editingReplyId || !editShortcut.trim() || !editContent.trim() || !onUpdateQuickReply) return;
+    setIsSavingEditedReply(true);
+    try {
+      await onUpdateQuickReply(editingReplyId, editShortcut, editContent);
+      toast.success("Atalho atualizado com sucesso!");
+      setEditingReplyId(null);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível atualizar o atalho.");
+    } finally {
+      setIsSavingEditedReply(false);
+    }
+  };
+
+  const handleDeleteQuickReply = async (id: string) => {
+    if (!onDeleteQuickReply) return;
+    try {
+      await onDeleteQuickReply(id);
+      toast.success("Atalho excluído.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível excluir o atalho.");
+    } finally {
+      setPendingDeleteReplyId(null);
     }
   };
 
@@ -910,7 +924,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                   <div className="absolute bottom-full left-0 mb-2 w-full max-w-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-lg py-2 z-30 max-h-64 overflow-y-auto animate-in fade-in slide-in-from-bottom-2 duration-150">
                     <div className="flex items-center justify-between px-3 py-1.5 border-b border-slate-100 dark:border-slate-800">
                       <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400">
-                        Respostas Rápidas Categorizadas
+                        Respostas Rápidas
                       </span>
                       <button
                         type="button"
@@ -918,27 +932,30 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                         className="text-[10px] font-semibold text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 flex items-center gap-1"
                       >
                         <Plus className="w-3 h-3" />
-                        Nova Resposta Rápida
+                        Gerenciar
                       </button>
                     </div>
 
-                    {filteredQuickReplies.map((reply) => (
-                      <button
-                        key={reply.shortcut}
-                        type="button"
-                        onClick={() => {
-                          setInputText(reply.content);
-                          setIsQuickReplyOpen(false);
-                        }}
-                        className="w-full px-3.5 py-2 text-left hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors border-b border-slate-50 dark:border-slate-800 last:border-0"
-                      >
-                        <div className="flex items-center justify-between">
+                    {filteredQuickReplies.length === 0 ? (
+                      <p className="px-3.5 py-3 text-xs text-slate-500 dark:text-slate-400">
+                        Nenhuma resposta rápida cadastrada ainda.
+                      </p>
+                    ) : (
+                      filteredQuickReplies.map((reply) => (
+                        <button
+                          key={reply.id}
+                          type="button"
+                          onClick={() => {
+                            setInputText(reply.content);
+                            setIsQuickReplyOpen(false);
+                          }}
+                          className="w-full px-3.5 py-2 text-left hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors border-b border-slate-50 dark:border-slate-800 last:border-0"
+                        >
                           <p className="font-semibold text-emerald-700 dark:text-emerald-400 text-xs">{reply.shortcut}</p>
-                          <span className="text-[10px] text-slate-500 dark:text-slate-400">{reply.category}</span>
-                        </div>
-                        <p className="text-slate-600 dark:text-slate-300 text-xs truncate mt-0.5">{reply.content}</p>
-                      </button>
-                    ))}
+                          <p className="text-slate-600 dark:text-slate-300 text-xs truncate mt-0.5">{reply.content}</p>
+                        </button>
+                      ))
+                    )}
                   </div>
                 )}
 
@@ -1374,8 +1391,17 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
         </aside>
       )}
 
-      {/* Modal de Nova Resposta Rápida */}
-      <Dialog open={isNewQuickReplyModalOpen} onOpenChange={(open) => !open && setIsNewQuickReplyModalOpen(false)}>
+      {/* Modal de Respostas Rápidas: lista com editar/excluir + cadastro de nova */}
+      <Dialog
+        open={isNewQuickReplyModalOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            setIsNewQuickReplyModalOpen(false);
+            setEditingReplyId(null);
+            setPendingDeleteReplyId(null);
+          }
+        }}
+      >
         <DialogContent className="max-w-md rounded-2xl p-6" showCloseButton={false}>
           <DialogClose
             aria-label="Fechar"
@@ -1386,11 +1412,111 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
           <DialogHeader>
             <DialogTitle className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
               <Zap className="w-4 h-4 text-amber-500" />
-              Nova Resposta Rápida
+              Respostas Rápidas
             </DialogTitle>
           </DialogHeader>
 
-          <form onSubmit={handleSaveNewQuickReply} className="space-y-4 mt-2">
+          {quickReplies.length > 0 && (
+            <div className="mt-2 space-y-1.5 max-h-64 overflow-y-auto pr-1">
+              {quickReplies.map((reply) => {
+                if (editingReplyId === reply.id) {
+                  return (
+                    <div key={reply.id} className="p-2.5 rounded-lg border border-emerald-300 dark:border-emerald-700 bg-emerald-50/60 dark:bg-emerald-950/30 space-y-2">
+                      <input
+                        type="text"
+                        value={editShortcut}
+                        onChange={(e) => setEditShortcut(e.target.value)}
+                        placeholder="/atalho"
+                        className="w-full px-2.5 py-1.5 text-xs font-semibold border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100"
+                      />
+                      <textarea
+                        value={editContent}
+                        onChange={(e) => setEditContent(e.target.value)}
+                        rows={3}
+                        className="w-full px-2.5 py-1.5 text-xs border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 resize-none"
+                      />
+                      <div className="flex justify-end gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setEditingReplyId(null)}
+                          className="px-3 py-1.5 text-[11px] font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg"
+                        >
+                          Cancelar
+                        </button>
+                        <button
+                          type="button"
+                          disabled={isSavingEditedReply}
+                          onClick={handleSaveEditedQuickReply}
+                          className="px-3 py-1.5 text-[11px] font-semibold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 rounded-lg"
+                        >
+                          {isSavingEditedReply ? "Salvando..." : "Salvar"}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                }
+
+                if (pendingDeleteReplyId === reply.id) {
+                  return (
+                    <div key={reply.id} className="p-2.5 rounded-lg border border-rose-300 dark:border-rose-700 bg-rose-50/60 dark:bg-rose-950/30 space-y-1.5">
+                      <p className="text-[11px] font-medium text-rose-800 dark:text-rose-300">
+                        Excluir o atalho {reply.shortcut}?
+                      </p>
+                      <div className="flex gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteQuickReply(reply.id)}
+                          className="flex-1 px-2 py-1.5 rounded-md bg-rose-600 text-white text-[11px] font-semibold hover:bg-rose-700"
+                        >
+                          Confirmar exclusão
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setPendingDeleteReplyId(null)}
+                          className="flex-1 px-2 py-1.5 rounded-md border border-slate-300 dark:border-slate-600 text-[11px] font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div
+                    key={reply.id}
+                    className="flex items-start justify-between gap-2 p-2.5 rounded-lg border border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/60"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-400">{reply.shortcut}</p>
+                      <p className="text-xs text-slate-600 dark:text-slate-300 line-clamp-2">{reply.content}</p>
+                    </div>
+                    <div className="flex items-center gap-0.5 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => startEditingQuickReply(reply)}
+                        aria-label={`Editar atalho ${reply.shortcut}`}
+                        className="p-1.5 text-slate-400 hover:text-emerald-700 dark:hover:text-emerald-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg"
+                      >
+                        <Edit2 className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPendingDeleteReplyId(reply.id)}
+                        aria-label={`Excluir atalho ${reply.shortcut}`}
+                        className="p-1.5 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          <form onSubmit={handleSaveNewQuickReply} className="space-y-3 mt-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+            <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">Novo atalho</p>
             <div className="space-y-3">
               <div>
                 <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Atalho (ex: /horarios):</label>

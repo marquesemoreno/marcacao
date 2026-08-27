@@ -1088,54 +1088,11 @@ async function main() {
     });
   }
 
-  console.log("Seeding respostas rápidas...");
-  const globalCannedResponses: { shortcut: string; content: string }[] = [
-    {
-      shortcut: "/confirmacao",
-      content:
-        "Você confirma sua presença? Responda *1* ou *SIM* para confirmar, ou *2* ou *CANCELAR* para cancelar.",
-    },
-    {
-      shortcut: "/preparo-jejum",
-      content:
-        "Lembrando que esse exame exige jejum de 8 horas. Pode beber água normalmente durante o período.",
-    },
-    {
-      shortcut: "/pix",
-      content:
-        "O pagamento pode ser feito via Pix na hora do atendimento. Qualquer dúvida, é só chamar por aqui.",
-    },
-    {
-      shortcut: "/horarios",
-      content:
-        "Atendemos de segunda a sexta, das 08h às 18h, e aos sábados das 08h às 12h. Qualquer alteração de horário avisamos por aqui.",
-    },
-    {
-      shortcut: "/atraso",
-      content:
-        "Sem problemas! Só avise com quanto tempo de atraso você chega que a gente vê a melhor forma de te encaixar.",
-    },
-  ];
-  for (const canned of globalCannedResponses) {
-    await prisma.cannedResponse.create({
-      data: { clinicId: null, shortcut: canned.shortcut, content: canned.content },
-    });
-  }
-
-  const addressShortcuts: { clinic: string; shortcut: string }[] = [
-    { clinic: "Clinica Cirurgica Santa Clara", shortcut: "/endereco" },
-    { clinic: "Imad Diagnóstico Por Imagem", shortcut: "/endereco" },
-    { clinic: "Urolaser - Clínica de Urologia e Diagnóstico", shortcut: "/endereco" },
-  ];
-  for (const { clinic: clinicTradeName, shortcut } of addressShortcuts) {
-    const clinicData = clinicsData.find((c) => c.tradeName === clinicTradeName);
-    const clinicId = clinics.get(clinicTradeName);
-    if (!clinicData || !clinicId) continue;
-    const content = `Nosso endereço: ${clinicData.address}, ${clinicData.neighborhood}, ${clinicData.city}.`;
-    await prisma.cannedResponse.create({
-      data: { clinicId, shortcut, content },
-    });
-  }
+  // Respostas rápidas genéricas de demonstração (globais + "/endereco" por clínica)
+  // foram removidas daqui — eram conteúdo de placeholder nunca validado por
+  // nenhuma clínica real, e a Santa Clara já escreveu suas próprias dezenas de
+  // atalhos reais (com nome de médico, preço, orientação real de preparo) via
+  // /clinic/inbox. Cada clínica cadastra o que precisa direto na ferramenta.
 
   const automations = [
     {

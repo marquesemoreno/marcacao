@@ -22,6 +22,8 @@ import {
   reopenConversation,
   listCannedResponses,
   createCannedResponse,
+  updateCannedResponse,
+  deleteCannedResponse,
   createContact,
   listClinicProceduresForAppointment,
   listClinicDoctorsForAppointment,
@@ -50,6 +52,8 @@ import {
   reopenConversationAdmin,
   listCannedResponsesAdmin,
   createCannedResponseAdmin,
+  updateCannedResponseAdmin,
+  deleteCannedResponseAdmin,
   createContactAdmin,
   listClinicProceduresForAppointmentAdmin,
   listClinicDoctorsForAppointmentAdmin,
@@ -94,6 +98,8 @@ const ACTIONS_BY_SCOPE = {
     reopenConversation: (id: string) => reopenConversation(id),
     listCannedResponses: () => listCannedResponses(),
     createCannedResponse: (shortcut: string, content: string) => createCannedResponse(shortcut, content),
+    updateCannedResponse: (id: string, shortcut: string, content: string) => updateCannedResponse(id, shortcut, content),
+    deleteCannedResponse: (id: string) => deleteCannedResponse(id),
     suggestIaReply: (id: string) => suggestIaReply(id),
     markConversationUnread: (id: string) => markConversationUnread(id),
     resendMessage: (id: string) => resendMessage(id),
@@ -115,6 +121,8 @@ const ACTIONS_BY_SCOPE = {
     reopenConversation: (id: string) => reopenConversationAdmin(id),
     listCannedResponses: () => listCannedResponsesAdmin(),
     createCannedResponse: (shortcut: string, content: string) => createCannedResponseAdmin(shortcut, content),
+    updateCannedResponse: (id: string, shortcut: string, content: string) => updateCannedResponseAdmin(id, shortcut, content),
+    deleteCannedResponse: (id: string) => deleteCannedResponseAdmin(id),
     suggestIaReply: (id: string) => suggestIaReplyAdmin(id),
     markConversationUnread: (id: string) => markConversationUnreadAdmin(id),
     resendMessage: (id: string) => resendMessageAdmin(id),
@@ -250,6 +258,16 @@ export function ChatCrmApp({ scope, basePath, view }: ChatCrmAppProps) {
 
   async function handleSaveQuickReply(shortcut: string, content: string) {
     await actions.createCannedResponse(shortcut, content);
+    await refreshQuickReplies();
+  }
+
+  async function handleUpdateQuickReply(id: string, shortcut: string, content: string) {
+    await actions.updateCannedResponse(id, shortcut, content);
+    await refreshQuickReplies();
+  }
+
+  async function handleDeleteQuickReply(id: string) {
+    await actions.deleteCannedResponse(id);
     await refreshQuickReplies();
   }
 
@@ -596,6 +614,8 @@ export function ChatCrmApp({ scope, basePath, view }: ChatCrmAppProps) {
           onSearchChange={setSearchQuery}
           quickReplies={quickReplies}
           onSaveQuickReply={handleSaveQuickReply}
+          onUpdateQuickReply={handleUpdateQuickReply}
+          onDeleteQuickReply={handleDeleteQuickReply}
           onSendMessage={handleSendMessage}
           onSendMedia={handleSendMedia}
           onAddTag={handleAddTag}

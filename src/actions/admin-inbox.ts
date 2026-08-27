@@ -640,6 +640,32 @@ export async function createCannedResponseAdmin(shortcut: string, content: strin
   }
 }
 
+export async function updateCannedResponseAdmin(id: string, shortcut: string, content: string) {
+  await requireAdminSession();
+  const normalizedShortcut = shortcut.trim().startsWith("/") ? shortcut.trim() : `/${shortcut.trim()}`;
+  const trimmedContent = content.trim();
+  if (normalizedShortcut === "/" || !trimmedContent) {
+    throw new Error("Preencha o atalho e o texto da resposta.");
+  }
+
+  try {
+    return await prisma.cannedResponse.update({
+      where: { id },
+      data: { shortcut: normalizedShortcut, content: trimmedContent },
+    });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      throw new Error(`Já existe uma resposta rápida com o atalho "${normalizedShortcut}".`);
+    }
+    throw error;
+  }
+}
+
+export async function deleteCannedResponseAdmin(id: string) {
+  await requireAdminSession();
+  await prisma.cannedResponse.delete({ where: { id } });
+}
+
 export async function listClinicProceduresForAppointmentAdmin(clinicId: string) {
   await requireAdminSession();
 

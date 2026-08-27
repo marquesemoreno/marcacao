@@ -846,6 +846,44 @@ export async function createCannedResponse(shortcut: string, content: string) {
   }
 }
 
+/** Só edita/apaga atalho da própria clínica — nunca um global (clinicId null)
+ * nem de outra clínica, mesmo sabendo o id. */
+async function assertOwnCannedResponse(id: string, clinicId: string) {
+  const existing = await prisma.cannedResponse.findUnique({ where: { id }, select: { clinicId: true } });
+  if (!existing || existing.clinicId !== clinicId) {
+    throw new Error("Resposta rápida não encontrada.");
+  }
+}
+
+export async function updateCannedResponse(id: string, shortcut: string, content: string) {
+  const { clinicId } = await requireClinicSession();
+  await assertOwnCannedResponse(id, clinicId);
+
+  const normalizedShortcut = shortcut.trim().startsWith("/") ? shortcut.trim() : `/${shortcut.trim()}`;
+  const trimmedContent = content.trim();
+  if (normalizedShortcut === "/" || !trimmedContent) {
+    throw new Error("Preencha o atalho e o texto da resposta.");
+  }
+
+  try {
+    return await prisma.cannedResponse.update({
+      where: { id },
+      data: { shortcut: normalizedShortcut, content: trimmedContent },
+    });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      throw new Error(`Já existe uma resposta rápida com o atalho "${normalizedShortcut}".`);
+    }
+    throw error;
+  }
+}
+
+export async function deleteCannedResponse(id: string) {
+  const { clinicId } = await requireClinicSession();
+  await assertOwnCannedResponse(id, clinicId);
+  await prisma.cannedResponse.delete({ where: { id } });
+}
+
 const INBOX_FILTER_TO_CONVERSATION_FILTER: Record<InboxFilter, ConversationFilter> = {
   minhas: "mine",
   nao_atribuidas: "unassigned",
