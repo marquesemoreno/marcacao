@@ -171,7 +171,7 @@ async function findOrCreateConversation(phone: string, name: string | undefined,
     orderBy: { createdAt: "desc" },
   });
   if (existingConversation) {
-    return { contact, conversation: existingConversation };
+    return { contact, conversation: existingConversation, isNewConversation: false };
   }
 
   let clinicId = resolvedClinicId;
@@ -197,7 +197,7 @@ async function findOrCreateConversation(phone: string, name: string | undefined,
   }
 
   if (!clinicId) {
-    return { contact, conversation: null };
+    return { contact, conversation: null, isNewConversation: false };
   }
 
   const conversation = await prisma.conversation.create({
@@ -208,7 +208,7 @@ async function findOrCreateConversation(phone: string, name: string | undefined,
       lastMessageAt: new Date(),
     },
   });
-  return { contact, conversation };
+  return { contact, conversation, isNewConversation: true };
 }
 
 export async function POST(request: Request) {
@@ -274,7 +274,7 @@ export async function POST(request: Request) {
   // =========================================================================
   // 2. REGISTRO E APRESENTAÇÃO NA CAIXA DE ENTRADA DO CHAT (/admin/inbox)
   // =========================================================================
-  const { conversation } = await findOrCreateConversation(incoming.phone, incoming.name, resolvedClinicId);
+  const { conversation, isNewConversation } = await findOrCreateConversation(incoming.phone, incoming.name, resolvedClinicId);
 
   if (conversation) {
     type MediaData =
@@ -340,6 +340,33 @@ export async function POST(request: Request) {
       where: { id: conversation.id },
       data: { lastMessageAt: new Date(), status: conversation.status === "RESOLVED" ? "OPEN" : conversation.status },
     });
+
+    // =========================================================================
+    // 2.1 MENSAGEM DE BOAS-VINDAS: dispara só na primeira Conversation de verdade
+    // desse contato com a clínica (não em toda mensagem, nem em conversa já
+    // existente/resolvida — ver isNewConversation em findOrCreateConversation).
+    // Como é o cliente que inicia o contato, cai na janela de atendimento de 24h
+    // do WhatsApp Business — mensagem livre permitida, sem exigir template
+    // pré-aprovado pela Meta.
+    // =========================================================================
+    if (isNewConversation) {
+      const clinic = await prisma.clinic.findUnique({
+        where: { id: conversation.clinicId },
+        select: { welcomeMessageEnabled: true, welcomeMessageText: true },
+      });
+      const welcomeText = clinic?.welcomeMessageEnabled ? clinic.welcomeMessageText?.trim() : null;
+      if (welcomeText) {
+        await prisma.message.create({
+          data: {
+            conversationId: conversation.id,
+            direction: "OUTBOUND",
+            content: welcomeText,
+            status: "DELIVERED",
+          },
+        });
+        sendWhatsAppMessage(incoming.phone, welcomeText, "welcome_message.sent", resolvedClinicId).catch(() => {});
+      }
+    }
 
     const activeAutomations = await prisma.chatAutomation.findMany({
       where: { active: true },

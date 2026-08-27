@@ -63,6 +63,23 @@ export async function toggleClinicMarketplaceListing(clinicId: string, listedInM
   return { success: true };
 }
 
+/** Mensagem automática enviada uma única vez no primeiro contato de um cliente
+ * novo (ver isNewConversation em src/app/api/webhooks/whatsapp/route.ts). Cada
+ * clínica liga/desliga e escreve a sua própria. */
+export async function saveClinicWelcomeMessage(clinicId: string, welcomeMessageEnabled: boolean, welcomeMessageText: string) {
+  await requireAdminSession();
+  const text = welcomeMessageText.trim();
+  await prisma.clinic.update({
+    where: { id: clinicId },
+    data: {
+      welcomeMessageEnabled: welcomeMessageEnabled && text.length > 0,
+      welcomeMessageText: text || null,
+    },
+  });
+  revalidatePath("/admin/clinicas");
+  return { success: true };
+}
+
 export async function getClinicProceduresAdmin(clinicId: string) {
   await requireAdminSession();
   const procedures = await prisma.clinicProcedure.findMany({

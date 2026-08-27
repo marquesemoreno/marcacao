@@ -7,6 +7,7 @@ import { CreateClinicModal } from "./create-clinic-modal";
 import { ViewProceduresModal } from "./view-procedures-modal";
 import { WhatsappInstanceModal } from "./whatsapp-instance-modal";
 import { ClinicAttendantsModal } from "./clinic-attendants-modal";
+import { WelcomeMessageModal } from "./welcome-message-modal";
 import { toast } from "sonner";
 
 export type ClinicItem = {
@@ -21,6 +22,8 @@ export type ClinicItem = {
   city: string;
   active: boolean;
   listedInMarketplace: boolean;
+  welcomeMessageEnabled: boolean;
+  welcomeMessageText: string | null;
   commissionRate: number;
   _count?: {
     clinicProcedures: number;
@@ -354,6 +357,12 @@ export function ClinicsManagement({ clinics: initialClinics }: { clinics: Clinic
                     />
                     <WhatsappInstanceModal clinicId={clinic.id} clinicName={clinic.tradeName} />
                     <ClinicAttendantsModal clinicId={clinic.id} clinicName={clinic.tradeName} />
+                    <WelcomeMessageModal
+                      clinicId={clinic.id}
+                      clinicName={clinic.tradeName}
+                      initialEnabled={clinic.welcomeMessageEnabled}
+                      initialText={clinic.welcomeMessageText ?? ""}
+                    />
                   </div>
 
                   {whatsappUrl && (

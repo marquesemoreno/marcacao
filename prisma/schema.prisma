@@ -161,6 +161,12 @@ model Clinic {
   /// grátis + comissão por agendamento concluído") mas não têm vitrine no
   /// marketplace público — não aparecem em busca, home ou /clinicas.
   listedInMarketplace Boolean @default(true) @map("listed_in_marketplace")
+  /// Mensagem automática enviada uma única vez, no primeiro contato de um
+  /// cliente novo (primeira Conversation dele com essa clínica). Cada clínica
+  /// liga/desliga e escreve a sua — não dispara em conversas já existentes,
+  /// mesmo resolvidas, pra não parecer robótico com quem já é conhecido.
+  welcomeMessageEnabled Boolean @default(false) @map("welcome_message_enabled")
+  welcomeMessageText    String? @map("welcome_message_text")
   commissionRate Decimal  @map("commission_rate") @db.Decimal(5, 2)
   rating         Float    @default(0)
   reviewCount    Int      @default(0) @map("review_count")
