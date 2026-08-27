@@ -55,6 +55,7 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
   const [procedureId, setProcedureId] = useState('');
   const [doctors, setDoctors] = useState<BridgeDoctor[]>([]);
   const [doctorId, setDoctorId] = useState('');
+  const [patientName, setPatientName] = useState(contact.name);
   const [cpf, setCpf] = useState(contact.cpf || '');
   const [date, setDate] = useState('');
   const [time, setTime] = useState('');
@@ -68,6 +69,7 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
 
   useEffect(() => {
     if (!isOpen) return;
+    setPatientName(contact.name);
     setCpf(contact.cpf || '');
     setProcedureId('');
     setDoctorId('');
@@ -79,12 +81,18 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
     setIsDoctorDropdownOpen(false);
     setLoadingProcedures(true);
     fetchProcedures()
-      .then(setProcedures)
+      .then((items) => {
+        setProcedures(items);
+        // Só 1 procedimento cadastrado (comum nas clínicas com integração hospitalar,
+        // que hoje só oferecem "Consulta") — pré-seleciona pra não obrigar o
+        // atendente a escolher algo que não tem outra opção.
+        if (items.length === 1) setProcedureId(items[0].id);
+      })
       .finally(() => setLoadingProcedures(false));
     fetchDoctors?.().then(setDoctors).catch(() => setDoctors([]));
     // fetchProcedures/fetchDoctors são recriadas a cada render do pai — só precisamos rodar quando o modal abre.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, contact.cpf]);
+  }, [isOpen, contact.cpf, contact.name]);
 
   // Busca a agenda do médico assim que ele e a data estiverem escolhidos —
   // mostra o que já está ocupado antes do atendente digitar um horário às cegas.
@@ -123,7 +131,9 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
         (d) => d.nome.toLowerCase().includes(normalizedDoctorQuery) || d.crm.toLowerCase().includes(normalizedDoctorQuery)
       )
     : doctors;
+  const hasFullName = patientName.trim().split(/\s+/).filter(Boolean).length >= 2;
   const missingFields = [
+    !hasFullName && "nome completo",
     !procedureId && "procedimento",
     !date && "data",
     requiresDoctor && !doctorId && "médico",
@@ -131,13 +141,13 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!procedureId || !date || !selectedProcedure) return;
+    if (!procedureId || !date || !selectedProcedure || !hasFullName) return;
     if (requiresDoctor && !doctorId) return;
 
     setSubmitting(true);
     try {
       const appointment = await createAppointment({
-        patientName: contact.name,
+        patientName,
         patientCpf: cpf,
         patientPhone: contact.phone,
         clinicProcedureId: procedureId,
@@ -208,6 +218,23 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="p-5 sm:p-6 space-y-4">
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5 flex items-center gap-1.5 font-mono">
+                <UserRound className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" /> Nome Completo
+              </label>
+              <input
+                type="text"
+                value={patientName}
+                onChange={(e) => setPatientName(e.target.value)}
+                placeholder="Nome e sobrenome do paciente"
+                className="w-full text-xs sm:text-sm border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 bg-slate-50/50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-medium"
+                required
+              />
+              <p className="mt-1 text-[10px] text-slate-400 dark:text-slate-500">
+                O nome do contato no WhatsApp costuma vir incompleto — confirme ou corrija aqui antes de agendar.
+              </p>
+            </div>
+
             {requiresDoctor && (
               <div className="relative" ref={doctorDropdownRef}>
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5 flex items-center gap-1.5 font-mono">
