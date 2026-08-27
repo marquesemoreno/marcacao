@@ -9,7 +9,7 @@ import { toPlainClinicProcedureItem } from "@/lib/serialize";
 import { toChatContact, toChatMessage, departmentToDb, funnelStageToDb } from "@/lib/chat-crm-adapters";
 import { attachSignedUrls, uploadWhatsAppMedia, getSignedMediaUrl, formatDuration } from "@/lib/whatsapp-media";
 import { sendWhatsAppMedia, sendWhatsAppAudio } from "@/lib/whatsapp";
-import { hasSantaClaraBridgeIntegration, fetchSantaClaraProcedures, fetchSantaClaraDoctors, fetchSantaClaraAgenda, adaptBridgeProcedureToPlainItem } from "@/lib/santa-clara-bridge";
+import { hasSantaClaraBridgeIntegration, fetchSantaClaraProcedures, fetchSantaClaraDoctors, fetchSantaClaraAgenda, fetchSantaClaraConvenios, adaptBridgeProcedureToPlainItem } from "@/lib/santa-clara-bridge";
 import { formatFileSize } from "@/lib/format";
 import { notifyInboxRealtime } from "@/lib/supabase-server";
 
@@ -785,12 +785,13 @@ export async function refreshContactPhoto(conversationId: string) {
 }
 
 /** Versão "achatada" (sem Decimal) de listClinicProcedures, para o atalho
- * "Criar Agendamento" no painel do contato — chamado direto do client. */
-export async function listClinicProceduresForAppointment() {
+ * "Criar Agendamento" no painel do contato — chamado direto do client.
+ * convenioId (bridge) só afeta o preço exibido — sem ele, mostra o do Particular. */
+export async function listClinicProceduresForAppointment(convenioId?: string) {
   const { clinicId } = await requireClinicSession();
 
   if (await hasSantaClaraBridgeIntegration(clinicId)) {
-    const bridgeProcedures = await fetchSantaClaraProcedures();
+    const bridgeProcedures = await fetchSantaClaraProcedures(convenioId ? Number(convenioId) : undefined);
     return bridgeProcedures.map((p) => adaptBridgeProcedureToPlainItem(clinicId, p));
   }
 
@@ -808,6 +809,13 @@ export async function listClinicDoctorsForAppointment() {
   const { clinicId } = await requireClinicSession();
   if (!(await hasSantaClaraBridgeIntegration(clinicId))) return [];
   return fetchSantaClaraDoctors();
+}
+
+/** Idem — lista de convênios pra escolher no agendamento hospitalar. */
+export async function listClinicConveniosForAppointment() {
+  const { clinicId } = await requireClinicSession();
+  if (!(await hasSantaClaraBridgeIntegration(clinicId))) return [];
+  return fetchSantaClaraConvenios();
 }
 
 /** Só pra clínicas com integração hospitalar — as demais não têm agenda por médico aqui. */

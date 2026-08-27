@@ -27,6 +27,9 @@ export const createAppointmentSchema = z.object({
   /** Só usado no fluxo de integração hospitalar (Santa Clara/bridge) — clínicas do
    * marketplace não têm conceito de médico específico no agendamento rápido. */
   medicoId: z.string().optional(),
+  /** Idem — convênio do paciente nesse agendamento hospitalar. Sem escolha, o
+   * bridge usa o Particular por padrão. */
+  convenioId: z.string().optional(),
 });
 
 export type CreateAppointmentInput = z.input<typeof createAppointmentSchema>;

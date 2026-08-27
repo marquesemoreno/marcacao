@@ -12,6 +12,7 @@ const BRIDGE_ID_PREFIX = "bridge:santa-clara:";
 
 type BridgeProcedure = { id: number; codigo: string; nome: string; valor: number };
 type BridgeDoctor = { id: number; nome: string; crm: string };
+export type BridgeConvenio = { id: number; nome: string };
 
 function getBridgeConfig() {
   const apiUrl = process.env.SANTA_CLARA_API_URL;
@@ -46,11 +47,32 @@ export async function hasSantaClaraBridgeIntegration(clinicId: string): Promise<
   return Boolean(instance);
 }
 
-export async function fetchSantaClaraProcedures(): Promise<BridgeProcedure[]> {
+/** Sem convenioId, o bridge usa o Particular por padrão (preço exibido reflete
+ * esse convênio até o atendente escolher outro). */
+export async function fetchSantaClaraProcedures(convenioId?: number): Promise<BridgeProcedure[]> {
   const config = getBridgeConfig();
   if (!config) return [];
   try {
-    const response = await fetch(`${config.apiUrl}/api/procedimentos`, {
+    const url = new URL(`${config.apiUrl}/api/procedimentos`);
+    if (convenioId != null) url.searchParams.set("convenio_id", String(convenioId));
+    const response = await fetch(url, {
+      headers: { "x-api-token": config.apiToken },
+      signal: AbortSignal.timeout(10000),
+      cache: "no-store",
+    });
+    if (!response.ok) return [];
+    const data = await response.json();
+    return Array.isArray(data) ? data : [];
+  } catch {
+    return [];
+  }
+}
+
+export async function fetchSantaClaraConvenios(): Promise<BridgeConvenio[]> {
+  const config = getBridgeConfig();
+  if (!config) return [];
+  try {
+    const response = await fetch(`${config.apiUrl}/api/convenios`, {
       headers: { "x-api-token": config.apiToken },
       signal: AbortSignal.timeout(10000),
       cache: "no-store",
@@ -138,12 +160,15 @@ export async function createSantaClaraBridgeAppointment(input: {
   date: string;
   timeSlot?: string;
   medicoId?: string;
+  /** Sem escolha do atendente, o bridge usa o Particular por padrão. */
+  convenioId?: string;
 }): Promise<PlainAppointment> {
   const config = getBridgeConfig();
   if (!config) throw new Error("Integração com a Santa Clara não está configurada.");
 
   const servicoId = fromBridgeProcedureId(input.clinicProcedureId);
-  const procedures = await fetchSantaClaraProcedures();
+  const convenioId = input.convenioId ? Number(input.convenioId) : undefined;
+  const procedures = await fetchSantaClaraProcedures(convenioId);
   const procedure = procedures.find((p) => p.id === servicoId);
   if (!procedure) throw new Error("Procedimento não encontrado no sistema da clínica.");
 
@@ -160,6 +185,7 @@ export async function createSantaClaraBridgeAppointment(input: {
         paciente_cpf: input.patientCpf,
         servico_id: servicoId,
         medico_id: input.medicoId ? Number(input.medicoId) : undefined,
+        convenio_id: convenioId,
         data: input.date,
         hora: input.timeSlot || undefined,
       }),

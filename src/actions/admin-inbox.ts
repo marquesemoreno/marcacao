@@ -5,7 +5,7 @@ import { ConversationStatus, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireAdminSession } from "@/lib/session";
 import { whatsappService, sendWhatsAppMedia, sendWhatsAppAudio, formatToWhatsAppNumber, fetchWhatsAppProfilePicture } from "@/lib/whatsapp";
-import { hasSantaClaraBridgeIntegration, fetchSantaClaraProcedures, fetchSantaClaraDoctors, fetchSantaClaraAgenda, adaptBridgeProcedureToPlainItem } from "@/lib/santa-clara-bridge";
+import { hasSantaClaraBridgeIntegration, fetchSantaClaraProcedures, fetchSantaClaraDoctors, fetchSantaClaraAgenda, fetchSantaClaraConvenios, adaptBridgeProcedureToPlainItem } from "@/lib/santa-clara-bridge";
 import { toPlainClinicProcedureItem } from "@/lib/serialize";
 import { departmentToDb, funnelStageToDb, toChatContact, toChatMessage } from "@/lib/chat-crm-adapters";
 import { attachSignedUrls, uploadWhatsAppMedia, getSignedMediaUrl } from "@/lib/whatsapp-media";
@@ -666,11 +666,11 @@ export async function deleteCannedResponseAdmin(id: string) {
   await prisma.cannedResponse.delete({ where: { id } });
 }
 
-export async function listClinicProceduresForAppointmentAdmin(clinicId: string) {
+export async function listClinicProceduresForAppointmentAdmin(clinicId: string, convenioId?: string) {
   await requireAdminSession();
 
   if (await hasSantaClaraBridgeIntegration(clinicId)) {
-    const bridgeProcedures = await fetchSantaClaraProcedures();
+    const bridgeProcedures = await fetchSantaClaraProcedures(convenioId ? Number(convenioId) : undefined);
     return bridgeProcedures.map((p) => adaptBridgeProcedureToPlainItem(clinicId, p));
   }
 
@@ -687,6 +687,12 @@ export async function listClinicDoctorsForAppointmentAdmin(clinicId: string) {
   await requireAdminSession();
   if (!(await hasSantaClaraBridgeIntegration(clinicId))) return [];
   return fetchSantaClaraDoctors();
+}
+
+export async function listClinicConveniosForAppointmentAdmin(clinicId: string) {
+  await requireAdminSession();
+  if (!(await hasSantaClaraBridgeIntegration(clinicId))) return [];
+  return fetchSantaClaraConvenios();
 }
 
 export async function getClinicDoctorAgendaAdmin(clinicId: string, medicoId: number, date: string) {

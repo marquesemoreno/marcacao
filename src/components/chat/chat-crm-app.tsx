@@ -27,6 +27,7 @@ import {
   createContact,
   listClinicProceduresForAppointment,
   listClinicDoctorsForAppointment,
+  listClinicConveniosForAppointment,
   getClinicDoctorAgenda,
   suggestIaReply,
   markConversationUnread,
@@ -57,6 +58,7 @@ import {
   createContactAdmin,
   listClinicProceduresForAppointmentAdmin,
   listClinicDoctorsForAppointmentAdmin,
+  listClinicConveniosForAppointmentAdmin,
   getClinicDoctorAgendaAdmin,
   suggestIaReplyAdmin,
   listClinicsForReassignment,
@@ -510,12 +512,24 @@ export function ChatCrmApp({ scope, basePath, view }: ChatCrmAppProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scope, selectedContact?.clinicId]);
 
-  const fetchProcedures = useCallback(async () => {
+  const fetchProcedures = useCallback(
+    async (convenioId?: string) => {
+      if (scope === "admin") {
+        if (!selectedContact?.clinicId) return [];
+        return listClinicProceduresForAppointmentAdmin(selectedContact.clinicId, convenioId);
+      }
+      return listClinicProceduresForAppointment(convenioId);
+    },
+    [scope, selectedContact?.clinicId]
+  );
+
+  const fetchConvenios = useCallback(async () => {
     if (scope === "admin") {
       if (!selectedContact?.clinicId) return [];
-      return listClinicProceduresForAppointmentAdmin(selectedContact.clinicId);
+      return listClinicConveniosForAppointmentAdmin(selectedContact.clinicId);
     }
-    return listClinicProceduresForAppointment();
+    return listClinicConveniosForAppointment();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scope, selectedContact?.clinicId]);
 
   const fetchAgenda = useCallback(
@@ -632,6 +646,7 @@ export function ChatCrmApp({ scope, basePath, view }: ChatCrmAppProps) {
           onFinishAttendance={handleFinishAttendance}
           fetchProcedures={fetchProcedures}
           fetchDoctors={fetchDoctors}
+          fetchConvenios={fetchConvenios}
           fetchAgenda={fetchAgenda}
           onScheduleConfirmed={handleScheduleConfirmed}
           onSuggestIaReply={async () => {

@@ -118,8 +118,9 @@ interface InboxLayoutProps {
    * na prática) no scope admin, que não está preso a uma clínica só — ver availableClinics. */
   onCreateContact?: (name: string, phone: string, clinicId?: string) => Promise<void>;
   onFinishAttendance: (resolutionData?: { reason: string; notes?: string }) => Promise<void> | void;
-  fetchProcedures: () => Promise<PlainClinicProcedureItem[]>;
+  fetchProcedures: (convenioId?: string) => Promise<PlainClinicProcedureItem[]>;
   fetchDoctors?: () => Promise<{ id: number; nome: string; crm: string }[]>;
+  fetchConvenios?: () => Promise<{ id: number; nome: string }[]>;
   fetchAgenda?: (medicoId: number, date: string) => Promise<string[]>;
   onScheduleConfirmed: (data: { appointmentId: string; specialty: string; doctor: string; date: string; time: string; price: string }) => void;
   onSuggestIaReply?: () => Promise<string>;
@@ -159,6 +160,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
   onFinishAttendance,
   fetchProcedures,
   fetchDoctors,
+  fetchConvenios,
   fetchAgenda,
   onScheduleConfirmed,
   onSuggestIaReply,
@@ -1637,6 +1639,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
           onClose={() => setIsScheduleModalOpen(false)}
           fetchProcedures={fetchProcedures}
           fetchDoctors={fetchDoctors}
+          fetchConvenios={fetchConvenios}
           fetchAgenda={fetchAgenda}
           onConfirmSchedule={onScheduleConfirmed}
         />

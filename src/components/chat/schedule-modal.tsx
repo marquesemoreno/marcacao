@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { Contact } from '@/types/chat-crm';
-import { X, Calendar, Clock, Stethoscope, IdCard, CheckCircle2, UserRound } from 'lucide-react';
+import { X, Calendar, Clock, Stethoscope, IdCard, CheckCircle2, UserRound, CreditCard } from 'lucide-react';
 import { createAppointment } from '@/actions/appointments';
 import { formatCurrency, appointmentTypeLabels } from '@/lib/format';
 import type { PlainClinicProcedureItem } from '@/lib/serialize';
@@ -11,6 +11,7 @@ import { useDialogA11y } from '@/hooks/use-dialog-a11y';
 import { useClickOutside } from '@/hooks/use-click-outside';
 
 type BridgeDoctor = { id: number; nome: string; crm: string };
+type BridgeConvenio = { id: number; nome: string };
 
 /** Máscara visual de CPF enquanto digita — "000.000.000-00". */
 function formatCpfMask(value: string): string {
@@ -25,10 +26,13 @@ interface ScheduleModalProps {
   contact: Contact;
   isOpen: boolean;
   onClose: () => void;
-  /** Clínica-scoped usa a clínica da sessão; Admin passa o clinicId da conversa selecionada. */
-  fetchProcedures: () => Promise<PlainClinicProcedureItem[]>;
+  /** Clínica-scoped usa a clínica da sessão; Admin passa o clinicId da conversa selecionada.
+   * convenioId só existe no fluxo hospitalar — afeta o preço exibido. */
+  fetchProcedures: (convenioId?: string) => Promise<PlainClinicProcedureItem[]>;
   /** Só clínicas com integração hospitalar (Santa Clara) retornam médicos — vazio pras demais. */
   fetchDoctors?: () => Promise<BridgeDoctor[]>;
+  /** Idem — lista de convênios pra escolher no agendamento hospitalar. */
+  fetchConvenios?: () => Promise<BridgeConvenio[]>;
   /** Idem — só quando há integração hospitalar dá pra ver a agenda antes de marcar. */
   fetchAgenda?: (medicoId: number, date: string) => Promise<string[]>;
   onConfirmSchedule: (scheduleData: {
@@ -47,6 +51,7 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
   onClose,
   fetchProcedures,
   fetchDoctors,
+  fetchConvenios,
   fetchAgenda,
   onConfirmSchedule,
 }) => {
@@ -55,6 +60,8 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
   const [procedureId, setProcedureId] = useState('');
   const [doctors, setDoctors] = useState<BridgeDoctor[]>([]);
   const [doctorId, setDoctorId] = useState('');
+  const [convenios, setConvenios] = useState<BridgeConvenio[]>([]);
+  const [convenioId, setConvenioId] = useState('');
   const [patientName, setPatientName] = useState(contact.name);
   const [cpf, setCpf] = useState(contact.cpf || '');
   const [date, setDate] = useState('');
@@ -73,6 +80,7 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
     setCpf(contact.cpf || '');
     setProcedureId('');
     setDoctorId('');
+    setConvenioId('');
     setDate('');
     setTime('');
     setIsSuccess(false);
@@ -90,9 +98,29 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
       })
       .finally(() => setLoadingProcedures(false));
     fetchDoctors?.().then(setDoctors).catch(() => setDoctors([]));
-    // fetchProcedures/fetchDoctors são recriadas a cada render do pai — só precisamos rodar quando o modal abre.
+    fetchConvenios?.()
+      .then((items) => {
+        setConvenios(items);
+        // Pré-seleciona "Particular" (o padrão de sempre) pra não obrigar escolha
+        // quando é o caso mais comum — o atendente troca se for outro convênio.
+        const particular = items.find((c) => c.nome.trim().toUpperCase() === 'PARTICULAR');
+        if (particular) setConvenioId(String(particular.id));
+      })
+      .catch(() => setConvenios([]));
+    // fetchProcedures/fetchDoctors/fetchConvenios são recriadas a cada render do pai — só precisamos rodar quando o modal abre.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, contact.cpf, contact.name]);
+
+  // Convênio afeta o preço exibido do procedimento — rebusca quando o atendente troca.
+  useEffect(() => {
+    if (!isOpen || !fetchConvenios) return;
+    setLoadingProcedures(true);
+    fetchProcedures(convenioId || undefined)
+      .then(setProcedures)
+      .finally(() => setLoadingProcedures(false));
+    // Só quando o convênio muda de fato (a busca inicial já roda no efeito de abertura acima).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [convenioId]);
 
   // Busca a agenda do médico assim que ele e a data estiverem escolhidos —
   // mostra o que já está ocupado antes do atendente digitar um horário às cegas.
@@ -154,6 +182,7 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
         date,
         timeSlot: time || undefined,
         medicoId: doctorId || undefined,
+        convenioId: convenioId || undefined,
       });
 
       setIsSuccess(true);
@@ -285,6 +314,25 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
                     )}
                   </div>
                 )}
+              </div>
+            )}
+
+            {fetchConvenios && convenios.length > 0 && (
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5 flex items-center gap-1.5 font-mono">
+                  <CreditCard className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" /> Convênio
+                </label>
+                <select
+                  value={convenioId}
+                  onChange={(e) => setConvenioId(e.target.value)}
+                  className="w-full text-xs sm:text-sm border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 bg-slate-50/50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-medium"
+                >
+                  {convenios.map((convenio) => (
+                    <option key={convenio.id} value={convenio.id}>
+                      {convenio.nome}
+                    </option>
+                  ))}
+                </select>
               </div>
             )}
 
