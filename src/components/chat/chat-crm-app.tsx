@@ -143,6 +143,8 @@ export function ChatCrmApp({ scope, basePath, view }: ChatCrmAppProps) {
   const totalUnreadRef = useRef(0);
   const isFirstLoadRef = useRef(true);
   const attemptedPhotoFetchRef = useRef<Set<string>>(new Set());
+  const photoFetchQueueRef = useRef<string[]>([]);
+  const isDrainingPhotoQueueRef = useRef(false);
 
   const [attendantCapacity, setAttendantCapacity] = useState<{ activeCount: number; maxLimit: number } | null>(null);
   const [availableClinics, setAvailableClinics] = useState<{ id: string; tradeName: string }[]>([]);
@@ -193,40 +195,42 @@ export function ChatCrmApp({ scope, basePath, view }: ChatCrmAppProps) {
     refreshContacts();
   }, [refreshContacts]);
 
-  // Busca a foto de perfil do WhatsApp só pra contatos que ainda não têm (uma
-  // vez por contato, marcado no ref pra não repetir a cada ciclo de polling)
-  // — evita bater na Evolution API pra toda a fila a cada 5s, só faz isso
-  // pontualmente até cada contato ter sua foto (ou "sem foto") cacheada.
+  // Busca a foto de perfil do WhatsApp só pra contatos que ainda não têm.
+  // Usa uma fila única (photoFetchQueueRef) processada por no máximo 1 loop
+  // por vez (isDrainingPhotoQueueRef) — sem isso, cada ciclo de polling (a
+  // cada 5s) enquanto o backfill inicial ainda está rodando começaria seu
+  // próprio loop concorrente, multiplicando a taxa de chamadas na Evolution
+  // API em vez de respeitar o intervalo entre elas. Marcar em
+  // attemptedPhotoFetchRef acontece na hora que o contato entra na fila
+  // (não quando é processado), pra um ciclo de polling seguinte nunca
+  // enfileirar o mesmo contato de novo enquanto ele ainda está esperando a vez.
   useEffect(() => {
-    const pending = contacts.filter((c) => !c.avatar && !attemptedPhotoFetchRef.current.has(c.id));
-    if (pending.length === 0) return;
+    const newlyPending = contacts.filter((c) => !c.avatar && !attemptedPhotoFetchRef.current.has(c.id));
+    if (newlyPending.length === 0) return;
 
-    let cancelled = false;
+    for (const contact of newlyPending) {
+      attemptedPhotoFetchRef.current.add(contact.id);
+      photoFetchQueueRef.current.push(contact.id);
+    }
+
+    if (isDrainingPhotoQueueRef.current) return;
+    isDrainingPhotoQueueRef.current = true;
+
     (async () => {
-      // Sequencial e com intervalo entre chamadas de propósito: no primeiro
-      // carregamento (nenhum contato ainda tem foto cacheada), o admin pode
-      // ver dezenas de contatos de uma vez — disparar tudo de uma rajada só
-      // pra Evolution API se parece com scraping e arrisca a instância de
-      // WhatsApp. Um a cada 400ms é bem mais gentil, e é só um custo único
-      // (próximos carregamentos já vêm com a foto cacheada no banco).
-      for (const contact of pending) {
-        if (cancelled) break;
-        attemptedPhotoFetchRef.current.add(contact.id);
+      while (photoFetchQueueRef.current.length > 0) {
+        const contactId = photoFetchQueueRef.current.shift()!;
         try {
-          const photoUrl = await actions.refreshContactPhoto(contact.id);
-          if (photoUrl && !cancelled) {
-            setContacts((prev) => prev.map((c) => (c.id === contact.id ? { ...c, avatar: photoUrl } : c)));
+          const photoUrl = await actions.refreshContactPhoto(contactId);
+          if (photoUrl) {
+            setContacts((prev) => prev.map((c) => (c.id === contactId ? { ...c, avatar: photoUrl } : c)));
           }
         } catch {
           // sem foto: mantém o fallback de iniciais
         }
         await new Promise((resolve) => setTimeout(resolve, 400));
       }
+      isDrainingPhotoQueueRef.current = false;
     })();
-
-    return () => {
-      cancelled = true;
-    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [contacts]);
 
