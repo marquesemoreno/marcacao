@@ -34,7 +34,7 @@ describe("createAppointment (integração)", () => {
   it("cria um agendamento com status PENDING e CPF/telefone normalizados", async () => {
     const appointment = await createAppointment({
       patientName: "Paciente Teste Integração",
-      patientCpf: "123.456.789-00",
+      patientCpf: "123.456.789-09",
       patientPhone: "(11) 91234-5678",
       clinicProcedureId,
       date: "2026-10-01",
@@ -42,7 +42,7 @@ describe("createAppointment (integração)", () => {
     createdAppointmentIds.push(appointment.id);
 
     expect(appointment.status).toBe("PENDING");
-    expect(appointment.patientCpf).toBe("12345678900");
+    expect(appointment.patientCpf).toBe("12345678909");
     expect(appointment.patientPhone).toBe("11912345678");
     expect(appointment.clinicProcedureId).toBe(clinicProcedureId);
     expect(appointment.clinicProcedure.clinic.tradeName).toBeTruthy();
@@ -68,7 +68,7 @@ describe("createAppointment (integração)", () => {
   it("grava timeSlot e notes quando enviados, null quando omitidos", async () => {
     const withExtras = await createAppointment({
       patientName: "Paciente Com Extras",
-      patientCpf: "11122233344",
+      patientCpf: "11122233477",
       patientPhone: "11999998888",
       clinicProcedureId,
       date: "2026-10-05",
@@ -81,7 +81,7 @@ describe("createAppointment (integração)", () => {
 
     const withoutExtras = await createAppointment({
       patientName: "Paciente Sem Extras",
-      patientCpf: "55566677788",
+      patientCpf: "55566677800",
       patientPhone: "11999997777",
       clinicProcedureId,
       date: "2026-10-06",

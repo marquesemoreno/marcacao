@@ -1,11 +1,16 @@
 import { z } from "zod";
+import { isValidCpf } from "@/lib/cpf";
 
 export const createAppointmentSchema = z.object({
-  patientName: z.string().trim().min(3, "Informe o nome completo"),
+  patientName: z
+    .string()
+    .trim()
+    .min(3, "Informe o nome completo")
+    .refine((value) => value.split(/\s+/).filter(Boolean).length >= 2, "Informe nome e sobrenome"),
   patientCpf: z
     .string()
     .transform((value) => value.replace(/\D/g, ""))
-    .refine((value) => value.length === 11, "CPF deve ter 11 dígitos"),
+    .refine(isValidCpf, "CPF inválido — confira os números"),
   patientPhone: z
     .string()
     .transform((value) => {
