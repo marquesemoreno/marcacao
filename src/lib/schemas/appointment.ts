@@ -7,10 +7,17 @@ export const createAppointmentSchema = z.object({
     .trim()
     .min(3, "Informe o nome completo")
     .refine((value) => value.split(/\s+/).filter(Boolean).length >= 2, "Informe nome e sobrenome"),
+  // Opcional a pedido da Santa Clara: nem sempre o atendente consegue o CPF do
+  // paciente pelo WhatsApp, e travar o agendamento por isso trazia mais problema
+  // que benefício. Quando informado, ainda precisa ser um CPF válido de verdade.
   patientCpf: z
     .string()
-    .transform((value) => value.replace(/\D/g, ""))
-    .refine(isValidCpf, "CPF inválido — confira os números"),
+    .optional()
+    .transform((value) => {
+      const digits = value ? value.replace(/\D/g, "") : "";
+      return digits || undefined;
+    })
+    .refine((value) => value === undefined || isValidCpf(value), "CPF inválido — confira os números"),
   patientPhone: z
     .string()
     .transform((value) => {
@@ -30,6 +37,9 @@ export const createAppointmentSchema = z.object({
   /** Idem — convênio do paciente nesse agendamento hospitalar. Sem escolha, o
    * bridge usa o Particular por padrão. */
   convenioId: z.string().optional(),
+  /** Idem — paciente já cadastrado no sistema hospitalar, escolhido via busca por
+   * nome, pra reaproveitar o cadastro em vez de criar um novo. */
+  patientId: z.string().optional(),
 });
 
 export type CreateAppointmentInput = z.input<typeof createAppointmentSchema>;

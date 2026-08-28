@@ -13,6 +13,7 @@ const BRIDGE_ID_PREFIX = "bridge:santa-clara:";
 type BridgeProcedure = { id: number; codigo: string; nome: string; valor: number };
 type BridgeDoctor = { id: number; nome: string; crm: string; especialidade: string | null };
 export type BridgeConvenio = { id: number; nome: string };
+export type BridgePatient = { id: number; nome: string; cpf: string | null };
 
 function getBridgeConfig() {
   const apiUrl = process.env.SANTA_CLARA_API_URL;
@@ -102,6 +103,29 @@ export async function fetchSantaClaraDoctors(): Promise<BridgeDoctor[]> {
   }
 }
 
+/** Busca paciente já cadastrado no sistema hospitalar por nome — deixa o atendente
+ * reaproveitar um cadastro existente (evita duplicar paciente de retorno) em vez de
+ * sempre criar um novo. Exige 2+ caracteres porque o bridge também exige isso e devolve
+ * lista vazia antes disso, pra não escanear a tabela toda a cada tecla digitada. */
+export async function fetchSantaClaraPatients(query: string): Promise<BridgePatient[]> {
+  const config = getBridgeConfig();
+  if (!config || query.trim().length < 2) return [];
+  try {
+    const url = new URL(`${config.apiUrl}/api/pacientes`);
+    url.searchParams.set("q", query.trim());
+    const response = await fetch(url, {
+      headers: { "x-api-token": config.apiToken },
+      signal: AbortSignal.timeout(10000),
+      cache: "no-store",
+    });
+    if (!response.ok) return [];
+    const data = await response.json();
+    return Array.isArray(data) ? data : [];
+  } catch {
+    return [];
+  }
+}
+
 /** Horários já ocupados de um médico num dia, direto do sistema da clínica —
  * pra atendente ver a agenda antes de marcar, em vez de digitar um horário às
  * cegas. Ver comentário do endpoint no bridge: conta qualquer marcação
@@ -154,12 +178,17 @@ export function adaptBridgeProcedureToPlainItem(clinicId: string, proc: BridgePr
 /** Grava a marcação real no Firebird da Santa Clara via bridge (POST, só cria — nunca atualiza/apaga nada existente). */
 export async function createSantaClaraBridgeAppointment(input: {
   patientName: string;
-  patientCpf: string;
+  /** Opcional a pedido da Santa Clara — nem sempre o atendente consegue o CPF pelo
+   * WhatsApp, e travar o agendamento por isso trazia mais problema que benefício. */
+  patientCpf?: string;
   patientPhone: string;
   clinicProcedureId: string;
   date: string;
   timeSlot?: string;
   medicoId?: string;
+  /** Paciente já cadastrado, escolhido via busca (fetchSantaClaraPatients) — reaproveita
+   * o cadastro em vez de criar um novo/depender do CPF pra achar o existente. */
+  patientId?: string;
   /** Sem escolha do atendente, o bridge usa o Particular por padrão. */
   convenioId?: string;
 }): Promise<PlainAppointment> {
@@ -183,6 +212,7 @@ export async function createSantaClaraBridgeAppointment(input: {
       body: JSON.stringify({
         paciente_nome: input.patientName,
         paciente_cpf: input.patientCpf,
+        paciente_id: input.patientId ? Number(input.patientId) : undefined,
         paciente_celular: input.patientPhone,
         servico_id: servicoId,
         medico_id: input.medicoId ? Number(input.medicoId) : undefined,
@@ -234,7 +264,7 @@ export async function createSantaClaraBridgeAppointment(input: {
       data: {
         patientName: input.patientName,
         patientPhone: input.patientPhone,
-        patientCpf: input.patientCpf,
+        patientCpf: input.patientCpf ?? "",
         clinicProcedureId: dbClinicProcedure.id,
         date: new Date(`${input.date}T00:00:00Z`),
         timeSlot: input.timeSlot || null,
@@ -253,7 +283,7 @@ export async function createSantaClaraBridgeAppointment(input: {
   return {
     id: appointmentId,
     patientName: input.patientName,
-    patientCpf: input.patientCpf,
+    patientCpf: input.patientCpf ?? "",
     patientPhone: input.patientPhone,
     clinicProcedureId: procedureId,
     date: new Date(`${input.date}T00:00:00Z`),

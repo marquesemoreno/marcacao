@@ -12,6 +12,7 @@ import { useClickOutside } from '@/hooks/use-click-outside';
 
 type BridgeDoctor = { id: number; nome: string; crm: string; especialidade: string | null };
 type BridgeConvenio = { id: number; nome: string };
+type BridgePatient = { id: number; nome: string; cpf: string | null };
 
 /** Máscara visual de CPF enquanto digita — "000.000.000-00". */
 function formatCpfMask(value: string): string {
@@ -35,6 +36,8 @@ interface ScheduleModalProps {
   fetchConvenios?: () => Promise<BridgeConvenio[]>;
   /** Idem — só quando há integração hospitalar dá pra ver a agenda antes de marcar. */
   fetchAgenda?: (medicoId: number, date: string) => Promise<string[]>;
+  /** Idem — busca paciente já cadastrado no sistema hospitalar por nome. */
+  fetchPatients?: (query: string) => Promise<BridgePatient[]>;
   onConfirmSchedule: (scheduleData: {
     appointmentId: string;
     specialty: string;
@@ -53,6 +56,7 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
   fetchDoctors,
   fetchConvenios,
   fetchAgenda,
+  fetchPatients,
   onConfirmSchedule,
 }) => {
   const [procedures, setProcedures] = useState<PlainClinicProcedureItem[]>([]);
@@ -63,6 +67,10 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
   const [convenios, setConvenios] = useState<BridgeConvenio[]>([]);
   const [convenioId, setConvenioId] = useState('');
   const [patientName, setPatientName] = useState(contact.name);
+  const [patientId, setPatientId] = useState('');
+  const [patientSuggestions, setPatientSuggestions] = useState<BridgePatient[]>([]);
+  const [isPatientDropdownOpen, setIsPatientDropdownOpen] = useState(false);
+  const patientDropdownRef = useClickOutside<HTMLDivElement>(isPatientDropdownOpen, () => setIsPatientDropdownOpen(false));
   const [cpf, setCpf] = useState(contact.cpf || '');
   const [date, setDate] = useState('');
   const [time, setTime] = useState('');
@@ -78,6 +86,9 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
   useEffect(() => {
     if (!isOpen) return;
     setPatientName(contact.name);
+    setPatientId('');
+    setPatientSuggestions([]);
+    setIsPatientDropdownOpen(false);
     setCpf(contact.cpf || '');
     setProcedureId('');
     setDoctorId('');
@@ -157,6 +168,32 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
     setTimeMode(procedure.appointmentType === 'ARRIVAL_ORDER' ? 'arrival' : 'scheduled');
   }, [procedureId, procedures]);
 
+  // Busca paciente já cadastrado por nome enquanto digita — debounce de 300ms pra não
+  // disparar uma consulta no Firebird a cada tecla. Só roda com o dropdown aberto (o
+  // atendente está de fato editando o nome, não só vendo o valor pré-preenchido do contato).
+  useEffect(() => {
+    if (!isOpen || !fetchPatients || !isPatientDropdownOpen) return;
+    const trimmed = patientName.trim();
+    if (trimmed.length < 2) {
+      setPatientSuggestions([]);
+      return;
+    }
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      fetchPatients(trimmed)
+        .then((items) => {
+          if (!cancelled) setPatientSuggestions(items);
+        })
+        .catch(() => {
+          if (!cancelled) setPatientSuggestions([]);
+        });
+    }, 300);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [isOpen, fetchPatients, isPatientDropdownOpen, patientName]);
+
   const dialogRef = useDialogA11y<HTMLDivElement>(isOpen, onClose);
 
   if (!isOpen) return null;
@@ -190,13 +227,14 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
     try {
       const appointment = await createAppointment({
         patientName,
-        patientCpf: cpf,
+        patientCpf: cpf || undefined,
         patientPhone: contact.phone,
         clinicProcedureId: procedureId,
         date,
         timeSlot: time || undefined,
         medicoId: doctorId || undefined,
         convenioId: convenioId || undefined,
+        patientId: patientId || undefined,
       });
 
       setIsSuccess(true);
@@ -270,20 +308,56 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
         ) : (
           <form onSubmit={handleSubmit} className="flex-1 min-h-0 flex flex-col">
           <div className="flex-1 min-h-0 overflow-y-auto p-5 sm:p-6 space-y-4">
-            <div>
+            <div className="relative" ref={patientDropdownRef}>
               <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5 flex items-center gap-1.5 font-mono">
                 <UserRound className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" /> Nome Completo
               </label>
-              <input
-                type="text"
-                value={patientName}
-                onChange={(e) => setPatientName(e.target.value)}
-                placeholder="Nome e sobrenome do paciente"
-                className="w-full text-xs sm:text-sm border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 bg-slate-50/50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-medium"
-                required
-              />
+              <div className="relative">
+                <input
+                  type="text"
+                  value={patientName}
+                  onChange={(e) => {
+                    setPatientName(e.target.value);
+                    setPatientId('');
+                  }}
+                  onFocus={() => fetchPatients && setIsPatientDropdownOpen(true)}
+                  placeholder="Nome e sobrenome do paciente"
+                  className={`w-full text-xs sm:text-sm border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 ${
+                    patientId ? 'pr-9' : ''
+                  } bg-slate-50/50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-medium`}
+                  autoComplete="off"
+                  required
+                />
+                {patientId && (
+                  <CheckCircle2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-500" />
+                )}
+              </div>
+              {fetchPatients && isPatientDropdownOpen && patientSuggestions.length > 0 && (
+                <div className="absolute left-0 right-0 mt-1 max-h-56 overflow-y-auto bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-lg py-1.5 z-50 animate-in fade-in zoom-in-95 duration-100">
+                  {patientSuggestions.map((patient) => (
+                    <button
+                      key={patient.id}
+                      type="button"
+                      onClick={() => {
+                        setPatientName(patient.nome);
+                        setPatientId(String(patient.id));
+                        if (patient.cpf) setCpf(formatCpfMask(patient.cpf));
+                        setIsPatientDropdownOpen(false);
+                      }}
+                      className="w-full px-3 py-2 text-left hover:bg-slate-50 dark:hover:bg-slate-800"
+                    >
+                      <p className="text-xs sm:text-sm text-slate-700 dark:text-slate-200">{patient.nome}</p>
+                      <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">
+                        {patient.cpf ? `CPF: ${formatCpfMask(patient.cpf)}` : 'Sem CPF cadastrado'}
+                      </p>
+                    </button>
+                  ))}
+                </div>
+              )}
               <p className="mt-1 text-[10px] text-slate-400 dark:text-slate-500">
-                O nome do contato no WhatsApp costuma vir incompleto — confirme ou corrija aqui antes de agendar.
+                {patientId
+                  ? 'Paciente já cadastrado no sistema da clínica — edite o nome pra buscar outro.'
+                  : 'O nome do contato no WhatsApp costuma vir incompleto — confirme ou corrija aqui antes de agendar.'}
               </p>
             </div>
 
@@ -479,7 +553,7 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
 
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5 flex items-center gap-1.5 font-mono">
-                  <IdCard className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" /> CPF
+                  <IdCard className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" /> CPF (opcional)
                 </label>
                 <input
                   type="text"
@@ -489,7 +563,6 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
                   placeholder="000.000.000-00"
                   maxLength={14}
                   className="w-full text-xs sm:text-sm border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 bg-slate-50/50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-mono"
-                  required
                 />
               </div>
             </div>

@@ -63,6 +63,7 @@ export async function createAppointment(input: CreateAppointmentInput) {
       timeSlot: data.timeSlot,
       medicoId: data.medicoId,
       convenioId: data.convenioId,
+      patientId: data.patientId,
     });
   }
 
@@ -74,7 +75,7 @@ export async function createAppointment(input: CreateAppointmentInput) {
   const appointment = await prisma.appointment.create({
     data: {
       patientName: data.patientName,
-      patientCpf: data.patientCpf,
+      patientCpf: data.patientCpf ?? "",
       patientPhone: data.patientPhone,
       clinicProcedureId: data.clinicProcedureId,
       date: new Date(`${data.date}T00:00:00Z`),

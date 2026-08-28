@@ -29,6 +29,7 @@ import {
   listClinicDoctorsForAppointment,
   listClinicConveniosForAppointment,
   getClinicDoctorAgenda,
+  listClinicPatientsForAppointment,
   suggestIaReply,
   markConversationUnread,
   resendMessage,
@@ -60,6 +61,7 @@ import {
   listClinicDoctorsForAppointmentAdmin,
   listClinicConveniosForAppointmentAdmin,
   getClinicDoctorAgendaAdmin,
+  listClinicPatientsForAppointmentAdmin,
   suggestIaReplyAdmin,
   listClinicsForReassignment,
   updateConversationClinicAdmin,
@@ -543,6 +545,17 @@ export function ChatCrmApp({ scope, basePath, view }: ChatCrmAppProps) {
     [scope, selectedContact?.clinicId]
   );
 
+  const fetchPatients = useCallback(
+    async (query: string) => {
+      if (scope === "admin") {
+        if (!selectedContact?.clinicId) return [];
+        return listClinicPatientsForAppointmentAdmin(selectedContact.clinicId, query);
+      }
+      return listClinicPatientsForAppointment(query);
+    },
+    [scope, selectedContact?.clinicId]
+  );
+
   async function handleScheduleConfirmed(data: {
     appointmentId: string;
     specialty: string;
@@ -648,6 +661,7 @@ export function ChatCrmApp({ scope, basePath, view }: ChatCrmAppProps) {
           fetchDoctors={fetchDoctors}
           fetchConvenios={fetchConvenios}
           fetchAgenda={fetchAgenda}
+          fetchPatients={fetchPatients}
           onScheduleConfirmed={handleScheduleConfirmed}
           onSuggestIaReply={async () => {
             if (!selectedContactId) return "";

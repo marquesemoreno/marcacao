@@ -109,6 +109,7 @@ interface InboxLayoutProps {
   fetchDoctors?: () => Promise<{ id: number; nome: string; crm: string; especialidade: string | null }[]>;
   fetchConvenios?: () => Promise<{ id: number; nome: string }[]>;
   fetchAgenda?: (medicoId: number, date: string) => Promise<string[]>;
+  fetchPatients?: (query: string) => Promise<{ id: number; nome: string; cpf: string | null }[]>;
   onScheduleConfirmed: (data: { appointmentId: string; specialty: string; doctor: string; date: string; time: string; price: string }) => void;
   onSuggestIaReply?: () => Promise<string>;
 }
@@ -149,6 +150,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
   fetchDoctors,
   fetchConvenios,
   fetchAgenda,
+  fetchPatients,
   onScheduleConfirmed,
   onSuggestIaReply,
 }) => {
@@ -1662,6 +1664,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
           fetchDoctors={fetchDoctors}
           fetchConvenios={fetchConvenios}
           fetchAgenda={fetchAgenda}
+          fetchPatients={fetchPatients}
           onConfirmSchedule={onScheduleConfirmed}
         />
       )}

@@ -9,7 +9,7 @@ import { toPlainClinicProcedureItem } from "@/lib/serialize";
 import { toChatContact, toChatMessage, departmentToDb, funnelStageToDb } from "@/lib/chat-crm-adapters";
 import { attachSignedUrls, uploadWhatsAppMedia, getSignedMediaUrl, formatDuration } from "@/lib/whatsapp-media";
 import { sendWhatsAppMedia, sendWhatsAppAudio } from "@/lib/whatsapp";
-import { hasSantaClaraBridgeIntegration, fetchSantaClaraProcedures, fetchSantaClaraDoctors, fetchSantaClaraAgenda, fetchSantaClaraConvenios, adaptBridgeProcedureToPlainItem } from "@/lib/santa-clara-bridge";
+import { hasSantaClaraBridgeIntegration, fetchSantaClaraProcedures, fetchSantaClaraDoctors, fetchSantaClaraAgenda, fetchSantaClaraConvenios, fetchSantaClaraPatients, adaptBridgeProcedureToPlainItem } from "@/lib/santa-clara-bridge";
 import { formatFileSize } from "@/lib/format";
 import { notifyInboxRealtime } from "@/lib/supabase-server";
 import { APPOINTMENT_CONFIRMED_TEMPLATE } from "@/lib/chat-messages";
@@ -824,6 +824,14 @@ export async function getClinicDoctorAgenda(medicoId: number, date: string) {
   const { clinicId } = await requireClinicSession();
   if (!(await hasSantaClaraBridgeIntegration(clinicId))) return [];
   return fetchSantaClaraAgenda(medicoId, date);
+}
+
+/** Idem — busca paciente já cadastrado no sistema hospitalar por nome, pra reaproveitar
+ * o cadastro em vez de criar um novo a cada agendamento. */
+export async function listClinicPatientsForAppointment(query: string) {
+  const { clinicId } = await requireClinicSession();
+  if (!(await hasSantaClaraBridgeIntegration(clinicId))) return [];
+  return fetchSantaClaraPatients(query);
 }
 
 export async function listCannedResponses() {
