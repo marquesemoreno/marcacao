@@ -169,7 +169,10 @@ export function toChatMessage(
     id: message.id,
     sender,
     senderName: message.senderUser?.name,
-    text: message.deletedAt ? "🚫 Mensagem apagada" : message.content,
+    // Mantém o conteúdo original visível (não troca por um placeholder) — só marca
+    // `deleted` pra tela aplicar o estilo (vermelho/tachado), avisando que o remetente
+    // apagou sem esconder o que a atendente já tinha visto.
+    text: message.content,
     deleted: Boolean(message.deletedAt),
     timestamp: formatMessageTimestamp(message.createdAt),
     type: typeMap[message.type],
