@@ -182,9 +182,11 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
     const timer = setTimeout(() => {
       fetchPatients(trimmed)
         .then((items) => {
+          console.log('[DEBUG patient-search]', { trimmed, count: items.length, items });
           if (!cancelled) setPatientSuggestions(items);
         })
-        .catch(() => {
+        .catch((err) => {
+          console.log('[DEBUG patient-search] ERROR', err);
           if (!cancelled) setPatientSuggestions([]);
         });
     }, 300);
