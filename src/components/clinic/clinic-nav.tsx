@@ -2,21 +2,22 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { MessageCircle, KanbanSquare, Users, CalendarCheck, Receipt, type LucideIcon } from "lucide-react";
 
-const fullNavItems: { href: string; label: string; exact?: boolean }[] = [
-  { href: "/clinic/inbox", label: "💬 Chat / WhatsApp" },
-  { href: "/clinic/crm", label: "📋 CRM" },
-  { href: "/clinic/contatos", label: "👥 Contatos" },
-  { href: "/clinic/agendamentos", label: "📅 Agendamentos de Hoje" },
-  { href: "/clinic/precos", label: "💲 Tabela de Procedimentos" },
+const fullNavItems: { href: string; label: string; icon: LucideIcon; exact?: boolean }[] = [
+  { href: "/clinic/inbox", label: "Chat / WhatsApp", icon: MessageCircle },
+  { href: "/clinic/crm", label: "CRM", icon: KanbanSquare },
+  { href: "/clinic/contatos", label: "Contatos", icon: Users },
+  { href: "/clinic/agendamentos", label: "Agendamentos de Hoje", icon: CalendarCheck },
+  { href: "/clinic/precos", label: "Tabela de Procedimentos", icon: Receipt },
 ];
 
 // Clínicas com instância própria de WhatsApp (atendimento exclusivo, fora dos processos
 // de agendamento do marketplace) não usam agendamento/tabela de preços do Conecta Saúde.
-const exclusiveNavItems: { href: string; label: string; exact?: boolean }[] = [
-  { href: "/clinic/inbox", label: "💬 Chat / WhatsApp" },
-  { href: "/clinic/crm", label: "📋 CRM" },
-  { href: "/clinic/contatos", label: "👥 Contatos" },
+const exclusiveNavItems: { href: string; label: string; icon: LucideIcon; exact?: boolean }[] = [
+  { href: "/clinic/inbox", label: "Chat / WhatsApp", icon: MessageCircle },
+  { href: "/clinic/crm", label: "CRM", icon: KanbanSquare },
+  { href: "/clinic/contatos", label: "Contatos", icon: Users },
 ];
 
 export function ClinicNav({ exclusiveWhatsapp = false }: { exclusiveWhatsapp?: boolean }) {
@@ -27,6 +28,7 @@ export function ClinicNav({ exclusiveWhatsapp = false }: { exclusiveWhatsapp?: b
     <nav className="flex items-center gap-1 overflow-x-auto no-scrollbar py-0.5">
       {navItems.map((item) => {
         const isActive = item.exact ? pathname === item.href : pathname?.startsWith(item.href);
+        const Icon = item.icon;
         return (
           <Link
             key={item.href}
@@ -37,6 +39,7 @@ export function ClinicNav({ exclusiveWhatsapp = false }: { exclusiveWhatsapp?: b
                 : "text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white"
             }`}
           >
+            <Icon className="h-3.5 w-3.5" />
             {item.label}
           </Link>
         );
