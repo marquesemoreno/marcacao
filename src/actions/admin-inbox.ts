@@ -462,6 +462,18 @@ export async function getAttendantCapacityAdmin() {
   return { activeCount, maxLimit };
 }
 
+/** Idem — sem clinicId porque o admin enxerga conversas de todas as clínicas. */
+export async function getOldestUnassignedWaitMinutesAdmin() {
+  await requireAdminSession();
+  const oldest = await prisma.conversation.findFirst({
+    where: { assignedUserId: null, status: { in: ACTIVE_STATUSES } },
+    orderBy: { lastMessageAt: "asc" },
+    select: { lastMessageAt: true },
+  });
+  if (!oldest?.lastMessageAt) return null;
+  return Math.floor((Date.now() - oldest.lastMessageAt.getTime()) / 60000);
+}
+
 export async function assignConversationToUserAdmin(conversationId: string, targetUserId: string | null) {
   await requireAdminSession();
   await prisma.conversation.update({

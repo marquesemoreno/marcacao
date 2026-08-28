@@ -49,15 +49,21 @@ export async function createContact(name: string, phone: string) {
     create: { phone: fullPhone, name: trimmedName },
   });
 
-  let conversation = await prisma.conversation.findFirst({
-    where: { contactId: contact.id, clinicId },
-  });
-
-  if (!conversation) {
-    conversation = await prisma.conversation.create({
+  // Trava consultiva por contactId dentro da transação: sem ela, duas requisições quase
+  // simultâneas pro mesmo contato podiam ambas passar pelo "findFirst" antes de qualquer
+  // "create" confirmar, e cada uma criava sua própria Conversation — o mesmo paciente
+  // aparecendo em duas conversas diferentes na tela. A trava serializa esse trecho por
+  // contato (contatos diferentes não se bloqueiam) e é liberada sozinha no fim da transação.
+  const conversation = await prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${contact.id})::bigint)`;
+    const existing = await tx.conversation.findFirst({
+      where: { contactId: contact.id, clinicId },
+    });
+    if (existing) return existing;
+    return tx.conversation.create({
       data: { clinicId, contactId: contact.id, status: "OPEN", lastMessageAt: new Date() },
     });
-  }
+  });
 
   revalidatePath("/clinic/inbox");
   notifyInboxRealtime().catch(() => {});
@@ -493,6 +499,20 @@ export async function getAttendantCapacity() {
   });
 
   return { activeCount, maxLimit };
+}
+
+/** Minutos desde a última mensagem da conversa mais antiga parada em "Não Atribuídas" —
+ * usado pra piscar a aba e alertar o atendente quando tem paciente esperando há muito
+ * tempo sem ninguém assumir. `null` quando não há nenhuma conversa não atribuída. */
+export async function getOldestUnassignedWaitMinutes() {
+  const { clinicId } = await requireClinicSession();
+  const oldest = await prisma.conversation.findFirst({
+    where: { clinicId, assignedUserId: null, status: { in: ACTIVE_STATUSES } },
+    orderBy: { lastMessageAt: "asc" },
+    select: { lastMessageAt: true },
+  });
+  if (!oldest?.lastMessageAt) return null;
+  return Math.floor((Date.now() - oldest.lastMessageAt.getTime()) / 60000);
 }
 
 export async function claimConversation(conversationId: string) {

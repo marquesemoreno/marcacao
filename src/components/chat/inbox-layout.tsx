@@ -59,6 +59,9 @@ function tagClasses(tag: string) {
   return PRESET_TAGS.find((preset) => preset.label === tag)?.classes ?? 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700';
 }
 
+/** A partir de quantos minutos parado em "Não Atribuídas" a aba pisca pra alertar o atendente. */
+const UNASSIGNED_ALERT_THRESHOLD_MINUTES = 10;
+
 const FUNNEL_STEPS: { id: FunnelStage; label: string }[] = [
   { id: 'novos', label: 'Novo' },
   { id: 'triagem', label: 'Em Atendimento' },
@@ -79,6 +82,9 @@ interface InboxLayoutProps {
   isLoadingOlderMessages?: boolean;
   onLoadOlderMessages?: () => void;
   attendantCapacity?: { activeCount: number; maxLimit: number } | null;
+  /** Minutos desde a última mensagem da conversa mais antiga em "Não Atribuídas" — pisca a
+   * aba quando passa do limiar, mesmo se o atendente estiver vendo outra aba no momento. */
+  unassignedWaitMinutes?: number | null;
   selectedContactId: string | null;
   onSelectContact: (id: string) => void;
   filterTab: InboxFilter;
@@ -122,6 +128,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
   isLoadingOlderMessages,
   onLoadOlderMessages,
   attendantCapacity,
+  unassignedWaitMinutes,
   selectedContactId,
   onSelectContact,
   filterTab,
@@ -531,19 +538,31 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                 { id: 'minhas', label: 'Minhas' },
                 { id: 'nao_atribuidas', label: 'Não Atribuídas' },
               ] as const
-            ).map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => onFilterTabChange(tab.id)}
-                className={`flex-1 py-1 px-1.5 rounded-md text-[11px] transition-all whitespace-nowrap text-center ${
-                  filterTab === tab.id
-                    ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 font-semibold shadow-sm'
-                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
+            ).map((tab) => {
+              // Pisca só quando o atendente NÃO está nessa aba — se ela já está olhando
+              // "Não Atribuídas", o paciente esperando já está visível, sem precisar de alerta.
+              const shouldAlert =
+                tab.id === 'nao_atribuidas' &&
+                filterTab !== 'nao_atribuidas' &&
+                unassignedWaitMinutes != null &&
+                unassignedWaitMinutes >= UNASSIGNED_ALERT_THRESHOLD_MINUTES;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => onFilterTabChange(tab.id)}
+                  title={shouldAlert ? `Paciente esperando há ${unassignedWaitMinutes} min sem atendente` : undefined}
+                  className={`flex-1 py-1 px-1.5 rounded-md text-[11px] transition-all whitespace-nowrap text-center ${
+                    shouldAlert
+                      ? 'bg-rose-500 text-white font-bold shadow-sm animate-pulse'
+                      : filterTab === tab.id
+                        ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 font-semibold shadow-sm'
+                        : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              );
+            })}
           </div>
 
           {/* Filtro por Tag: Dropdown Compacto */}

@@ -30,6 +30,7 @@ import {
   listClinicConveniosForAppointment,
   getClinicDoctorAgenda,
   listClinicPatientsForAppointment,
+  getOldestUnassignedWaitMinutes,
   suggestIaReply,
   markConversationUnread,
   resendMessage,
@@ -62,6 +63,7 @@ import {
   listClinicConveniosForAppointmentAdmin,
   getClinicDoctorAgendaAdmin,
   listClinicPatientsForAppointmentAdmin,
+  getOldestUnassignedWaitMinutesAdmin,
   suggestIaReplyAdmin,
   listClinicsForReassignment,
   updateConversationClinicAdmin,
@@ -162,10 +164,15 @@ export function ChatCrmApp({ scope, basePath, view }: ChatCrmAppProps) {
 
   const [attendantCapacity, setAttendantCapacity] = useState<{ activeCount: number; maxLimit: number } | null>(null);
   const [availableClinics, setAvailableClinics] = useState<{ id: string; tradeName: string }[]>([]);
+  const [unassignedWaitMinutes, setUnassignedWaitMinutes] = useState<number | null>(null);
 
   const refreshContacts = useCallback(async () => {
     const capacityFn = scope === "admin" ? getAttendantCapacityAdmin : getAttendantCapacity;
     capacityFn().then(setAttendantCapacity).catch(() => {});
+    // Busca independente da aba selecionada — precisa saber se tem paciente esperando há
+    // muito tempo em "Não Atribuídas" mesmo quando o atendente está vendo "Minhas".
+    const waitFn = scope === "admin" ? getOldestUnassignedWaitMinutesAdmin : getOldestUnassignedWaitMinutes;
+    waitFn().then(setUnassignedWaitMinutes).catch(() => {});
 
     const result =
       view === "crm"
@@ -194,10 +201,13 @@ export function ChatCrmApp({ scope, basePath, view }: ChatCrmAppProps) {
     totalUnreadRef.current = totalUnread;
     isFirstLoadRef.current = false;
 
-    setSelectedContactId((current) => {
-      if (current && result.some((c) => c.id === current)) return current;
-      return result[0]?.id ?? null;
-    });
+    // Nunca troca sozinho a conversa aberta na tela — antes, qualquer refresh (o polling de
+    // 5s, um broadcast do realtime, trocar de aba/busca) que não trouxesse mais a conversa
+    // atual nesse recorte específico (ex: ela saiu de "Não Atribuídas" porque outro atendente
+    // assumiu) fazia cair sozinho na primeira conversa da lista — trocando de paciente no meio
+    // do atendimento sem a atendente clicar em nada. Só escolhe uma conversa automaticamente
+    // quando não existe nenhuma selecionada ainda (primeiro carregamento).
+    setSelectedContactId((current) => current ?? result[0]?.id ?? null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [actions, filterTab, searchQuery, scope, view]);
 
@@ -633,6 +643,7 @@ export function ChatCrmApp({ scope, basePath, view }: ChatCrmAppProps) {
           isLoadingOlderMessages={isLoadingOlderMessages}
           onLoadOlderMessages={handleLoadOlderMessages}
           attendantCapacity={attendantCapacity}
+          unassignedWaitMinutes={unassignedWaitMinutes}
           selectedContactId={selectedContactId}
           onSelectContact={selectContact}
           filterTab={filterTab}

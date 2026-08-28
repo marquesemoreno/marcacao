@@ -197,49 +197,61 @@ async function findOrCreateConversation(phone: string, name: string | undefined,
   // original). Instância exclusiva: só reaproveita se já houver conversa DESSA clínica com
   // esse contato — senão cria uma nova, em vez de herdar uma conversa antiga de outra clínica
   // (ex: o mesmo telefone já ter escrito pro número compartilhado antes).
-  const existingConversation = await prisma.conversation.findFirst({
-    where: resolvedClinicId ? { contactId: contact.id, clinicId: resolvedClinicId } : { contactId: contact.id },
-    orderBy: { createdAt: "desc" },
-  });
-  if (existingConversation) {
-    return { contact, conversation: existingConversation, isNewConversation: false };
-  }
+  //
+  // Tudo dentro de uma trava consultiva por contactId (pg_advisory_xact_lock, liberada
+  // sozinha no fim da transação): sem ela, duas mensagens do WhatsApp chegando quase juntas
+  // pro mesmo telefone (ex: imagem + legenda, ou reentrega do webhook da Evolution API)
+  // podiam ambas passar pelo "findFirst" antes de qualquer "create" confirmar, e cada uma
+  // criava sua própria Conversation pro mesmo Contact — o paciente aparecendo em duas
+  // conversas diferentes na tela do atendente. A trava serializa esse trecho por contato;
+  // contatos diferentes não se bloqueiam entre si.
+  return prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${contact.id})::bigint)`;
 
-  let clinicId = resolvedClinicId;
-
-  if (!clinicId) {
-    const appointment = await prisma.appointment.findFirst({
-      where: {
-        patientPhone: { endsWith: phoneSuffix },
-        status: { in: ["PENDING", "CONFIRMED"] },
-      },
+    const existingConversation = await tx.conversation.findFirst({
+      where: resolvedClinicId ? { contactId: contact.id, clinicId: resolvedClinicId } : { contactId: contact.id },
       orderBy: { createdAt: "desc" },
-      select: { clinicProcedure: { select: { clinicId: true } } },
     });
-    clinicId = appointment?.clinicProcedure.clinicId;
-  }
+    if (existingConversation) {
+      return { contact, conversation: existingConversation, isNewConversation: false };
+    }
 
-  if (!clinicId) {
-    const defaultClinic = await prisma.clinic.findFirst({
-      where: { active: true },
-      orderBy: { createdAt: "asc" },
+    let clinicId = resolvedClinicId;
+
+    if (!clinicId) {
+      const appointment = await tx.appointment.findFirst({
+        where: {
+          patientPhone: { endsWith: phoneSuffix },
+          status: { in: ["PENDING", "CONFIRMED"] },
+        },
+        orderBy: { createdAt: "desc" },
+        select: { clinicProcedure: { select: { clinicId: true } } },
+      });
+      clinicId = appointment?.clinicProcedure.clinicId;
+    }
+
+    if (!clinicId) {
+      const defaultClinic = await tx.clinic.findFirst({
+        where: { active: true },
+        orderBy: { createdAt: "asc" },
+      });
+      clinicId = defaultClinic?.id;
+    }
+
+    if (!clinicId) {
+      return { contact, conversation: null, isNewConversation: false };
+    }
+
+    const conversation = await tx.conversation.create({
+      data: {
+        clinicId,
+        contactId: contact.id,
+        status: "OPEN",
+        lastMessageAt: new Date(),
+      },
     });
-    clinicId = defaultClinic?.id;
-  }
-
-  if (!clinicId) {
-    return { contact, conversation: null, isNewConversation: false };
-  }
-
-  const conversation = await prisma.conversation.create({
-    data: {
-      clinicId,
-      contactId: contact.id,
-      status: "OPEN",
-      lastMessageAt: new Date(),
-    },
+    return { contact, conversation, isNewConversation: true };
   });
-  return { contact, conversation, isNewConversation: true };
 }
 
 export async function POST(request: Request) {
