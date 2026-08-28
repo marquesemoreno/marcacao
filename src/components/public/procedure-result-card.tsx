@@ -4,7 +4,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { RatingStars } from "@/components/public/rating-stars";
 import { appointmentTypeLabels, categoryLabels, formatCurrency } from "@/lib/format";
-import { MapPin, FileText, ArrowRight, MessageCircle } from "lucide-react";
+import { MapPin, FileText, ArrowRight } from "lucide-react";
+import { WhatsAppIcon } from "@/components/icons/whatsapp-icon";
 
 export type ClinicProcedureResult = Prisma.ClinicProcedureGetPayload<{
   include: { clinic: true; procedure: { include: { specialty: true } } };
@@ -99,7 +100,7 @@ export function ProcedureResultCard({ result }: { result: ClinicProcedureResult 
             >
               {isSobConsulta ? (
                 <>
-                  <MessageCircle className="size-3.5" />
+                  <WhatsAppIcon className="size-3.5" />
                   <span>Consultar no WhatsApp</span>
                 </>
               ) : (

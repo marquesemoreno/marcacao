@@ -1,6 +1,7 @@
 "use client";
 
-import { Share2, MessageCircle, Printer } from "lucide-react";
+import { Share2, Printer } from "lucide-react";
+import { WhatsAppIcon } from "@/components/icons/whatsapp-icon";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { buildWhatsAppLink } from "@/lib/format";
@@ -72,8 +73,8 @@ export function ProposalActionBar() {
           nativeButton={false}
           className="h-9 gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-2xs"
         >
-          <MessageCircle className="h-4 w-4 fill-current" />
-          💬 Falar no WhatsApp com o Diretor Comercial
+          <WhatsAppIcon className="h-4 w-4" />
+          Falar no WhatsApp com o Diretor Comercial
         </Button>
       </div>
     </div>

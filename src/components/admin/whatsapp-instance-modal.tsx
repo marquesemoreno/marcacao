@@ -2,7 +2,8 @@
 
 import { useCallback, useRef, useState } from "react";
 import type { WhatsappInstanceStatus } from "@prisma/client";
-import { MessageCircle, QrCode, RefreshCw, Power, Loader2, CheckCircle2, XCircle, Circle } from "lucide-react";
+import { QrCode, RefreshCw, Power, Loader2, CheckCircle2, XCircle, Circle } from "lucide-react";
+import { WhatsAppIcon } from "@/components/icons/whatsapp-icon";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import {
@@ -202,14 +203,14 @@ export function WhatsappInstanceModal({ clinicId, clinicName }: { clinicId: stri
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-sky-700 bg-sky-50 hover:bg-sky-100 border border-sky-200 rounded-xl transition-all cursor-pointer">
-        <MessageCircle className="w-3.5 h-3.5 text-sky-600" />
+        <WhatsAppIcon className="w-3.5 h-3.5 text-emerald-600" />
         <span>Instância WhatsApp</span>
       </DialogTrigger>
 
       <DialogContent className="max-w-lg rounded-3xl p-6 sm:p-8">
         <DialogHeader className="space-y-1">
           <DialogTitle className="text-lg font-extrabold text-slate-900 flex items-center gap-2">
-            <MessageCircle className="w-5 h-5 text-sky-600" />
+            <WhatsAppIcon className="w-5 h-5 text-emerald-600" />
             WhatsApp exclusivo — {clinicName}
           </DialogTitle>
           <p className="text-xs text-slate-500 font-medium">

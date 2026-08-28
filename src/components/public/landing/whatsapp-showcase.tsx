@@ -11,7 +11,6 @@ import {
   Smartphone,
   ShieldCheck,
   ExternalLink,
-  MessageCircle,
   Clock,
   Search,
   CheckCircle2,
@@ -20,6 +19,7 @@ import {
   Mic,
   Camera,
 } from "lucide-react";
+import { WhatsAppIcon } from "@/components/icons/whatsapp-icon";
 
 export function WhatsAppShowcase() {
   return (
@@ -33,7 +33,7 @@ export function WhatsAppShowcase() {
         <div className="mx-auto max-w-3xl text-center mb-12 lg:mb-16 space-y-4">
           <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200/80 bg-emerald-50/90 px-4 py-1.5 text-xs font-semibold text-emerald-800 shadow-2xs backdrop-blur-xs">
             <span className="flex size-2 rounded-full bg-emerald-500 animate-pulse" />
-            <MessageCircle className="size-3.5 text-emerald-600" />
+            <WhatsAppIcon className="size-3.5 text-emerald-600" />
             Experiência 100% no WhatsApp
           </div>
 

@@ -1,4 +1,5 @@
-import { MessageCircle, Mail, FileText } from "lucide-react";
+import { Mail, FileText } from "lucide-react";
+import { WhatsAppIcon } from "@/components/icons/whatsapp-icon";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -97,7 +98,7 @@ export default async function AdminLeadsPage() {
                       size="sm"
                       className="gap-1.5 bg-emerald-600 text-white hover:bg-emerald-700"
                     >
-                      <MessageCircle className="h-4 w-4" />
+                      <WhatsAppIcon className="h-4 w-4" />
                       Chamar no WhatsApp
                     </Button>
                     <Button

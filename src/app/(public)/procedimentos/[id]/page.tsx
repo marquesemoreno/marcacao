@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
-import { MapPin, Phone, MessageCircle } from "lucide-react";
+import { MapPin, Phone } from "lucide-react";
+import { WhatsAppIcon } from "@/components/icons/whatsapp-icon";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { RatingStars } from "@/components/public/rating-stars";
@@ -55,7 +56,7 @@ export default async function ProcedureDetailPage({ params }: DetailPageProps) {
             <div>
               <p className="text-xl font-extrabold text-teal-800">Valor sob consulta</p>
               <p className="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
-                <MessageCircle className="size-3.5 text-emerald-600" />
+                <WhatsAppIcon className="size-3.5 text-emerald-600" />
                 Negociado diretamente com a clínica via WhatsApp ou recepção.
               </p>
             </div>

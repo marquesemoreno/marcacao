@@ -1,7 +1,8 @@
 "use client";
 
 import { QRCodeSVG } from "qrcode.react";
-import { CheckCircle2, MapPin, Phone, Printer, MessageCircle, AlertTriangle } from "lucide-react";
+import { CheckCircle2, MapPin, Phone, Printer, AlertTriangle } from "lucide-react";
+import { WhatsAppIcon } from "@/components/icons/whatsapp-icon";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Logo } from "@/components/brand/logo";
@@ -148,7 +149,7 @@ export function VoucherCard({
               nativeButton={false}
               className="h-10 flex-1 gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-2xs"
             >
-              <MessageCircle className="size-3.5" />
+              <WhatsAppIcon className="size-3.5" />
               Enviar no WhatsApp
             </Button>
           </div>

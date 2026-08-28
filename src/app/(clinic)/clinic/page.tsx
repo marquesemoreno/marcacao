@@ -1,4 +1,5 @@
-import { CalendarDays, TrendingUp, Clock3, MessageCircle, QrCode, CalendarX2 } from "lucide-react";
+import { CalendarDays, TrendingUp, Clock3, QrCode, CalendarX2 } from "lucide-react";
+import { WhatsAppIcon } from "@/components/icons/whatsapp-icon";
 import { getClinicOverview, listClinicAppointments } from "@/actions/clinic";
 import { AppointmentActions } from "@/components/clinic/appointment-actions";
 import { AvatarBadge } from "@/components/chat/avatar-badge";
@@ -138,7 +139,7 @@ export default async function ClinicDashboardPage() {
                               title="Chamar no WhatsApp"
                               className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-xs font-semibold text-emerald-700 transition-colors hover:bg-emerald-100"
                             >
-                              <MessageCircle className="h-3.5 w-3.5" />
+                              <WhatsAppIcon className="h-3.5 w-3.5" />
                               WhatsApp
                             </a>
                             <a

@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { MapPin, Phone, CheckCircle2, ShieldCheck, ArrowRight, MessageCircle, Building2, Search } from "lucide-react";
+import { MapPin, Phone, CheckCircle2, ShieldCheck, ArrowRight, Building2, Search } from "lucide-react";
+import { WhatsAppIcon } from "@/components/icons/whatsapp-icon";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { RatingStars } from "@/components/public/rating-stars";
@@ -248,7 +249,7 @@ export default async function ClinicasCredenciadasPage({ searchParams }: Clinica
                     variant="outline"
                     className="h-10 w-full border-emerald-300 text-emerald-800 bg-emerald-50/60 font-bold rounded-xl hover:bg-emerald-100 transition-all flex items-center justify-center gap-1.5 text-xs"
                   >
-                    <MessageCircle className="size-3.5 text-emerald-600" />
+                    <WhatsAppIcon className="size-3.5 text-emerald-600" />
                     <span>Falar no WhatsApp</span>
                   </Button>
                 </div>

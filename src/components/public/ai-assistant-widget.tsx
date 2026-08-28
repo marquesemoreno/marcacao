@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { X, Send, MessageCircleHeart, Sparkles, MessageCircle } from "lucide-react";
+import { X, Send, MessageCircleHeart, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { WhatsAppIcon } from "@/components/icons/whatsapp-icon";
 
 type Message = {
   id: string;
@@ -189,8 +190,8 @@ export function AIAssistantWidget() {
                       rel="noopener noreferrer"
                       className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-3.5 py-2.5 text-xs font-bold text-white shadow-2xs transition-all hover:bg-emerald-700 active:scale-95"
                     >
-                      <MessageCircle className="h-4 w-4" />
-                      <span>📲 Falar com a Recepção no WhatsApp</span>
+                      <WhatsAppIcon className="h-4 w-4" />
+                      <span>Falar com a Recepção no WhatsApp</span>
                     </a>
                   </div>
                 )}

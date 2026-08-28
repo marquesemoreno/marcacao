@@ -4,7 +4,8 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { HelpCircle, MessageCircle } from "lucide-react";
+import { HelpCircle } from "lucide-react";
+import { WhatsAppIcon } from "@/components/icons/whatsapp-icon";
 
 const faqs = [
   {
@@ -90,7 +91,7 @@ export function FaqSection() {
         <div className="mt-12 flex flex-col sm:flex-row items-center justify-between gap-4 rounded-2xl border border-emerald-200/80 bg-emerald-50/60 p-6 sm:p-7 shadow-sm">
           <div className="flex items-center gap-4 text-left">
             <div className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-600 text-white shadow-md shadow-emerald-600/20">
-              <MessageCircle className="size-6" />
+              <WhatsAppIcon className="size-6" />
             </div>
             <div>
               <h4 className="font-bold text-slate-900 text-base">Ainda ficou com alguma dúvida?</h4>

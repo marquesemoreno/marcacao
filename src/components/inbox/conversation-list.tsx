@@ -1,6 +1,6 @@
 "use client";
 
-import { MessageCircle } from "lucide-react";
+import { WhatsAppIcon } from "@/components/icons/whatsapp-icon";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -101,7 +101,7 @@ export function ConversationList({
                     </p>
                     <div className="mt-1 flex items-center gap-1.5">
                       <Badge variant="outline" className="gap-1 px-1.5 py-0 text-[10px]">
-                        <MessageCircle className="h-2.5 w-2.5" />
+                        <WhatsAppIcon className="h-2.5 w-2.5" />
                         WhatsApp
                       </Badge>
                       {conversation.unreadCount > 0 && (

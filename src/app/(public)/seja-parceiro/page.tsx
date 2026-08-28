@@ -1,4 +1,5 @@
-import { CalendarClock, MessageCircle, LayoutDashboard, Wallet } from "lucide-react";
+import { CalendarClock, LayoutDashboard, Wallet } from "lucide-react";
+import { WhatsAppIcon } from "@/components/icons/whatsapp-icon";
 import { PartnerLeadForm } from "@/components/public/partner-lead-form";
 
 export const metadata = {
@@ -19,7 +20,7 @@ const benefits = [
     description: "Comissão só sobre agendamentos realizados de verdade — nada de mensalidade fixa.",
   },
   {
-    icon: MessageCircle,
+    icon: WhatsAppIcon,
     title: "Confirmação automática no WhatsApp",
     description: "O paciente recebe lembrete e confirmação sozinho, sem sua equipe precisar ligar.",
   },
