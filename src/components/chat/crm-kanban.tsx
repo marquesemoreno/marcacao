@@ -26,7 +26,7 @@ interface CRMKanbanProps {
 }
 
 const STAGES: { id: KanbanStage; title: string; shortLabel: string; color: string; bgBadge: string }[] = [
-  { id: 'novos', title: '🆕 Novos Leads', shortLabel: '🆕 Novos', color: 'border-amber-400', bgBadge: 'bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-800' },
+  { id: 'novos', title: '🆕 Novos Pacientes', shortLabel: '🆕 Novos', color: 'border-amber-400', bgBadge: 'bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-800' },
   { id: 'triagem', title: '💬 Em Atendimento', shortLabel: '💬 Em Atendimento', color: 'border-sky-400', bgBadge: 'bg-sky-100 dark:bg-sky-950/60 text-sky-800 dark:text-sky-300 border-sky-200 dark:border-sky-800' },
   { id: 'orcamento', title: '💲 Orçamento / Dúvidas', shortLabel: '💲 Orçamento', color: 'border-purple-400', bgBadge: 'bg-purple-100 dark:bg-purple-950/60 text-purple-800 dark:text-purple-300 border-purple-200 dark:border-purple-800' },
   { id: 'agendado', title: '🎟️ Agendamento Confirmado', shortLabel: '🎟️ Agendado', color: 'border-emerald-500', bgBadge: 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800' },
@@ -34,11 +34,6 @@ const STAGES: { id: KanbanStage; title: string; shortLabel: string; color: strin
 ];
 
 const STAGE_ORDER: KanbanStage[] = ['novos', 'triagem', 'orcamento', 'agendado', 'finalizado'];
-
-function parseEstimatedValue(value?: string) {
-  if (!value) return 0;
-  return parseFloat(value.replace('R$', '').replace(/\./g, '').replace(',', '.').trim()) || 0;
-}
 
 export const CRMKanban: React.FC<CRMKanbanProps> = ({
   contacts,
@@ -97,8 +92,6 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
     return matchesSearch && matchesAgent && matchesDept;
   });
 
-  const pipelineTotal = filtered.reduce((acc, c) => acc + parseEstimatedValue(c.estimatedValue), 0);
-
   const visibleStages = mobileSelectedStage === 'todos'
     ? STAGES
     : STAGES.filter((s) => s.id === mobileSelectedStage);
@@ -111,7 +104,7 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
       <div className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-4 sm:px-6 py-3 flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 shrink-0">
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 flex-wrap">
           <h2 className="text-sm sm:text-base font-extrabold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-            <span>📋 Funil de Vendas & CRM</span>
+            <span>📋 CRM</span>
             <span className="text-xs font-mono font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-2.5 py-0.5 rounded-full border border-slate-200 dark:border-slate-700">
               {filtered.length} paciente{filtered.length === 1 ? '' : 's'}
             </span>
@@ -160,14 +153,6 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
           </div>
         </div>
 
-        <div className="flex items-center justify-between sm:justify-end gap-3">
-          <div className="text-xs text-slate-600 dark:text-slate-300 font-semibold flex items-center gap-2 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 px-3.5 py-1.5 rounded-xl shadow-2xs">
-            <span>Pipeline Total:</span>
-            <span className="font-mono font-bold text-emerald-700 dark:text-emerald-400 text-sm">
-              {pipelineTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-            </span>
-          </div>
-        </div>
       </div>
 
       <div className="md:hidden bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-3 py-2 flex items-center gap-1.5 overflow-x-auto no-scrollbar shrink-0">
@@ -211,8 +196,6 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
               const currentStage = c.statusTag.label === 'Finalizado' ? 'finalizado' : c.funnelStage;
               return currentStage === stage.id;
             });
-            const totalStageValue = stageContacts.reduce((acc, curr) => acc + parseEstimatedValue(curr.estimatedValue), 0);
-
             return (
               <div
                 key={stage.id}
@@ -228,7 +211,7 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
                       </span>
                     </div>
                     <p className="text-[11px] text-slate-500 dark:text-slate-400 font-mono mt-0.5 font-semibold">
-                      {stageContacts.length} paciente{stageContacts.length === 1 ? '' : 's'} • R$ {totalStageValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      {stageContacts.length} paciente{stageContacts.length === 1 ? '' : 's'}
                     </p>
                   </div>
                 </div>

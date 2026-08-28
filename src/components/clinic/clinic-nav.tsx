@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 
 const fullNavItems: { href: string; label: string; exact?: boolean }[] = [
   { href: "/clinic/inbox", label: "💬 Chat / WhatsApp" },
-  { href: "/clinic/crm", label: "📋 CRM (Funil de Leads)" },
+  { href: "/clinic/crm", label: "📋 CRM" },
   { href: "/clinic/contatos", label: "👥 Contatos" },
   { href: "/clinic/agendamentos", label: "📅 Agendamentos de Hoje" },
   { href: "/clinic/precos", label: "💲 Tabela de Procedimentos" },
@@ -15,7 +15,7 @@ const fullNavItems: { href: string; label: string; exact?: boolean }[] = [
 // de agendamento do marketplace) não usam agendamento/tabela de preços do Conecta Saúde.
 const exclusiveNavItems: { href: string; label: string; exact?: boolean }[] = [
   { href: "/clinic/inbox", label: "💬 Chat / WhatsApp" },
-  { href: "/clinic/crm", label: "📋 CRM (Funil de Leads)" },
+  { href: "/clinic/crm", label: "📋 CRM" },
   { href: "/clinic/contatos", label: "👥 Contatos" },
 ];
 
