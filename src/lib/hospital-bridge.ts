@@ -4,54 +4,52 @@ import type { PlainClinicProcedureItem, PlainAppointment } from "@/lib/serialize
 
 /**
  * Prefixo que marca um id de procedimento/agendamento como vindo do sistema
- * hospitalar da Santa Clara (Firebird, via bridge) em vez do catálogo próprio
+ * hospitalar de uma clínica (Firebird, via bridge) em vez do catálogo próprio
  * do marketplace — usado pra rotear createAppointment() e pra evitar mandar o
  * link de comprovante (que só existe pra agendamentos do nosso Postgres).
+ * Carrega o clinicId embutido pra suportar várias clínicas com bridge ao
+ * mesmo tempo sem colidir ids sintéticos entre elas.
  */
-const BRIDGE_ID_PREFIX = "bridge:santa-clara:";
+const BRIDGE_ID_PREFIX = "bridge:";
 
 type BridgeProcedure = { id: number; codigo: string; nome: string; valor: number };
 type BridgeDoctor = { id: number; nome: string; crm: string; especialidade: string | null };
 export type BridgeConvenio = { id: number; nome: string };
 export type BridgePatient = { id: number; nome: string; cpf: string | null };
 
-function getBridgeConfig() {
-  const apiUrl = process.env.SANTA_CLARA_API_URL;
-  const apiToken = process.env.SANTA_CLARA_API_TOKEN;
-  if (!apiUrl || !apiToken) return null;
-  return { apiUrl: apiUrl.replace(/\/$/, ""), apiToken };
+async function getBridgeConfig(clinicId: string) {
+  const integration = await prisma.hospitalIntegration.findUnique({ where: { clinicId } });
+  if (!integration || !integration.active) return null;
+  return { apiUrl: integration.apiUrl.replace(/\/$/, ""), apiToken: integration.apiToken };
 }
 
 export function isBridgeId(id: string): boolean {
   return id.startsWith(BRIDGE_ID_PREFIX);
 }
 
-function toBridgeProcedureId(servicoId: number): string {
-  return `${BRIDGE_ID_PREFIX}${servicoId}`;
+/** Extrai o clinicId embutido num id sintético de procedimento/agendamento do bridge. */
+export function getBridgeClinicId(id: string): string {
+  return id.slice(BRIDGE_ID_PREFIX.length).split(":")[0];
+}
+
+function toBridgeProcedureId(clinicId: string, servicoId: number): string {
+  return `${BRIDGE_ID_PREFIX}${clinicId}:${servicoId}`;
 }
 
 function fromBridgeProcedureId(id: string): number {
-  return Number(id.slice(BRIDGE_ID_PREFIX.length));
+  return Number(id.split(":")[2]);
 }
 
-/**
- * Só a Santa Clara tem instância própria de WhatsApp hoje — reaproveita esse
- * mesmo sinal (WhatsappInstance) pra decidir se os procedimentos/agendamentos
- * dessa clínica vêm do sistema hospitalar (Firebird) em vez do catálogo do
- * marketplace. Se outra clínica ganhar instância própria sem ter integração
- * hospitalar, isso precisa virar uma flag dedicada — hoje só existe uma bridge
- * configurada (env global, não por clínica), então o acoplamento é seguro.
- */
-export async function hasSantaClaraBridgeIntegration(clinicId: string): Promise<boolean> {
-  if (!getBridgeConfig()) return false;
-  const instance = await prisma.whatsappInstance.findUnique({ where: { clinicId } });
-  return Boolean(instance);
+/** Diz se a clínica tem integração hospitalar ativa (bridge) — se não, o agendamento
+ * cai no catálogo normal do marketplace (ClinicProcedure no Postgres). */
+export async function hasHospitalBridgeIntegration(clinicId: string): Promise<boolean> {
+  return (await getBridgeConfig(clinicId)) !== null;
 }
 
 /** Sem convenioId, o bridge usa o Particular por padrão (preço exibido reflete
  * esse convênio até o atendente escolher outro). */
-export async function fetchSantaClaraProcedures(convenioId?: number): Promise<BridgeProcedure[]> {
-  const config = getBridgeConfig();
+export async function fetchBridgeProcedures(clinicId: string, convenioId?: number): Promise<BridgeProcedure[]> {
+  const config = await getBridgeConfig(clinicId);
   if (!config) return [];
   try {
     const url = new URL(`${config.apiUrl}/api/procedimentos`);
@@ -69,8 +67,8 @@ export async function fetchSantaClaraProcedures(convenioId?: number): Promise<Br
   }
 }
 
-export async function fetchSantaClaraConvenios(): Promise<BridgeConvenio[]> {
-  const config = getBridgeConfig();
+export async function fetchBridgeConvenios(clinicId: string): Promise<BridgeConvenio[]> {
+  const config = await getBridgeConfig(clinicId);
   if (!config) return [];
   try {
     const response = await fetch(`${config.apiUrl}/api/convenios`, {
@@ -86,8 +84,8 @@ export async function fetchSantaClaraConvenios(): Promise<BridgeConvenio[]> {
   }
 }
 
-export async function fetchSantaClaraDoctors(): Promise<BridgeDoctor[]> {
-  const config = getBridgeConfig();
+export async function fetchBridgeDoctors(clinicId: string): Promise<BridgeDoctor[]> {
+  const config = await getBridgeConfig(clinicId);
   if (!config) return [];
   try {
     const response = await fetch(`${config.apiUrl}/api/medicos`, {
@@ -107,8 +105,8 @@ export async function fetchSantaClaraDoctors(): Promise<BridgeDoctor[]> {
  * reaproveitar um cadastro existente (evita duplicar paciente de retorno) em vez de
  * sempre criar um novo. Exige 2+ caracteres porque o bridge também exige isso e devolve
  * lista vazia antes disso, pra não escanear a tabela toda a cada tecla digitada. */
-export async function fetchSantaClaraPatients(query: string): Promise<BridgePatient[]> {
-  const config = getBridgeConfig();
+export async function fetchBridgePatients(clinicId: string, query: string): Promise<BridgePatient[]> {
+  const config = await getBridgeConfig(clinicId);
   if (!config || query.trim().length < 2) return [];
   try {
     const url = new URL(`${config.apiUrl}/api/pacientes`);
@@ -130,8 +128,8 @@ export async function fetchSantaClaraPatients(query: string): Promise<BridgePati
  * pra atendente ver a agenda antes de marcar, em vez de digitar um horário às
  * cegas. Ver comentário do endpoint no bridge: conta qualquer marcação
  * existente como ocupada, sem distinguir cancelada de confirmada. */
-export async function fetchSantaClaraAgenda(medicoId: number, date: string): Promise<string[]> {
-  const config = getBridgeConfig();
+export async function fetchBridgeAgenda(clinicId: string, medicoId: number, date: string): Promise<string[]> {
+  const config = await getBridgeConfig(clinicId);
   if (!config) return [];
   try {
     const response = await fetch(
@@ -152,7 +150,7 @@ export async function fetchSantaClaraAgenda(medicoId: number, date: string): Pro
 
 export function adaptBridgeProcedureToPlainItem(clinicId: string, proc: BridgeProcedure): PlainClinicProcedureItem {
   const now = new Date();
-  const id = toBridgeProcedureId(proc.id);
+  const id = toBridgeProcedureId(clinicId, proc.id);
   return {
     id,
     clinicId,
@@ -175,29 +173,32 @@ export function adaptBridgeProcedureToPlainItem(clinicId: string, proc: BridgePr
   };
 }
 
-/** Grava a marcação real no Firebird da Santa Clara via bridge (POST, só cria — nunca atualiza/apaga nada existente). */
-export async function createSantaClaraBridgeAppointment(input: {
-  patientName: string;
-  /** Opcional a pedido da Santa Clara — nem sempre o atendente consegue o CPF pelo
-   * WhatsApp, e travar o agendamento por isso trazia mais problema que benefício. */
-  patientCpf?: string;
-  patientPhone: string;
-  clinicProcedureId: string;
-  date: string;
-  timeSlot?: string;
-  medicoId?: string;
-  /** Paciente já cadastrado, escolhido via busca (fetchSantaClaraPatients) — reaproveita
-   * o cadastro em vez de criar um novo/depender do CPF pra achar o existente. */
-  patientId?: string;
-  /** Sem escolha do atendente, o bridge usa o Particular por padrão. */
-  convenioId?: string;
-}): Promise<PlainAppointment> {
-  const config = getBridgeConfig();
-  if (!config) throw new Error("Integração com a Santa Clara não está configurada.");
+/** Grava a marcação real no Firebird da clínica via bridge (POST, só cria — nunca atualiza/apaga nada existente). */
+export async function createBridgeAppointment(
+  clinicId: string,
+  input: {
+    patientName: string;
+    /** Opcional a pedido da Santa Clara — nem sempre o atendente consegue o CPF pelo
+     * WhatsApp, e travar o agendamento por isso trazia mais problema que benefício. */
+    patientCpf?: string;
+    patientPhone: string;
+    clinicProcedureId: string;
+    date: string;
+    timeSlot?: string;
+    medicoId?: string;
+    /** Paciente já cadastrado, escolhido via busca (fetchBridgePatients) — reaproveita
+     * o cadastro em vez de criar um novo/depender do CPF pra achar o existente. */
+    patientId?: string;
+    /** Sem escolha do atendente, o bridge usa o Particular por padrão. */
+    convenioId?: string;
+  }
+): Promise<PlainAppointment> {
+  const config = await getBridgeConfig(clinicId);
+  if (!config) throw new Error("Integração hospitalar não está configurada para esta clínica.");
 
   const servicoId = fromBridgeProcedureId(input.clinicProcedureId);
   const convenioId = input.convenioId ? Number(input.convenioId) : undefined;
-  const procedures = await fetchSantaClaraProcedures(convenioId);
+  const procedures = await fetchBridgeProcedures(clinicId, convenioId);
   const procedure = procedures.find((p) => p.id === servicoId);
   if (!procedure) throw new Error("Procedimento não encontrado no sistema da clínica.");
 
@@ -231,8 +232,8 @@ export async function createSantaClaraBridgeAppointment(input: {
     throw new Error(body?.message || `Não foi possível registrar o agendamento (HTTP ${response.status}).`);
   }
 
-  const instance = await prisma.whatsappInstance.findFirst({ include: { clinic: true } });
-  if (!instance) throw new Error("Clínica com integração hospitalar não encontrada.");
+  const clinic = await prisma.clinic.findUnique({ where: { id: clinicId } });
+  if (!clinic) throw new Error("Clínica com integração hospitalar não encontrada.");
 
   // Espelha o agendamento (já real no Firebird a essa altura) num Appointment de
   // verdade no nosso Postgres — só pra relatório (getFinancialReport etc já
@@ -243,16 +244,16 @@ export async function createSantaClaraBridgeAppointment(input: {
   // altura, então uma falha aqui (só espelho pra relatório) não pode derrubar a
   // resposta de sucesso pro atendente.
   try {
-    const dbProcedureName = `${procedure.nome} — ${instance.clinic.tradeName} (Bridge)`;
+    const dbProcedureName = `${procedure.nome} — ${clinic.tradeName} (Bridge)`;
     const dbProcedure = await prisma.procedure.upsert({
       where: { name: dbProcedureName },
       create: { name: dbProcedureName, category: "CONSULTATION", tussCode: procedure.codigo },
       update: { tussCode: procedure.codigo },
     });
     const dbClinicProcedure = await prisma.clinicProcedure.upsert({
-      where: { clinicId_procedureId: { clinicId: instance.clinicId, procedureId: dbProcedure.id } },
+      where: { clinicId_procedureId: { clinicId, procedureId: dbProcedure.id } },
       create: {
-        clinicId: instance.clinicId,
+        clinicId,
         procedureId: dbProcedure.id,
         price: procedure.valor,
         requiresAppointment: true,
@@ -269,16 +270,16 @@ export async function createSantaClaraBridgeAppointment(input: {
         date: new Date(`${input.date}T00:00:00Z`),
         timeSlot: input.timeSlot || null,
         status: "CONFIRMED",
-        notes: `Agendado via bridge Santa Clara — NUMERO Firebird: ${body?.numero ?? "?"}`,
+        notes: `Agendado via bridge ${clinic.tradeName} — NUMERO Firebird: ${body?.numero ?? "?"}`,
       },
     });
   } catch (error) {
-    console.error("Falha ao espelhar agendamento da Santa Clara no Postgres (só relatório):", error);
+    console.error("Falha ao espelhar agendamento do bridge no Postgres (só relatório):", error);
   }
 
   const now = new Date();
-  const procedureId = toBridgeProcedureId(servicoId);
-  const appointmentId = `${BRIDGE_ID_PREFIX}${Date.now()}`;
+  const procedureId = toBridgeProcedureId(clinicId, servicoId);
+  const appointmentId = `${BRIDGE_ID_PREFIX}${clinicId}:${Date.now()}`;
 
   return {
     id: appointmentId,
@@ -300,13 +301,13 @@ export async function createSantaClaraBridgeAppointment(input: {
     updatedAt: now,
     clinicProcedure: {
       id: procedureId,
-      clinicId: instance.clinicId,
+      clinicId,
       procedureId,
       requiresAppointment: true,
       appointmentType: "SCHEDULED",
       price: procedure.valor,
       promotionalPrice: null,
-      clinic: { ...instance.clinic, commissionRate: Number(instance.clinic.commissionRate) },
+      clinic: { ...clinic, commissionRate: Number(clinic.commissionRate) },
       procedure: {
         id: procedureId,
         specialtyId: null,

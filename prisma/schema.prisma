@@ -147,38 +147,39 @@ model User {
 }
 
 model Clinic {
-  id             String   @id @default(cuid())
-  name           String
-  tradeName      String   @map("trade_name")
-  cnpj           String   @unique
-  phone          String?
-  whatsapp       String?
-  address        String
-  neighborhood   String
-  city           String
-  active         Boolean  @default(true)
+  id                    String   @id @default(cuid())
+  name                  String
+  tradeName             String   @map("trade_name")
+  cnpj                  String   @unique
+  phone                 String?
+  whatsapp              String?
+  address               String
+  neighborhood          String
+  city                  String
+  active                Boolean  @default(true)
   /// Clínicas parceiras que usam só o CRM/WhatsApp (ex: modelo "ferramenta
   /// grátis + comissão por agendamento concluído") mas não têm vitrine no
   /// marketplace público — não aparecem em busca, home ou /clinicas.
-  listedInMarketplace Boolean @default(true) @map("listed_in_marketplace")
+  listedInMarketplace   Boolean  @default(true) @map("listed_in_marketplace")
   /// Mensagem automática enviada uma única vez, no primeiro contato de um
   /// cliente novo (primeira Conversation dele com essa clínica). Cada clínica
   /// liga/desliga e escreve a sua — não dispara em conversas já existentes,
   /// mesmo resolvidas, pra não parecer robótico com quem já é conhecido.
-  welcomeMessageEnabled Boolean @default(false) @map("welcome_message_enabled")
-  welcomeMessageText    String? @map("welcome_message_text")
-  commissionRate Decimal  @map("commission_rate") @db.Decimal(5, 2)
-  rating         Float    @default(0)
-  reviewCount    Int      @default(0) @map("review_count")
-  businessHours  Json?    @map("business_hours")
-  createdAt      DateTime @default(now()) @map("created_at")
-  updatedAt      DateTime @updatedAt @map("updated_at")
+  welcomeMessageEnabled Boolean  @default(false) @map("welcome_message_enabled")
+  welcomeMessageText    String?  @map("welcome_message_text")
+  commissionRate        Decimal  @map("commission_rate") @db.Decimal(5, 2)
+  rating                Float    @default(0)
+  reviewCount           Int      @default(0) @map("review_count")
+  businessHours         Json?    @map("business_hours")
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
 
-  users            User[]
-  clinicProcedures ClinicProcedure[]
-  conversations    Conversation[]
-  cannedResponses  CannedResponse[]
-  whatsappInstance WhatsappInstance?
+  users               User[]
+  clinicProcedures    ClinicProcedure[]
+  conversations       Conversation[]
+  cannedResponses     CannedResponse[]
+  whatsappInstance    WhatsappInstance?
+  hospitalIntegration HospitalIntegration?
 
   @@map("clinics")
 }
@@ -208,6 +209,26 @@ model WhatsappInstance {
   clinic Clinic @relation(fields: [clinicId], references: [id])
 
   @@map("whatsapp_instances")
+}
+
+/// Config da integração com o sistema hospitalar da clínica (bridge Node.js que fala
+/// com o banco Firebird dela) — uma linha por clínica, editável via /admin/clinicas.
+/// Presença + `active: true` é o sinal de "essa clínica usa o bridge, não o catálogo
+/// do marketplace" (ver hasHospitalBridgeIntegration em src/lib/hospital-bridge.ts).
+model HospitalIntegration {
+  id            String    @id @default(cuid())
+  clinicId      String    @unique @map("clinic_id")
+  apiUrl        String    @map("api_url")
+  apiToken      String    @map("api_token")
+  active        Boolean   @default(true)
+  lastCheckedAt DateTime? @map("last_checked_at")
+  lastCheckOk   Boolean?  @map("last_check_ok")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  clinic Clinic @relation(fields: [clinicId], references: [id])
+
+  @@map("hospital_integrations")
 }
 
 model Specialty {

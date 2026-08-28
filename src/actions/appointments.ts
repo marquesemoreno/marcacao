@@ -6,7 +6,7 @@ import { createAppointmentSchema, type CreateAppointmentInput } from "@/lib/sche
 import { sendAppointmentConfirmation } from "@/lib/whatsapp";
 import { toPlainAppointment } from "@/lib/serialize";
 import { AFFILIATE_REF_COOKIE, AFFILIATE_COMMISSION_FLAT } from "@/lib/affiliate";
-import { isBridgeId, createSantaClaraBridgeAppointment } from "@/lib/santa-clara-bridge";
+import { isBridgeId, getBridgeClinicId, createBridgeAppointment } from "@/lib/hospital-bridge";
 
 /**
  * `cookies()` só funciona dentro do ciclo de request do Next (Server Action
@@ -51,10 +51,10 @@ export async function createAppointment(input: CreateAppointmentInput) {
   }
   const data = parsed.data;
 
-  // Procedimento veio do sistema hospitalar da Santa Clara (Firebird via bridge),
+  // Procedimento veio do sistema hospitalar da clínica (Firebird via bridge),
   // não do catálogo de ClinicProcedure do marketplace — grava lá em vez de aqui.
   if (isBridgeId(data.clinicProcedureId)) {
-    return createSantaClaraBridgeAppointment({
+    return createBridgeAppointment(getBridgeClinicId(data.clinicProcedureId), {
       patientName: data.patientName,
       patientCpf: data.patientCpf,
       patientPhone: data.patientPhone,
