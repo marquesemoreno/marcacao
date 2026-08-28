@@ -1063,7 +1063,7 @@ export async function updateConversationFunnelStage(conversationId: string, stag
       },
     });
 
-    whatsappService.sendMessage(conversation.contact.phone, confirmMessage, "appointment.confirmed.crm_kanban").catch(() => {});
+    whatsappService.sendMessage(conversation.contact.phone, confirmMessage, "appointment.confirmed.crm_kanban", clinicId).catch(() => {});
   }
 
   revalidatePath("/clinic/inbox");
