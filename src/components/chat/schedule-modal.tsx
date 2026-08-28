@@ -207,16 +207,20 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+    // Painel abre encostado à direita (ao lado da conversa) a partir do breakpoint sm — sem
+    // fundo escurecido cobrindo a tela, pra atendente continuar conversando com o paciente
+    // enquanto preenche o agendamento. Em telas pequenas continua como modal de tela cheia,
+    // já que não sobra espaço pra mostrar os dois lado a lado.
+    <div className="fixed inset-0 sm:inset-y-0 sm:left-auto sm:right-0 sm:w-[420px] z-50 flex items-end sm:items-stretch justify-center sm:justify-end p-0 bg-slate-900/60 sm:bg-transparent backdrop-blur-sm sm:backdrop-blur-none animate-in fade-in duration-200">
       <div
         ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="schedule-modal-title"
         tabIndex={-1}
-        className="bg-white dark:bg-slate-900 rounded-t-2xl sm:rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden border border-slate-100 dark:border-slate-800 animate-in slide-in-from-bottom-6 sm:zoom-in-95 duration-200 outline-none"
+        className="bg-white dark:bg-slate-900 rounded-t-2xl sm:rounded-none shadow-2xl sm:border-l border-slate-100 dark:border-slate-800 max-w-lg sm:max-w-none w-full sm:h-full overflow-y-auto animate-in slide-in-from-bottom-6 sm:slide-in-from-right duration-200 outline-none flex flex-col"
       >
-        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/40">
+        <div className="sticky top-0 z-10 flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/40 backdrop-blur-sm">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-xl bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 flex items-center justify-center font-bold shadow-2xs">
               <Calendar className="w-4 h-4" />
