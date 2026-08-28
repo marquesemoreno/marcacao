@@ -86,6 +86,11 @@ interface InboxLayoutProps {
    * aba quando passa do limiar, mesmo se o atendente estiver vendo outra aba no momento. */
   unassignedWaitMinutes?: number | null;
   selectedContactId: string | null;
+  /** Objeto completo do contato selecionado, já resolvido pelo pai (com fallback pra um
+   * cache quando o contato não está no recorte atual de `contacts` — ver contactCacheRef
+   * em chat-crm-app.tsx). Não recalcular aqui via contacts.find, senão a conversa aberta
+   * some da tela ao trocar de aba/busca sem esse contato no resultado mais recente. */
+  selectedContact: Contact | null;
   onSelectContact: (id: string) => void;
   filterTab: InboxFilter;
   onFilterTabChange: (tab: InboxFilter) => void;
@@ -130,6 +135,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
   attendantCapacity,
   unassignedWaitMinutes,
   selectedContactId,
+  selectedContact,
   onSelectContact,
   filterTab,
   onFilterTabChange,
@@ -316,8 +322,6 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
       setIsQuickReplyOpen(false);
     }
   };
-
-  const selectedContact = contacts.find((c) => c.id === selectedContactId) ?? null;
 
   const availableTagFilters = useMemo(() => {
     const presetLabels = PRESET_TAGS.map((preset) => preset.label);

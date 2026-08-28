@@ -654,6 +654,7 @@ export function ChatCrmApp({ scope, basePath, view }: ChatCrmAppProps) {
           attendantCapacity={attendantCapacity}
           unassignedWaitMinutes={unassignedWaitMinutes}
           selectedContactId={selectedContactId}
+          selectedContact={selectedContact}
           onSelectContact={selectContact}
           filterTab={filterTab}
           onFilterTabChange={setFilterTab}
