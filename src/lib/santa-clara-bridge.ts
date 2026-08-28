@@ -11,7 +11,7 @@ import type { PlainClinicProcedureItem, PlainAppointment } from "@/lib/serialize
 const BRIDGE_ID_PREFIX = "bridge:santa-clara:";
 
 type BridgeProcedure = { id: number; codigo: string; nome: string; valor: number };
-type BridgeDoctor = { id: number; nome: string; crm: string };
+type BridgeDoctor = { id: number; nome: string; crm: string; especialidade: string | null };
 export type BridgeConvenio = { id: number; nome: string };
 
 function getBridgeConfig() {

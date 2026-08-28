@@ -10,7 +10,7 @@ import type { PlainClinicProcedureItem } from '@/lib/serialize';
 import { useDialogA11y } from '@/hooks/use-dialog-a11y';
 import { useClickOutside } from '@/hooks/use-click-outside';
 
-type BridgeDoctor = { id: number; nome: string; crm: string };
+type BridgeDoctor = { id: number; nome: string; crm: string; especialidade: string | null };
 type BridgeConvenio = { id: number; nome: string };
 
 /** Máscara visual de CPF enquanto digita — "000.000.000-00". */
@@ -167,7 +167,10 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
   const normalizedDoctorQuery = doctorQuery.trim().toLowerCase();
   const filteredDoctors = normalizedDoctorQuery
     ? doctors.filter(
-        (d) => d.nome.toLowerCase().includes(normalizedDoctorQuery) || d.crm.toLowerCase().includes(normalizedDoctorQuery)
+        (d) =>
+          d.nome.toLowerCase().includes(normalizedDoctorQuery) ||
+          d.crm.toLowerCase().includes(normalizedDoctorQuery) ||
+          d.especialidade?.toLowerCase().includes(normalizedDoctorQuery)
       )
     : doctors;
   const hasFullName = patientName.trim().split(/\s+/).filter(Boolean).length >= 2;
@@ -291,7 +294,13 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
                 </label>
                 <input
                   type="text"
-                  value={isDoctorDropdownOpen ? doctorQuery : selectedDoctor ? `Dr(a). ${selectedDoctor.nome} (CRM: ${selectedDoctor.crm})` : doctorQuery}
+                  value={
+                    isDoctorDropdownOpen
+                      ? doctorQuery
+                      : selectedDoctor
+                        ? `Dr(a). ${selectedDoctor.nome}${selectedDoctor.especialidade ? ` — ${selectedDoctor.especialidade}` : ''}`
+                        : doctorQuery
+                  }
                   onChange={(e) => {
                     setDoctorQuery(e.target.value);
                     setDoctorId('');
@@ -320,9 +329,14 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
                               setDoctorQuery('');
                               setIsDoctorDropdownOpen(false);
                             }}
-                            className="w-full px-3 py-2 text-left text-xs sm:text-sm hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200"
+                            className="w-full px-3 py-2 text-left hover:bg-slate-50 dark:hover:bg-slate-800"
                           >
-                            Dr(a). {doctor.nome} <span className="text-slate-400 dark:text-slate-500">(CRM: {doctor.crm})</span>
+                            <p className="text-xs sm:text-sm text-slate-700 dark:text-slate-200">
+                              Dr(a). {doctor.nome} <span className="text-slate-400 dark:text-slate-500">(CRM: {doctor.crm})</span>
+                            </p>
+                            {doctor.especialidade && (
+                              <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">{doctor.especialidade}</p>
+                            )}
                           </button>
                         ))}
                         {filteredDoctors.length > 50 && (

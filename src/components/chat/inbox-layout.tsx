@@ -106,7 +106,7 @@ interface InboxLayoutProps {
   onCreateContact?: (name: string, phone: string, clinicId?: string) => Promise<void>;
   onFinishAttendance: (resolutionData?: { reason: string; notes?: string }) => Promise<void> | void;
   fetchProcedures: (convenioId?: string) => Promise<PlainClinicProcedureItem[]>;
-  fetchDoctors?: () => Promise<{ id: number; nome: string; crm: string }[]>;
+  fetchDoctors?: () => Promise<{ id: number; nome: string; crm: string; especialidade: string | null }[]>;
   fetchConvenios?: () => Promise<{ id: number; nome: string }[]>;
   fetchAgenda?: (medicoId: number, date: string) => Promise<string[]>;
   onScheduleConfirmed: (data: { appointmentId: string; specialty: string; doctor: string; date: string; time: string; price: string }) => void;
