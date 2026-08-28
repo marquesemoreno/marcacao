@@ -5,6 +5,7 @@ import { sendAppointmentConfirmation, sendWhatsAppMessage, formatToWhatsAppNumbe
 import { fetchMediaBase64, uploadWhatsAppMedia, formatDuration } from "@/lib/whatsapp-media";
 import { formatFileSize } from "@/lib/format";
 import { notifyInboxRealtime } from "@/lib/supabase-server";
+import { MEDIA_DOWNLOAD_FAILED_PREFIX } from "@/lib/chat-messages";
 
 type IncomingMedia =
   | { kind: "image" | "document"; mimeType: string; fileName: string; sizeBytes: number; key: Record<string, unknown> }
@@ -360,8 +361,8 @@ export async function POST(request: Request) {
 
     const failedMediaNotice = incoming.media && !mediaData
       ? incoming.media.kind === "audio"
-        ? "⚠️ Não foi possível baixar o áudio recebido."
-        : `⚠️ Não foi possível baixar o anexo recebido (${incoming.media.fileName}).`
+        ? `${MEDIA_DOWNLOAD_FAILED_PREFIX} o áudio recebido.`
+        : `${MEDIA_DOWNLOAD_FAILED_PREFIX} o anexo recebido (${incoming.media.fileName}).`
       : null;
 
     await prisma.message.create({

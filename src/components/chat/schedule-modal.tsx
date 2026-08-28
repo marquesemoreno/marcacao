@@ -66,6 +66,7 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
   const [cpf, setCpf] = useState(contact.cpf || '');
   const [date, setDate] = useState('');
   const [time, setTime] = useState('');
+  const [timeMode, setTimeMode] = useState<'scheduled' | 'arrival'>('scheduled');
   const [submitting, setSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [occupiedTimes, setOccupiedTimes] = useState<string[]>([]);
@@ -83,6 +84,7 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
     setConvenioId('');
     setDate('');
     setTime('');
+    setTimeMode('scheduled');
     setIsSuccess(false);
     setOccupiedTimes([]);
     setDoctorQuery('');
@@ -145,6 +147,15 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
       cancelled = true;
     };
   }, [isOpen, fetchAgenda, doctorId, date]);
+
+  // Cada procedimento já vem com um jeito padrão de atender (horário marcado ou ordem de
+  // chegada) — troca o toggle sozinho quando o atendente escolhe outro procedimento, sem
+  // travar: ele ainda pode alternar manualmente depois se preferir o outro modo.
+  useEffect(() => {
+    const procedure = procedures.find((p) => p.id === procedureId);
+    if (!procedure) return;
+    setTimeMode(procedure.appointmentType === 'ARRIVAL_ORDER' ? 'arrival' : 'scheduled');
+  }, [procedureId, procedures]);
 
   const dialogRef = useDialogA11y<HTMLDivElement>(isOpen, onClose);
 
@@ -219,9 +230,12 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
         aria-modal="true"
         aria-labelledby="schedule-modal-title"
         tabIndex={-1}
-        className="bg-white dark:bg-slate-900 rounded-t-2xl sm:rounded-none shadow-2xl sm:shadow-none sm:border-l border-slate-100 dark:border-slate-800 max-w-lg sm:max-w-none w-full sm:h-full overflow-y-auto animate-in slide-in-from-bottom-6 sm:slide-in-from-right duration-200 outline-none flex flex-col"
+        // max-h garante um limite de altura mesmo no modal de tela cheia do mobile — sem
+        // isso o rodapé com "Confirmar/Cancelar" podia ficar fora da área visível quando o
+        // formulário crescia (médico, convênio, agenda ocupada), sem jeito de rolar até ele.
+        className="bg-white dark:bg-slate-900 rounded-t-2xl sm:rounded-none shadow-2xl sm:shadow-none sm:border-l border-slate-100 dark:border-slate-800 max-w-lg sm:max-w-none w-full max-h-[92dvh] sm:max-h-none sm:h-full animate-in slide-in-from-bottom-6 sm:slide-in-from-right duration-200 outline-none flex flex-col"
       >
-        <div className="sticky top-0 z-10 flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/40 backdrop-blur-sm">
+        <div className="shrink-0 flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/40">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-xl bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 flex items-center justify-center font-bold shadow-2xs">
               <Calendar className="w-4 h-4" />
@@ -241,7 +255,7 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
         </div>
 
         {isSuccess ? (
-          <div className="p-8 text-center flex flex-col items-center justify-center gap-3 animate-in zoom-in-95 duration-300">
+          <div className="flex-1 min-h-0 overflow-y-auto p-8 text-center flex flex-col items-center justify-center gap-3 animate-in zoom-in-95 duration-300">
             <div className="w-14 h-14 bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 rounded-full flex items-center justify-center shadow-xs">
               <CheckCircle2 className="w-8 h-8" />
             </div>
@@ -251,7 +265,8 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
             </p>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="p-5 sm:p-6 space-y-4">
+          <form onSubmit={handleSubmit} className="flex-1 min-h-0 flex flex-col">
+          <div className="flex-1 min-h-0 overflow-y-auto p-5 sm:p-6 space-y-4">
             <div>
               <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5 flex items-center gap-1.5 font-mono">
                 <UserRound className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" /> Nome Completo
@@ -391,24 +406,59 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
                 />
               </div>
 
-              {selectedProcedure?.appointmentType === 'SCHEDULED' && (
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5 flex items-center gap-1.5 font-mono">
+              <div>
+                <div className="flex items-center justify-between mb-1.5 gap-2">
+                  <label className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 flex items-center gap-1.5 font-mono">
                     <Clock className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" /> Horário
                   </label>
-                  <input
-                    type="time"
-                    value={time}
-                    onChange={(e) => setTime(e.target.value)}
-                    className="w-full text-xs sm:text-sm border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 bg-slate-50/50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
-                  />
-                  {time && occupiedTimes.includes(time) && (
-                    <p className="mt-1 text-[10px] text-amber-600 dark:text-amber-400 font-semibold">
-                      ⚠️ Esse médico já tem uma marcação às {time} nesse dia.
-                    </p>
-                  )}
+                  <div className="inline-flex rounded-lg border border-slate-200 dark:border-slate-700 p-0.5 bg-slate-50 dark:bg-slate-950 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setTimeMode('scheduled')}
+                      className={`px-2 py-1 rounded-md text-[10px] font-bold transition-colors ${
+                        timeMode === 'scheduled'
+                          ? 'bg-emerald-600 text-white shadow-2xs'
+                          : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                      }`}
+                    >
+                      Marcado
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setTimeMode('arrival');
+                        setTime('');
+                      }}
+                      className={`px-2 py-1 rounded-md text-[10px] font-bold transition-colors ${
+                        timeMode === 'arrival'
+                          ? 'bg-emerald-600 text-white shadow-2xs'
+                          : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                      }`}
+                    >
+                      Chegada
+                    </button>
+                  </div>
                 </div>
-              )}
+                {timeMode === 'scheduled' ? (
+                  <>
+                    <input
+                      type="time"
+                      value={time}
+                      onChange={(e) => setTime(e.target.value)}
+                      className="w-full text-xs sm:text-sm border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 bg-slate-50/50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+                    />
+                    {time && occupiedTimes.includes(time) && (
+                      <p className="mt-1 text-[10px] text-amber-600 dark:text-amber-400 font-semibold">
+                        ⚠️ Esse médico já tem uma marcação às {time} nesse dia.
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <div className="w-full text-xs sm:text-sm border border-dashed border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 bg-slate-50/50 dark:bg-slate-950 text-slate-500 dark:text-slate-400 font-medium">
+                    Por ordem de chegada
+                  </div>
+                )}
+              </div>
 
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5 flex items-center gap-1.5 font-mono">
@@ -454,30 +504,31 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
                 )}
               </div>
             )}
+          </div>
 
-            <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex flex-col items-end gap-1.5">
-              {!submitting && missingFields.length > 0 && (
-                <p className="text-[10px] text-amber-600 dark:text-amber-400 font-medium">
-                  Falta preencher: {missingFields.join(", ")}
-                </p>
-              )}
-              <div className="flex items-center gap-2.5">
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="px-4 py-2.5 text-xs sm:text-sm font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors min-h-[44px]"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={submitting || missingFields.length > 0}
-                  className="px-5 py-2.5 text-xs sm:text-sm font-semibold bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white rounded-xl shadow-xs hover:shadow-md transition-all active:scale-[0.99] flex items-center gap-2 min-h-[44px]"
-                >
-                  {submitting ? 'Criando...' : 'Confirmar Agendamento'}
-                </button>
-              </div>
+          <div className="shrink-0 px-5 sm:px-6 py-3 border-t border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col items-end gap-1.5">
+            {!submitting && missingFields.length > 0 && (
+              <p className="text-[10px] text-amber-600 dark:text-amber-400 font-medium">
+                Falta preencher: {missingFields.join(", ")}
+              </p>
+            )}
+            <div className="flex items-center gap-2.5">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2.5 text-xs sm:text-sm font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors min-h-[44px]"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={submitting || missingFields.length > 0}
+                className="px-5 py-2.5 text-xs sm:text-sm font-semibold bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white rounded-xl shadow-xs hover:shadow-md transition-all active:scale-[0.99] flex items-center gap-2 min-h-[44px]"
+              >
+                {submitting ? 'Criando...' : 'Confirmar Agendamento'}
+              </button>
             </div>
+          </div>
           </form>
         )}
       </div>

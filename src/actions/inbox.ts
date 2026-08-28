@@ -12,6 +12,7 @@ import { sendWhatsAppMedia, sendWhatsAppAudio } from "@/lib/whatsapp";
 import { hasSantaClaraBridgeIntegration, fetchSantaClaraProcedures, fetchSantaClaraDoctors, fetchSantaClaraAgenda, fetchSantaClaraConvenios, adaptBridgeProcedureToPlainItem } from "@/lib/santa-clara-bridge";
 import { formatFileSize } from "@/lib/format";
 import { notifyInboxRealtime } from "@/lib/supabase-server";
+import { APPOINTMENT_CONFIRMED_TEMPLATE } from "@/lib/chat-messages";
 
 const ALLOWED_MEDIA_MIME_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif", "application/pdf"];
 const MAX_MEDIA_SIZE_BYTES = 15 * 1024 * 1024; // 15 MB — mesma ordem de grandeza do limite de mídia do WhatsApp
@@ -1047,8 +1048,7 @@ export async function updateConversationFunnelStage(conversationId: string, stag
     const clinicName = conversation.clinic.tradeName;
     const procedureName = appointment?.clinicProcedure.procedure.name || "Consulta";
 
-    const rawTemplate = "✅ *Agendamento Realizado!* 👋 Olá, {{nome}}! Seu agendamento para *{{procedimento}}* na clínica *{{clinica}}* foi realizado com sucesso!";
-    const confirmMessage = applyMessageVariables(rawTemplate, {
+    const confirmMessage = applyMessageVariables(APPOINTMENT_CONFIRMED_TEMPLATE, {
       nome: patientFirstName,
       clinica: clinicName,
       procedimento: procedureName,

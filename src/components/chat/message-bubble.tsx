@@ -2,7 +2,25 @@
 
 import React, { useRef, useState } from 'react';
 import { Message } from '@/types/chat-crm';
-import { Play, Pause, Lock, CheckCheck, FileText, Copy, Check, Download, ZoomIn, X, Image as ImageIcon, Clock, AlertCircle } from 'lucide-react';
+import {
+  Play,
+  Pause,
+  Lock,
+  CheckCheck,
+  FileText,
+  FileSpreadsheet,
+  FileArchive,
+  Copy,
+  Check,
+  Download,
+  ZoomIn,
+  X,
+  Image as ImageIcon,
+  Clock,
+  AlertCircle,
+  AlertTriangle,
+  CheckCircle2,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from '@/components/ui/dialog';
 
@@ -10,6 +28,27 @@ interface MessageBubbleProps {
   message: Message;
   /** Reenvia essa mensagem (só relevante quando deliveryStatus === 'failed'). */
   onRetry?: () => void;
+  /** Manda um texto pedindo pro paciente reenviar o arquivo (só relevante quando mediaDownloadFailed). */
+  onRequestResend?: () => void;
+}
+
+/** Ícone + cor por tipo de arquivo — em vez de um FileText genérico pra qualquer
+ * anexo, ajuda a reconhecer o tipo (PDF, planilha, compactado) sem precisar abrir. */
+function getAttachmentTypeStyle(mimeType?: string, fileName?: string) {
+  const ext = fileName?.split('.').pop()?.toLowerCase();
+  if (mimeType === 'application/pdf' || ext === 'pdf') {
+    return { Icon: FileText, classes: 'bg-red-100 dark:bg-red-950/60 text-red-600 dark:text-red-400' };
+  }
+  if (mimeType?.includes('spreadsheet') || mimeType?.includes('excel') || ['xls', 'xlsx', 'csv'].includes(ext || '')) {
+    return { Icon: FileSpreadsheet, classes: 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400' };
+  }
+  if (mimeType?.includes('word') || ['doc', 'docx'].includes(ext || '')) {
+    return { Icon: FileText, classes: 'bg-blue-100 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400' };
+  }
+  if (mimeType?.includes('zip') || mimeType?.includes('compressed') || ['zip', 'rar', '7z'].includes(ext || '')) {
+    return { Icon: FileArchive, classes: 'bg-amber-100 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400' };
+  }
+  return { Icon: FileText, classes: 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300' };
 }
 
 /** Aviso + botão de reenviar pra mensagens que falharam ao sair — sem isso o
@@ -38,7 +77,7 @@ const MessageStatusTicks: React.FC<{ status?: Message['deliveryStatus'] }> = ({ 
   return <Clock className="w-3 h-3 text-emerald-200/80" aria-label="Enviando..." />;
 };
 
-export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry }) => {
+export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry, onRequestResend }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   const [playbackSpeed, setPlaybackSpeed] = useState<'1x' | '1.5x' | '2x'>('1x');
@@ -105,6 +144,47 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry }
   }
 
   const isAgent = message.sender === 'agent';
+
+  // 1.1 Badge discreto de mídia que falhou ao baixar (não polui o histórico como bolha normal)
+  if (message.mediaDownloadFailed) {
+    return (
+      <div className="flex justify-center my-2 w-full px-2 sm:px-4" data-od-id={`media-failed-${message.id}`}>
+        <div className="inline-flex max-w-md items-center gap-2 rounded-full border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 pl-3 pr-1.5 py-1.5">
+          <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
+          <span className="truncate text-[11px] text-amber-800 dark:text-amber-300" title={message.text}>
+            {message.text}
+          </span>
+          {onRequestResend && (
+            <button
+              type="button"
+              onClick={onRequestResend}
+              className="shrink-0 rounded-full bg-amber-100 dark:bg-amber-900/60 hover:bg-amber-200 dark:hover:bg-amber-800 px-2.5 py-1 text-[10.5px] font-bold text-amber-900 dark:text-amber-200 transition-colors"
+            >
+              Solicitar reenvio
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // 1.2 Aviso compacto de mensagem automática do sistema (ex: confirmação de agendamento)
+  if (message.isSystemNotice) {
+    return (
+      <div className="flex justify-center my-2 w-full px-2 sm:px-4" data-od-id={`system-notice-${message.id}`}>
+        <div className="flex max-w-xs sm:max-w-sm items-start gap-2 rounded-xl border border-emerald-200/80 dark:border-emerald-800/60 bg-emerald-50 dark:bg-emerald-950/40 px-3 py-2">
+          <CheckCircle2 className="w-3.5 h-3.5 mt-0.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+          <div className="min-w-0 flex-1">
+            <p className="text-[11px] leading-snug font-medium text-emerald-800 dark:text-emerald-300">{message.text}</p>
+            <div className="mt-0.5 flex items-center gap-1 text-[10px] text-emerald-700/70 dark:text-emerald-400/70 font-mono">
+              <span>{message.timestamp}</span>
+              {isAgent && <MessageStatusTicks status={message.deliveryStatus} />}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // 2. Balão de Áudio
   if (message.type === 'audio') {
@@ -211,6 +291,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry }
     const fileName = message.attachmentName || (isImage ? 'imagem.jpg' : 'documento');
     const fileSize = message.attachmentSize || '';
     const hasRealFile = Boolean(message.mediaUrl);
+    const { Icon: FileTypeIcon, classes: fileTypeClasses } = getAttachmentTypeStyle(message.mimeType, fileName);
 
     return (
       <>
@@ -235,8 +316,8 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry }
               />
             ) : (
               <div className="flex items-center gap-3 p-2.5 rounded-xl bg-black/5 dark:bg-white/5 mb-2 border border-black/5 dark:border-white/10 hover:bg-black/10 transition-colors">
-                <div className={`p-2 rounded-lg ${isAgent ? 'bg-white/20' : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'}`}>
-                  <FileText className="w-5 h-5" />
+                <div className={`p-2 rounded-lg ${fileTypeClasses}`}>
+                  <FileTypeIcon className="w-5 h-5" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-semibold truncate">{fileName}</p>
@@ -244,7 +325,23 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry }
                     {fileSize || (hasRealFile ? '' : 'Anexo indisponível')}
                   </p>
                 </div>
-                {hasRealFile && <ZoomIn className="w-4 h-4 opacity-75 shrink-0" />}
+                {hasRealFile && (
+                  <div className="flex items-center gap-0.5 shrink-0">
+                    <a
+                      href={message.mediaUrl}
+                      download={fileName}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      aria-label="Baixar arquivo"
+                      title="Baixar arquivo"
+                      className={`p-1.5 rounded-lg transition-colors ${isAgent ? 'hover:bg-white/20' : 'hover:bg-slate-200 dark:hover:bg-slate-600'}`}
+                    >
+                      <Download className="w-4 h-4 opacity-90" />
+                    </a>
+                    <ZoomIn className="w-4 h-4 opacity-75" />
+                  </div>
+                )}
               </div>
             )}
             {message.text && <p className="text-xs sm:text-sm mb-1 leading-relaxed">{message.text}</p>}

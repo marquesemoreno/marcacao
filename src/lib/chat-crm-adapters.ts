@@ -9,6 +9,7 @@ import type {
   User,
 } from "@prisma/client";
 import { formatCurrency } from "@/lib/format";
+import { isMediaDownloadFailedNotice, isAutoSystemMessage } from "@/lib/chat-messages";
 import type {
   Channel,
   Contact,
@@ -174,6 +175,10 @@ export function toChatMessage(
     // apagou sem esconder o que a atendente já tinha visto.
     text: message.content,
     deleted: Boolean(message.deletedAt),
+    mediaDownloadFailed:
+      message.type === "TEXT" && message.direction === "INBOUND" && isMediaDownloadFailedNotice(message.content),
+    isSystemNotice:
+      message.type === "TEXT" && message.direction === "OUTBOUND" && isAutoSystemMessage(message.content),
     timestamp: formatMessageTimestamp(message.createdAt),
     type: typeMap[message.type],
     audioDuration: message.audioDuration ?? undefined,

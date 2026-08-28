@@ -34,6 +34,10 @@ export interface Message {
   deliveryStatus?: 'pending' | 'sent' | 'delivered' | 'read' | 'failed';
   /** true quando o WhatsApp avisou que essa mensagem foi apagada (evento messages.delete). */
   deleted?: boolean;
+  /** true pro aviso automático de mídia recebida que não foi possível baixar — vira um badge discreto em vez de bolha de texto normal. */
+  mediaDownloadFailed?: boolean;
+  /** true pra mensagem automática do sistema (ex: confirmação de agendamento) — vira um aviso compacto em vez de bolha de texto normal. */
+  isSystemNotice?: boolean;
 }
 
 export interface Contact {
