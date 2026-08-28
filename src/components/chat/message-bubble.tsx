@@ -334,7 +334,13 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry }
             : 'bg-white dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-tl-xs hover:border-slate-300 dark:hover:border-slate-600'
         }`}
       >
-        <p className="whitespace-pre-wrap font-sans text-xs sm:text-[13.5px] leading-relaxed select-text">{message.text}</p>
+        <p
+          className={`whitespace-pre-wrap font-sans text-xs sm:text-[13.5px] leading-relaxed select-text ${
+            message.deleted ? 'italic opacity-70' : ''
+          }`}
+        >
+          {message.text}
+        </p>
         <div
           className={`flex items-center justify-end gap-1.5 text-[10px] font-mono mt-1 ${
             isAgent ? 'text-emerald-100/90' : 'text-slate-500 dark:text-slate-400'

@@ -32,6 +32,8 @@ export interface Message {
   isRead?: boolean;
   /** Status real de entrega no WhatsApp (só relevante pra mensagens enviadas pelo agente). */
   deliveryStatus?: 'pending' | 'sent' | 'delivered' | 'read' | 'failed';
+  /** true quando o WhatsApp avisou que essa mensagem foi apagada (evento messages.delete). */
+  deleted?: boolean;
 }
 
 export interface Contact {

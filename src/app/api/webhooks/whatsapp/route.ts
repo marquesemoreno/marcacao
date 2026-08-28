@@ -10,7 +10,7 @@ type IncomingMedia =
   | { kind: "image" | "document"; mimeType: string; fileName: string; sizeBytes: number; key: Record<string, unknown> }
   | { kind: "audio"; mimeType: string; seconds: number; key: Record<string, unknown> };
 
-type IncomingMessage = { phone: string; text: string; name?: string; media?: IncomingMedia };
+type IncomingMessage = { phone: string; text: string; name?: string; media?: IncomingMedia; keyId?: string };
 
 /**
  * Extrai a mensagem recebida no webhook da Evolution API v2 (ou payload simplificado).
@@ -38,11 +38,14 @@ function extractIncomingMessage(body: unknown): IncomingMessage | null {
   if (typeof remoteJid !== "string") return null;
   const name = typeof pushName === "string" ? pushName : undefined;
   const phone = formatToWhatsAppNumber(remoteJid);
+  // ID da mensagem no WhatsApp — guardado em Message.whatsappKeyId pra depois casar
+  // com o evento "messages.delete" (mesmo campo já usado pra ack de mensagem enviada).
+  const keyId = typeof key?.id === "string" ? key.id : undefined;
 
   const extended = message?.extendedTextMessage as Record<string, unknown> | undefined;
   const text = message?.conversation ?? extended?.text;
   if (typeof text === "string") {
-    return { phone, text, name };
+    return { phone, text, name, keyId };
   }
 
   const audioMessage = message?.audioMessage as Record<string, unknown> | undefined;
@@ -52,6 +55,7 @@ function extractIncomingMessage(body: unknown): IncomingMessage | null {
       phone,
       text: "🎤 Áudio recebido",
       name,
+      keyId,
       media: { kind: "audio", mimeType: audioMessage.mimetype, seconds, key },
     };
   }
@@ -75,6 +79,7 @@ function extractIncomingMessage(body: unknown): IncomingMessage | null {
       phone,
       text: caption || (isImage ? "📷 Imagem recebida" : "📄 Documento recebido"),
       name,
+      keyId,
       media: { kind: isImage ? "image" : "document", mimeType: mediaMessage.mimetype, fileName, sizeBytes, key },
     };
   }
@@ -126,6 +131,31 @@ async function handleMessageStatusUpdate(data: Record<string, unknown>) {
   });
   notifyInboxRealtime().catch(() => {});
   await logInbound({ kind: "message_status_update", ...data, mapped, messageDbId: message.id }, "SUCCESS");
+}
+
+/**
+ * Trata o webhook "messages.delete" — dispara quando alguém apaga uma mensagem no
+ * WhatsApp (paciente ou atendente, "apagar para todos"). Formato real confirmado via
+ * WebhookLog: `data.id` é o mesmo id do Baileys que já gravamos em Message.whatsappKeyId
+ * ao enviar/receber. Não apaga a mensagem — só marca deletedAt, mantendo o conteúdo
+ * original no banco (a tela troca a exibição por "Mensagem apagada").
+ */
+async function handleMessageDelete(data: Record<string, unknown>) {
+  const keyId = data.id;
+  if (typeof keyId !== "string") {
+    await logInbound({ kind: "message_delete", ...data }, "IGNORED");
+    return;
+  }
+
+  const message = await prisma.message.findUnique({ where: { whatsappKeyId: keyId }, select: { id: true } });
+  if (!message) {
+    await logInbound({ kind: "message_delete", ...data }, "IGNORED");
+    return;
+  }
+
+  await prisma.message.update({ where: { id: message.id }, data: { deletedAt: new Date() } });
+  notifyInboxRealtime().catch(() => {});
+  await logInbound({ kind: "message_delete", ...data, messageDbId: message.id }, "SUCCESS");
 }
 
 function resolveStatusFromReply(text: string): AppointmentStatus | null {
@@ -253,6 +283,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, status: "message_status_update" }, { status: 200 });
   }
 
+  // Mesma lógica: precisa vir antes da trava anti-loop porque o próprio atendente
+  // pode apagar uma mensagem que ele mandou (fromMe:true nesse caso).
+  if (bodyRec.event === "messages.delete" && dataPayload) {
+    await handleMessageDelete(dataPayload);
+    return NextResponse.json({ ok: true, status: "message_deleted" }, { status: 200 });
+  }
+
   // =========================================================================
   // 1. TRAVA ANTI-LOOP: ignora mensagens enviadas pela própria instância / bot / atendente
   // =========================================================================
@@ -333,6 +370,7 @@ export async function POST(request: Request) {
         direction: "INBOUND",
         content: failedMediaNotice ?? incoming.text,
         status: "DELIVERED",
+        whatsappKeyId: incoming.keyId,
         ...(mediaData ?? {}),
       },
     });
