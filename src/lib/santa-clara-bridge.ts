@@ -183,6 +183,7 @@ export async function createSantaClaraBridgeAppointment(input: {
       body: JSON.stringify({
         paciente_nome: input.patientName,
         paciente_cpf: input.patientCpf,
+        paciente_celular: input.patientPhone,
         servico_id: servicoId,
         medico_id: input.medicoId ? Number(input.medicoId) : undefined,
         convenio_id: convenioId,
