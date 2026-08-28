@@ -607,33 +607,45 @@ export async function transferConversation(
 
   const targetUser = await prisma.user.findUnique({
     where: { id: targetUserId },
-    select: { name: true, maxConcurrentChats: true, role: true },
+    select: { name: true, maxConcurrentChats: true, role: true, clinic: { select: { tradeName: true } } },
   });
 
   if (!targetUser) {
     return { success: false, message: "Atendente de destino não encontrado." };
   }
 
-  const maxLimit = targetUser.maxConcurrentChats ?? 5;
-  const activeCount = await prisma.conversation.count({
-    where: {
-      assignedUserId: targetUserId,
-      status: "OPEN",
-      id: { not: conversationId },
-    },
-  });
+  // Toda clínica tem uma conta genérica "Equipe {nome da clínica}" (convenção usada desde o
+  // cadastro inicial) — "transferir" pra ela na prática significa devolver pra fila geral,
+  // não atribuir a essa conta como se fosse mais um atendente. Sem essa checagem, um "atribui
+  // sozinho ao responder" nunca conseguia devolver essa conversa pra "Não Atribuídas" de novo.
+  const isTeamQueue = targetUser.clinic?.tradeName ? targetUser.name === `Equipe ${targetUser.clinic.tradeName}` : false;
 
-  if (activeCount >= maxLimit && targetUser.role !== "ADMIN") {
-    return {
-      success: false,
-      message: `Limite atingido: ${targetUser.name} já possui ${activeCount}/${maxLimit} conversas abertas.`,
-    };
+  const actingUser = isTeamQueue
+    ? await prisma.user.findUnique({ where: { id: userId }, select: { name: true } })
+    : null;
+
+  if (!isTeamQueue) {
+    const maxLimit = targetUser.maxConcurrentChats ?? 5;
+    const activeCount = await prisma.conversation.count({
+      where: {
+        assignedUserId: targetUserId,
+        status: "OPEN",
+        id: { not: conversationId },
+      },
+    });
+
+    if (activeCount >= maxLimit && targetUser.role !== "ADMIN") {
+      return {
+        success: false,
+        message: `Limite atingido: ${targetUser.name} já possui ${activeCount}/${maxLimit} conversas abertas.`,
+      };
+    }
   }
 
   await prisma.conversation.update({
     where: { id: conversationId },
     data: {
-      assignedUserId: targetUserId,
+      assignedUserId: isTeamQueue ? null : targetUserId,
       ...(department ? { department: departmentToDb[department] } : {}),
     },
   });
@@ -643,7 +655,9 @@ export async function transferConversation(
       conversationId,
       direction: "OUTBOUND",
       type: "INTERNAL_NOTE",
-      content: `🔒 Conversa transferida para ${targetUser.name}.`,
+      content: isTeamQueue
+        ? `🔄 Conversa devolvida para a fila de "Não Atribuídas" por ${actingUser?.name || "Atendente"}.`
+        : `🔒 Conversa transferida para ${targetUser.name}.`,
       status: "SENT",
       senderUserId: userId,
     },

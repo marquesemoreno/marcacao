@@ -513,9 +513,18 @@ export async function claimConversationAdmin(conversationId: string) {
 
 export async function transferConversationAdmin(conversationId: string, targetUserId: string) {
   await requireAdminSession();
+
+  // Mesma regra do lado clínica (ver transferConversation em actions/inbox.ts): a conta
+  // genérica "Equipe {nome da clínica}" representa a fila geral, não um atendente de verdade.
+  const targetUser = await prisma.user.findUnique({
+    where: { id: targetUserId },
+    select: { name: true, clinic: { select: { tradeName: true } } },
+  });
+  const isTeamQueue = targetUser?.clinic?.tradeName ? targetUser.name === `Equipe ${targetUser.clinic.tradeName}` : false;
+
   await prisma.conversation.update({
     where: { id: conversationId },
-    data: { assignedUserId: targetUserId, status: "OPEN" },
+    data: { assignedUserId: isTeamQueue ? null : targetUserId, status: "OPEN" },
   });
 
   revalidatePath("/admin/inbox");
