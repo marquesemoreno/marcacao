@@ -265,6 +265,35 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedContactId]);
 
+  // Rola pro fim da conversa: ao abrir/trocar de conversa sempre vai pro final (senão
+  // ficava parado no topo, no meio das mensagens mais antigas). Em mensagem nova só
+  // acompanha se o atendente já estava perto do fim — sem isso "Carregar mensagens
+  // anteriores" (que também aumenta messages.length) seria arrastado de volta pro fim.
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const isNearBottomRef = useRef(true);
+  const previousContactIdRef = useRef<string | null>(null);
+  const previousMessageCountRef = useRef(0);
+
+  React.useEffect(() => {
+    const container = messagesContainerRef.current;
+    if (!container) return;
+    const isNewConversation = previousContactIdRef.current !== selectedContactId;
+    if (isNewConversation) {
+      container.scrollTop = container.scrollHeight;
+      isNearBottomRef.current = true;
+    } else if (messages.length > previousMessageCountRef.current && isNearBottomRef.current) {
+      container.scrollTop = container.scrollHeight;
+    }
+    previousContactIdRef.current = selectedContactId;
+    previousMessageCountRef.current = messages.length;
+  }, [selectedContactId, messages]);
+
+  const handleMessagesScroll = () => {
+    const container = messagesContainerRef.current;
+    if (!container) return;
+    isNearBottomRef.current = container.scrollHeight - container.scrollTop - container.clientHeight < 150;
+  };
+
   const quickReplyQuery = inputText.startsWith('/') ? inputText.slice(1).toLowerCase() : '';
   const filteredQuickReplies = quickReplyQuery
     ? quickReplies.filter((reply) => reply.shortcut.toLowerCase().includes(quickReplyQuery))
@@ -876,6 +905,8 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
 
             {/* Área de Mensagens */}
             <div
+              ref={messagesContainerRef}
+              onScroll={handleMessagesScroll}
               className="flex-1 overflow-y-auto p-3 sm:p-6 space-y-3 bg-[#F1F5F9] dark:bg-slate-950/60"
               data-od-id="chat-messages-area"
             >
