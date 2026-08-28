@@ -1,4 +1,3 @@
-import { useId } from "react";
 import { cn } from "@/lib/utils";
 
 type LogoVariant = "full" | "icon-only" | "white";
@@ -16,15 +15,7 @@ const brandTextClasses: Record<LogoSize, string> = {
   lg: "text-2xl",
 };
 
-const subtitleTextClasses: Record<LogoSize, string> = {
-  sm: "text-[8px]",
-  md: "text-[10px]",
-  lg: "text-xs",
-};
-
 function LogoIcon({ size, white, className }: { size: LogoSize; white: boolean; className?: string }) {
-  const gradientId = useId();
-
   return (
     <svg
       viewBox="0 0 100 100"
@@ -32,41 +23,27 @@ function LogoIcon({ size, white, className }: { size: LogoSize; white: boolean; 
       role="img"
       aria-label="Conecta Saúde"
     >
-      {!white && (
-        <defs>
-          <linearGradient id={gradientId} x1="0" y1="0" x2="100" y2="100" gradientUnits="userSpaceOnUse">
-            <stop offset="0%" stopColor="#0284c7" />
-            <stop offset="100%" stopColor="#0d9488" />
-          </linearGradient>
-        </defs>
-      )}
-
       <rect
         x="0"
         y="0"
         width="100"
         height="100"
         rx="28"
-        fill={white ? "rgba(255,255,255,0.12)" : `url(#${gradientId})`}
+        fill={white ? "rgba(255,255,255,0.12)" : "#0f766e"}
         stroke={white ? "rgba(255,255,255,0.5)" : "none"}
         strokeWidth={white ? 2 : 0}
       />
 
-      {/* 4 pontos de conexão — rede de saúde conectada */}
-      <circle cx="22" cy="22" r="4.5" fill={white ? "#fff" : "rgba(255,255,255,0.85)"} />
-      <circle cx="78" cy="22" r="4.5" fill={white ? "#fff" : "rgba(255,255,255,0.85)"} />
-      <circle cx="22" cy="78" r="4.5" fill={white ? "#fff" : "rgba(255,255,255,0.85)"} />
-      <circle cx="78" cy="78" r="4.5" fill={white ? "#fff" : "rgba(255,255,255,0.85)"} />
-
-      {/* Linha de pulso vital / batimento cardíaco */}
+      {/* Linha de pulso vital terminando em um ponto de conexão — "Conecta" */}
       <path
-        d="M14 50 L34 50 L42 28 L52 72 L60 50 L86 50"
+        d="M14 50 L30 50 L38 30 L48 70 L56 50 L70 50"
         fill="none"
         stroke="#ffffff"
-        strokeWidth="5.5"
+        strokeWidth="6"
         strokeLinecap="round"
         strokeLinejoin="round"
       />
+      <circle cx="82" cy="50" r="6.5" fill="#ffffff" />
     </svg>
   );
 }
@@ -89,28 +66,9 @@ export function Logo({
   return (
     <span className={cn("inline-flex items-center gap-2.5", className)}>
       <LogoIcon size={size} white={isWhite} />
-      <span className="flex flex-col leading-none">
-        <span className={cn("font-extrabold tracking-tight", brandTextClasses[size])}>
-          <span className={isWhite ? "text-white" : "text-slate-900"}>Conecta</span>{" "}
-          <span
-            className={
-              isWhite
-                ? "text-white"
-                : "bg-gradient-to-r from-sky-600 to-teal-600 bg-clip-text text-transparent"
-            }
-          >
-            Saúde
-          </span>
-        </span>
-        <span
-          className={cn(
-            "font-semibold uppercase tracking-wider",
-            subtitleTextClasses[size],
-            isWhite ? "text-white/70" : "text-slate-500"
-          )}
-        >
-          Consultas & Exames
-        </span>
+      <span className={cn("font-extrabold tracking-tight", brandTextClasses[size])}>
+        <span className={isWhite ? "text-white" : "text-slate-900"}>Conecta</span>{" "}
+        <span className={isWhite ? "text-white" : "text-teal-700"}>Saúde</span>
       </span>
     </span>
   );

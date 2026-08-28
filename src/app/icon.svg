@@ -1,24 +1,13 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <defs>
-    <linearGradient id="conectaSaudeIconGradient" x1="0" y1="0" x2="100" y2="100" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#0284c7" />
-      <stop offset="100%" stop-color="#0d9488" />
-    </linearGradient>
-  </defs>
-
-  <rect x="0" y="0" width="100" height="100" rx="28" fill="url(#conectaSaudeIconGradient)" />
-
-  <circle cx="22" cy="22" r="4.5" fill="rgba(255,255,255,0.85)" />
-  <circle cx="78" cy="22" r="4.5" fill="rgba(255,255,255,0.85)" />
-  <circle cx="22" cy="78" r="4.5" fill="rgba(255,255,255,0.85)" />
-  <circle cx="78" cy="78" r="4.5" fill="rgba(255,255,255,0.85)" />
+  <rect x="0" y="0" width="100" height="100" rx="28" fill="#0f766e" />
 
   <path
-    d="M14 50 L34 50 L42 28 L52 72 L60 50 L86 50"
+    d="M14 50 L30 50 L38 30 L48 70 L56 50 L70 50"
     fill="none"
     stroke="#ffffff"
-    stroke-width="5.5"
+    stroke-width="6"
     stroke-linecap="round"
     stroke-linejoin="round"
   />
+  <circle cx="82" cy="50" r="6.5" fill="#ffffff" />
 </svg>
