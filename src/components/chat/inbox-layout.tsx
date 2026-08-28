@@ -448,7 +448,9 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
          ========================================================================= */}
       <aside
         className={`w-full md:w-80 md:min-w-[320px] md:max-w-[320px] bg-slate-100/70 dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 shadow-sm flex-col h-full shrink-0 z-20 select-none ${
-          mobileView === 'queue' ? 'flex' : 'hidden md:flex'
+          // Some enquanto agenda — só conversa + painel de agendamento na tela; volta ao
+          // normal assim que fecha.
+          mobileView === 'queue' ? 'flex' : isScheduleModalOpen ? 'hidden' : 'hidden md:flex'
         }`}
         data-od-id="inbox-queue-column"
       >
@@ -1098,7 +1100,10 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
           className={`w-full lg:w-[300px] lg:min-w-[300px] lg:max-w-[300px] bg-slate-50 dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 shadow-sm flex-col h-full shrink-0 overflow-y-auto ${
             mobileView === 'crm'
               ? 'flex absolute inset-0 z-40 bg-slate-50 dark:bg-slate-900 animate-in slide-in-from-right duration-200'
-              : 'hidden lg:flex'
+              // Esconde enquanto o painel de agendamento está aberto — os dois disputam a
+              // mesma faixa lateral, e mostrar os três (contatos + CRM + agendamento) juntos
+              // deixava a conversa espremida demais.
+              : isScheduleModalOpen ? 'hidden' : 'hidden lg:flex'
           }`}
           data-od-id="inbox-crm-column"
         >
