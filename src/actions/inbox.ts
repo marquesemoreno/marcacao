@@ -28,6 +28,14 @@ import {
 
 const ACTIVE_STATUSES: ConversationStatus[] = [ConversationStatus.OPEN, ConversationStatus.PENDING];
 
+/** Atribui a conversa a quem está respondendo, se ainda não tiver ninguém assumido —
+ * sem isso, dava pra responder uma conversa de "Não Atribuídas" sem nunca clicar em
+ * "Atribuir pra Mim", e ela sumia da aba "Minhas" e não contava pro limite de
+ * atendimentos simultâneos do atendente. Espalhar no "data" de um conversation.update. */
+function autoAssignOnReply(conversation: { assignedUserId: string | null }, userId: string) {
+  return conversation.assignedUserId ? {} : { assignedUserId: userId };
+}
+
 /** Cadastra um contato novo (ou reaproveita um já existente pelo telefone) e garante
  * uma conversa aberta dessa clínica com ele — pra atendente iniciar contato proativo,
  * sem precisar esperar o paciente mandar mensagem primeiro. */
@@ -247,7 +255,7 @@ export async function sendMessage(conversationId: string, content: string, isInt
     });
     await prisma.conversation.update({
       where: { id: data.conversationId },
-      data: { lastMessageAt: new Date() },
+      data: { lastMessageAt: new Date(), ...autoAssignOnReply(conversation, userId) },
     });
     revalidatePath("/clinic/inbox");
     notifyInboxRealtime().catch(() => {});
@@ -266,7 +274,7 @@ export async function sendMessage(conversationId: string, content: string, isInt
 
   await prisma.conversation.update({
     where: { id: data.conversationId },
-    data: { lastMessageAt: new Date(), status: "OPEN" },
+    data: { lastMessageAt: new Date(), status: "OPEN", ...autoAssignOnReply(conversation, userId) },
   });
 
   // Dispara o envio ao WhatsApp via Evolution API em segundo plano (assíncrono), liberando a interface instantaneamente
@@ -334,7 +342,7 @@ export async function sendMediaMessage(conversationId: string, formData: FormDat
 
   await prisma.conversation.update({
     where: { id: conversationId },
-    data: { lastMessageAt: new Date(), status: "OPEN" },
+    data: { lastMessageAt: new Date(), status: "OPEN", ...autoAssignOnReply(conversation, userId) },
   });
 
   // Mesma URL assinada que a UI usa pra exibir — a Evolution API busca o arquivo nela.
@@ -401,7 +409,7 @@ export async function sendAudioMessage(conversationId: string, formData: FormDat
 
   await prisma.conversation.update({
     where: { id: conversationId },
-    data: { lastMessageAt: new Date(), status: "OPEN" },
+    data: { lastMessageAt: new Date(), status: "OPEN", ...autoAssignOnReply(conversation, userId) },
   });
 
   const signedUrl = await getSignedMediaUrl(uploaded.path);

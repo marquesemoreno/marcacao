@@ -24,6 +24,12 @@ const CONTACT_PHOTO_CACHE_DAYS = 30;
 
 const ACTIVE_STATUSES: ConversationStatus[] = [ConversationStatus.OPEN, ConversationStatus.PENDING];
 
+/** Atribui a conversa a quem está respondendo, se ainda não tiver ninguém assumido — ver
+ * mesma função em actions/inbox.ts. Espalhar no "data" de um conversation.update. */
+function autoAssignOnReply(conversation: { assignedUserId: string | null }, userId: string) {
+  return conversation.assignedUserId ? {} : { assignedUserId: userId };
+}
+
 /** Uma linha por contato cadastrado em qualquer clínica — usado na aba "Contatos"
  * do admin pra buscar por nome/telefone/CPF e ver de qual clínica é. */
 export async function listAllContactsAdmin(search?: string) {
@@ -280,7 +286,7 @@ export async function sendMessageAdmin(conversationId: string, content: string, 
     });
     await prisma.conversation.update({
       where: { id: data.conversationId },
-      data: { lastMessageAt: new Date() },
+      data: { lastMessageAt: new Date(), ...autoAssignOnReply(conversation, userId) },
     });
     revalidatePath("/admin/inbox");
     notifyInboxRealtime().catch(() => {});
@@ -299,7 +305,7 @@ export async function sendMessageAdmin(conversationId: string, content: string, 
 
   await prisma.conversation.update({
     where: { id: data.conversationId },
-    data: { lastMessageAt: new Date(), status: "OPEN" },
+    data: { lastMessageAt: new Date(), status: "OPEN", ...autoAssignOnReply(conversation, userId) },
   });
 
   // Disparo assíncrono não-bloqueante para a Evolution API em segundo plano com timeout de 4s
@@ -366,7 +372,7 @@ export async function sendMediaMessageAdmin(conversationId: string, formData: Fo
 
   await prisma.conversation.update({
     where: { id: conversationId },
-    data: { lastMessageAt: new Date(), status: "OPEN" },
+    data: { lastMessageAt: new Date(), status: "OPEN", ...autoAssignOnReply(conversation, userId) },
   });
 
   const signedUrl = await getSignedMediaUrl(uploaded.path);
