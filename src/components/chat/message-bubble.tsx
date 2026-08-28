@@ -336,7 +336,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry }
       >
         <p
           className={`whitespace-pre-wrap font-sans text-xs sm:text-[13.5px] leading-relaxed select-text ${
-            message.deleted ? 'italic opacity-70' : ''
+            message.deleted ? `italic line-through ${isAgent ? 'text-rose-100' : 'text-rose-500 dark:text-rose-400'}` : ''
           }`}
         >
           {message.text}
