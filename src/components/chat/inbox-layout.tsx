@@ -449,8 +449,9 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
       <aside
         className={`w-full md:w-80 md:min-w-[320px] md:max-w-[320px] bg-slate-100/70 dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 shadow-sm flex-col h-full shrink-0 z-20 select-none ${
           // Some enquanto agenda — só conversa + painel de agendamento na tela; volta ao
-          // normal assim que fecha.
-          mobileView === 'queue' ? 'flex' : isScheduleModalOpen ? 'hidden' : 'hidden md:flex'
+          // normal assim que fecha. Precisa vir antes do mobileView, senão "queue" (o
+          // padrão fora do mobile) sempre ganhava e escondia esse hide.
+          isScheduleModalOpen ? 'hidden' : mobileView === 'queue' ? 'flex' : 'hidden md:flex'
         }`}
         data-od-id="inbox-queue-column"
       >
