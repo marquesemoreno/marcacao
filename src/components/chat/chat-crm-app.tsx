@@ -161,6 +161,7 @@ export function ChatCrmApp({ scope, basePath, view }: ChatCrmAppProps) {
   const attemptedPhotoFetchRef = useRef<Set<string>>(new Set());
   const photoFetchQueueRef = useRef<string[]>([]);
   const isDrainingPhotoQueueRef = useRef(false);
+  const contactCacheRef = useRef<Map<string, Contact>>(new Map());
 
   const [attendantCapacity, setAttendantCapacity] = useState<{ activeCount: number; maxLimit: number } | null>(null);
   const [availableClinics, setAvailableClinics] = useState<{ id: string; tradeName: string }[]>([]);
@@ -384,7 +385,15 @@ export function ChatCrmApp({ scope, basePath, view }: ChatCrmAppProps) {
     refreshMessages();
   });
 
-  const selectedContact = contacts.find((c) => c.id === selectedContactId) ?? null;
+  // `contacts` é substituído por inteiro a cada busca (escopada pela aba/busca atual) — sem
+  // esse cache, a conversa aberta desaparecia da tela assim que a atendente trocava de aba
+  // (ex: "Minhas") e a conversa que ela estava vendo pertencia só à outra aba ("Não
+  // Atribuídas"), mesmo com selectedContactId preservado. A lista da esquerda continua
+  // só com os contatos da aba atual — só o painel da conversa aberta usa esse fallback.
+  contacts.forEach((c) => contactCacheRef.current.set(c.id, c));
+  const selectedContact =
+    contacts.find((c) => c.id === selectedContactId) ??
+    (selectedContactId ? contactCacheRef.current.get(selectedContactId) ?? null : null);
 
   function selectContact(id: string) {
     setSelectedContactId(id);
