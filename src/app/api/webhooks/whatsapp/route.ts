@@ -262,6 +262,11 @@ export async function POST(request: Request) {
   );
 
   if (isFromMe) {
+    // DIAGNÓSTICO TEMPORÁRIO: precisamos ver o formato real que a Evolution API manda
+    // quando uma mensagem enviada por nós é apagada (revoke) no WhatsApp, pra depois
+    // marcar a mensagem como apagada em vez de deixar o conteúdo antigo. Sem isso, esse
+    // evento sempre caía aqui e nunca era logado — remover assim que confirmarmos o formato.
+    await logInbound({ kind: "diagnostico_fromMe_temporario", body }, "IGNORED").catch(() => {});
     return NextResponse.json({ ignored: true, reason: "outbound_message" }, { status: 200 });
   }
 

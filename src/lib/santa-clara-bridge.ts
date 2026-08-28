@@ -204,6 +204,48 @@ export async function createSantaClaraBridgeAppointment(input: {
   const instance = await prisma.whatsappInstance.findFirst({ include: { clinic: true } });
   if (!instance) throw new Error("Clínica com integração hospitalar não encontrada.");
 
+  // Espelha o agendamento (já real no Firebird a essa altura) num Appointment de
+  // verdade no nosso Postgres — só pra relatório (getFinancialReport etc já
+  // contam qualquer Appointment, sem filtro especial). Não usa esse id como
+  // retorno da função: o id sintético "bridge:..." abaixo continua sendo o que
+  // o front usa pra saber que não existe guia/QR Code pra esse agendamento.
+  // Em try/catch isolado: o agendamento no Firebird já aconteceu de verdade a essa
+  // altura, então uma falha aqui (só espelho pra relatório) não pode derrubar a
+  // resposta de sucesso pro atendente.
+  try {
+    const dbProcedureName = `${procedure.nome} — ${instance.clinic.tradeName} (Bridge)`;
+    const dbProcedure = await prisma.procedure.upsert({
+      where: { name: dbProcedureName },
+      create: { name: dbProcedureName, category: "CONSULTATION", tussCode: procedure.codigo },
+      update: { tussCode: procedure.codigo },
+    });
+    const dbClinicProcedure = await prisma.clinicProcedure.upsert({
+      where: { clinicId_procedureId: { clinicId: instance.clinicId, procedureId: dbProcedure.id } },
+      create: {
+        clinicId: instance.clinicId,
+        procedureId: dbProcedure.id,
+        price: procedure.valor,
+        requiresAppointment: true,
+        appointmentType: "SCHEDULED",
+      },
+      update: { price: procedure.valor },
+    });
+    await prisma.appointment.create({
+      data: {
+        patientName: input.patientName,
+        patientPhone: input.patientPhone,
+        patientCpf: input.patientCpf,
+        clinicProcedureId: dbClinicProcedure.id,
+        date: new Date(`${input.date}T00:00:00Z`),
+        timeSlot: input.timeSlot || null,
+        status: "CONFIRMED",
+        notes: `Agendado via bridge Santa Clara — NUMERO Firebird: ${body?.numero ?? "?"}`,
+      },
+    });
+  } catch (error) {
+    console.error("Falha ao espelhar agendamento da Santa Clara no Postgres (só relatório):", error);
+  }
+
   const now = new Date();
   const procedureId = toBridgeProcedureId(servicoId);
   const appointmentId = `${BRIDGE_ID_PREFIX}${Date.now()}`;
