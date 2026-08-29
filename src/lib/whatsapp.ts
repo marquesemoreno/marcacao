@@ -42,7 +42,15 @@ export function formatToWhatsAppNumber(phone: string): string {
   else if (!digits.startsWith('55') && (digits.length === 10 || digits.length === 11)) {
     digits = '55' + digits;
   }
-  
+
+  // Celular brasileiro é DDI(2) + DDD(2) + 9 dígitos = 13 no total. Se sobrou só
+  // 12 (DDD + 8 dígitos locais), o WhatsApp/Evolution mandou no formato antigo,
+  // sem o "9" que a operadora exige há anos — sem repor, a mensagem vai pra um
+  // número que não existe (foi o caso real: "7788411342" devia ser "77988411342").
+  if (digits.startsWith('55') && digits.length === 12) {
+    digits = digits.slice(0, 4) + '9' + digits.slice(4);
+  }
+
   return digits;
 }
 
