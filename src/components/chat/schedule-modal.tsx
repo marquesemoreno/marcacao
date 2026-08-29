@@ -463,8 +463,9 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
                   return (
                   <option key={procedure.id} value={procedure.id}>
                     {procedure.procedure.name}
+                    {procedure.procedure.tussCode ? ` (${procedure.procedure.tussCode})` : ''}
                     {/* Preço 0 normalmente é "ainda não cadastrado" (ex: procedimentos vindos da
-                        integração hospitalar da Santa Clara) — melhor omitir do que mostrar R$ 0,00. */}
+                        integração hospitalar) — melhor omitir do que mostrar R$ 0,00. */}
                     {effectivePrice > 0 ? ` — ${formatCurrency(effectivePrice)}` : ''}
                   </option>
                   );
