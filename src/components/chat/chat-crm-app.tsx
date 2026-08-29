@@ -86,9 +86,11 @@ import type { Agent, Contact, FunnelStage, InboxFilter, Message } from "@/types/
 type Scope = "clinic" | "admin";
 type View = "inbox" | "crm";
 
+type ListChatContactsFn = (filter: InboxFilter, search?: string, clinicId?: string) => Promise<Contact[]>;
+
 const ACTIONS_BY_SCOPE = {
   clinic: {
-    listChatContacts: (filter: InboxFilter, search?: string) => listChatContacts(filter, search),
+    listChatContacts: ((filter, search) => listChatContacts(filter, search)) as ListChatContactsFn,
     listChatAgents: () => listChatAgents(),
     getChatMessages: (id: string) => getChatMessages(id),
     getOlderChatMessages: (id: string, beforeId: string) => getOlderChatMessages(id, beforeId),
@@ -111,7 +113,8 @@ const ACTIONS_BY_SCOPE = {
     resendMessage: (id: string) => resendMessage(id),
   },
   admin: {
-    listChatContacts: (filter: InboxFilter, search?: string) => listChatContactsAdmin(filter, search),
+    listChatContacts: ((filter, search, clinicId) =>
+      listChatContactsAdmin(filter, search, clinicId)) as ListChatContactsFn,
     listChatAgents: () => listChatAgentsAdmin(),
     getChatMessages: (id: string) => getChatMessagesAdmin(id),
     getOlderChatMessages: (id: string, beforeId: string) => getOlderChatMessagesAdmin(id, beforeId),
@@ -165,6 +168,8 @@ export function ChatCrmApp({ scope, basePath, view }: ChatCrmAppProps) {
 
   const [attendantCapacity, setAttendantCapacity] = useState<{ activeCount: number; maxLimit: number } | null>(null);
   const [availableClinics, setAvailableClinics] = useState<{ id: string; tradeName: string }[]>([]);
+  /** Filtro de clínica da fila — só existe no scope admin, que vê todas juntas. "" = todas. */
+  const [clinicFilter, setClinicFilter] = useState("");
   const [unassignedWaitMinutes, setUnassignedWaitMinutes] = useState<number | null>(null);
 
   const refreshContacts = useCallback(async () => {
@@ -175,15 +180,16 @@ export function ChatCrmApp({ scope, basePath, view }: ChatCrmAppProps) {
     const waitFn = scope === "admin" ? getOldestUnassignedWaitMinutesAdmin : getOldestUnassignedWaitMinutes;
     waitFn().then(setUnassignedWaitMinutes).catch(() => {});
 
+    const clinicIdArg = scope === "admin" && clinicFilter ? clinicFilter : undefined;
     const result =
       view === "crm"
         ? (
             await Promise.all([
-              actions.listChatContacts("todas", searchQuery || undefined),
-              actions.listChatContacts("finalizadas", searchQuery || undefined),
+              actions.listChatContacts("todas", searchQuery || undefined, clinicIdArg),
+              actions.listChatContacts("finalizadas", searchQuery || undefined, clinicIdArg),
             ])
           ).flat()
-        : await actions.listChatContacts(filterTab, searchQuery || undefined);
+        : await actions.listChatContacts(filterTab, searchQuery || undefined, clinicIdArg);
     setContacts(result);
 
     const totalUnread = result.reduce((sum, item) => sum + item.unreadCount, 0);
@@ -210,7 +216,7 @@ export function ChatCrmApp({ scope, basePath, view }: ChatCrmAppProps) {
     // quando não existe nenhuma selecionada ainda (primeiro carregamento).
     setSelectedContactId((current) => current ?? result[0]?.id ?? null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [actions, filterTab, searchQuery, scope, view]);
+  }, [actions, filterTab, searchQuery, scope, view, clinicFilter]);
 
   useEffect(() => {
     requestNotificationPermission();
@@ -676,6 +682,8 @@ export function ChatCrmApp({ scope, basePath, view }: ChatCrmAppProps) {
           onTransferAgent={handleTransferAgent}
           availableClinics={scope === "admin" ? availableClinics : undefined}
           onReassignClinic={scope === "admin" ? handleReassignClinic : undefined}
+          clinicFilter={scope === "admin" ? clinicFilter : undefined}
+          onClinicFilterChange={scope === "admin" ? setClinicFilter : undefined}
           onCreateContact={handleCreateContact}
           onFinishAttendance={handleFinishAttendance}
           fetchProcedures={fetchProcedures}

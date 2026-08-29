@@ -61,7 +61,7 @@ export async function listAllContactsAdmin(search?: string) {
   }));
 }
 
-export async function listChatContactsAdmin(filter: InboxFilter, search?: string) {
+export async function listChatContactsAdmin(filter: InboxFilter, search?: string, clinicId?: string) {
   await requireAdminSession();
 
   // Com busca ativa, ignora o filtro de aba e procura em todas as conversas —
@@ -79,6 +79,7 @@ export async function listChatContactsAdmin(filter: InboxFilter, search?: string
   const conversations = await prisma.conversation.findMany({
     where: {
       ...where,
+      ...(clinicId ? { clinicId } : {}),
       ...(search
         ? {
             contact: {

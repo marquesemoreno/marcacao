@@ -112,6 +112,10 @@ interface InboxLayoutProps {
   onTransferAgent: (agentId: string, agentName: string) => Promise<void> | void;
   availableClinics?: { id: string; tradeName: string }[];
   onReassignClinic?: (clinicId: string) => Promise<void> | void;
+  /** Filtro de clínica da fila (scope admin, que vê todas juntas) — "" = todas.
+   * Reaproveita availableClinics, que já lista as clínicas ativas. */
+  clinicFilter?: string;
+  onClinicFilterChange?: (clinicId: string) => void;
   /** Cadastra um contato novo e abre a conversa dele. `clinicId` só é usado (e obrigatório
    * na prática) no scope admin, que não está preso a uma clínica só — ver availableClinics. */
   onCreateContact?: (name: string, phone: string, clinicId?: string) => Promise<void>;
@@ -157,6 +161,8 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
   onTransferAgent,
   availableClinics,
   onReassignClinic,
+  clinicFilter,
+  onClinicFilterChange,
   onCreateContact,
   onFinishAttendance,
   fetchProcedures,
@@ -534,6 +540,22 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
               className="w-full pl-9 pr-3 py-2 text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 focus:bg-white dark:focus:bg-slate-900 transition-all text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500"
             />
           </div>
+
+          {/* Filtro de clínica — só existe no scope admin, que vê a fila de todas juntas. */}
+          {onClinicFilterChange && availableClinics && availableClinics.length > 0 && (
+            <select
+              value={clinicFilter ?? ""}
+              onChange={(e) => onClinicFilterChange(e.target.value)}
+              className="w-full px-2.5 py-1.5 text-xs font-semibold bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-slate-700 dark:text-slate-200"
+            >
+              <option value="">Todas as Clínicas</option>
+              {availableClinics.map((clinic) => (
+                <option key={clinic.id} value={clinic.id}>
+                  {clinic.tradeName}
+                </option>
+              ))}
+            </select>
+          )}
 
           {/* Abas de Filtros: Segmented Control Compacto */}
           <div className="flex items-center gap-0.5 p-0.5 bg-slate-100 dark:bg-slate-800/90 rounded-lg text-xs font-medium">
