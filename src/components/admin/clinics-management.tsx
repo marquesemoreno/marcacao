@@ -348,38 +348,38 @@ export function ClinicsManagement({ clinics: initialClinics }: { clinics: Clinic
                   </button>
                 </div>
 
-                {/* BOTÕES DE AÇÃO RÁPIDA */}
-                <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
-                  <div className="flex items-center gap-2">
-                    <ViewProceduresModal
-                      clinicId={clinic.id}
-                      clinicName={clinic.tradeName}
-                      totalProceduresCount={clinic._count?.clinicProcedures || 0}
-                    />
-                    <WhatsappInstanceModal clinicId={clinic.id} clinicName={clinic.tradeName} />
-                    <HospitalIntegrationModal clinicId={clinic.id} clinicName={clinic.tradeName} />
-                    <ClinicAttendantsModal clinicId={clinic.id} clinicName={clinic.tradeName} />
-                    <WelcomeMessageModal
-                      clinicId={clinic.id}
-                      clinicName={clinic.tradeName}
-                      initialEnabled={clinic.welcomeMessageEnabled}
-                      initialText={clinic.welcomeMessageText ?? ""}
-                      onSaved={(enabled, text) =>
-                        setClinics((prev) =>
-                          prev.map((c) =>
-                            c.id === clinic.id ? { ...c, welcomeMessageEnabled: enabled, welcomeMessageText: text } : c
-                          )
+                {/* BOTÕES DE AÇÃO RÁPIDA — flex-wrap: 5 botões + link de WhatsApp não cabem
+                    numa linha só na largura do card (1-3 colunas do grid), então quebram em
+                    vez de estourar a borda do card ou espremer o texto. */}
+                <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                  <ViewProceduresModal
+                    clinicId={clinic.id}
+                    clinicName={clinic.tradeName}
+                    totalProceduresCount={clinic._count?.clinicProcedures || 0}
+                  />
+                  <WhatsappInstanceModal clinicId={clinic.id} clinicName={clinic.tradeName} />
+                  <HospitalIntegrationModal clinicId={clinic.id} clinicName={clinic.tradeName} />
+                  <ClinicAttendantsModal clinicId={clinic.id} clinicName={clinic.tradeName} />
+                  <WelcomeMessageModal
+                    clinicId={clinic.id}
+                    clinicName={clinic.tradeName}
+                    initialEnabled={clinic.welcomeMessageEnabled}
+                    initialText={clinic.welcomeMessageText ?? ""}
+                    onSaved={(enabled, text) =>
+                      setClinics((prev) =>
+                        prev.map((c) =>
+                          c.id === clinic.id ? { ...c, welcomeMessageEnabled: enabled, welcomeMessageText: text } : c
                         )
-                      }
-                    />
-                  </div>
+                      )
+                    }
+                  />
 
                   {whatsappUrl && (
                     <a
                       href={whatsappUrl}
                       target="_blank"
                       rel="noreferrer"
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-emerald-800 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 dark:hover:bg-emerald-900 border border-emerald-200 dark:border-emerald-800 rounded-xl transition-all"
+                      className="ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-emerald-800 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 dark:hover:bg-emerald-900 border border-emerald-200 dark:border-emerald-800 rounded-xl transition-all"
                     >
                       <MessageSquare className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
                       <span>WhatsApp</span>
