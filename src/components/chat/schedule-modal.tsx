@@ -82,6 +82,9 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
   const [doctorQuery, setDoctorQuery] = useState('');
   const [isDoctorDropdownOpen, setIsDoctorDropdownOpen] = useState(false);
   const doctorDropdownRef = useClickOutside<HTMLDivElement>(isDoctorDropdownOpen, () => setIsDoctorDropdownOpen(false));
+  const [procedureQuery, setProcedureQuery] = useState('');
+  const [isProcedureDropdownOpen, setIsProcedureDropdownOpen] = useState(false);
+  const procedureDropdownRef = useClickOutside<HTMLDivElement>(isProcedureDropdownOpen, () => setIsProcedureDropdownOpen(false));
 
   useEffect(() => {
     if (!isOpen) return;
@@ -210,6 +213,14 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
           d.especialidade?.toLowerCase().includes(normalizedDoctorQuery)
       )
     : doctors;
+  const normalizedProcedureQuery = procedureQuery.trim().toLowerCase();
+  const filteredProcedures = normalizedProcedureQuery
+    ? procedures.filter(
+        (p) =>
+          p.procedure.name.toLowerCase().includes(normalizedProcedureQuery) ||
+          p.procedure.tussCode?.toLowerCase().includes(normalizedProcedureQuery)
+      )
+    : procedures;
   const hasFullName = patientName.trim().split(/\s+/).filter(Boolean).length >= 2;
   const missingFields = [
     !hasFullName && "nome completo",
@@ -444,33 +455,75 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
               </div>
             )}
 
-            <div>
+            <div className="relative" ref={procedureDropdownRef}>
               <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5 flex items-center gap-1.5 font-mono">
                 <Stethoscope className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" /> Procedimento Médico
               </label>
-              <select
-                value={procedureId}
-                onChange={(e) => setProcedureId(e.target.value)}
+              <input
+                type="text"
+                value={
+                  isProcedureDropdownOpen
+                    ? procedureQuery
+                    : selectedProcedure
+                      ? `${selectedProcedure.procedure.name}${selectedProcedure.procedure.tussCode ? ` (${selectedProcedure.procedure.tussCode})` : ''}`
+                      : procedureQuery
+                }
+                onChange={(e) => {
+                  setProcedureQuery(e.target.value);
+                  setProcedureId('');
+                }}
+                onFocus={() => {
+                  setProcedureQuery('');
+                  setIsProcedureDropdownOpen(true);
+                }}
+                placeholder={loadingProcedures ? 'Carregando opções...' : 'Digite o nome ou código do procedimento...'}
                 className="w-full text-xs sm:text-sm border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 bg-slate-50/50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-medium"
+                autoComplete="off"
                 required
                 disabled={loadingProcedures}
-              >
-                <option value="" disabled>
-                  {loadingProcedures ? 'Carregando opções...' : 'Escolha um procedimento...'}
-                </option>
-                {procedures.map((procedure) => {
-                  const effectivePrice = procedure.promotionalPrice ?? procedure.price;
-                  return (
-                  <option key={procedure.id} value={procedure.id}>
-                    {procedure.procedure.name}
-                    {procedure.procedure.tussCode ? ` (${procedure.procedure.tussCode})` : ''}
-                    {/* Preço 0 normalmente é "ainda não cadastrado" (ex: procedimentos vindos da
-                        integração hospitalar) — melhor omitir do que mostrar R$ 0,00. */}
-                    {effectivePrice > 0 ? ` — ${formatCurrency(effectivePrice)}` : ''}
-                  </option>
-                  );
-                })}
-              </select>
+              />
+              {isProcedureDropdownOpen && (
+                <div className="absolute left-0 right-0 mt-1 max-h-56 overflow-y-auto bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-lg py-1.5 z-50 animate-in fade-in zoom-in-95 duration-100">
+                  {filteredProcedures.length === 0 ? (
+                    <p className="px-3 py-2 text-xs text-slate-500 dark:text-slate-400">Nenhum procedimento encontrado.</p>
+                  ) : (
+                    <>
+                      {filteredProcedures.slice(0, 50).map((procedure) => {
+                        const effectivePrice = procedure.promotionalPrice ?? procedure.price;
+                        return (
+                          <button
+                            key={procedure.id}
+                            type="button"
+                            onClick={() => {
+                              setProcedureId(procedure.id);
+                              setProcedureQuery('');
+                              setIsProcedureDropdownOpen(false);
+                            }}
+                            className="w-full px-3 py-2 text-left hover:bg-slate-50 dark:hover:bg-slate-800"
+                          >
+                            <p className="text-xs sm:text-sm text-slate-700 dark:text-slate-200">
+                              {procedure.procedure.name}
+                              {procedure.procedure.tussCode && (
+                                <span className="text-slate-400 dark:text-slate-500"> ({procedure.procedure.tussCode})</span>
+                              )}
+                            </p>
+                            {/* Preço 0 normalmente é "ainda não cadastrado" (ex: procedimentos vindos da
+                                integração hospitalar) — melhor omitir do que mostrar R$ 0,00. */}
+                            {effectivePrice > 0 && (
+                              <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">{formatCurrency(effectivePrice)}</p>
+                            )}
+                          </button>
+                        );
+                      })}
+                      {filteredProcedures.length > 50 && (
+                        <p className="px-3 py-1.5 text-[10px] text-slate-400 dark:text-slate-500 border-t border-slate-100 dark:border-slate-800 mt-1">
+                          +{filteredProcedures.length - 50} procedimentos — digite pra refinar a busca.
+                        </p>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
               {selectedProcedure && (
                 <p className="mt-1.5 text-[11px] text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 p-2 rounded-lg border border-slate-100 dark:border-slate-700">
                   <span className="font-semibold text-slate-700 dark:text-slate-300">{appointmentTypeLabels[selectedProcedure.appointmentType]}</span>
