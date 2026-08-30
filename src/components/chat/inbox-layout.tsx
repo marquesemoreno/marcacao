@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Contact,
   Message,
@@ -43,6 +43,7 @@ import {
   User,
   Clock,
   Trash2,
+  Settings2,
 } from 'lucide-react';
 
 const MAX_MEDIA_SIZE_BYTES = 15 * 1024 * 1024; // 15 MB — mesmo limite validado no servidor
@@ -61,6 +62,15 @@ function tagClasses(tag: string) {
 
 /** A partir de quantos minutos parado em "Não Atribuídas" a aba pisca pra alertar o atendente. */
 const UNASSIGNED_ALERT_THRESHOLD_MINUTES = 10;
+
+/** Todas as abas possíveis da fila — o atendente escolhe quais ficam visíveis (persiste no navegador). */
+const ALL_INBOX_TABS: { id: InboxFilter; label: string }[] = [
+  { id: 'minhas', label: 'Minhas' },
+  { id: 'nao_atribuidas', label: 'Não Atribuídas' },
+  { id: 'finalizadas', label: 'Finalizadas' },
+];
+const INBOX_VISIBLE_TABS_STORAGE_KEY = 'inbox-visible-tabs';
+const DEFAULT_VISIBLE_TAB_IDS: InboxFilter[] = ['minhas', 'nao_atribuidas'];
 
 const FUNNEL_STEPS: { id: FunnelStage; label: string }[] = [
   { id: 'novos', label: 'Novo' },
@@ -179,6 +189,31 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
   const [selectedTagFilter, setSelectedTagFilter] = useState<string | null>(null);
   const [isTagFilterOpen, setIsTagFilterOpen] = useState(false);
   const tagFilterRef = useClickOutside<HTMLDivElement>(isTagFilterOpen, () => setIsTagFilterOpen(false));
+  const [visibleTabIds, setVisibleTabIds] = useState<InboxFilter[]>(DEFAULT_VISIBLE_TAB_IDS);
+  const [isTabSettingsOpen, setIsTabSettingsOpen] = useState(false);
+  const tabSettingsRef = useClickOutside<HTMLDivElement>(isTabSettingsOpen, () => setIsTabSettingsOpen(false));
+
+  // Preferência pessoal de quais abas ficam visíveis — salva só no navegador, não no banco.
+  useEffect(() => {
+    const saved = window.localStorage.getItem(INBOX_VISIBLE_TABS_STORAGE_KEY);
+    if (!saved) return;
+    try {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed) && parsed.length > 0) setVisibleTabIds(parsed);
+    } catch {
+      // ignora preferência salva corrompida, mantém o padrão
+    }
+  }, []);
+
+  function toggleTabVisibility(tabId: InboxFilter) {
+    setVisibleTabIds((prev) => {
+      const next = prev.includes(tabId) ? prev.filter((id) => id !== tabId) : [...prev, tabId];
+      if (next.length === 0) return prev; // sempre deixa pelo menos 1 aba visível
+      window.localStorage.setItem(INBOX_VISIBLE_TABS_STORAGE_KEY, JSON.stringify(next));
+      if (!next.includes(filterTab)) onFilterTabChange(next[0]);
+      return next;
+    });
+  }
   const [isClinicMenuOpen, setIsClinicMenuOpen] = useState(false);
   const clinicMenuRef = useClickOutside<HTMLDivElement>(isClinicMenuOpen, () => setIsClinicMenuOpen(false));
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
@@ -557,14 +592,10 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
             </select>
           )}
 
-          {/* Abas de Filtros: Segmented Control Compacto */}
-          <div className="flex items-center gap-0.5 p-0.5 bg-slate-100 dark:bg-slate-800/90 rounded-lg text-xs font-medium">
-            {(
-              [
-                { id: 'minhas', label: 'Minhas' },
-                { id: 'nao_atribuidas', label: 'Não Atribuídas' },
-              ] as const
-            ).map((tab) => {
+          {/* Abas de Filtros: Segmented Control Compacto + botão de escolher quais abas mostrar */}
+          <div className="flex items-center gap-1.5">
+          <div className="flex-1 flex items-center gap-0.5 p-0.5 bg-slate-100 dark:bg-slate-800/90 rounded-lg text-xs font-medium">
+            {ALL_INBOX_TABS.filter((tab) => visibleTabIds.includes(tab.id)).map((tab) => {
               // Pisca só quando o atendente NÃO está nessa aba — se ela já está olhando
               // "Não Atribuídas", o paciente esperando já está visível, sem precisar de alerta.
               const shouldAlert =
@@ -589,6 +620,40 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                 </button>
               );
             })}
+          </div>
+
+          <div className="relative" ref={tabSettingsRef}>
+            <button
+              type="button"
+              onClick={() => setIsTabSettingsOpen((open) => !open)}
+              title="Escolher quais abas mostrar"
+              aria-label="Escolher quais abas mostrar"
+              className="flex items-center justify-center w-7 h-7 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-800 dark:hover:text-slate-200 transition-colors"
+            >
+              <Settings2 className="w-3.5 h-3.5" />
+            </button>
+            {isTabSettingsOpen && (
+              <div className="absolute right-0 mt-1 w-48 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-lg py-1.5 z-30 animate-in fade-in zoom-in-95 duration-100">
+                <p className="px-3 py-1 text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wide">
+                  Abas visíveis
+                </p>
+                {ALL_INBOX_TABS.map((tab) => (
+                  <label
+                    key={tab.id}
+                    className="flex items-center gap-2 px-3 py-1.5 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={visibleTabIds.includes(tab.id)}
+                      onChange={() => toggleTabVisibility(tab.id)}
+                      className="accent-emerald-600"
+                    />
+                    {tab.label}
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
           </div>
 
           {/* Filtro por Tag: Dropdown Compacto */}
