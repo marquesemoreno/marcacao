@@ -716,9 +716,9 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                 <div
                   key={c.id}
                   onClick={() => handleSelectContactMobile(c.id)}
-                  className={`px-3.5 py-3 transition-colors cursor-pointer relative flex gap-3 items-start border-l-4 ${
+                  className={`px-3.5 py-3 transition-colors cursor-pointer relative flex gap-3 items-start border-l-2 ${
                     isSelected
-                      ? 'bg-white dark:bg-slate-800/70 border-emerald-600 shadow-sm'
+                      ? 'bg-white dark:bg-slate-800/70 border-emerald-500 shadow-sm'
                       : 'hover:bg-slate-200/50 dark:hover:bg-slate-800/40 border-transparent'
                   }`}
                   data-od-id={`contact-card-${c.id}`}
@@ -1202,7 +1202,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                         type="button"
                         onClick={handleGenerateIaReply}
                         disabled={isGeneratingIa}
-                        className="flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-semibold text-slate-500 dark:text-slate-300 hover:text-emerald-700 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 rounded-lg transition-all"
+                        className="flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-semibold text-emerald-700/70 dark:text-emerald-400/70 hover:text-emerald-700 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 rounded-lg transition-all"
                         title="Sugerir resposta com IA baseada no contexto do paciente"
                       >
                         <Sparkles className={`w-3.5 h-3.5 ${isGeneratingIa ? 'animate-spin text-emerald-600' : ''}`} />
