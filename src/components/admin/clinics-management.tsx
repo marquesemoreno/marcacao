@@ -7,6 +7,7 @@ import { CreateClinicModal } from "./create-clinic-modal";
 import { ViewProceduresModal } from "./view-procedures-modal";
 import { WhatsappInstanceModal } from "./whatsapp-instance-modal";
 import { HospitalIntegrationModal } from "./hospital-integration-modal";
+import { AiAttendantModal } from "./ai-attendant-modal";
 import { ClinicAttendantsModal } from "./clinic-attendants-modal";
 import { WelcomeMessageModal } from "./welcome-message-modal";
 import { toast } from "sonner";
@@ -373,6 +374,7 @@ export function ClinicsManagement({ clinics: initialClinics }: { clinics: Clinic
                   />
                   <WhatsappInstanceModal clinicId={clinic.id} clinicName={clinic.tradeName} />
                   <HospitalIntegrationModal clinicId={clinic.id} clinicName={clinic.tradeName} />
+                  <AiAttendantModal clinicId={clinic.id} clinicName={clinic.tradeName} />
                   <ClinicAttendantsModal clinicId={clinic.id} clinicName={clinic.tradeName} />
                   <WelcomeMessageModal
                     clinicId={clinic.id}

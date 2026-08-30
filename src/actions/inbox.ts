@@ -274,7 +274,7 @@ export async function sendMessage(conversationId: string, content: string, isInt
 
   await prisma.conversation.update({
     where: { id: data.conversationId },
-    data: { lastMessageAt: new Date(), status: "OPEN", ...autoAssignOnReply(conversation, userId) },
+    data: { lastMessageAt: new Date(), status: "OPEN", aiEnabled: false, ...autoAssignOnReply(conversation, userId) },
   });
 
   // Dispara o envio ao WhatsApp via Evolution API em segundo plano (assíncrono), liberando a interface instantaneamente
@@ -342,7 +342,7 @@ export async function sendMediaMessage(conversationId: string, formData: FormDat
 
   await prisma.conversation.update({
     where: { id: conversationId },
-    data: { lastMessageAt: new Date(), status: "OPEN", ...autoAssignOnReply(conversation, userId) },
+    data: { lastMessageAt: new Date(), status: "OPEN", aiEnabled: false, ...autoAssignOnReply(conversation, userId) },
   });
 
   // Mesma URL assinada que a UI usa pra exibir — a Evolution API busca o arquivo nela.
@@ -409,7 +409,7 @@ export async function sendAudioMessage(conversationId: string, formData: FormDat
 
   await prisma.conversation.update({
     where: { id: conversationId },
-    data: { lastMessageAt: new Date(), status: "OPEN", ...autoAssignOnReply(conversation, userId) },
+    data: { lastMessageAt: new Date(), status: "OPEN", aiEnabled: false, ...autoAssignOnReply(conversation, userId) },
   });
 
   const signedUrl = await getSignedMediaUrl(uploaded.path);

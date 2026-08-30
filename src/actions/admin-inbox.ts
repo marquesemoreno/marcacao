@@ -300,7 +300,7 @@ export async function sendMessageAdmin(conversationId: string, content: string, 
 
   await prisma.conversation.update({
     where: { id: data.conversationId },
-    data: { lastMessageAt: new Date(), status: "OPEN" },
+    data: { lastMessageAt: new Date(), status: "OPEN", aiEnabled: false },
   });
 
   // Disparo assíncrono não-bloqueante para a Evolution API em segundo plano com timeout de 4s
@@ -367,7 +367,7 @@ export async function sendMediaMessageAdmin(conversationId: string, formData: Fo
 
   await prisma.conversation.update({
     where: { id: conversationId },
-    data: { lastMessageAt: new Date(), status: "OPEN" },
+    data: { lastMessageAt: new Date(), status: "OPEN", aiEnabled: false },
   });
 
   const signedUrl = await getSignedMediaUrl(uploaded.path);

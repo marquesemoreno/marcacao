@@ -48,6 +48,15 @@ enum ConversationStatus {
   @@map("conversation_status")
 }
 
+enum AiConsentStatus {
+  NOT_ASKED
+  PENDING
+  ACCEPTED
+  DECLINED
+
+  @@map("ai_consent_status")
+}
+
 enum MessageDirection {
   INBOUND
   OUTBOUND
@@ -180,6 +189,7 @@ model Clinic {
   cannedResponses     CannedResponse[]
   whatsappInstance    WhatsappInstance?
   hospitalIntegration HospitalIntegration?
+  aiAttendantConfig   AiAttendantConfig?
 
   @@map("clinics")
 }
@@ -229,6 +239,24 @@ model HospitalIntegration {
   clinic Clinic @relation(fields: [clinicId], references: [id])
 
   @@map("hospital_integrations")
+}
+
+/// Config do atendente de IA da clínica (OpenAI) — uma linha por clínica, editável via
+/// /admin/clinicas. `instructions` soma com um prompt-base fixo (regras de LGPD: sempre
+/// se identificar como IA, nunca dar diagnóstico, sempre oferecer transferência pra
+/// humano) definido em src/lib/ai-attendant.ts. Consentimento e escalação são controlados
+/// por conversa (ver Conversation.aiConsentStatus/aiEnabled), não por aqui.
+model AiAttendantConfig {
+  id           String   @id @default(cuid())
+  clinicId     String   @unique @map("clinic_id")
+  active       Boolean  @default(false)
+  instructions String   @db.Text
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  clinic Clinic @relation(fields: [clinicId], references: [id])
+
+  @@map("ai_attendant_configs")
 }
 
 model Specialty {
@@ -365,13 +393,21 @@ model Conversation {
   resolvedAt       DateTime?               @map("resolved_at")
   resolvedByUserId String?                 @map("resolved_by_user_id")
   lastMessageAt    DateTime?               @map("last_message_at")
+  /// Estado do consentimento LGPD pra atendimento automatizado por IA (ver
+  /// src/lib/ai-attendant.ts). Por conversa, não por Contact — o mesmo paciente pode
+  /// falar com clínicas diferentes e o consentimento é específico daquele atendimento.
+  aiConsentStatus  AiConsentStatus         @default(NOT_ASKED) @map("ai_consent_status")
+  /// true só depois do consentimento aceito; volta a false automaticamente se o paciente
+  /// pedir humano, bater gatilho de escalação, ou um atendente responder manualmente.
+  aiEnabled        Boolean                 @default(false) @map("ai_enabled")
   createdAt        DateTime                @default(now()) @map("created_at")
   updatedAt        DateTime                @updatedAt @map("updated_at")
 
-  clinic       Clinic    @relation(fields: [clinicId], references: [id])
-  contact      Contact   @relation(fields: [contactId], references: [id])
-  assignedUser User?     @relation("ConversationAssignee", fields: [assignedUserId], references: [id])
+  clinic       Clinic             @relation(fields: [clinicId], references: [id])
+  contact      Contact            @relation(fields: [contactId], references: [id])
+  assignedUser User?              @relation("ConversationAssignee", fields: [assignedUserId], references: [id])
   messages     Message[]
+  aiLogs       AiInteractionLog[]
 
   @@index([clinicId, status])
   @@index([contactId])
@@ -446,6 +482,24 @@ model WebhookLog {
   createdAt    DateTime @default(now()) @map("created_at")
 
   @@map("webhook_logs")
+}
+
+/// Registro de auditoria de cada troca feita pelo atendente de IA (Art. 18 LGPD —
+/// rastreabilidade). Gravado tanto quando a IA responde quanto quando ela escalona
+/// pra humano (nesse caso aiResponse fica null e escalated/escalationReason preenchidos).
+model AiInteractionLog {
+  id               String   @id @default(cuid())
+  conversationId   String   @map("conversation_id")
+  userMessage      String   @db.Text @map("user_message")
+  aiResponse       String?  @db.Text @map("ai_response")
+  escalated        Boolean  @default(false)
+  escalationReason String?  @map("escalation_reason")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  conversation Conversation @relation(fields: [conversationId], references: [id])
+
+  @@index([conversationId])
+  @@map("ai_interaction_logs")
 }
 
 model ChatAutomation {

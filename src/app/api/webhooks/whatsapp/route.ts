@@ -6,6 +6,15 @@ import { fetchMediaBase64, uploadWhatsAppMedia, formatDuration } from "@/lib/wha
 import { formatFileSize } from "@/lib/format";
 import { notifyInboxRealtime } from "@/lib/supabase-server";
 import { MEDIA_DOWNLOAD_FAILED_PREFIX } from "@/lib/chat-messages";
+import {
+  getAiAttendantConfig,
+  buildAiDisclosureMessage,
+  AI_CONSENT_ACCEPTED_REPLY,
+  AI_HANDOFF_MESSAGE,
+  parseConsentReply,
+  matchEscalationTrigger,
+  generateAiReply,
+} from "@/lib/ai-attendant";
 
 type IncomingMedia =
   | { kind: "image" | "document"; mimeType: string; fileName: string; sizeBytes: number; key: Record<string, unknown> }
@@ -400,11 +409,12 @@ export async function POST(request: Request) {
     // do WhatsApp Business — mensagem livre permitida, sem exigir template
     // pré-aprovado pela Meta.
     // =========================================================================
+    const clinic = await prisma.clinic.findUnique({
+      where: { id: conversation.clinicId },
+      select: { tradeName: true, welcomeMessageEnabled: true, welcomeMessageText: true },
+    });
+
     if (isNewConversation) {
-      const clinic = await prisma.clinic.findUnique({
-        where: { id: conversation.clinicId },
-        select: { welcomeMessageEnabled: true, welcomeMessageText: true },
-      });
       const welcomeText = clinic?.welcomeMessageEnabled ? clinic.welcomeMessageText?.trim() : null;
       if (welcomeText) {
         await prisma.message.create({
@@ -419,24 +429,103 @@ export async function POST(request: Request) {
       }
     }
 
-    const activeAutomations = await prisma.chatAutomation.findMany({
-      where: { active: true },
-    });
-    const textLower = incoming.text.toLowerCase();
-    const matchedAutomation = activeAutomations.find((auto) =>
-      textLower.includes(auto.keyword.toLowerCase())
-    );
+    // =========================================================================
+    // 2.2 ATENDENTE DE IA: consentimento (LGPD) -> escalação -> resposta gerada.
+    // Só entra em jogo se a clínica tiver AiAttendantConfig ativo (ver
+    // src/lib/ai-attendant.ts). Enquanto isso não acontecer, `aiHandled` fica
+    // false e a mensagem cai no fluxo de automação por keyword de sempre.
+    // =========================================================================
+    let aiHandled = false;
+    const aiConfig = clinic ? await getAiAttendantConfig(conversation.clinicId) : null;
+    const clinicName = clinic?.tradeName ?? "nossa clínica";
 
-    if (matchedAutomation) {
-      await prisma.message.create({
-        data: {
-          conversationId: conversation.id,
-          direction: "OUTBOUND",
-          content: matchedAutomation.responseText,
-          status: "DELIVERED",
-        },
+    if (aiConfig) {
+      if (conversation.aiConsentStatus === "NOT_ASKED") {
+        const disclosure = buildAiDisclosureMessage(clinicName);
+        await prisma.message.create({
+          data: { conversationId: conversation.id, direction: "OUTBOUND", content: disclosure, status: "DELIVERED" },
+        });
+        await prisma.conversation.update({ where: { id: conversation.id }, data: { aiConsentStatus: "PENDING" } });
+        sendWhatsAppMessage(incoming.phone, disclosure, "ai_attendant.disclosure_sent", resolvedClinicId).catch(() => {});
+        aiHandled = true;
+      } else if (conversation.aiConsentStatus === "PENDING") {
+        // Ambíguo conta como recusa: consentimento LGPD precisa ser uma afirmação
+        // inequívoca, nunca presumido. A conversa segue no fluxo humano normal.
+        const consent = parseConsentReply(incoming.text);
+        if (consent === "ACCEPTED") {
+          await prisma.conversation.update({
+            where: { id: conversation.id },
+            data: { aiConsentStatus: "ACCEPTED", aiEnabled: true },
+          });
+          await prisma.message.create({
+            data: { conversationId: conversation.id, direction: "OUTBOUND", content: AI_CONSENT_ACCEPTED_REPLY, status: "DELIVERED" },
+          });
+          sendWhatsAppMessage(incoming.phone, AI_CONSENT_ACCEPTED_REPLY, "ai_attendant.consent_accepted", resolvedClinicId).catch(() => {});
+        } else {
+          await prisma.conversation.update({
+            where: { id: conversation.id },
+            data: { aiConsentStatus: "DECLINED", aiEnabled: false },
+          });
+        }
+        aiHandled = true;
+      } else if (conversation.aiEnabled) {
+        const escalationReason = matchEscalationTrigger(incoming.text);
+        if (escalationReason) {
+          await prisma.conversation.update({ where: { id: conversation.id }, data: { aiEnabled: false } });
+          await prisma.message.create({
+            data: { conversationId: conversation.id, direction: "OUTBOUND", content: AI_HANDOFF_MESSAGE, status: "DELIVERED" },
+          });
+          sendWhatsAppMessage(incoming.phone, AI_HANDOFF_MESSAGE, "ai_attendant.escalated", resolvedClinicId).catch(() => {});
+          await prisma.aiInteractionLog.create({
+            data: { conversationId: conversation.id, userMessage: incoming.text, escalated: true, escalationReason },
+          });
+        } else {
+          const reply = await generateAiReply(conversation.id, clinicName, aiConfig.instructions);
+          if (reply) {
+            await prisma.message.create({
+              data: { conversationId: conversation.id, direction: "OUTBOUND", content: reply, status: "DELIVERED" },
+            });
+            sendWhatsAppMessage(incoming.phone, reply, "ai_attendant.replied", resolvedClinicId).catch(() => {});
+            await prisma.aiInteractionLog.create({
+              data: { conversationId: conversation.id, userMessage: incoming.text, aiResponse: reply },
+            });
+          } else {
+            // Falha ao gerar resposta (sem API key, erro da OpenAI etc): escala pra
+            // humano em vez de deixar o paciente sem nenhuma resposta.
+            await prisma.conversation.update({ where: { id: conversation.id }, data: { aiEnabled: false } });
+            await prisma.message.create({
+              data: { conversationId: conversation.id, direction: "OUTBOUND", content: AI_HANDOFF_MESSAGE, status: "DELIVERED" },
+            });
+            sendWhatsAppMessage(incoming.phone, AI_HANDOFF_MESSAGE, "ai_attendant.failed_escalated", resolvedClinicId).catch(() => {});
+            await prisma.aiInteractionLog.create({
+              data: { conversationId: conversation.id, userMessage: incoming.text, escalated: true, escalationReason: "Falha ao gerar resposta da IA" },
+            });
+          }
+        }
+        aiHandled = true;
+      }
+    }
+
+    if (!aiHandled) {
+      const activeAutomations = await prisma.chatAutomation.findMany({
+        where: { active: true },
       });
-      sendWhatsAppMessage(incoming.phone, matchedAutomation.responseText, "chat_automation.triggered", resolvedClinicId).catch(() => {});
+      const textLower = incoming.text.toLowerCase();
+      const matchedAutomation = activeAutomations.find((auto) =>
+        textLower.includes(auto.keyword.toLowerCase())
+      );
+
+      if (matchedAutomation) {
+        await prisma.message.create({
+          data: {
+            conversationId: conversation.id,
+            direction: "OUTBOUND",
+            content: matchedAutomation.responseText,
+            status: "DELIVERED",
+          },
+        });
+        sendWhatsAppMessage(incoming.phone, matchedAutomation.responseText, "chat_automation.triggered", resolvedClinicId).catch(() => {});
+      }
     }
 
     notifyInboxRealtime().catch(() => {});
