@@ -189,8 +189,12 @@ export function ClinicsManagement({ clinics: initialClinics }: { clinics: Clinic
 
         {/* Campo de Busca Rápida */}
         <div className="relative min-w-[240px]">
+          <label htmlFor="clinics-search" className="sr-only">
+            Buscar clínica, CNPJ ou bairro
+          </label>
           <Search className="w-3.5 h-3.5 absolute left-3 top-3 text-slate-400 dark:text-slate-500" />
           <input
+            id="clinics-search"
             type="text"
             placeholder="Buscar clínica, CNPJ ou bairro..."
             value={search}
@@ -233,7 +237,7 @@ export function ClinicsManagement({ clinics: initialClinics }: { clinics: Clinic
                       <h3 className="text-base font-bold text-slate-900 dark:text-slate-100 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
                         {clinic.tradeName}
                       </h3>
-                      <p className="text-[11px] text-slate-400 dark:text-slate-500 font-medium line-clamp-1">
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium line-clamp-1">
                         {clinic.name}
                       </p>
                     </div>
@@ -243,6 +247,8 @@ export function ClinicsManagement({ clinics: initialClinics }: { clinics: Clinic
                   <div className="flex flex-col items-end gap-1.5">
                     <button
                       type="button"
+                      role="switch"
+                      aria-checked={clinic.active}
                       onClick={() => handleToggleActive(clinic.id, clinic.active)}
                       className={`px-2.5 py-1 rounded-full text-[11px] font-bold transition-all flex items-center gap-1.5 border ${
                         clinic.active
@@ -266,6 +272,8 @@ export function ClinicsManagement({ clinics: initialClinics }: { clinics: Clinic
 
                     <button
                       type="button"
+                      role="switch"
+                      aria-checked={clinic.listedInMarketplace}
                       onClick={() => handleToggleMarketplaceListing(clinic.id, clinic.listedInMarketplace)}
                       className={`px-2.5 py-1 rounded-full text-[11px] font-bold transition-all flex items-center gap-1.5 border ${
                         clinic.listedInMarketplace
@@ -292,7 +300,7 @@ export function ClinicsManagement({ clinics: initialClinics }: { clinics: Clinic
                 {/* DETALHES DE LOCALIZAÇÃO E CONTATO */}
                 <div className="space-y-2 text-xs font-medium text-slate-600 dark:text-slate-300 pt-2 border-t border-slate-100 dark:border-slate-800">
                   <div className="flex items-center justify-between">
-                    <span className="text-[11px] text-slate-400 dark:text-slate-500 font-mono">CNPJ: {clinic.cnpj}</span>
+                    <span className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">CNPJ: {clinic.cnpj}</span>
                     <span className="inline-flex items-center gap-1 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-2 py-0.5 rounded-md border border-slate-200 dark:border-slate-700 text-[11px] font-semibold">
                       <MapPin className="w-3 h-3 text-slate-400 dark:text-slate-500" />
                       {clinic.neighborhood}, {clinic.city}
@@ -318,12 +326,16 @@ export function ClinicsManagement({ clinics: initialClinics }: { clinics: Clinic
                 {/* CONTROLE DE COMISSÃO DA CONECTA SAÚDE */}
                 <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-2xl border border-slate-100 dark:border-slate-800 flex items-center justify-between gap-3">
                   <div>
-                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-500 block">
+                    <label
+                      htmlFor={`commission-rate-${clinic.id}`}
+                      className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400 block"
+                    >
                       Taxa da Plataforma
-                    </span>
+                    </label>
                     <div className="relative mt-0.5 flex items-center gap-1">
                       <Percent className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400 absolute left-2" />
                       <input
+                        id={`commission-rate-${clinic.id}`}
                         type="number"
                         step="0.1"
                         min="0"
@@ -348,9 +360,11 @@ export function ClinicsManagement({ clinics: initialClinics }: { clinics: Clinic
                   </button>
                 </div>
 
-                {/* BOTÕES DE AÇÃO RÁPIDA — flex-wrap: 5 botões + link de WhatsApp não cabem
-                    numa linha só na largura do card (1-3 colunas do grid), então quebram em
-                    vez de estourar a borda do card ou espremer o texto. */}
+                {/* BOTÕES DE AÇÃO RÁPIDA — ícones compactos (não pill com texto): 5 ações +
+                    WhatsApp com rótulo completo não cabiam numa linha só na largura do card
+                    (1-3 colunas do grid) e quebravam em 2-3 linhas, deixando os cards com
+                    altura inconsistente entre si. Ícone com title/aria-label mantém a ação
+                    identificável sem o peso do texto; flex-wrap continua como rede de segurança. */}
                 <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
                   <ViewProceduresModal
                     clinicId={clinic.id}
@@ -379,10 +393,11 @@ export function ClinicsManagement({ clinics: initialClinics }: { clinics: Clinic
                       href={whatsappUrl}
                       target="_blank"
                       rel="noreferrer"
-                      className="ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-emerald-800 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 dark:hover:bg-emerald-900 border border-emerald-200 dark:border-emerald-800 rounded-xl transition-all"
+                      title="Conversar no WhatsApp"
+                      aria-label="Conversar no WhatsApp"
+                      className="ml-auto inline-flex items-center justify-center w-9 h-9 text-emerald-800 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 dark:hover:bg-emerald-900 border border-emerald-200 dark:border-emerald-800 rounded-xl transition-all"
                     >
-                      <MessageSquare className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                      <span>WhatsApp</span>
+                      <MessageSquare className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                     </a>
                   )}
                 </div>

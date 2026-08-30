@@ -55,18 +55,21 @@ export function WelcomeMessageModal({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogTrigger className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-xl transition-all cursor-pointer">
-        <Sparkles className="w-3.5 h-3.5 text-amber-600" />
-        <span>Boas-vindas</span>
+      <DialogTrigger
+        className="inline-flex items-center justify-center w-9 h-9 text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60 hover:bg-amber-100 dark:hover:bg-amber-900 border border-amber-200 dark:border-amber-800 rounded-xl transition-all cursor-pointer"
+        title="Boas-vindas"
+        aria-label="Boas-vindas"
+      >
+        <Sparkles className="w-4 h-4 text-amber-600 dark:text-amber-400" />
       </DialogTrigger>
 
       <DialogContent className="max-w-lg rounded-3xl p-6 sm:p-8">
         <DialogHeader className="space-y-1">
-          <DialogTitle className="text-lg font-extrabold text-slate-900 flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-amber-600" />
+          <DialogTitle className="text-lg font-extrabold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+            <Sparkles className="w-5 h-5 text-amber-600 dark:text-amber-400" />
             Mensagem de boas-vindas — {clinicName}
           </DialogTitle>
-          <p className="text-xs text-slate-500 font-medium">
+          <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
             Enviada automaticamente uma única vez, quando um cliente novo escreve pela
             primeira vez. Como quem inicia a conversa é o cliente, isso está dentro das
             regras da Meta (janela de atendimento de 24h) — não precisa de template
@@ -77,16 +80,18 @@ export function WelcomeMessageModal({
         <div className="space-y-4 mt-2">
           <button
             type="button"
+            role="switch"
+            aria-checked={enabled}
             onClick={() => setEnabled((prev) => !prev)}
             className={`w-full inline-flex items-center justify-between px-3 py-2 rounded-xl border text-xs font-bold transition-all ${
               enabled
-                ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                : "bg-slate-100 text-slate-600 border-slate-200"
+                ? "bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800"
+                : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700"
             }`}
           >
             <span>{enabled ? "Ativada" : "Desativada"}</span>
             <span
-              className={`w-9 h-5 rounded-full relative transition-colors ${enabled ? "bg-emerald-500" : "bg-slate-300"}`}
+              className={`w-9 h-5 rounded-full relative transition-colors ${enabled ? "bg-emerald-500" : "bg-slate-300 dark:bg-slate-600"}`}
             >
               <span
                 className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-transform ${
@@ -97,15 +102,16 @@ export function WelcomeMessageModal({
           </button>
 
           <div>
-            <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">
+            <label htmlFor="welcome-message-text" className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
               Texto da mensagem
             </label>
             <textarea
+              id="welcome-message-text"
               value={text}
               onChange={(e) => setText(e.target.value)}
               placeholder={PLACEHOLDER}
               rows={5}
-              className="w-full mt-1 px-3 py-2 text-xs font-medium rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 resize-none"
+              className="w-full mt-1 px-3 py-2 text-xs font-medium rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 resize-none"
             />
           </div>
 
