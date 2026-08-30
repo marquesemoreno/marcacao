@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { Users, UserPlus, Loader2, Mail, MessagesSquare } from "lucide-react";
+import { Users, UserPlus, Loader2, Mail, KeyRound, Save } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { listClinicUsers, createTeamMember } from "@/actions/admin";
+import { listClinicUsers, createTeamMember, updateUserMaxConcurrentChats, resetAttendantPassword } from "@/actions/admin";
 
 type Attendant = {
   id: string;
@@ -24,6 +24,12 @@ export function ClinicAttendantsModal({ clinicId, clinicName }: { clinicId: stri
   const [password, setPassword] = useState("");
   const [maxConcurrentChats, setMaxConcurrentChats] = useState(5);
 
+  const [editingMaxChats, setEditingMaxChats] = useState<Record<string, number>>({});
+  const [savingMaxChatsId, setSavingMaxChatsId] = useState<string | null>(null);
+  const [resetPasswordForId, setResetPasswordForId] = useState<string | null>(null);
+  const [resetPasswordValue, setResetPasswordValue] = useState("");
+  const [resettingPassword, setResettingPassword] = useState(false);
+
   async function loadAttendants() {
     setLoading(true);
     try {
@@ -38,7 +44,13 @@ export function ClinicAttendantsModal({ clinicId, clinicName }: { clinicId: stri
 
   function handleOpenChange(next: boolean) {
     setOpen(next);
-    if (next) loadAttendants();
+    if (next) {
+      loadAttendants();
+    } else {
+      setEditingMaxChats({});
+      setResetPasswordForId(null);
+      setResetPasswordValue("");
+    }
   }
 
   async function handleCreate() {
@@ -72,6 +84,44 @@ export function ClinicAttendantsModal({ clinicId, clinicName }: { clinicId: stri
     }
   }
 
+  async function handleSaveMaxChats(attendantId: string) {
+    const value = editingMaxChats[attendantId];
+    if (value === undefined) return;
+    setSavingMaxChatsId(attendantId);
+    try {
+      await updateUserMaxConcurrentChats(attendantId, value);
+      setAttendants((prev) => prev.map((a) => (a.id === attendantId ? { ...a, maxConcurrentChats: value } : a)));
+      setEditingMaxChats((prev) => {
+        const next = { ...prev };
+        delete next[attendantId];
+        return next;
+      });
+      toast.success("Limite de conversas atualizado.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Erro ao atualizar limite.");
+    } finally {
+      setSavingMaxChatsId(null);
+    }
+  }
+
+  async function handleResetPassword(attendantId: string) {
+    if (resetPasswordValue.length < 6) {
+      toast.error("A senha precisa ter pelo menos 6 caracteres.");
+      return;
+    }
+    setResettingPassword(true);
+    try {
+      await resetAttendantPassword(attendantId, resetPasswordValue);
+      toast.success("Senha redefinida com sucesso.");
+      setResetPasswordForId(null);
+      setResetPasswordValue("");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Erro ao redefinir senha.");
+    } finally {
+      setResettingPassword(false);
+    }
+  }
+
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger
@@ -94,7 +144,7 @@ export function ClinicAttendantsModal({ clinicId, clinicName }: { clinicId: stri
         </DialogHeader>
 
         <div className="space-y-4 mt-2">
-          <div className="max-h-40 overflow-y-auto rounded-xl border border-slate-200 dark:border-slate-800 divide-y divide-slate-100 dark:divide-slate-800">
+          <div className="max-h-64 overflow-y-auto rounded-xl border border-slate-200 dark:border-slate-800 divide-y divide-slate-100 dark:divide-slate-800">
             {loading ? (
               <div className="p-4 text-center text-xs font-semibold text-slate-400 dark:text-slate-500 flex items-center justify-center gap-2">
                 <Loader2 className="w-3.5 h-3.5 animate-spin" /> Carregando...
@@ -104,19 +154,96 @@ export function ClinicAttendantsModal({ clinicId, clinicName }: { clinicId: stri
                 Nenhuma atendente cadastrada ainda.
               </div>
             ) : (
-              attendants.map((attendant) => (
-                <div key={attendant.id} className="p-3 flex items-center justify-between gap-2">
-                  <div>
-                    <p className="text-xs font-bold text-slate-800 dark:text-slate-200">{attendant.name}</p>
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1">
-                      <Mail className="w-3 h-3" /> {attendant.email}
-                    </p>
+              attendants.map((attendant) => {
+                const currentMax = editingMaxChats[attendant.id] ?? attendant.maxConcurrentChats;
+                const maxChanged = editingMaxChats[attendant.id] !== undefined && editingMaxChats[attendant.id] !== attendant.maxConcurrentChats;
+                const isResettingThis = resetPasswordForId === attendant.id;
+
+                return (
+                  <div key={attendant.id} className="p-3 space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">{attendant.name}</p>
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1 truncate">
+                          <Mail className="w-3 h-3 shrink-0" /> {attendant.email}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setResetPasswordForId(isResettingThis ? null : attendant.id);
+                          setResetPasswordValue("");
+                        }}
+                        title="Redefinir senha"
+                        aria-label="Redefinir senha"
+                        className="shrink-0 inline-flex items-center justify-center w-7 h-7 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-100 transition-colors"
+                      >
+                        <KeyRound className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+
+                    <div className="flex items-center gap-1.5">
+                      <label htmlFor={`max-chats-${attendant.id}`} className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 whitespace-nowrap">
+                        Limite simultâneo
+                      </label>
+                      <input
+                        id={`max-chats-${attendant.id}`}
+                        type="number"
+                        min={1}
+                        max={50}
+                        value={currentMax}
+                        onChange={(e) =>
+                          setEditingMaxChats((prev) => ({
+                            ...prev,
+                            [attendant.id]: Math.max(1, Math.min(50, Number(e.target.value) || 1)),
+                          }))
+                        }
+                        className="w-14 px-2 py-1 text-xs font-mono font-bold rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                      />
+                      {maxChanged && (
+                        <button
+                          type="button"
+                          disabled={savingMaxChatsId === attendant.id}
+                          onClick={() => handleSaveMaxChats(attendant.id)}
+                          className="inline-flex items-center gap-1 px-2 py-1 text-[10px] font-bold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 rounded-lg transition-all"
+                        >
+                          {savingMaxChatsId === attendant.id ? (
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                          ) : (
+                            <Save className="w-3 h-3" />
+                          )}
+                          Salvar
+                        </button>
+                      )}
+                    </div>
+
+                    {isResettingThis && (
+                      <div className="flex items-center gap-1.5 pt-1">
+                        <label htmlFor={`reset-pwd-${attendant.id}`} className="sr-only">
+                          Nova senha para {attendant.name}
+                        </label>
+                        <input
+                          id={`reset-pwd-${attendant.id}`}
+                          type="password"
+                          placeholder="Nova senha (mín. 6 caracteres)"
+                          value={resetPasswordValue}
+                          onChange={(e) => setResetPasswordValue(e.target.value)}
+                          autoComplete="new-password"
+                          className="flex-1 px-2 py-1.5 text-xs font-medium rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                        />
+                        <button
+                          type="button"
+                          disabled={resettingPassword}
+                          onClick={() => handleResetPassword(attendant.id)}
+                          className="inline-flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-bold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 rounded-lg transition-all"
+                        >
+                          {resettingPassword ? <Loader2 className="w-3 h-3 animate-spin" /> : "Confirmar"}
+                        </button>
+                      </div>
+                    )}
                   </div>
-                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-2 py-0.5 rounded-md">
-                    <MessagesSquare className="w-3 h-3" /> até {attendant.maxConcurrentChats} simultâneas
-                  </span>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
 

@@ -1,4 +1,6 @@
+import Link from "next/link";
 import { getServerSession } from "next-auth";
+import { KeyRound } from "lucide-react";
 import { authOptions } from "@/lib/auth";
 import { SignOutButton } from "@/components/sign-out-button";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -46,6 +48,14 @@ export default async function ClinicLayout({
               {session.user.name}
             </span>
           )}
+          <Link
+            href="/clinic/perfil"
+            title="Minha Conta / Trocar senha"
+            aria-label="Minha Conta / Trocar senha"
+            className="flex items-center justify-center w-8 h-8 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-100 transition-colors"
+          >
+            <KeyRound className="w-4 h-4" />
+          </Link>
           <ThemeToggle />
           <SignOutButton />
         </div>

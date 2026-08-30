@@ -243,6 +243,18 @@ export async function createTeamMember(formData: FormData) {
   revalidatePath("/admin/inbox");
 }
 
+/** Admin redefine a senha de uma atendente (ex: esqueceu a senha) — não exige a senha atual. */
+export async function resetAttendantPassword(userId: string, newPassword: string) {
+  await requireAdminSession();
+  if (newPassword.length < 6) {
+    throw new Error("A senha precisa ter pelo menos 6 caracteres.");
+  }
+  const bcrypt = (await import("bcryptjs")).default;
+  const passwordHash = await bcrypt.hash(newPassword, 10);
+  await prisma.user.update({ where: { id: userId }, data: { passwordHash } });
+  return { success: true as const };
+}
+
 /** Atendentes (role CLINIC) cadastrados numa clínica — pra exibir/gerenciar no painel admin. */
 export async function listClinicUsers(clinicId: string) {
   await requireAdminSession();
