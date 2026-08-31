@@ -12,6 +12,7 @@ import {
   TrendingUp,
   Share2,
   BarChart3,
+  Megaphone,
   type LucideIcon,
 } from "lucide-react";
 
@@ -20,6 +21,7 @@ const navItems: { href: string; label: string; icon: LucideIcon; exact?: boolean
   { href: "/admin/inbox", label: "Chat / WhatsApp", icon: MessageCircle },
   { href: "/admin/contatos", label: "Contatos", icon: Users },
   { href: "/admin/automacoes", label: "Automações", icon: Zap },
+  { href: "/admin/disparos", label: "Disparos", icon: Megaphone },
   { href: "/admin/crm", label: "CRM", icon: KanbanSquare },
   { href: "/admin/clinicas", label: "Clínicas", icon: Building2 },
   { href: "/admin/leads", label: "Leads B2B", icon: TrendingUp },

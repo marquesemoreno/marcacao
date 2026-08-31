@@ -190,6 +190,7 @@ model Clinic {
   whatsappInstance    WhatsappInstance?
   hospitalIntegration HospitalIntegration?
   aiAttendantConfig   AiAttendantConfig?
+  broadcastCampaigns  BroadcastCampaign[]
 
   @@map("clinics")
 }
@@ -369,6 +370,10 @@ model Contact {
   cpf            String?
   photoUrl       String?   @map("photo_url")
   photoUpdatedAt DateTime? @map("photo_updated_at")
+  /// Preenchido quando a pessoa responde "sair"/"parar"/"cancelar" (ver route.ts do
+  /// webhook) — permanente e vale pra qualquer clínica, nunca mais entra em disparo
+  /// em massa (ver src/lib/broadcast.ts) enquanto isso estiver preenchido.
+  optedOutOfBroadcastsAt DateTime? @map("opted_out_of_broadcasts_at")
   createdAt      DateTime  @default(now()) @map("created_at")
   updatedAt      DateTime  @updatedAt @map("updated_at")
 
@@ -500,6 +505,62 @@ model AiInteractionLog {
 
   @@index([conversationId])
   @@map("ai_interaction_logs")
+}
+
+enum BroadcastCampaignStatus {
+  DRAFT
+  RUNNING
+  PAUSED
+  COMPLETED
+
+  @@map("broadcast_campaign_status")
+}
+
+enum BroadcastRecipientStatus {
+  PENDING
+  SENT
+  FAILED
+  SKIPPED_OPT_OUT
+
+  @@map("broadcast_recipient_status")
+}
+
+/// Campanha de disparo em massa de WhatsApp (ex: aviso pra lista de pacientes da
+/// Urolaser). Roda através da mesma instância dedicada da clínica, processada aos
+/// poucos pelo cron em src/app/api/cron/broadcast-dispatch — nunca de uma vez só,
+/// pra não parecer spam e arriscar banimento do número (ver src/lib/broadcast.ts).
+model BroadcastCampaign {
+  id              String                  @id @default(cuid())
+  clinicId        String                  @map("clinic_id")
+  name            String
+  messageTemplate String                  @db.Text @map("message_template")
+  status          BroadcastCampaignStatus @default(DRAFT)
+  createdByUserId String                  @map("created_by_user_id")
+  createdAt       DateTime                @default(now()) @map("created_at")
+  updatedAt       DateTime                @updatedAt @map("updated_at")
+
+  clinic     Clinic               @relation(fields: [clinicId], references: [id])
+  recipients BroadcastRecipient[]
+
+  @@map("broadcast_campaigns")
+}
+
+model BroadcastRecipient {
+  id           String                   @id @default(cuid())
+  campaignId   String                   @map("campaign_id")
+  phone        String
+  /// Colunas extras do CSV (nome, procedimento, data...) usadas como {{variavel}}
+  /// no messageTemplate — ver applyBroadcastVariables em src/lib/broadcast.ts.
+  variables    Json
+  status       BroadcastRecipientStatus @default(PENDING)
+  sentAt       DateTime?                @map("sent_at")
+  errorMessage String?                  @map("error_message")
+  createdAt    DateTime                 @default(now()) @map("created_at")
+
+  campaign BroadcastCampaign @relation(fields: [campaignId], references: [id])
+
+  @@index([campaignId, status])
+  @@map("broadcast_recipients")
 }
 
 model ChatAutomation {

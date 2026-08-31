@@ -333,7 +333,28 @@ export async function POST(request: Request) {
   // =========================================================================
   // 2. REGISTRO E APRESENTAÇÃO NA CAIXA DE ENTRADA DO CHAT (/admin/inbox)
   // =========================================================================
-  const { conversation, isNewConversation } = await findOrCreateConversation(incoming.phone, incoming.name, resolvedClinicId);
+  const { contact, conversation, isNewConversation } = await findOrCreateConversation(incoming.phone, incoming.name, resolvedClinicId);
+
+  // Opt-out de disparo em massa (LGPD — saída fácil de mensagem não solicitada, ver
+  // src/lib/broadcast.ts). Independente do fluxo de IA/automação abaixo, e permanente
+  // pra qualquer clínica: uma vez que a pessoa pede pra sair, nunca mais entra em
+  // campanha nenhuma enquanto isso não for revertido manualmente. Não usa "cancelar"
+  // sozinho aqui: essa palavra já significa "cancelar agendamento" no fluxo de
+  // confirmação mais abaixo (resolveStatusFromReply) — usar aqui roubaria essa resposta.
+  if (/^(sair|parar)$/i.test(incoming.text.trim())) {
+    if (!contact.optedOutOfBroadcastsAt) {
+      await prisma.contact.update({ where: { id: contact.id }, data: { optedOutOfBroadcastsAt: new Date() } });
+    }
+    const optOutReply = "Você não vai mais receber nossos avisos. Se quiser voltar a receber, é só nos chamar por aqui.";
+    if (conversation) {
+      await prisma.message.create({
+        data: { conversationId: conversation.id, direction: "OUTBOUND", content: optOutReply, status: "DELIVERED" },
+      });
+    }
+    sendWhatsAppMessage(incoming.phone, optOutReply, "broadcast.opt_out", resolvedClinicId).catch(() => {});
+    notifyInboxRealtime().catch(() => {});
+    return NextResponse.json({ ok: true, status: "opted_out" }, { status: 200 });
+  }
 
   if (conversation) {
     type MediaData =

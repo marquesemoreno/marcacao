@@ -6,13 +6,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { toast } from "sonner";
 import { getAiAttendantConfig, saveAiAttendantConfig } from "@/actions/admin-ai-attendant";
 
-type ConfigState = { active: boolean; instructions: string };
-
 export function AiAttendantModal({ clinicId, clinicName }: { clinicId: string; clinicName: string }) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [config, setConfig] = useState<ConfigState | null>(null);
   const [active, setActive] = useState(false);
   const [instructions, setInstructions] = useState("");
 
@@ -20,7 +17,6 @@ export function AiAttendantModal({ clinicId, clinicName }: { clinicId: string; c
     setLoading(true);
     try {
       const data = await getAiAttendantConfig(clinicId);
-      setConfig(data);
       setActive(data?.active ?? false);
       setInstructions(data?.instructions ?? "");
     } catch {
