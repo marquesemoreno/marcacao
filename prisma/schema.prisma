@@ -3,8 +3,14 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  // Pooled (pgbouncer/Supavisor, porta 6543) — usado em runtime. Sem isso, cada
+  // invocação serverless podia abrir sua própria conexão direta e estourar o limite
+  // de conexões simultâneas do Postgres sob tráfego mais alto.
+  url       = env("DATABASE_URL")
+  // Direta (porta 5432) — só pra migrations, que precisam de prepared statements/DDL
+  // que o pgbouncer em modo transaction não suporta.
+  directUrl = env("DIRECT_URL")
 }
 
 enum UserRole {
