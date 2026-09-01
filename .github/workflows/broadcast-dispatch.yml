@@ -14,6 +14,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Chamar endpoint de disparo em massa
+        # www (não o domínio apex) — o apex redireciona pra www, e o curl descarta o
+        # header Authorization ao seguir redirect pra outro host, o que faria essa
+        # chamada nunca autenticar de verdade se apontasse pro apex sem -L.
         run: |
-          curl -sf -X GET "https://conectasaudevc.com.br/api/cron/broadcast-dispatch" \
+          curl -sf -X GET "https://www.conectasaudevc.com.br/api/cron/broadcast-dispatch" \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
