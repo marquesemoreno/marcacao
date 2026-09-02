@@ -16,6 +16,12 @@ if (!process.env.NEXTAUTH_URL?.trim()) {
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: "standalone",
+  experimental: {
+    // Padrão do Next é 1MB — baixo demais pras Server Actions que recebem imagem
+    // direto do navegador (feedback de atendente, disparo em massa). 20MB dá folga
+    // acima do limite de 15MB já validado no código pra esses uploads.
+    serverActions: { bodySizeLimit: "20mb" },
+  },
   async redirects() {
     return [
       { source: "/admin/dashboard", destination: "/admin", permanent: true },

@@ -9,24 +9,30 @@ import { buildFeedbackMessage, type FeedbackType } from "@/lib/feedback";
 const ALLOWED_IMAGE_MIME_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 const MAX_IMAGE_SIZE_BYTES = 15 * 1024 * 1024;
 
+type FeedbackResult = { success: true } | { success: false; error: string };
+
 /** Atendente reporta bug/sugestão pelo widget flutuante do painel da clínica — vira
  * uma mensagem de WhatsApp direto pro número de operação (FEEDBACK_WHATSAPP_NUMBER),
- * sem tela de admin nova pra abrir (decisão do usuário: usar o canal que já monitora). */
-export async function submitFeedbackReport(formData: FormData) {
+ * sem tela de admin nova pra abrir (decisão do usuário: usar o canal que já monitora).
+ * Retorna um objeto em vez de lançar exceção pros casos esperados — Next.js redige a
+ * mensagem de erro de exceções lançadas em Server Action em build de produção, então
+ * "throw" aqui viraria sempre o texto genérico "Server Components render..." pro
+ * atendente, escondendo até erro de validação simples. */
+export async function submitFeedbackReport(formData: FormData): Promise<FeedbackResult> {
   const { clinicId, userId } = await requireClinicSession();
 
   const type = formData.get("type");
   const description = String(formData.get("description") ?? "").trim();
   if (type !== "BUG" && type !== "SUGGESTION") {
-    throw new Error("Tipo de relato inválido.");
+    return { success: false, error: "Tipo de relato inválido." };
   }
   if (description.length < 5) {
-    throw new Error("Descreva com um pouco mais de detalhe (mínimo 5 caracteres).");
+    return { success: false, error: "Descreva com um pouco mais de detalhe (mínimo 5 caracteres)." };
   }
 
   const targetPhone = process.env.FEEDBACK_WHATSAPP_NUMBER;
   if (!targetPhone) {
-    throw new Error("Envio de feedback não está configurado (FEEDBACK_WHATSAPP_NUMBER ausente).");
+    return { success: false, error: "Envio de feedback não está configurado (FEEDBACK_WHATSAPP_NUMBER ausente)." };
   }
   // Instância que ENVIA o relato — não é a instância global (histórico de ficar
   // desconectada) nem necessariamente a da própria clínica do atendente (a maioria
@@ -51,19 +57,27 @@ export async function submitFeedbackReport(formData: FormData) {
 
   if (imageFile instanceof File && imageFile.size > 0) {
     if (!ALLOWED_IMAGE_MIME_TYPES.includes(imageFile.type)) {
-      throw new Error("Tipo de imagem não suportado. Envie JPEG, PNG, WEBP ou GIF.");
+      return { success: false, error: "Tipo de imagem não suportado. Envie JPEG, PNG, WEBP ou GIF." };
     }
     if (imageFile.size > MAX_IMAGE_SIZE_BYTES) {
-      throw new Error("Imagem muito grande. O limite é 15 MB.");
+      return { success: false, error: "Imagem muito grande. O limite é 15 MB." };
     }
-    const buffer = Buffer.from(await imageFile.arrayBuffer());
-    const uploaded = await uploadWhatsAppMedia(`feedback-${Date.now()}`, buffer, imageFile.type);
+
+    let uploaded: { path: string; sizeBytes: number } | null;
+    try {
+      const buffer = Buffer.from(await imageFile.arrayBuffer());
+      uploaded = await uploadWhatsAppMedia(`feedback-${Date.now()}`, buffer, imageFile.type);
+    } catch (error) {
+      console.error("Falha ao ler/subir a imagem do relato de feedback:", error);
+      uploaded = null;
+    }
     if (!uploaded) {
-      throw new Error("Não foi possível processar a imagem. Tente enviar sem anexo.");
+      return { success: false, error: "Não foi possível processar a imagem. Tente enviar sem anexo." };
     }
+
     const mediaUrl = await getSignedMediaUrl(uploaded.path);
     if (!mediaUrl) {
-      throw new Error("Não foi possível gerar o link da imagem. Tente enviar sem anexo.");
+      return { success: false, error: "Não foi possível gerar o link da imagem. Tente enviar sem anexo." };
     }
     result = await sendWhatsAppMedia(targetPhone, mediaUrl, imageFile.type, "relato.jpg", text, "feedback.report", senderClinicId);
   } else {
@@ -71,8 +85,8 @@ export async function submitFeedbackReport(formData: FormData) {
   }
 
   if (!result.success && !result.skipped) {
-    throw new Error("Não foi possível enviar o relato agora. Tente novamente em instantes.");
+    return { success: false, error: "Não foi possível enviar o relato agora. Tente novamente em instantes." };
   }
 
-  return { success: true as const };
+  return { success: true };
 }

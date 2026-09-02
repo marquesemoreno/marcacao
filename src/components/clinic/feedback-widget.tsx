@@ -46,11 +46,15 @@ export function FeedbackWidget() {
       formData.set("description", description.trim());
       if (image) formData.set("image", image);
 
-      await submitFeedbackReport(formData);
+      const result = await submitFeedbackReport(formData);
+      if (!result.success) {
+        toast.error(result.error);
+        return;
+      }
       toast.success("Enviado! Obrigado pelo retorno.");
       handleOpenChange(false);
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Erro ao enviar. Tente de novo.");
+    } catch {
+      toast.error("Erro ao enviar. Tente de novo.");
     } finally {
       setSending(false);
     }
