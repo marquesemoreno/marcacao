@@ -266,8 +266,12 @@ export function ChatCrmApp({ scope, basePath, view }: ChatCrmAppProps) {
       suppressAutoSelectRef.current = true;
       setSelectedContactId(null);
     }
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
+    // Fase de CAPTURA (3º argumento true): roda antes de qualquer handler de
+    // ESC de outro componente no caminho do clique (dialog, toast, etc.) que
+    // possa chamar stopPropagation — sem isso, dependendo de onde o foco
+    // estava, o ESC nunca chegava até aqui.
+    document.addEventListener('keydown', handleKeyDown, true);
+    return () => document.removeEventListener('keydown', handleKeyDown, true);
   }, []);
 
   // Busca a foto de perfil do WhatsApp só pra contatos que ainda não têm.
