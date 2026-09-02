@@ -243,6 +243,22 @@ export function ChatCrmApp({ scope, basePath, view }: ChatCrmAppProps) {
     setSelectedContactId(null);
   }, [filterTab, clinicFilter]);
 
+  // ESC fecha a conversa aberta — mesmo "soltar a seleção" usado acima quando o
+  // atendente troca de aba/clínica, só que agora por atalho de teclado. Ignora
+  // enquanto o foco está no campo de digitar mensagem, pra não fechar a conversa
+  // no meio de uma resposta só porque a atendente apertou ESC por outro motivo
+  // (ex: fechar um emoji picker que nem existe ainda, mas por via das dúvidas).
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key !== 'Escape') return;
+      const target = e.target as HTMLElement | null;
+      if (target?.tagName === 'TEXTAREA' || target?.tagName === 'INPUT') return;
+      setSelectedContactId(null);
+    }
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   // Busca a foto de perfil do WhatsApp só pra contatos que ainda não têm.
   // Usa uma fila única (photoFetchQueueRef) processada por no máximo 1 loop
   // por vez (isDrainingPhotoQueueRef) — sem isso, cada ciclo de polling (a
