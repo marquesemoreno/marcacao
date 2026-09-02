@@ -226,6 +226,23 @@ export function ChatCrmApp({ scope, basePath, view }: ChatCrmAppProps) {
     refreshContacts();
   }, [refreshContacts]);
 
+  // Trocar de aba (Minhas/Não Atribuídas/...) ou de filtro de clínica (admin) é uma
+  // navegação EXPLÍCITA da atendente/admin — diferente do refresh de fundo (polling de
+  // 5s, realtime) que a lógica de "nunca troca sozinho" em refreshContacts existe pra
+  // ignorar. Sem isso, a conversa aberta ficava presa na tela vindo do cache
+  // (contactCacheRef) mesmo depois de trocar pra um contexto totalmente diferente — ex:
+  // mudar o filtro de "Santa Clara" pra "TIVDC" no admin e continuar vendo a conversa da
+  // Santa Clara, ou uma atendente trocar de aba e ver informação de outra conversa.
+  // Ignora a primeira renderização pra não descartar o "?c=" da URL (deep link).
+  const isFirstFilterRenderRef = useRef(true);
+  useEffect(() => {
+    if (isFirstFilterRenderRef.current) {
+      isFirstFilterRenderRef.current = false;
+      return;
+    }
+    setSelectedContactId(null);
+  }, [filterTab, clinicFilter]);
+
   // Busca a foto de perfil do WhatsApp só pra contatos que ainda não têm.
   // Usa uma fila única (photoFetchQueueRef) processada por no máximo 1 loop
   // por vez (isDrainingPhotoQueueRef) — sem isso, cada ciclo de polling (a
