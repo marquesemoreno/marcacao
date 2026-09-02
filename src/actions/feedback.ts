@@ -28,6 +28,11 @@ export async function submitFeedbackReport(formData: FormData) {
   if (!targetPhone) {
     throw new Error("Envio de feedback não está configurado (FEEDBACK_WHATSAPP_NUMBER ausente).");
   }
+  // Instância que ENVIA o relato — não é a instância global (histórico de ficar
+  // desconectada) nem necessariamente a da própria clínica do atendente (a maioria
+  // não tem instância dedicada). Configurável por env pra trocar sem precisar de
+  // deploy quando a numeração mudar (ex: quando a TIVDC tiver instância própria).
+  const senderClinicId = process.env.FEEDBACK_SENDER_CLINIC_ID || undefined;
 
   const [clinic, user] = await Promise.all([
     prisma.clinic.findUnique({ where: { id: clinicId }, select: { tradeName: true } }),
@@ -60,9 +65,9 @@ export async function submitFeedbackReport(formData: FormData) {
     if (!mediaUrl) {
       throw new Error("Não foi possível gerar o link da imagem. Tente enviar sem anexo.");
     }
-    result = await sendWhatsAppMedia(targetPhone, mediaUrl, imageFile.type, "relato.jpg", text, "feedback.report");
+    result = await sendWhatsAppMedia(targetPhone, mediaUrl, imageFile.type, "relato.jpg", text, "feedback.report", senderClinicId);
   } else {
-    result = await sendWhatsAppMessage(targetPhone, text, "feedback.report");
+    result = await sendWhatsAppMessage(targetPhone, text, "feedback.report", senderClinicId);
   }
 
   if (!result.success && !result.skipped) {
