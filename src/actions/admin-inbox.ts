@@ -11,6 +11,7 @@ import { departmentToDb, funnelStageToDb, toChatContact, toChatMessage } from "@
 import { attachSignedUrls, uploadWhatsAppMedia, getSignedMediaUrl } from "@/lib/whatsapp-media";
 import { formatFileSize } from "@/lib/format";
 import { notifyInboxRealtime } from "@/lib/supabase-server";
+import { isTeamQueueUser } from "@/lib/team-queue";
 import type { Department, FunnelStage, InboxFilter } from "@/types/chat-crm";
 import {
   sendMessageSchema,
@@ -515,7 +516,7 @@ export async function transferConversationAdmin(conversationId: string, targetUs
     where: { id: targetUserId },
     select: { name: true, clinic: { select: { tradeName: true } } },
   });
-  const isTeamQueue = targetUser?.clinic?.tradeName ? targetUser.name === `Equipe ${targetUser.clinic.tradeName}` : false;
+  const isTeamQueue = targetUser ? isTeamQueueUser(targetUser) : false;
 
   await prisma.conversation.update({
     where: { id: conversationId },

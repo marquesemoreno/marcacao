@@ -13,6 +13,7 @@ import { hasHospitalBridgeIntegration, fetchBridgeProcedures, fetchBridgeDoctors
 import { formatFileSize } from "@/lib/format";
 import { notifyInboxRealtime } from "@/lib/supabase-server";
 import { APPOINTMENT_CONFIRMED_TEMPLATE } from "@/lib/chat-messages";
+import { isTeamQueueUser } from "@/lib/team-queue";
 
 const ALLOWED_MEDIA_MIME_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif", "application/pdf"];
 const MAX_MEDIA_SIZE_BYTES = 15 * 1024 * 1024; // 15 MB — mesma ordem de grandeza do limite de mídia do WhatsApp
@@ -614,11 +615,7 @@ export async function transferConversation(
     return { success: false, message: "Atendente de destino não encontrado." };
   }
 
-  // Toda clínica tem uma conta genérica "Equipe {nome da clínica}" (convenção usada desde o
-  // cadastro inicial) — "transferir" pra ela na prática significa devolver pra fila geral,
-  // não atribuir a essa conta como se fosse mais um atendente. Sem essa checagem, um "atribui
-  // sozinho ao responder" nunca conseguia devolver essa conversa pra "Não Atribuídas" de novo.
-  const isTeamQueue = targetUser.clinic?.tradeName ? targetUser.name === `Equipe ${targetUser.clinic.tradeName}` : false;
+  const isTeamQueue = isTeamQueueUser(targetUser);
 
   const actingUser = isTeamQueue
     ? await prisma.user.findUnique({ where: { id: userId }, select: { name: true } })

@@ -7,6 +7,7 @@ import { formatFileSize } from "@/lib/format";
 import { notifyInboxRealtime } from "@/lib/supabase-server";
 import { MEDIA_DOWNLOAD_FAILED_PREFIX } from "@/lib/chat-messages";
 import { isBroadcastOptOutReply } from "@/lib/broadcast-csv";
+import { reopenIfResolved } from "@/lib/conversation-reopen";
 import {
   getAiAttendantConfig,
   buildAiDisclosureMessage,
@@ -420,7 +421,7 @@ export async function POST(request: Request) {
     });
     await prisma.conversation.update({
       where: { id: conversation.id },
-      data: { lastMessageAt: new Date(), status: conversation.status === "RESOLVED" ? "OPEN" : conversation.status },
+      data: { lastMessageAt: new Date(), ...reopenIfResolved(conversation) },
     });
 
     // =========================================================================
