@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { parseBroadcastCsv, buildBroadcastMessage, BROADCAST_OPT_OUT_FOOTER } from "./broadcast-csv";
+import {
+  parseBroadcastCsv,
+  buildBroadcastMessage,
+  isBroadcastOptOutReply,
+  BROADCAST_OPT_OUT_FOOTER,
+} from "./broadcast-csv";
 
 describe("parseBroadcastCsv", () => {
   it("aceita o CSV real relatado pelo usuário: sem cabeçalho, separado por ; (telefone,nome,procedimento)", () => {
@@ -70,5 +75,23 @@ describe("buildBroadcastMessage", () => {
     const result = buildBroadcastMessage(template, {});
 
     expect(result).toBe(template);
+  });
+});
+
+describe("isBroadcastOptOutReply", () => {
+  it("reconhece 9, sair e parar (com espaço e maiúscula/minúscula)", () => {
+    expect(isBroadcastOptOutReply("9")).toBe(true);
+    expect(isBroadcastOptOutReply("SAIR")).toBe(true);
+    expect(isBroadcastOptOutReply(" parar ")).toBe(true);
+  });
+
+  it("não confunde com 1/2 do fluxo de confirmação de consulta (resolveStatusFromReply)", () => {
+    expect(isBroadcastOptOutReply("1")).toBe(false);
+    expect(isBroadcastOptOutReply("2")).toBe(false);
+  });
+
+  it("ignora mensagens sem relação", () => {
+    expect(isBroadcastOptOutReply("Olá, tudo bem?")).toBe(false);
+    expect(isBroadcastOptOutReply("")).toBe(false);
   });
 });

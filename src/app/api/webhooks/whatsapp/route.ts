@@ -6,6 +6,7 @@ import { fetchMediaBase64, uploadWhatsAppMedia, formatDuration } from "@/lib/wha
 import { formatFileSize } from "@/lib/format";
 import { notifyInboxRealtime } from "@/lib/supabase-server";
 import { MEDIA_DOWNLOAD_FAILED_PREFIX } from "@/lib/chat-messages";
+import { isBroadcastOptOutReply } from "@/lib/broadcast-csv";
 import {
   getAiAttendantConfig,
   buildAiDisclosureMessage,
@@ -338,10 +339,10 @@ export async function POST(request: Request) {
   // Opt-out de disparo em massa (LGPD — saída fácil de mensagem não solicitada, ver
   // src/lib/broadcast.ts). Independente do fluxo de IA/automação abaixo, e permanente
   // pra qualquer clínica: uma vez que a pessoa pede pra sair, nunca mais entra em
-  // campanha nenhuma enquanto isso não for revertido manualmente. Não usa "cancelar"
-  // sozinho aqui: essa palavra já significa "cancelar agendamento" no fluxo de
-  // confirmação mais abaixo (resolveStatusFromReply) — usar aqui roubaria essa resposta.
-  if (/^(sair|parar)$/i.test(incoming.text.trim())) {
+  // campanha nenhuma enquanto isso não for revertido manualmente. isBroadcastOptOutReply
+  // nunca usa "1"/"2"/"cancelar" sozinho — esses já significam confirmar/cancelar
+  // consulta no fluxo mais abaixo (resolveStatusFromReply), usar aqui roubaria essa resposta.
+  if (isBroadcastOptOutReply(incoming.text)) {
     if (!contact.optedOutOfBroadcastsAt) {
       await prisma.contact.update({ where: { id: contact.id }, data: { optedOutOfBroadcastsAt: new Date() } });
     }

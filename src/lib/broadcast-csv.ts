@@ -14,10 +14,19 @@ export function applyBroadcastVariables(template: string, vars: Record<string, s
 }
 
 /** Linha de opt-out (LGPD) acrescentada em toda mensagem de campanha — reaproveita o
- * mecanismo de "sair"/"parar" já tratado no webhook (route.ts) pra desligar
+ * mecanismo de opt-out já tratado no webhook (route.ts) pra desligar
  * Contact.optedOutOfBroadcastsAt. Texto automático, não botão interativo: WhatsApp
- * bloqueia/penaliza mensagem com botão vinda de cliente não-oficial (Evolution/Baileys). */
-export const BROADCAST_OPT_OUT_FOOTER = "Responda SAIR para não receber mais nossos avisos.";
+ * bloqueia/penaliza mensagem com botão vinda de cliente não-oficial (Evolution/Baileys).
+ * "9" em vez de "1"/"2" de propósito: esses dois já significam confirmar/cancelar
+ * consulta no fluxo de lembrete de agendamento (resolveStatusFromReply). */
+export const BROADCAST_OPT_OUT_FOOTER = "Digite *9* para não receber mais avisos.";
+
+/** Reconhece a resposta de opt-out de disparo em massa — "9", "sair" ou "parar"
+ * (trim + case-insensitive). Nunca usa "1"/"2" (ver BROADCAST_OPT_OUT_FOOTER) nem
+ * "cancelar" sozinho (já significa "cancelar consulta" no mesmo fluxo de reply). */
+export function isBroadcastOptOutReply(text: string): boolean {
+  return /^(9|sair|parar)$/i.test(text.trim());
+}
 
 /** Monta o texto final enviado ao destinatário: aplica as variáveis do CSV e acrescenta
  * o rodapé de opt-out (a menos que já esteja presente no template). */
