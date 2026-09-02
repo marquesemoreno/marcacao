@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { isTeamQueueUser } from "./team-queue";
+import { isTeamQueueUser, formatAgentDisplayName } from "./team-queue";
 
 describe("isTeamQueueUser", () => {
   it("reconhece a conta de equipe mesmo com acentuação diferente entre user.name e clinic.tradeName", () => {
@@ -36,5 +36,22 @@ describe("isTeamQueueUser", () => {
 
   it("retorna false quando não há clínica associada", () => {
     expect(isTeamQueueUser({ name: "Equipe Alguma Coisa", clinic: null })).toBe(false);
+  });
+});
+
+describe("formatAgentDisplayName", () => {
+  it("troca qualquer conta 'Equipe X' por Não Atribuídas, pra qualquer clínica", () => {
+    expect(formatAgentDisplayName("Equipe Clinica Cirurgica Santa Clara")).toBe("Não Atribuídas");
+    expect(formatAgentDisplayName("Equipe Urolaser - Clínica de Urologia e Diagnóstico")).toBe("Não Atribuídas");
+  });
+
+  it("acrescenta o nome da clínica quando informado (lista que mistura várias clínicas, ex: admin)", () => {
+    expect(formatAgentDisplayName("Equipe Clinica Cirurgica Santa Clara", "Clínica Cirúrgica Santa Clara")).toBe(
+      "Não Atribuídas — Clínica Cirúrgica Santa Clara"
+    );
+  });
+
+  it("não mexe no nome de um atendente de verdade", () => {
+    expect(formatAgentDisplayName("Jamile Cardozo")).toBe("Jamile Cardozo");
   });
 });

@@ -13,7 +13,7 @@ import { hasHospitalBridgeIntegration, fetchBridgeProcedures, fetchBridgeDoctors
 import { formatFileSize } from "@/lib/format";
 import { notifyInboxRealtime } from "@/lib/supabase-server";
 import { APPOINTMENT_CONFIRMED_TEMPLATE } from "@/lib/chat-messages";
-import { isTeamQueueUser } from "@/lib/team-queue";
+import { isTeamQueueUser, formatAgentDisplayName } from "@/lib/team-queue";
 
 const ALLOWED_MEDIA_MIME_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif", "application/pdf"];
 const MAX_MEDIA_SIZE_BYTES = 15 * 1024 * 1024; // 15 MB — mesma ordem de grandeza do limite de mídia do WhatsApp
@@ -1012,7 +1012,7 @@ export async function listChatAgents() {
     select: { id: true, name: true },
     orderBy: { name: "asc" },
   });
-  return users.map((user) => ({ id: user.id, name: user.name, avatar: "", role: "Equipe da clínica" }));
+  return users.map((user) => ({ id: user.id, name: formatAgentDisplayName(user.name), avatar: "", role: "Equipe da clínica" }));
 }
 
 /** Histórico clínico do contato (consultas/exames já realizados ou agendados),

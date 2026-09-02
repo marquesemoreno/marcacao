@@ -19,3 +19,15 @@ export function isTeamQueueUser(user: { name: string; clinic: { tradeName: strin
   if (!user.clinic) return false;
   return normalize(user.name) === normalize(`Equipe ${user.clinic.tradeName}`);
 }
+
+const TEAM_QUEUE_PREFIX = /^equipe\s+/i;
+
+/** Rótulo pra exibir no lugar do nome cru da conta "Equipe X" no seletor de transferência
+ * (ela representa a fila de Não Atribuídas, não deveria aparecer como se fosse mais um
+ * atendente) — funciona pra qualquer clínica, não só a que tinha o bug de acento.
+ * `clinicName` é opcional: só necessário numa lista que mistura várias clínicas (admin),
+ * pra não mostrar "Não Atribuídas" repetido sem dizer de qual clínica é cada uma. */
+export function formatAgentDisplayName(name: string, clinicName?: string): string {
+  if (!TEAM_QUEUE_PREFIX.test(name.trim())) return name;
+  return clinicName ? `Não Atribuídas — ${clinicName}` : "Não Atribuídas";
+}

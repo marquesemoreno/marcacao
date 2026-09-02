@@ -11,7 +11,7 @@ import { departmentToDb, funnelStageToDb, toChatContact, toChatMessage } from "@
 import { attachSignedUrls, uploadWhatsAppMedia, getSignedMediaUrl } from "@/lib/whatsapp-media";
 import { formatFileSize } from "@/lib/format";
 import { notifyInboxRealtime } from "@/lib/supabase-server";
-import { isTeamQueueUser } from "@/lib/team-queue";
+import { isTeamQueueUser, formatAgentDisplayName } from "@/lib/team-queue";
 import type { Department, FunnelStage, InboxFilter } from "@/types/chat-crm";
 import {
   sendMessageSchema,
@@ -183,13 +183,15 @@ export async function listChatAgentsAdmin() {
   await requireAdminSession();
   const users = await prisma.user.findMany({
     where: { role: { in: ["ADMIN", "CLINIC"] }, active: true },
-    select: { id: true, name: true, role: true },
+    select: { id: true, name: true, role: true, clinic: { select: { tradeName: true } } },
     orderBy: { name: "asc" },
   });
 
   return users.map((u) => ({
     id: u.id,
-    name: u.name,
+    // Lista mistura várias clínicas — passa o nome da clínica pra não mostrar
+    // "Não Atribuídas" repetido sem dizer de qual fila é cada uma.
+    name: formatAgentDisplayName(u.name, u.clinic?.tradeName),
     avatar: "",
     role: u.role === "ADMIN" ? "Administrador Master" : "Atendente",
   }));
