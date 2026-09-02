@@ -20,6 +20,7 @@ import {
   AlertCircle,
   AlertTriangle,
   CheckCircle2,
+  Ban,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from '@/components/ui/dialog';
@@ -145,6 +146,20 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry, 
 
   const isAgent = message.sender === 'agent';
 
+  // Legenda "Mensagem apagada" pra qualquer tipo (texto/áudio/anexo) — o conteúdo
+  // original continua visível (tachado no texto), só acrescenta o aviso de que o
+  // paciente/atendente apagou essa mensagem no WhatsApp (evento messages.delete).
+  const DeletedBadge = () => (
+    <div
+      className={`flex items-center gap-1 mb-1.5 text-[10.5px] font-semibold uppercase tracking-wide ${
+        isAgent ? 'text-emerald-100/80' : 'text-rose-500 dark:text-rose-400'
+      }`}
+    >
+      <Ban className="w-3 h-3 shrink-0" />
+      <span>Mensagem apagada</span>
+    </div>
+  );
+
   // 1.1 Badge discreto de mídia que falhou ao baixar (não polui o histórico como bolha normal)
   if (message.mediaDownloadFailed) {
     return (
@@ -204,6 +219,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry, 
               : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-tl-xs hover:border-slate-300 dark:hover:border-slate-600'
           }`}
         >
+          {message.deleted && <DeletedBadge />}
           {hasRealAudio && (
             <audio
               ref={audioRef}
@@ -307,6 +323,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry, 
             }`}
             onClick={() => hasRealFile && setIsLightboxOpen(true)}
           >
+            {message.deleted && <DeletedBadge />}
             {isImage && hasRealFile ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
@@ -431,6 +448,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry, 
             : 'bg-white dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-tl-xs hover:border-slate-300 dark:hover:border-slate-600'
         }`}
       >
+        {message.deleted && <DeletedBadge />}
         <p
           className={`whitespace-pre-wrap font-sans text-xs sm:text-[13.5px] leading-relaxed select-text ${
             message.deleted ? `italic line-through ${isAgent ? 'text-rose-100' : 'text-rose-500 dark:text-rose-400'}` : ''
