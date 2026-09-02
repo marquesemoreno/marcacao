@@ -181,7 +181,7 @@ export function BroadcastManagement({ clinics }: { clinics: ClinicOption[] }) {
         <div>
           <div className="flex items-center justify-between">
             <label htmlFor="broadcast-csv" className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
-              Lista de contatos (CSV — coluna &quot;telefone&quot; obrigatória)
+              Lista de contatos (CSV — vírgula ou ponto-e-vírgula, cabeçalho opcional)
             </label>
             <label className="inline-flex items-center gap-1.5 text-[11px] font-bold text-violet-700 dark:text-violet-300 cursor-pointer">
               <Upload className="w-3.5 h-3.5" /> Enviar arquivo
@@ -201,6 +201,10 @@ export function BroadcastManagement({ clinics }: { clinics: ClinicOption[] }) {
             placeholder={"telefone,nome,procedimento\n77999998888,Maria Silva,Consulta Urológica"}
             className="w-full mt-1 px-3 py-2 text-xs font-mono rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 resize-none"
           />
+          <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+            Sem cabeçalho, assume a ordem telefone, nome, procedimento, data. Com cabeçalho, qualquer
+            coluna extra vira variável — só a coluna de telefone precisa se chamar &quot;telefone&quot; ou &quot;phone&quot;.
+          </p>
           {csvError && <p className="mt-1 text-[11px] font-semibold text-red-600 dark:text-red-400">{csvError}</p>}
           {recipients.length > 0 && (
             <p className="mt-1 text-[11px] font-semibold text-emerald-700 dark:text-emerald-400">
