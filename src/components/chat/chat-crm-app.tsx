@@ -244,15 +244,13 @@ export function ChatCrmApp({ scope, basePath, view }: ChatCrmAppProps) {
   }, [filterTab, clinicFilter]);
 
   // ESC fecha a conversa aberta — mesmo "soltar a seleção" usado acima quando o
-  // atendente troca de aba/clínica, só que agora por atalho de teclado. Ignora
-  // enquanto o foco está no campo de digitar mensagem, pra não fechar a conversa
-  // no meio de uma resposta só porque a atendente apertou ESC por outro motivo
-  // (ex: fechar um emoji picker que nem existe ainda, mas por via das dúvidas).
+  // atendente troca de aba/clínica, só que agora por atalho de teclado. Dispara mesmo
+  // com foco no campo de digitar mensagem: é justamente onde o foco costuma estar
+  // quando a atendente está olhando uma conversa, então uma trava ali fazia o atalho
+  // nunca funcionar na prática.
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key !== 'Escape') return;
-      const target = e.target as HTMLElement | null;
-      if (target?.tagName === 'TEXTAREA' || target?.tagName === 'INPUT') return;
       setSelectedContactId(null);
     }
     document.addEventListener('keydown', handleKeyDown);
