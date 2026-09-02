@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Megaphone, Loader2, Play, Pause, Upload } from "lucide-react";
+import { Megaphone, Loader2, Play, Pause, Upload, Image as ImageIcon, X } from "lucide-react";
 import { toast } from "sonner";
 import {
   listBroadcastCampaigns,
@@ -9,7 +9,7 @@ import {
   startBroadcastCampaign,
   pauseBroadcastCampaign,
 } from "@/actions/admin-broadcast";
-import { parseBroadcastCsv, type ParsedBroadcastRecipient } from "@/lib/broadcast-csv";
+import { parseBroadcastCsv, BROADCAST_OPT_OUT_FOOTER, type ParsedBroadcastRecipient } from "@/lib/broadcast-csv";
 
 type ClinicOption = { id: string; tradeName: string };
 type Campaign = Awaited<ReturnType<typeof listBroadcastCampaigns>>[number];
@@ -40,6 +40,8 @@ export function BroadcastManagement({ clinics }: { clinics: ClinicOption[] }) {
   const [csvText, setCsvText] = useState("");
   const [recipients, setRecipients] = useState<ParsedBroadcastRecipient[]>([]);
   const [csvError, setCsvError] = useState<string | null>(null);
+  const [image, setImage] = useState<File | null>(null);
+  const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
 
   async function loadCampaigns(id: string) {
     if (!id) return;
@@ -79,6 +81,18 @@ export function BroadcastManagement({ clinics }: { clinics: ClinicOption[] }) {
     reader.readAsText(file, "utf-8");
   }
 
+  function handleImageSelect(file: File) {
+    if (imagePreviewUrl) URL.revokeObjectURL(imagePreviewUrl);
+    setImage(file);
+    setImagePreviewUrl(URL.createObjectURL(file));
+  }
+
+  function handleRemoveImage() {
+    if (imagePreviewUrl) URL.revokeObjectURL(imagePreviewUrl);
+    setImage(null);
+    setImagePreviewUrl(null);
+  }
+
   async function handleCreate() {
     if (!clinicId) return;
     if (recipients.length === 0) {
@@ -87,12 +101,18 @@ export function BroadcastManagement({ clinics }: { clinics: ClinicOption[] }) {
     }
     setCreating(true);
     try {
-      await createBroadcastCampaign(clinicId, name, template, recipients);
+      let imageFormData: FormData | undefined;
+      if (image) {
+        imageFormData = new FormData();
+        imageFormData.set("image", image);
+      }
+      await createBroadcastCampaign(clinicId, name, template, recipients, imageFormData);
       toast.success("Campanha criada como rascunho. Clique em Iniciar quando estiver pronto.");
       setName("");
       setTemplate("");
       setCsvText("");
       setRecipients([]);
+      handleRemoveImage();
       await loadCampaigns(clinicId);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Erro ao criar campanha.");
@@ -176,6 +196,38 @@ export function BroadcastManagement({ clinics }: { clinics: ClinicOption[] }) {
               Variáveis disponíveis: {csvColumns.map((c) => `{{${c}}}`).join(", ")}
             </p>
           )}
+          <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+            Toda mensagem sai com um aviso de opt-out no final: &quot;{BROADCAST_OPT_OUT_FOOTER}&quot;
+          </p>
+        </div>
+
+        <div>
+          <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+            Imagem (opcional)
+          </label>
+          {imagePreviewUrl ? (
+            <div className="mt-1 flex items-center gap-3">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={imagePreviewUrl} alt="Prévia da imagem da campanha" className="w-16 h-16 rounded-xl object-cover border border-slate-200 dark:border-slate-800" />
+              <button
+                type="button"
+                onClick={handleRemoveImage}
+                className="inline-flex items-center gap-1.5 text-[11px] font-bold text-red-600 dark:text-red-400"
+              >
+                <X className="w-3.5 h-3.5" /> Remover
+              </button>
+            </div>
+          ) : (
+            <label className="mt-1 inline-flex items-center gap-1.5 text-[11px] font-bold text-violet-700 dark:text-violet-300 cursor-pointer">
+              <ImageIcon className="w-3.5 h-3.5" /> Anexar imagem
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                className="hidden"
+                onChange={(e) => e.target.files?.[0] && handleImageSelect(e.target.files[0])}
+              />
+            </label>
+          )}
         </div>
 
         <div>
@@ -244,6 +296,7 @@ export function BroadcastManagement({ clinics }: { clinics: ClinicOption[] }) {
                   <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border ${STATUS_CLASS[c.status]}`}>
                     {STATUS_LABEL[c.status]}
                   </span>
+                  {c.hasImage && <ImageIcon className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 shrink-0" />}
                 </div>
                 <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
                   {c.sent}/{c.total} enviados

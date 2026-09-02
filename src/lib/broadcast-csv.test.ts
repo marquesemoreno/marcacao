@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseBroadcastCsv } from "./broadcast-csv";
+import { parseBroadcastCsv, buildBroadcastMessage, BROADCAST_OPT_OUT_FOOTER } from "./broadcast-csv";
 
 describe("parseBroadcastCsv", () => {
   it("aceita o CSV real relatado pelo usuário: sem cabeçalho, separado por ; (telefone,nome,procedimento)", () => {
@@ -43,5 +43,32 @@ describe("parseBroadcastCsv", () => {
   it("retorna lista vazia pra CSV vazio", () => {
     expect(parseBroadcastCsv("")).toEqual([]);
     expect(parseBroadcastCsv("   ")).toEqual([]);
+  });
+});
+
+describe("buildBroadcastMessage", () => {
+  it("acrescenta o rodapé de opt-out numa mensagem simples", () => {
+    const result = buildBroadcastMessage("Olá, tudo bem?", {});
+
+    expect(result).toBe(`Olá, tudo bem?\n\n${BROADCAST_OPT_OUT_FOOTER}`);
+  });
+
+  it("aplica as variáveis do CSV antes de acrescentar o rodapé", () => {
+    const result = buildBroadcastMessage("Olá {{nome}}, sua {{procedimento}} está confirmada.", {
+      nome: "Maria Silva",
+      procedimento: "Consulta Urológica",
+    });
+
+    expect(result).toBe(
+      `Olá Maria Silva, sua Consulta Urológica está confirmada.\n\n${BROADCAST_OPT_OUT_FOOTER}`
+    );
+  });
+
+  it("não duplica o rodapé se o admin já escreveu ele no template", () => {
+    const template = `Aviso importante.\n\n${BROADCAST_OPT_OUT_FOOTER}`;
+
+    const result = buildBroadcastMessage(template, {});
+
+    expect(result).toBe(template);
   });
 });

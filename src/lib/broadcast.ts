@@ -1,7 +1,8 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
-import { sendWhatsAppMessage } from "@/lib/whatsapp";
-import { applyBroadcastVariables } from "@/lib/broadcast-csv";
+import { sendWhatsAppMessage, sendWhatsAppMedia } from "@/lib/whatsapp";
+import { getSignedMediaUrl } from "@/lib/whatsapp-media";
+import { buildBroadcastMessage } from "@/lib/broadcast-csv";
 
 const BATCH_SIZE = Number(process.env.BROADCAST_BATCH_SIZE) || 3;
 
@@ -41,15 +42,37 @@ export async function dispatchNextBatch(): Promise<{ processed: number }> {
       }
 
       const variables = recipient.variables as Record<string, string>;
-      const text = applyBroadcastVariables(campaign.messageTemplate, variables);
+      const text = buildBroadcastMessage(campaign.messageTemplate, variables);
 
-      const result = await sendWhatsAppMessage(recipient.phone, text, "broadcast.sent", campaign.clinicId);
+      let result: { success: boolean; skipped: boolean };
+      let failureReason = "Falha ao enviar via WhatsApp";
+
+      if (campaign.imagePath) {
+        const mediaUrl = await getSignedMediaUrl(campaign.imagePath);
+        if (!mediaUrl) {
+          result = { success: false, skipped: false };
+          failureReason = "Falha ao gerar URL da imagem da campanha";
+        } else {
+          result = await sendWhatsAppMedia(
+            recipient.phone,
+            mediaUrl,
+            campaign.imageMimeType ?? "image/jpeg",
+            "campanha.jpg",
+            text,
+            "broadcast.sent",
+            campaign.clinicId
+          );
+        }
+      } else {
+        result = await sendWhatsAppMessage(recipient.phone, text, "broadcast.sent", campaign.clinicId);
+      }
+
       await prisma.broadcastRecipient.update({
         where: { id: recipient.id },
         data:
           result.success || result.skipped
             ? { status: "SENT", sentAt: new Date() }
-            : { status: "FAILED", errorMessage: "Falha ao enviar via WhatsApp" },
+            : { status: "FAILED", errorMessage: failureReason },
       });
     }
 

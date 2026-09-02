@@ -540,6 +540,10 @@ model BroadcastCampaign {
   clinicId        String                  @map("clinic_id")
   name            String
   messageTemplate String                  @db.Text @map("message_template")
+  /// Caminho no bucket privado do Supabase Storage (mesmo bucket do inbox, ver
+  /// src/lib/whatsapp-media.ts) — null quando a campanha é só texto.
+  imagePath       String?                 @map("image_path")
+  imageMimeType   String?                 @map("image_mime_type")
   status          BroadcastCampaignStatus @default(DRAFT)
   createdByUserId String                  @map("created_by_user_id")
   createdAt       DateTime                @default(now()) @map("created_at")

@@ -13,6 +13,20 @@ export function applyBroadcastVariables(template: string, vars: Record<string, s
   });
 }
 
+/** Linha de opt-out (LGPD) acrescentada em toda mensagem de campanha — reaproveita o
+ * mecanismo de "sair"/"parar" já tratado no webhook (route.ts) pra desligar
+ * Contact.optedOutOfBroadcastsAt. Texto automático, não botão interativo: WhatsApp
+ * bloqueia/penaliza mensagem com botão vinda de cliente não-oficial (Evolution/Baileys). */
+export const BROADCAST_OPT_OUT_FOOTER = "Responda SAIR para não receber mais nossos avisos.";
+
+/** Monta o texto final enviado ao destinatário: aplica as variáveis do CSV e acrescenta
+ * o rodapé de opt-out (a menos que já esteja presente no template). */
+export function buildBroadcastMessage(template: string, vars: Record<string, string>): string {
+  const withVariables = applyBroadcastVariables(template, vars);
+  if (withVariables.includes(BROADCAST_OPT_OUT_FOOTER)) return withVariables;
+  return `${withVariables}\n\n${BROADCAST_OPT_OUT_FOOTER}`;
+}
+
 /** Ordem assumida quando o CSV não tem cabeçalho — mesmo exemplo mostrado no formulário
  * de "Nova campanha" (telefone,nome,procedimento), pra colar sem cabeçalho já funcionar. */
 const DEFAULT_HEADERS = ["telefone", "nome", "procedimento", "data"];
