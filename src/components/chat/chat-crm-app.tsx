@@ -165,6 +165,11 @@ export function ChatCrmApp({ scope, basePath, view }: ChatCrmAppProps) {
   const photoFetchQueueRef = useRef<string[]>([]);
   const isDrainingPhotoQueueRef = useRef(false);
   const contactCacheRef = useRef<Map<string, Contact>>(new Map());
+  /** true logo depois do ESC fechar a conversa — impede o refresh seguinte de já
+   * escolher a primeira conversa da fila sozinho, que é o comportamento certo pra
+   * "sem seleção ainda" (primeiro carregamento) mas não pra "fechei de propósito".
+   * Some assim que a atendente seleciona qualquer conversa de novo (selectContact). */
+  const suppressAutoSelectRef = useRef(false);
 
   const [attendantCapacity, setAttendantCapacity] = useState<{ activeCount: number; maxLimit: number } | null>(null);
   const [availableClinics, setAvailableClinics] = useState<{ id: string; tradeName: string }[]>([]);
@@ -214,7 +219,11 @@ export function ChatCrmApp({ scope, basePath, view }: ChatCrmAppProps) {
     // assumiu) fazia cair sozinho na primeira conversa da lista — trocando de paciente no meio
     // do atendimento sem a atendente clicar em nada. Só escolhe uma conversa automaticamente
     // quando não existe nenhuma selecionada ainda (primeiro carregamento).
-    setSelectedContactId((current) => current ?? result[0]?.id ?? null);
+    setSelectedContactId((current) => {
+      if (current) return current;
+      if (suppressAutoSelectRef.current) return null;
+      return result[0]?.id ?? null;
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [actions, filterTab, searchQuery, scope, view, clinicFilter]);
 
@@ -240,6 +249,9 @@ export function ChatCrmApp({ scope, basePath, view }: ChatCrmAppProps) {
       isFirstFilterRenderRef.current = false;
       return;
     }
+    // Trocar de aba/clínica é uma navegação nova — sempre quer mostrar a primeira
+    // conversa do contexto novo, mesmo que um ESC anterior tivesse suprimido isso.
+    suppressAutoSelectRef.current = false;
     setSelectedContactId(null);
   }, [filterTab, clinicFilter]);
 
@@ -251,6 +263,7 @@ export function ChatCrmApp({ scope, basePath, view }: ChatCrmAppProps) {
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key !== 'Escape') return;
+      suppressAutoSelectRef.current = true;
       setSelectedContactId(null);
     }
     document.addEventListener('keydown', handleKeyDown);
@@ -433,6 +446,7 @@ export function ChatCrmApp({ scope, basePath, view }: ChatCrmAppProps) {
     (selectedContactId ? contactCacheRef.current.get(selectedContactId) ?? null : null);
 
   function selectContact(id: string) {
+    suppressAutoSelectRef.current = false;
     setSelectedContactId(id);
     router.replace(`${basePath}/inbox?c=${id}`);
   }
