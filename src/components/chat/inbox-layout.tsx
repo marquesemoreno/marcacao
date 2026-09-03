@@ -65,12 +65,13 @@ const UNASSIGNED_ALERT_THRESHOLD_MINUTES = 10;
 
 /** Todas as abas possíveis da fila — o atendente escolhe quais ficam visíveis (persiste no navegador). */
 const ALL_INBOX_TABS: { id: InboxFilter; label: string }[] = [
+  { id: 'todas', label: 'Todas' },
   { id: 'minhas', label: 'Minhas' },
   { id: 'nao_atribuidas', label: 'Não Atribuídas' },
   { id: 'finalizadas', label: 'Finalizadas' },
 ];
 const INBOX_VISIBLE_TABS_STORAGE_KEY = 'inbox-visible-tabs';
-const DEFAULT_VISIBLE_TAB_IDS: InboxFilter[] = ['minhas', 'nao_atribuidas'];
+const DEFAULT_VISIBLE_TAB_IDS: InboxFilter[] = ['todas', 'minhas', 'nao_atribuidas'];
 
 const FUNNEL_STEPS: { id: FunnelStage; label: string }[] = [
   { id: 'novos', label: 'Novo' },
