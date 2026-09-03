@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { Users, UserPlus, Loader2, Mail, KeyRound, Save } from "lucide-react";
+import { Users, UserPlus, Loader2, Mail, KeyRound, Save, Pencil } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { listClinicUsers, createTeamMember, updateUserMaxConcurrentChats, resetAttendantPassword } from "@/actions/admin";
+import { listClinicUsers, createTeamMember, updateUserMaxConcurrentChats, updateAttendantName, resetAttendantPassword } from "@/actions/admin";
 
 type Attendant = {
   id: string;
@@ -29,6 +29,9 @@ export function ClinicAttendantsModal({ clinicId, clinicName }: { clinicId: stri
   const [resetPasswordForId, setResetPasswordForId] = useState<string | null>(null);
   const [resetPasswordValue, setResetPasswordValue] = useState("");
   const [resettingPassword, setResettingPassword] = useState(false);
+  const [editingNameForId, setEditingNameForId] = useState<string | null>(null);
+  const [editingNameValue, setEditingNameValue] = useState("");
+  const [savingName, setSavingName] = useState(false);
 
   async function loadAttendants() {
     setLoading(true);
@@ -50,6 +53,8 @@ export function ClinicAttendantsModal({ clinicId, clinicName }: { clinicId: stri
       setEditingMaxChats({});
       setResetPasswordForId(null);
       setResetPasswordValue("");
+      setEditingNameForId(null);
+      setEditingNameValue("");
     }
   }
 
@@ -101,6 +106,27 @@ export function ClinicAttendantsModal({ clinicId, clinicName }: { clinicId: stri
       toast.error(error instanceof Error ? error.message : "Erro ao atualizar limite.");
     } finally {
       setSavingMaxChatsId(null);
+    }
+  }
+
+  async function handleSaveName(attendantId: string) {
+    if (!editingNameValue.trim()) {
+      toast.error("O nome não pode ficar em branco.");
+      return;
+    }
+    setSavingName(true);
+    try {
+      await updateAttendantName(attendantId, editingNameValue.trim());
+      setAttendants((prev) =>
+        prev.map((a) => (a.id === attendantId ? { ...a, name: editingNameValue.trim() } : a))
+      );
+      toast.success("Nome atualizado.");
+      setEditingNameForId(null);
+      setEditingNameValue("");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Erro ao atualizar nome.");
+    } finally {
+      setSavingName(false);
     }
   }
 
@@ -158,16 +184,57 @@ export function ClinicAttendantsModal({ clinicId, clinicName }: { clinicId: stri
                 const currentMax = editingMaxChats[attendant.id] ?? attendant.maxConcurrentChats;
                 const maxChanged = editingMaxChats[attendant.id] !== undefined && editingMaxChats[attendant.id] !== attendant.maxConcurrentChats;
                 const isResettingThis = resetPasswordForId === attendant.id;
+                const isEditingNameThis = editingNameForId === attendant.id;
 
                 return (
                   <div key={attendant.id} className="p-3 space-y-2">
                     <div className="flex items-center justify-between gap-2">
-                      <div className="min-w-0">
-                        <p className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">{attendant.name}</p>
+                      <div className="min-w-0 flex-1">
+                        {isEditingNameThis ? (
+                          <div className="flex items-center gap-1.5">
+                            <label htmlFor={`edit-name-${attendant.id}`} className="sr-only">
+                              Nome de {attendant.name}
+                            </label>
+                            <input
+                              id={`edit-name-${attendant.id}`}
+                              type="text"
+                              value={editingNameValue}
+                              onChange={(e) => setEditingNameValue(e.target.value)}
+                              autoFocus
+                              className="flex-1 min-w-0 px-2 py-1 text-xs font-bold rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                            />
+                            <button
+                              type="button"
+                              disabled={savingName}
+                              onClick={() => handleSaveName(attendant.id)}
+                              title="Salvar nome"
+                              aria-label="Salvar nome"
+                              className="shrink-0 inline-flex items-center justify-center w-7 h-7 rounded-lg text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+                            >
+                              {savingName ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                            </button>
+                          </div>
+                        ) : (
+                          <p className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">{attendant.name}</p>
+                        )}
                         <p className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1 truncate">
                           <Mail className="w-3 h-3 shrink-0" /> {attendant.email}
                         </p>
                       </div>
+                      {!isEditingNameThis && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingNameForId(attendant.id);
+                            setEditingNameValue(attendant.name);
+                          }}
+                          title="Editar nome"
+                          aria-label="Editar nome"
+                          className="shrink-0 inline-flex items-center justify-center w-7 h-7 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-100 transition-colors"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                       <button
                         type="button"
                         onClick={() => {

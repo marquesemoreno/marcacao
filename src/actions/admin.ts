@@ -255,6 +255,20 @@ export async function resetAttendantPassword(userId: string, newPassword: string
   return { success: true as const };
 }
 
+/** Admin corrige o nome de exibição de uma atendente (ex: nome cadastrado errado/incompleto). */
+export async function updateAttendantName(userId: string, name: string) {
+  await requireAdminSession();
+  const trimmed = name.trim();
+  if (!trimmed) {
+    throw new Error("O nome não pode ficar em branco.");
+  }
+  await prisma.user.update({ where: { id: userId }, data: { name: trimmed } });
+  revalidatePath("/admin/clinicas");
+  revalidatePath("/admin/inbox");
+  revalidatePath("/clinic/inbox");
+  return { success: true as const };
+}
+
 /** Atendentes (role CLINIC) cadastrados numa clínica — pra exibir/gerenciar no painel admin. */
 export async function listClinicUsers(clinicId: string) {
   await requireAdminSession();
