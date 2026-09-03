@@ -399,9 +399,9 @@ export async function resendMessageAdmin(messageId: string) {
     where: { id: messageId },
     include: { conversation: { include: { contact: true } } },
   });
-  if (!message) throw new Error("Mensagem não encontrada");
+  if (!message) return { success: false as const, error: "Mensagem não encontrada" };
   if (message.direction !== "OUTBOUND" || message.type === "INTERNAL_NOTE") {
-    throw new Error("Essa mensagem não pode ser reenviada.");
+    return { success: false as const, error: "Essa mensagem não pode ser reenviada." };
   }
 
   await prisma.message.update({ where: { id: messageId }, data: { status: "SENT" } });
@@ -409,9 +409,13 @@ export async function resendMessageAdmin(messageId: string) {
   const clinicId = message.conversation.clinicId;
 
   if (message.type === "ATTACHMENT" || message.type === "AUDIO") {
-    if (!message.mediaPath) throw new Error("Arquivo original não encontrado para reenviar.");
+    if (!message.mediaPath) {
+      return { success: false as const, error: "Arquivo original não encontrado para reenviar." };
+    }
     const signedUrl = await getSignedMediaUrl(message.mediaPath);
-    if (!signedUrl) throw new Error("Não foi possível gerar o link do arquivo.");
+    if (!signedUrl) {
+      return { success: false as const, error: "Não foi possível gerar o link do arquivo." };
+    }
 
     const result =
       message.type === "AUDIO"
@@ -428,7 +432,7 @@ export async function resendMessageAdmin(messageId: string) {
 
     if (!result.success && !result.skipped) {
       await prisma.message.update({ where: { id: messageId }, data: { status: "FAILED" } });
-      throw new Error("Falha ao reenviar. Tente novamente em instantes.");
+      return { success: false as const, error: "Falha ao reenviar. Verifique se o número do contato está correto." };
     }
     if (result.keyId) {
       await prisma.message.update({ where: { id: messageId }, data: { whatsappKeyId: result.keyId } });
@@ -437,7 +441,7 @@ export async function resendMessageAdmin(messageId: string) {
     const result = await whatsappService.sendMessage(phone, message.content, "chat.retry_admin", clinicId);
     if (!result.success && !result.skipped) {
       await prisma.message.update({ where: { id: messageId }, data: { status: "FAILED" } });
-      throw new Error("Falha ao reenviar. Tente novamente em instantes.");
+      return { success: false as const, error: "Falha ao reenviar. Verifique se o número do contato está correto." };
     }
     if (result.keyId) {
       await prisma.message.update({ where: { id: messageId }, data: { whatsappKeyId: result.keyId } });
@@ -446,6 +450,7 @@ export async function resendMessageAdmin(messageId: string) {
 
   revalidatePath("/admin/inbox");
   notifyInboxRealtime().catch(() => {});
+  return { success: true as const };
 }
 
 export async function getAttendantCapacityAdmin() {

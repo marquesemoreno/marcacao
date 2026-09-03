@@ -676,13 +676,13 @@ export function ChatCrmApp({ scope, basePath, view }: ChatCrmAppProps) {
   }
 
   async function handleRetryMessage(messageId: string) {
-    try {
-      await actions.resendMessage(messageId);
-      toast.success("Mensagem reenviada!");
-      await refreshMessages();
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Não foi possível reenviar a mensagem.");
+    const result = await actions.resendMessage(messageId);
+    if (!result.success) {
+      toast.error(result.error || "Não foi possível reenviar a mensagem.");
+      return;
     }
+    toast.success("Mensagem reenviada!");
+    await refreshMessages();
   }
 
   async function handleTransferAgent(agentId: string) {
