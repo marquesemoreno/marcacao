@@ -165,11 +165,13 @@ export function ChatCrmApp({ scope, basePath, view }: ChatCrmAppProps) {
   const photoFetchQueueRef = useRef<string[]>([]);
   const isDrainingPhotoQueueRef = useRef(false);
   const contactCacheRef = useRef<Map<string, Contact>>(new Map());
-  /** true logo depois do ESC fechar a conversa — impede o refresh seguinte de já
-   * escolher a primeira conversa da fila sozinho, que é o comportamento certo pra
-   * "sem seleção ainda" (primeiro carregamento) mas não pra "fechei de propósito".
-   * Some assim que a atendente seleciona qualquer conversa de novo (selectContact). */
-  const suppressAutoSelectRef = useRef(false);
+  /** Começa true: abrir a tela de chat não deve escolher uma conversa sozinho (só a
+   * barra lateral), a menos que tenha link direto pra uma (searchParams "c" na URL,
+   * que já entra no selectedContactId inicial e passa direto pelo "if (current)"
+   * abaixo). Também fica true logo depois do ESC fechar a conversa, pelo mesmo
+   * motivo. Some assim que a atendente seleciona qualquer conversa (selectContact)
+   * ou troca de aba/clínica (aí sim é esperado mostrar a primeira do contexto novo). */
+  const suppressAutoSelectRef = useRef(true);
 
   const [attendantCapacity, setAttendantCapacity] = useState<{ activeCount: number; maxLimit: number } | null>(null);
   const [availableClinics, setAvailableClinics] = useState<{ id: string; tradeName: string }[]>([]);
@@ -256,22 +258,22 @@ export function ChatCrmApp({ scope, basePath, view }: ChatCrmAppProps) {
   }, [filterTab, clinicFilter]);
 
   // ESC fecha a conversa aberta — mesmo "soltar a seleção" usado acima quando o
-  // atendente troca de aba/clínica, só que agora por atalho de teclado. Dispara mesmo
-  // com foco no campo de digitar mensagem: é justamente onde o foco costuma estar
-  // quando a atendente está olhando uma conversa, então uma trava ali fazia o atalho
-  // nunca funcionar na prática.
+  // atendente troca de aba/clínica, só que agora por atalho de teclado. Causa raiz
+  // confirmada via inspeção do bundle em produção: o Base UI (usado nos Dialogs do
+  // projeto) registra seu próprio listener de ESC em WINDOW, fase de captura, e
+  // chama stopPropagation quando algum elemento flutuante interno está "aberto" —
+  // isso impedia o evento de sequer chegar em `document`, onde esse listener estava
+  // antes. Registrando em WINDOW (checado antes de document na fase de captura) e
+  // no mount do componente (antes de qualquer dialog abrir), o evento passa por
+  // aqui primeiro.
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key !== 'Escape') return;
       suppressAutoSelectRef.current = true;
       setSelectedContactId(null);
     }
-    // Fase de CAPTURA (3º argumento true): roda antes de qualquer handler de
-    // ESC de outro componente no caminho do clique (dialog, toast, etc.) que
-    // possa chamar stopPropagation — sem isso, dependendo de onde o foco
-    // estava, o ESC nunca chegava até aqui.
-    document.addEventListener('keydown', handleKeyDown, true);
-    return () => document.removeEventListener('keydown', handleKeyDown, true);
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => window.removeEventListener('keydown', handleKeyDown, true);
   }, []);
 
   // Busca a foto de perfil do WhatsApp só pra contatos que ainda não têm.
