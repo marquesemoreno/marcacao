@@ -58,6 +58,15 @@ export function formatWhatsAppNumber(phone: string): string {
   return formatToWhatsAppNumber(phone);
 }
 
+/** Um celular brasileiro normalizado é sempre DDI(2) + DDD(2) + 9 dígitos = 13.
+ * Números que não se encaixam em nenhuma correção de formatToWhatsAppNumber
+ * (ex: dígito a mais/a menos, sem DDI) saem do tamanho errado e por isso não
+ * chegam a um destino válido na Evolution API. */
+export function isValidWhatsAppNumber(phone: string): boolean {
+  const digits = formatToWhatsAppNumber(phone);
+  return digits.length === 13 && digits.startsWith("55");
+}
+
 function getGlobalEvolutionConfig() {
   const apiUrl = process.env.EVOLUTION_API_URL || process.env.WHATSAPP_API_URL || "https://evolution.tivdc.com.br";
   const apiKey = process.env.EVOLUTION_API_KEY || process.env.WHATSAPP_API_KEY;

@@ -99,7 +99,7 @@ const ACTIONS_BY_SCOPE = {
     sendMediaMessage: (id: string, formData: FormData) => sendMediaMessage(id, formData),
     updateConversationTags: (id: string, tags: string[]) => updateConversationTags(id, tags),
     updateConversationFunnelStage: (id: string, stage: FunnelStage) => updateConversationFunnelStage(id, stage),
-    updateContactInfo: (id: string, data: { name: string; cpf?: string }) => updateContactInfo(id, data),
+    updateContactInfo: (id: string, data: { name: string; cpf?: string; phone?: string }) => updateContactInfo(id, data),
     refreshContactPhoto: (id: string) => refreshContactPhoto(id),
     assignConversationToUser: (id: string, userId: string | null) => assignConversationToUser(id, userId ?? ""),
     resolveConversation: (id: string, data?: { reason: string; notes?: string }) => resolveConversation(id, data),
@@ -123,7 +123,7 @@ const ACTIONS_BY_SCOPE = {
     sendMediaMessage: (id: string, formData: FormData) => sendMediaMessageAdmin(id, formData),
     updateConversationTags: (id: string, tags: string[]) => updateConversationTagsAdmin(id, tags),
     updateConversationFunnelStage: (id: string, stage: FunnelStage) => updateConversationFunnelStageAdmin(id, stage),
-    updateContactInfo: (id: string, data: { name: string; cpf?: string }) => updateContactInfoAdmin(id, data),
+    updateContactInfo: (id: string, data: { name: string; cpf?: string; phone?: string }) => updateContactInfoAdmin(id, data),
     refreshContactPhoto: (id: string) => refreshContactPhotoAdmin(id),
     assignConversationToUser: (id: string, userId: string | null) => assignConversationToUserAdmin(id, userId),
     resolveConversation: (id: string, data?: { reason: string; notes?: string }) => resolveConversationAdmin(id, data),
@@ -547,10 +547,13 @@ export function ChatCrmApp({ scope, basePath, view }: ChatCrmAppProps) {
     await refreshContacts();
   }
 
-  async function handleUpdatePatient(data: { name: string; cpf?: string }) {
-    if (!selectedContact) return;
-    await actions.updateContactInfo(selectedContact.id, data);
-    await refreshContacts();
+  async function handleUpdatePatient(data: { name: string; cpf?: string; phone?: string }) {
+    if (!selectedContact) return { success: false as const, error: "Nenhuma conversa selecionada." };
+    const result = await actions.updateContactInfo(selectedContact.id, data);
+    if (result.success) {
+      await refreshContacts();
+    }
+    return result;
   }
 
   async function handleUpdateFunnelStage(stage: FunnelStage) {

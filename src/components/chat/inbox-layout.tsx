@@ -115,7 +115,11 @@ interface InboxLayoutProps {
   onSendMedia: (file: File) => Promise<void> | void;
   onAddTag: (tag: string) => Promise<void> | void;
   onRemoveTag: (tag: string) => Promise<void> | void;
-  onUpdatePatient: (data: { name: string; cpf?: string }) => Promise<void> | void;
+  onUpdatePatient: (data: {
+    name: string;
+    cpf?: string;
+    phone?: string;
+  }) => Promise<{ success: boolean; error?: string } | void> | { success: boolean; error?: string } | void;
   onUpdateFunnelStage: (stage: FunnelStage) => Promise<void> | void;
   onClaimConversation?: () => Promise<void> | void;
   onMarkUnread?: () => Promise<void> | void;
@@ -253,6 +257,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
   const [isEditingPatient, setIsEditingPatient] = useState(false);
   const [editPatientName, setEditPatientName] = useState('');
   const [editPatientCpf, setEditPatientCpf] = useState('');
+  const [editPatientPhone, setEditPatientPhone] = useState('');
   const [isSavingPatientEdits, setIsSavingPatientEdits] = useState(false);
 
   // Confirmação de transferência de atendimento — reatribuir um paciente pra outro
@@ -472,7 +477,15 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
     if (!editPatientName.trim()) return;
     setIsSavingPatientEdits(true);
     try {
-      await onUpdatePatient({ name: editPatientName, cpf: editPatientCpf || undefined });
+      const result = await onUpdatePatient({
+        name: editPatientName,
+        cpf: editPatientCpf || undefined,
+        phone: editPatientPhone || undefined,
+      });
+      if (result && !result.success) {
+        toast.error(result.error || "Não foi possível atualizar os dados do paciente.");
+        return;
+      }
       toast.success("Dados do paciente atualizados com sucesso!");
       setIsEditingPatient(false);
     } catch (error) {
@@ -1292,6 +1305,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                   onClick={() => {
                     setEditPatientName(selectedContact.name);
                     setEditPatientCpf(selectedContact.cpf || '');
+                    setEditPatientPhone(selectedContact.phone);
                     setIsEditingPatient(!isEditingPatient);
                   }}
                   className="p-2.5 -m-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 shrink-0"
@@ -1318,6 +1332,16 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                       type="text"
                       value={editPatientCpf}
                       onChange={(e) => setEditPatientCpf(e.target.value)}
+                      className="w-full px-2 py-1 text-xs border rounded-lg bg-white dark:bg-slate-900 dark:border-slate-700 text-slate-900 dark:text-slate-100"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">Telefone (WhatsApp):</label>
+                    <input
+                      type="text"
+                      value={editPatientPhone}
+                      onChange={(e) => setEditPatientPhone(e.target.value)}
+                      placeholder="Ex: 77999998888"
                       className="w-full px-2 py-1 text-xs border rounded-lg bg-white dark:bg-slate-900 dark:border-slate-700 text-slate-900 dark:text-slate-100"
                     />
                   </div>

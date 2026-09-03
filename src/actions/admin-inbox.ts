@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { ConversationStatus, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireAdminSession } from "@/lib/session";
-import { whatsappService, sendWhatsAppMedia, sendWhatsAppAudio, formatToWhatsAppNumber, fetchWhatsAppProfilePicture } from "@/lib/whatsapp";
+import { whatsappService, sendWhatsAppMedia, sendWhatsAppAudio, formatToWhatsAppNumber, isValidWhatsAppNumber, fetchWhatsAppProfilePicture } from "@/lib/whatsapp";
 import { hasHospitalBridgeIntegration, fetchBridgeProcedures, fetchBridgeDoctors, fetchBridgeAgenda, fetchBridgeConvenios, fetchBridgePatients, adaptBridgeProcedureToPlainItem } from "@/lib/hospital-bridge";
 import { toPlainClinicProcedureItem } from "@/lib/serialize";
 import { departmentToDb, funnelStageToDb, toChatContact, toChatMessage } from "@/lib/chat-crm-adapters";
@@ -138,8 +138,8 @@ export async function createContactAdmin(name: string, phone: string, clinicId: 
     throw new Error("Informe o nome do contato.");
   }
   const fullPhone = formatToWhatsAppNumber(phone);
-  if (fullPhone.length < 12) {
-    throw new Error("Telefone inválido. Informe com DDD (ex: 77999998888).");
+  if (!isValidWhatsAppNumber(fullPhone)) {
+    throw new Error("Telefone inválido. Informe com DDD e 9 dígitos (ex: 77999998888).");
   }
 
   const contact = await prisma.contact.upsert({
@@ -544,12 +544,12 @@ export async function updateConversationTagsAdmin(conversationId: string, tags: 
   revalidatePath("/admin/inbox");
 }
 
-export async function updateContactInfoAdmin(conversationId: string, data: { name: string; cpf?: string }) {
+export async function updateContactInfoAdmin(conversationId: string, data: { name: string; cpf?: string; phone?: string }) {
   await requireAdminSession();
 
   const trimmedName = data.name.trim();
   if (trimmedName.length < 2) {
-    throw new Error("Informe o nome do paciente.");
+    return { success: false as const, error: "Informe o nome do paciente." };
   }
 
   const conversation = await prisma.conversation.findUnique({
@@ -557,14 +557,30 @@ export async function updateContactInfoAdmin(conversationId: string, data: { nam
     select: { contactId: true },
   });
   if (!conversation) {
-    throw new Error("Conversa não encontrada");
+    return { success: false as const, error: "Conversa não encontrada" };
   }
 
-  await prisma.contact.update({
-    where: { id: conversation.contactId },
-    data: { name: trimmedName, cpf: data.cpf?.trim() || null },
-  });
+  let fullPhone: string | undefined;
+  if (data.phone !== undefined) {
+    fullPhone = formatToWhatsAppNumber(data.phone);
+    if (!isValidWhatsAppNumber(fullPhone)) {
+      return { success: false as const, error: "Telefone inválido. Informe com DDD e 9 dígitos (ex: 77999998888)." };
+    }
+  }
+
+  try {
+    await prisma.contact.update({
+      where: { id: conversation.contactId },
+      data: { name: trimmedName, cpf: data.cpf?.trim() || null, ...(fullPhone ? { phone: fullPhone } : {}) },
+    });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      return { success: false as const, error: "Esse telefone já está cadastrado em outro contato." };
+    }
+    throw error;
+  }
   revalidatePath("/admin/inbox");
+  return { success: true as const };
 }
 
 export async function refreshContactPhotoAdmin(conversationId: string) {
