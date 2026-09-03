@@ -291,13 +291,6 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
     selectedContactId ? 'chat' : 'queue'
   );
 
-  // Auto-seleção no Desktop: se nenhuma conversa estiver selecionada, seleciona a 1ª
-  React.useEffect(() => {
-    if (!selectedContactId && contacts.length > 0 && typeof window !== "undefined" && window.innerWidth >= 1024) {
-      onSelectContact(contacts[0].id);
-    }
-  }, [selectedContactId, contacts, onSelectContact]);
-
   const handleSelectContactMobile = (id: string) => {
     onSelectContact(id);
     setMobileView('chat');
