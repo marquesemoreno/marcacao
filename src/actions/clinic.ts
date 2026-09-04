@@ -104,9 +104,13 @@ export async function updateAppointmentStatus(appointmentId: string, status: App
     include: { clinicProcedure: { include: { clinic: true, procedure: true } } },
   });
 
-  notifyAppointmentStatus(validStatus, updated).catch((error) => {
+  // Com `await` — ver nota em appointments.ts sobre fire-and-forget não
+  // sobreviver ao encerramento da função serverless na Vercel.
+  try {
+    await notifyAppointmentStatus(validStatus, updated);
+  } catch (error) {
     console.error("Falha ao notificar mudança de status via WhatsApp:", error);
-  });
+  }
 
   revalidatePath("/clinic/agendamentos");
   revalidatePath("/clinic");

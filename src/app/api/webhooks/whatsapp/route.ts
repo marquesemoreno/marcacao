@@ -604,7 +604,13 @@ export async function POST(request: Request) {
         newStatus === "CONFIRMED"
           ? "Presença confirmada, obrigado! Até lá. 😊"
           : "Entendido, obrigado por avisar! Se quiser remarcar, é só chamar por aqui.";
-      sendWhatsAppMessage(incoming.phone, ackText, "appointment.bridge_reply_ack", resolvedClinicId).catch(() => {});
+      // Com `await` — ver nota mais abaixo sobre fire-and-forget não sobreviver
+      // ao encerramento da função serverless na Vercel.
+      try {
+        await sendWhatsAppMessage(incoming.phone, ackText, "appointment.bridge_reply_ack", resolvedClinicId);
+      } catch (error) {
+        console.error("Falha ao enviar confirmação de resposta ao lembrete (bridge):", error);
+      }
       notifyInboxRealtime().catch(() => {});
     }
     await logInbound(
@@ -628,14 +634,23 @@ export async function POST(request: Request) {
     "SUCCESS"
   );
 
-  // Se confirmado com "1" ou "SIM", envia a Guia Oficial com QR Code.
+  // Se confirmado com "1" ou "SIM", envia a Guia Oficial com QR Code. Com
+  // `await` em ambos os ramos — sem esperar, a função serverless da Vercel
+  // pode encerrar antes do envio em segundo plano terminar (confirmado em
+  // produção com a confirmação do bridge: ver hospital-bridge.ts).
   if (newStatus === "CONFIRMED") {
-    sendAppointmentConfirmation(updated).catch((error) => {
+    try {
+      await sendAppointmentConfirmation(updated);
+    } catch (error) {
       console.error("Falha ao enviar confirmação com Guia QR Code:", error);
-    });
+    }
   } else if (newStatus === "CANCELLED") {
     const cancelMsg = `Olá ${updated.patientName}! Seu agendamento para ${updated.clinicProcedure.procedure.name} na ${updated.clinicProcedure.clinic.tradeName} foi cancelado com sucesso. Caso precise remarcar, acesse nosso site!`;
-    sendWhatsAppMessage(updated.patientPhone, cancelMsg, "appointment.cancelled.ack").catch(() => {});
+    try {
+      await sendWhatsAppMessage(updated.patientPhone, cancelMsg, "appointment.cancelled.ack");
+    } catch (error) {
+      console.error("Falha ao enviar confirmação de cancelamento:", error);
+    }
   }
 
   return NextResponse.json({ ok: true, status: newStatus }, { status: 200 });

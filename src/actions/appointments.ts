@@ -88,10 +88,16 @@ export async function createAppointment(input: CreateAppointmentInput) {
     include: { clinicProcedure: { include: { clinic: true, procedure: true } } },
   });
 
-  // Dispara a mensagem oficial de confirmação no WhatsApp via Evolution API v2 sem segurar a resposta
-  sendAppointmentConfirmation(appointment).catch((error) => {
+  // Dispara a mensagem oficial de confirmação no WhatsApp via Evolution API v2.
+  // Com `await` — sem esperar, a função serverless da Vercel pode encerrar antes
+  // do envio em segundo plano terminar (confirmado em produção: agendamento
+  // gravava certinho, mensagem nunca saía). Em try/catch isolado: o agendamento
+  // já é real a essa altura, uma falha só no envio não pode derrubar a resposta.
+  try {
+    await sendAppointmentConfirmation(appointment);
+  } catch (error) {
     console.error("Falha ao notificar novo agendamento via WhatsApp:", error);
-  });
+  }
 
   // Serializado (Decimal -> number) porque esta action é chamada direto de
   // Client Components (BookingDialog, CreateAppointmentShortcut do inbox) —
