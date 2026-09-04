@@ -197,6 +197,7 @@ model Clinic {
   hospitalIntegration HospitalIntegration?
   aiAttendantConfig   AiAttendantConfig?
   broadcastCampaigns  BroadcastCampaign[]
+  bridgeReminderLogs  BridgeReminderLog[]
 
   @@map("clinics")
 }
@@ -246,6 +247,22 @@ model HospitalIntegration {
   clinic Clinic @relation(fields: [clinicId], references: [id])
 
   @@map("hospital_integrations")
+}
+
+/// Controla quais agendamentos do bridge (Firebird) já receberam o lembrete D-1
+/// automático (ver dispatchBridgeReminders) — evita mandar duplicado se o cron
+/// rodar mais de uma vez no mesmo dia. bridgeNumero é o MARCACAO.NUMERO real da
+/// clínica, não um id nosso.
+model BridgeReminderLog {
+  id           String   @id @default(cuid())
+  clinicId     String   @map("clinic_id")
+  bridgeNumero Int      @map("bridge_numero")
+  sentAt       DateTime @default(now()) @map("sent_at")
+
+  clinic Clinic @relation(fields: [clinicId], references: [id])
+
+  @@unique([clinicId, bridgeNumero])
+  @@map("bridge_reminder_logs")
 }
 
 /// Config do atendente de IA da clínica (OpenAI) — uma linha por clínica, editável via

@@ -148,6 +148,36 @@ export async function fetchBridgeAgenda(clinicId: string, medicoId: number, date
   }
 }
 
+export type BridgeDailyAppointment = {
+  numero: number;
+  paciente: string;
+  telefone: string;
+  hora: string | null;
+  procedimento: string | null;
+  medico: string | null;
+};
+
+/** Agenda completa de um dia (todos os médicos), só quem tem telefone achado no
+ * Firebird — usada pro lembrete D-1 automático (ver src/lib/bridge-reminders.ts). */
+export async function fetchBridgeDailyAgenda(clinicId: string, date: string): Promise<BridgeDailyAppointment[]> {
+  const config = await getBridgeConfig(clinicId);
+  if (!config) return [];
+  try {
+    const url = new URL(`${config.apiUrl}/api/agenda-do-dia`);
+    url.searchParams.set("data", date);
+    const response = await fetch(url, {
+      headers: { "x-api-token": config.apiToken },
+      signal: AbortSignal.timeout(15000),
+      cache: "no-store",
+    });
+    if (!response.ok) return [];
+    const data = await response.json();
+    return Array.isArray(data?.agendamentos) ? data.agendamentos : [];
+  } catch {
+    return [];
+  }
+}
+
 export function adaptBridgeProcedureToPlainItem(clinicId: string, proc: BridgeProcedure): PlainClinicProcedureItem {
   const now = new Date();
   const id = toBridgeProcedureId(clinicId, proc.id);

@@ -587,11 +587,34 @@ export async function POST(request: Request) {
   });
 
   if (!appointment) {
+    // Sem Appointment nosso — comum pra agendamento que veio da agenda do bridge
+    // (lembrete D-1 automático, ver dispatchBridgeReminders), marcado direto na
+    // recepção sem passar pelo nosso fluxo de agendamento. Mesmo assim registra
+    // a resposta na conversa pra atendente ver e agir manualmente — não dá pra
+    // atualizar de volta o Firebird, o bridge hoje só insere, nunca atualiza.
+    if (conversation) {
+      const noteText =
+        newStatus === "CONFIRMED"
+          ? "✅ Paciente confirmou presença via WhatsApp (resposta ao lembrete)."
+          : "❌ Paciente avisou que não vai comparecer / quer cancelar (resposta ao lembrete).";
+      await prisma.message.create({
+        data: { conversationId: conversation.id, direction: "OUTBOUND", type: "INTERNAL_NOTE", content: noteText, status: "SENT" },
+      });
+      const ackText =
+        newStatus === "CONFIRMED"
+          ? "Presença confirmada, obrigado! Até lá. 😊"
+          : "Entendido, obrigado por avisar! Se quiser remarcar, é só chamar por aqui.";
+      sendWhatsAppMessage(incoming.phone, ackText, "appointment.bridge_reply_ack", resolvedClinicId).catch(() => {});
+      notifyInboxRealtime().catch(() => {});
+    }
     await logInbound(
       { phone: incoming.phone, text: incoming.text, reason: "nenhum agendamento ativo encontrado para este número" },
-      "FAILED"
+      conversation ? "SUCCESS" : "FAILED"
     );
-    return NextResponse.json({ ok: true, status: "no_active_appointment" }, { status: 200 });
+    return NextResponse.json(
+      { ok: true, status: conversation ? "no_appointment_but_noted" : "no_active_appointment" },
+      { status: 200 }
+    );
   }
 
   const updated = await prisma.appointment.update({
