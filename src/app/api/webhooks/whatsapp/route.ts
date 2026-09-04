@@ -329,15 +329,43 @@ export async function POST(request: Request) {
 
   // FASE DE CAPTURA (não processa ainda) — sincronização de histórico
   // (syncFullHistory, ver setEvolutionSyncFullHistory) chega por esse evento
-  // separado, formato ainda não documentado oficialmente. Só grava o payload
-  // bruto pra inspecionar antes de escrever qualquer lógica de importação —
-  // não criar Contact/Conversation/Message às cegas aqui.
+  // separado, formato ainda não documentado oficialmente. Extrai só o essencial
+  // de cada mensagem (quem/quando/tipo/texto curto) — os metadados de mídia
+  // (fileSha256, mediaKey etc, como array de bytes no JSON) infla cada lote pra
+  // vários MB à toa; guardar isso bruto estourava o limite de truncamento e
+  // corrompia o JSON salvo. Ainda não cria Contact/Conversation/Message aqui.
   if (bodyRec.event === "messages.set") {
-    const raw = JSON.stringify(body);
+    const rawMessages = Array.isArray(dataPayload) ? dataPayload : Array.isArray(bodyRec.data) ? (bodyRec.data as unknown[]) : [];
+    const summarized = (rawMessages as Record<string, unknown>[]).map((m) => {
+      const key = m.key as Record<string, unknown> | undefined;
+      const message = m.message as Record<string, unknown> | undefined;
+      const text =
+        (message?.conversation as string | undefined) ??
+        (message?.extendedTextMessage as Record<string, unknown> | undefined)?.text ??
+        (message?.imageMessage as Record<string, unknown> | undefined)?.caption ??
+        (message?.videoMessage as Record<string, unknown> | undefined)?.caption ??
+        (message?.documentMessage as Record<string, unknown> | undefined)?.caption ??
+        null;
+      return {
+        remoteJid: key?.remoteJid ?? null,
+        fromMe: key?.fromMe ?? null,
+        pushName: m.pushName ?? null,
+        messageType: m.messageType ?? (message ? Object.keys(message)[0] : null),
+        messageTimestamp: m.messageTimestamp ?? null,
+        status: m.status ?? null,
+        text,
+      };
+    });
     await prisma.webhookLog.create({
       data: {
         event: "whatsapp.history_sync_capture",
-        payload: { instance: instanceNameFromPayload ?? null, raw: raw.slice(0, 500000), truncated: raw.length > 500000, length: raw.length },
+        payload: {
+          instance: instanceNameFromPayload ?? null,
+          isLatest: bodyRec.isLatest ?? null,
+          progress: bodyRec.progress ?? null,
+          count: summarized.length,
+          messages: summarized,
+        },
         status: "SUCCESS",
         responseCode: null,
       },
