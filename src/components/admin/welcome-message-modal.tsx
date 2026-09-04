@@ -91,11 +91,11 @@ export function WelcomeMessageModal({
           >
             <span>{enabled ? "Ativada" : "Desativada"}</span>
             <span
-              className={`w-9 h-5 rounded-full relative transition-colors ${enabled ? "bg-emerald-500" : "bg-slate-300 dark:bg-slate-600"}`}
+              className={`w-9 h-5 rounded-full relative shrink-0 overflow-hidden transition-colors ${enabled ? "bg-emerald-500" : "bg-slate-300 dark:bg-slate-600"}`}
             >
               <span
-                className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-transform ${
-                  enabled ? "translate-x-4" : "translate-x-0.5"
+                className={`absolute left-0.5 top-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-transform ${
+                  enabled ? "translate-x-4" : "translate-x-0"
                 }`}
               />
             </span>
