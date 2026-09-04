@@ -1,6 +1,8 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import type { PlainClinicProcedureItem, PlainAppointment } from "@/lib/serialize";
+import { sendWhatsAppMessage } from "@/lib/whatsapp";
+import { buildBridgeConfirmationMessage } from "@/lib/bridge-confirmation";
 
 /**
  * Prefixo que marca um id de procedimento/agendamento como vindo do sistema
@@ -264,6 +266,28 @@ export async function createBridgeAppointment(
 
   const clinic = await prisma.clinic.findUnique({ where: { id: clinicId } });
   if (!clinic) throw new Error("Clínica com integração hospitalar não encontrada.");
+
+  // Confirmação automática — antes disso não existia nenhuma mensagem pro
+  // agendamento feito pelo bridge (createAppointment não chama
+  // sendAppointmentConfirmation nesse caminho, ela é só pro marketplace), e as
+  // atendentes digitavam esse texto na mão a cada vez. Busca o nome do médico
+  // à parte (o bridge só devolve o id na resposta do POST). Fire-and-forget,
+  // igual às outras confirmações — não pode atrasar/derrubar a resposta pro
+  // atendente por causa disso.
+  (async () => {
+    const doctors = input.medicoId ? await fetchBridgeDoctors(clinicId) : [];
+    const doctor = doctors.find((d) => String(d.id) === String(input.medicoId));
+    const [year, month, day] = input.date.split("-");
+    const messageText = buildBridgeConfirmationMessage({
+      procedureName: procedure.nome,
+      doctorName: doctor?.nome ?? null,
+      dateFormatted: `${day}/${month}/${year}`,
+      time: input.timeSlot || null,
+    });
+    return sendWhatsAppMessage(input.patientPhone, messageText, "appointment.bridge_confirmation", clinicId);
+  })().catch((error) => {
+    console.error("Falha ao enviar confirmação do agendamento (bridge):", error);
+  });
 
   // Espelha o agendamento (já real no Firebird a essa altura) num Appointment de
   // verdade no nosso Postgres — só pra relatório (getFinancialReport etc já
