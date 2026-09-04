@@ -327,6 +327,24 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, status: "message_deleted" }, { status: 200 });
   }
 
+  // FASE DE CAPTURA (não processa ainda) — sincronização de histórico
+  // (syncFullHistory, ver setEvolutionSyncFullHistory) chega por esse evento
+  // separado, formato ainda não documentado oficialmente. Só grava o payload
+  // bruto pra inspecionar antes de escrever qualquer lógica de importação —
+  // não criar Contact/Conversation/Message às cegas aqui.
+  if (bodyRec.event === "messages.set") {
+    const raw = JSON.stringify(body);
+    await prisma.webhookLog.create({
+      data: {
+        event: "whatsapp.history_sync_capture",
+        payload: { instance: instanceNameFromPayload ?? null, raw: raw.slice(0, 500000), truncated: raw.length > 500000, length: raw.length },
+        status: "SUCCESS",
+        responseCode: null,
+      },
+    });
+    return NextResponse.json({ ok: true, status: "history_sync_captured" }, { status: 200 });
+  }
+
   // =========================================================================
   // 1. TRAVA ANTI-LOOP: ignora mensagens enviadas pela própria instância / bot / atendente
   // =========================================================================

@@ -67,7 +67,10 @@ export async function createEvolutionInstance(config: EvolutionInstanceConfig) {
   });
 }
 
-/** Configura o webhook da instância pra apontar pro endpoint compartilhado do projeto. */
+/** Configura o webhook da instância pra apontar pro endpoint compartilhado do projeto.
+ * MESSAGES_SET carrega a sincronização de histórico (Baileys/WhatsApp multi-dispositivo,
+ * ver setEvolutionSyncFullHistory) — sem assinar esse evento aqui, o histórico nunca
+ * chega no nosso webhook mesmo com syncFullHistory ativado na instância. */
 export async function setEvolutionWebhook(config: EvolutionInstanceConfig) {
   const webhookUrl = `${getBaseUrl()}/api/webhooks/whatsapp`;
   return evolutionFetch<unknown>(config, `/webhook/set/${config.instanceName}`, {
@@ -77,8 +80,28 @@ export async function setEvolutionWebhook(config: EvolutionInstanceConfig) {
         url: webhookUrl,
         enabled: true,
         webhookByEvents: false,
-        events: ["MESSAGES_UPSERT", "MESSAGES_UPDATE"],
+        events: ["MESSAGES_UPSERT", "MESSAGES_UPDATE", "MESSAGES_SET"],
       },
+    }),
+  });
+}
+
+/** Liga a sincronização de histórico completo (recurso nativo do WhatsApp
+ * multi-dispositivo, via Baileys) — só tem efeito prático na PRÓXIMA vez que o
+ * número for pareado (desconectar + escanear o QR Code de novo), não em uma
+ * instância já conectada. Mantém os outros campos no default (nenhuma clínica
+ * customizou nada além disso até agora) pra não resetar configuração por engano. */
+export async function setEvolutionSyncFullHistory(config: EvolutionInstanceConfig, enabled: boolean) {
+  return evolutionFetch<unknown>(config, `/settings/set/${config.instanceName}`, {
+    method: "POST",
+    body: JSON.stringify({
+      rejectCall: false,
+      msgCall: "",
+      groupsIgnore: false,
+      alwaysOnline: false,
+      readMessages: false,
+      readStatus: false,
+      syncFullHistory: enabled,
     }),
   });
 }
