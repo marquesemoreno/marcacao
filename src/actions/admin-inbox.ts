@@ -163,6 +163,60 @@ export async function createContactAdmin(name: string, phone: string, clinicId: 
   return conversation.id;
 }
 
+export type ImportContactsResult = {
+  imported: number;
+  skipped: { name: string; phone: string; reason: string }[];
+};
+
+/** Importação em massa (ver "Importar Contatos" em contacts-app.tsx) — mesma
+ * lógica de createContactAdmin por linha (upsert Contact + garante Conversation
+ * na clínica escolhida), mas processando uma lista inteira de uma vez. Uma
+ * linha com nome/telefone inválido é reportada em `skipped`, não aborta a
+ * importação das demais. */
+export async function importContactsAdmin(
+  clinicId: string,
+  rows: { name: string; phone: string; cpf?: string }[]
+): Promise<ImportContactsResult> {
+  await requireAdminSession();
+
+  const clinic = await prisma.clinic.findUnique({ where: { id: clinicId }, select: { id: true } });
+  if (!clinic) throw new Error("Clínica não encontrada");
+
+  const skipped: ImportContactsResult["skipped"] = [];
+  let imported = 0;
+
+  for (const row of rows) {
+    const trimmedName = row.name.trim();
+    if (trimmedName.length < 2) {
+      skipped.push({ name: row.name, phone: row.phone, reason: "Nome inválido" });
+      continue;
+    }
+    const fullPhone = formatToWhatsAppNumber(row.phone);
+    if (!isValidWhatsAppNumber(fullPhone)) {
+      skipped.push({ name: row.name, phone: row.phone, reason: "Telefone inválido" });
+      continue;
+    }
+
+    const contact = await prisma.contact.upsert({
+      where: { phone: fullPhone },
+      update: row.cpf?.trim() ? { cpf: row.cpf.trim() } : {},
+      create: { phone: fullPhone, name: trimmedName, cpf: row.cpf?.trim() || null },
+    });
+
+    const conversation = await prisma.conversation.findFirst({ where: { contactId: contact.id, clinicId } });
+    if (!conversation) {
+      await prisma.conversation.create({
+        data: { clinicId, contactId: contact.id, status: "OPEN", lastMessageAt: new Date() },
+      });
+    }
+    imported++;
+  }
+
+  revalidatePath("/admin/inbox");
+  notifyInboxRealtime().catch(() => {});
+  return { imported, skipped };
+}
+
 /** Corrige a clínica de uma conversa que caiu na atribuição automática errada
  * (webhook do WhatsApp usa a 1ª clínica cadastrada como fallback quando não
  * acha agendamento pendente/confirmado pro telefone — ver route.ts). */
