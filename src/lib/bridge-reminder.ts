@@ -20,5 +20,6 @@ export function buildBridgeReminderMessage(input: BridgeReminderInput): string {
 
 Por favor, responda com uma das opções abaixo:
 1️⃣ Digite 1 para Confirmar presença
-2️⃣ Digite 2 para Cancelar`;
+2️⃣ Digite 2 para Cancelar
+3️⃣ Digite 3 para Remarcar`;
 }

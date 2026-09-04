@@ -21,6 +21,8 @@ describe("buildBridgeReminderMessage", () => {
     expect(message).toContain("Urolaser");
     expect(message).toContain("1️⃣");
     expect(message).toContain("2️⃣");
+    expect(message).toContain("3️⃣");
+    expect(message.toLowerCase()).toContain("remarcar");
   });
 
   it("não quebra quando procedimento, médico ou horário vêm vazios do Firebird", () => {

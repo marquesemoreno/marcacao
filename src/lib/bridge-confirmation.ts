@@ -18,5 +18,10 @@ export function buildBridgeConfirmationMessage(input: BridgeConfirmationInput): 
   return `Agendado(a) *${input.procedureName}*${doctorText} para o dia *${input.dateFormatted}*${timeText}, por ordem de chegada!
 
 📌 *As consultas têm prazo de até 30 dias para retorno — entre em contato antes do prazo para reagendar. Passado esse prazo, será cobrada uma nova consulta.*
-💳 *Formas de pagamento: Dinheiro, Pix, Cartão de Crédito e Débito.*`;
+💳 *Formas de pagamento: Dinheiro, Pix, Cartão de Crédito e Débito.*
+
+Por favor, responda com uma das opções abaixo:
+1️⃣ Digite 1 para Confirmar presença
+2️⃣ Digite 2 para Cancelar
+3️⃣ Digite 3 para Remarcar`;
 }

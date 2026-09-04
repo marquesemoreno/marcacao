@@ -22,6 +22,16 @@ describe("buildBridgeConfirmationMessage", () => {
     expect(asteriscos % 2).toBe(0);
   });
 
+  it("dá as três opções de resposta pro paciente (confirmar/cancelar/remarcar)", () => {
+    const message = buildBridgeConfirmationMessage(base);
+    expect(message).toContain("1️⃣");
+    expect(message).toContain("2️⃣");
+    expect(message).toContain("3️⃣");
+    expect(message.toLowerCase()).toContain("confirmar");
+    expect(message.toLowerCase()).toContain("cancelar");
+    expect(message.toLowerCase()).toContain("remarcar");
+  });
+
   it("não menciona Valor R$ (removido a pedido)", () => {
     const message = buildBridgeConfirmationMessage(base);
     expect(message).not.toMatch(/valor/i);

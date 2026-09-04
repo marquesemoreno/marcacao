@@ -177,6 +177,15 @@ function resolveStatusFromReply(text: string): AppointmentStatus | null {
   return null;
 }
 
+/** "Remarcar" não é um AppointmentStatus (não temos automação de reagendar
+ * sozinho) — só sinaliza que um atendente precisa assumir e remarcar na mão.
+ * Checado só quando resolveStatusFromReply não bateu, senão "3" nunca chegaria
+ * aqui de propósito (não colide hoje, mas mantém a prioridade clara). */
+function isRescheduleReply(text: string): boolean {
+  const normalized = text.trim().toUpperCase();
+  return normalized === "3" || normalized === "REMARCAR" || normalized === "REAGENDAR";
+}
+
 async function logInbound(payload: Prisma.InputJsonValue, status: string) {
   await prisma.webhookLog.create({
     data: {
@@ -555,9 +564,46 @@ export async function POST(request: Request) {
   }
 
   // =========================================================================
-  // 3. TRATAMENTO DE COMANDOS DO PACIENTE (1 - CONFIRMAR / 2 - CANCELAR)
+  // 3. TRATAMENTO DE COMANDOS DO PACIENTE (1 - CONFIRMAR / 2 - CANCELAR / 3 - REMARCAR)
   // =========================================================================
   const newStatus = resolveStatusFromReply(incoming.text);
+
+  // "Remarcar" não muda o status do agendamento (não temos automação de
+  // reagendar sozinho) — só desatribui a conversa (some pra "Não Atribuídas")
+  // pra alguém assumir e remarcar na mão, e avisa o paciente que entendeu.
+  if (!newStatus && isRescheduleReply(incoming.text)) {
+    if (conversation) {
+      await prisma.message.create({
+        data: {
+          conversationId: conversation.id,
+          direction: "OUTBOUND",
+          type: "INTERNAL_NOTE",
+          content: "🔄 Paciente pediu para remarcar a consulta via WhatsApp.",
+          status: "SENT",
+        },
+      });
+      await prisma.conversation.update({
+        where: { id: conversation.id },
+        data: { assignedUserId: null, status: "OPEN" },
+      });
+      const ackText = "Entendido! Nossa equipe vai entrar em contato em breve pra reagendar sua consulta. 😊";
+      try {
+        await sendWhatsAppMessage(incoming.phone, ackText, "appointment.reschedule_ack", resolvedClinicId);
+      } catch (error) {
+        console.error("Falha ao enviar confirmação de remarcação:", error);
+      }
+      notifyInboxRealtime().catch(() => {});
+    }
+    await logInbound(
+      { phone: incoming.phone, text: incoming.text, reason: "paciente pediu remarcação" },
+      conversation ? "SUCCESS" : "FAILED"
+    );
+    return NextResponse.json(
+      { ok: true, status: conversation ? "reschedule_requested" : "no_active_conversation" },
+      { status: 200 }
+    );
+  }
+
   if (!newStatus) {
     await logInbound(
       {
