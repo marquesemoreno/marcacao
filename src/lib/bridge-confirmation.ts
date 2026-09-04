@@ -23,9 +23,9 @@ export function buildBridgeConfirmationMessage(input: BridgeConfirmationInput): 
   }
   lines.push("");
   lines.push("Por favor, responda com o número da opção desejada:");
-  lines.push("1 - Confirmar presença");
-  lines.push("2 - Preciso remarcar");
-  lines.push("3 - Cancelar agendamento");
+  lines.push("1️⃣ Digite 1 para Confirmar presença");
+  lines.push("2️⃣ Digite 2 para Remarcar");
+  lines.push("3️⃣ Digite 3 para Cancelar");
   return lines.join("\n");
 }
 
@@ -40,7 +40,6 @@ export type BridgeConfirmationFollowUpInput = {
  * do marketplace, que não existe pra esses agendamentos. */
 export function buildBridgeConfirmationFollowUp(input: BridgeConfirmationFollowUpInput): string {
   const addressParts = [input.address, input.neighborhood, input.city].filter(Boolean).join(", ");
-  const addressLine = addressParts ? `📍 Endereço: ${addressParts}\n` : "";
-  return `${addressLine}📌 As consultas têm prazo de até 30 dias para retorno — entre em contato antes do prazo para reagendar. Passado esse prazo, será cobrada uma nova consulta.
-💳 Formas de pagamento: Dinheiro, Pix, Cartão de Crédito e Débito.`;
+  if (!addressParts) return "Agradecemos a confirmação!";
+  return `Agradecemos a confirmação!\n📍 Te aguardamos no endereço: ${addressParts}`;
 }

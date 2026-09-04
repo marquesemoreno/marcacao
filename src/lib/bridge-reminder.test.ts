@@ -20,9 +20,9 @@ describe("buildBridgeReminderMessage", () => {
     expect(message).toContain("04/09/2026");
     expect(message).toContain("Urolaser");
     const lines = message.split("\n").map((l) => l.trim());
-    expect(lines).toContain("1 - Confirmar presença");
-    expect(lines).toContain("2 - Preciso remarcar");
-    expect(lines).toContain("3 - Cancelar agendamento");
+    expect(lines).toContain("1️⃣ Digite 1 para Confirmar presença");
+    expect(lines).toContain("2️⃣ Digite 2 para Remarcar");
+    expect(lines).toContain("3️⃣ Digite 3 para Cancelar");
   });
 
   it("não quebra quando procedimento, médico ou horário vêm vazios do Firebird", () => {

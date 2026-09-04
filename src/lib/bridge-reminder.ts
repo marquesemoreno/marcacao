@@ -20,7 +20,7 @@ export function buildBridgeReminderMessage(input: BridgeReminderInput): string {
   return `Olá ${input.patientName}! 👋 Lembrando da sua consulta/exame${procedureText}${doctorText} em ${input.dateFormatted}${timeText} na ${input.clinicName}.
 
 Por favor, responda com o número da opção desejada:
-1 - Confirmar presença
-2 - Preciso remarcar
-3 - Cancelar agendamento`;
+1️⃣ Digite 1 para Confirmar presença
+2️⃣ Digite 2 para Remarcar
+3️⃣ Digite 3 para Cancelar`;
 }

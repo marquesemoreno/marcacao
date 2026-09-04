@@ -19,12 +19,12 @@ describe("buildBridgeConfirmationMessage", () => {
     expect(message).toContain("08:00");
   });
 
-  it("dá as três opções na ordem certa (1 confirmar / 2 remarcar / 3 cancelar)", () => {
+  it("dá as três opções com emoji numerado, na ordem certa (1 confirmar / 2 remarcar / 3 cancelar)", () => {
     const message = buildBridgeConfirmationMessage(base);
     const lines = message.split("\n").map((l) => l.trim());
-    expect(lines).toContain("1 - Confirmar presença");
-    expect(lines).toContain("2 - Preciso remarcar");
-    expect(lines).toContain("3 - Cancelar agendamento");
+    expect(lines).toContain("1️⃣ Digite 1 para Confirmar presença");
+    expect(lines).toContain("2️⃣ Digite 2 para Remarcar");
+    expect(lines).toContain("3️⃣ Digite 3 para Cancelar");
   });
 
   it("não quebra sem médico ou horário (nem sempre vêm do bridge)", () => {
@@ -37,22 +37,20 @@ describe("buildBridgeConfirmationMessage", () => {
 });
 
 describe("buildBridgeConfirmationFollowUp", () => {
-  it("inclui endereço e as políticas de prazo/pagamento", () => {
+  it("agradece e inclui o endereço", () => {
     const message = buildBridgeConfirmationFollowUp({
-      address: "Avenida Otávio Santos, n 444",
+      address: "Av. Otávio Santos, 395, 2º andar, sala 202",
       neighborhood: "Recreio",
       city: "Vitória da Conquista",
     });
-    expect(message).toContain("Avenida Otávio Santos, n 444");
+    expect(message.toLowerCase()).toContain("agradecemos a confirmação");
+    expect(message).toContain("Av. Otávio Santos, 395, 2º andar, sala 202");
     expect(message).toContain("Recreio");
-    expect(message).toContain("Vitória da Conquista");
-    expect(message.toLowerCase()).toContain("30 dias");
-    expect(message.toLowerCase()).toContain("pix");
   });
 
   it("não quebra sem endereço cadastrado", () => {
     const message = buildBridgeConfirmationFollowUp({ address: null, neighborhood: null, city: null });
-    expect(message.toLowerCase()).toContain("pix");
+    expect(message.toLowerCase()).toContain("agradecemos a confirmação");
     expect(message).not.toContain("null");
     expect(message).not.toContain("undefined");
   });
