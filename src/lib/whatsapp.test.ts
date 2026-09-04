@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { isValidWhatsAppNumber } from "./whatsapp";
+import { isValidWhatsAppNumber, formatToWhatsAppNumber } from "./whatsapp";
 
 describe("isValidWhatsAppNumber", () => {
   it("aceita um celular brasileiro completo (DDI + DDD + 9 dígitos)", () => {
@@ -24,5 +24,14 @@ describe("isValidWhatsAppNumber", () => {
 
   it("aceita e normaliza número sem o DDI, corrigido por formatToWhatsAppNumber", () => {
     expect(isValidWhatsAppNumber("77988411342")).toBe(true);
+  });
+
+  it("aceita e normaliza número com prefixo de discagem local (0 + DDD + 9 dígitos)", () => {
+    // Bug real de produção: telefone vindo do bridge da Urolaser (coluna
+    // TELEFONEAUX/CELULAR) no formato "0" + DDD + 9 dígitos (ex: "077991000524",
+    // 12 dígitos) — nenhuma correção existente reconhecia esse "0" na frente, e
+    // TODOS os 28 lembretes D-1 de teste falharam no envio por causa disso.
+    expect(formatToWhatsAppNumber("077991000524")).toBe("5577991000524");
+    expect(isValidWhatsAppNumber("077991000524")).toBe(true);
   });
 });

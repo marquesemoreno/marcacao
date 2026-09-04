@@ -38,6 +38,13 @@ export function formatToWhatsAppNumber(phone: string): string {
   } else if (digits.length === 12 && digits.startsWith('577')) {
     digits = '55' + digits.substring(1);
   }
+  // "0" + DDD + 9 dígitos = prefixo de discagem local (comum em cadastro de
+  // sistema hospitalar — bug real confirmado com dado do bridge da Urolaser:
+  // "077991000524" devia ser "5577991000524"). Nenhum DDD brasileiro começa
+  // com 0, então não colide com número de verdade.
+  else if (digits.length === 12 && digits.startsWith('0')) {
+    digits = '55' + digits.substring(1);
+  }
   // Se veio sem DDI 55 (ex: 77988411342 ou 7788411342), adiciona 55
   else if (!digits.startsWith('55') && (digits.length === 10 || digits.length === 11)) {
     digits = '55' + digits;

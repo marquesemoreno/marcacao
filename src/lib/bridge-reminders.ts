@@ -16,17 +16,31 @@ function tomorrowInBahia(): { iso: string; formatted: string } {
   return { iso, formatted };
 }
 
+/** "AAAA-MM-DD" -> "DD/MM/AAAA" só com manipulação de string — nunca via
+ * `Date`, pra não repetir o mesmo bug de fuso horário já corrigido no bridge
+ * (ver EXTRACT em vez de Date no index.js da Urolaser). */
+function formatIsoDateToBr(iso: string): string {
+  const [year, month, day] = iso.split("-");
+  return `${day}/${month}/${year}`;
+}
+
 /** Dispara o lembrete D-1 automático pra clínicas com integração hospitalar
- * ativa, puxando a agenda de amanhã direto do Firebird (via bridge) — cobre
- * também agendamentos marcados direto na recepção, não só os feitos pelo
- * WhatsApp (esses últimos já tinham lembrete manual, mas incompleto: ver
- * reminders.ts). Só manda pra quem tem telefone achado no bridge. Idempotente
- * por dia via BridgeReminderLog — chamar de novo no mesmo dia não duplica. */
-export async function dispatchBridgeReminders() {
-  const { iso: dateIso, formatted: dateFormatted } = tomorrowInBahia();
+ * ativa, puxando a agenda direto do Firebird (via bridge) — cobre também
+ * agendamentos marcados direto na recepção, não só os feitos pelo WhatsApp
+ * (esses últimos já tinham lembrete manual, mas incompleto: ver reminders.ts).
+ * Só manda pra quem tem telefone achado no bridge. Idempotente por
+ * clínica+agendamento via BridgeReminderLog — chamar de novo não duplica.
+ * `clinicId` restringe a uma única clínica (ex: disparo manual adiantado só
+ * pra uma, sem mexer nas outras que têm bridge ativo). `dateIso` sobrescreve
+ * a data-alvo (default: amanhã) — usado pra disparo manual antecipado (ex:
+ * pedir a confirmação de terça numa sexta, por causa de feriado na véspera). */
+export async function dispatchBridgeReminders(options?: { clinicId?: string; dateIso?: string }) {
+  const { iso: dateIso, formatted: dateFormatted } = options?.dateIso
+    ? { iso: options.dateIso, formatted: formatIsoDateToBr(options.dateIso) }
+    : tomorrowInBahia();
 
   const clinics = await prisma.clinic.findMany({
-    where: { hospitalIntegration: { active: true } },
+    where: { hospitalIntegration: { active: true }, ...(options?.clinicId ? { id: options.clinicId } : {}) },
     select: { id: true, tradeName: true, name: true },
   });
 
