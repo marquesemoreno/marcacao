@@ -8,6 +8,7 @@ import { notifyInboxRealtime } from "@/lib/supabase-server";
 import { MEDIA_DOWNLOAD_FAILED_PREFIX } from "@/lib/chat-messages";
 import { isBroadcastOptOutReply } from "@/lib/broadcast-csv";
 import { reopenIfResolved } from "@/lib/conversation-reopen";
+import { buildBridgeConfirmationFollowUp } from "@/lib/bridge-confirmation";
 import {
   getAiAttendantConfig,
   buildAiDisclosureMessage,
@@ -170,20 +171,22 @@ async function handleMessageDelete(data: Record<string, unknown>) {
   await logInbound({ kind: "message_delete", ...data, messageDbId: message.id }, "SUCCESS");
 }
 
+/** Numeração combinada com o texto das mensagens (bridge-confirmation.ts e
+ * bridge-reminder.ts): 1 confirma, 2 pede remarcação, 3 cancela. */
 function resolveStatusFromReply(text: string): AppointmentStatus | null {
   const normalized = text.trim().toUpperCase();
   if (normalized === "1" || normalized === "SIM" || normalized === "SIM, CONFIRMO") return "CONFIRMED";
-  if (normalized === "2" || normalized === "CANCELAR" || normalized === "NÃO" || normalized === "NAO") return "CANCELLED";
+  if (normalized === "3" || normalized === "CANCELAR" || normalized === "NÃO" || normalized === "NAO") return "CANCELLED";
   return null;
 }
 
 /** "Remarcar" não é um AppointmentStatus (não temos automação de reagendar
  * sozinho) — só sinaliza que um atendente precisa assumir e remarcar na mão.
- * Checado só quando resolveStatusFromReply não bateu, senão "3" nunca chegaria
+ * Checado só quando resolveStatusFromReply não bateu, senão "2" nunca chegaria
  * aqui de propósito (não colide hoje, mas mantém a prioridade clara). */
 function isRescheduleReply(text: string): boolean {
   const normalized = text.trim().toUpperCase();
-  return normalized === "3" || normalized === "REMARCAR" || normalized === "REAGENDAR";
+  return normalized === "2" || normalized === "REMARCAR" || normalized === "REAGENDAR";
 }
 
 async function logInbound(payload: Prisma.InputJsonValue, status: string) {
@@ -646,10 +649,18 @@ export async function POST(request: Request) {
       await prisma.message.create({
         data: { conversationId: conversation.id, direction: "OUTBOUND", type: "INTERNAL_NOTE", content: noteText, status: "SENT" },
       });
-      const ackText =
-        newStatus === "CONFIRMED"
-          ? "Presença confirmada, obrigado! Até lá. 😊"
-          : "Entendido, obrigado por avisar! Se quiser remarcar, é só chamar por aqui.";
+      // Confirmado: manda endereço + políticas de prazo/pagamento (mesmo texto
+      // que entra depois da confirmação de agendamento feito pelo bridge, ver
+      // hospital-bridge.ts) — não a confirmação genérica de antes.
+      let ackText = "Entendido, obrigado por avisar! Se quiser remarcar, é só chamar por aqui.";
+      if (newStatus === "CONFIRMED") {
+        const ackClinic = await prisma.clinic.findUnique({ where: { id: conversation.clinicId } });
+        ackText = buildBridgeConfirmationFollowUp({
+          address: ackClinic?.address ?? null,
+          neighborhood: ackClinic?.neighborhood ?? null,
+          city: ackClinic?.city ?? null,
+        });
+      }
       // Com `await` — ver nota mais abaixo sobre fire-and-forget não sobreviver
       // ao encerramento da função serverless na Vercel.
       try {
@@ -680,13 +691,26 @@ export async function POST(request: Request) {
     "SUCCESS"
   );
 
-  // Se confirmado com "1" ou "SIM", envia a Guia Oficial com QR Code. Com
-  // `await` em ambos os ramos — sem esperar, a função serverless da Vercel
+  // Se confirmado com "1" ou "SIM": agendamento de origem bridge (ver o marcador
+  // "(Bridge)" gravado no nome do procedimento em hospital-bridge.ts) não tem
+  // Guia/QR Code — manda endereço + políticas em vez da confirmação do
+  // marketplace, que citaria um comprovante que não existe pra esse caso.
+  // Com `await` em ambos os ramos — sem esperar, a função serverless da Vercel
   // pode encerrar antes do envio em segundo plano terminar (confirmado em
   // produção com a confirmação do bridge: ver hospital-bridge.ts).
+  const isBridgeAppointment = updated.clinicProcedure.procedure.name.endsWith("(Bridge)");
   if (newStatus === "CONFIRMED") {
     try {
-      await sendAppointmentConfirmation(updated);
+      if (isBridgeAppointment) {
+        const followUp = buildBridgeConfirmationFollowUp({
+          address: updated.clinicProcedure.clinic.address,
+          neighborhood: updated.clinicProcedure.clinic.neighborhood,
+          city: updated.clinicProcedure.clinic.city,
+        });
+        await sendWhatsAppMessage(updated.patientPhone, followUp, "appointment.bridge_confirmation_followup", resolvedClinicId);
+      } else {
+        await sendAppointmentConfirmation(updated);
+      }
     } catch (error) {
       console.error("Falha ao enviar confirmação com Guia QR Code:", error);
     }

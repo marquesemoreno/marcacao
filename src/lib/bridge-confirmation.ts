@@ -1,5 +1,6 @@
 export type BridgeConfirmationInput = {
-  procedureName: string;
+  patientName: string;
+  clinicName: string;
   doctorName: string | null;
   dateFormatted: string;
   time: string | null;
@@ -7,21 +8,39 @@ export type BridgeConfirmationInput = {
 
 /** Confirmação enviada quando um agendamento é feito pelo bridge (Firebird) —
  * antes disso, nenhuma mensagem automática existia nesse fluxo, e as
- * atendentes digitavam esse texto na mão a cada agendamento. Mesmo modelo que
- * elas já usam ("por ordem de chegada", sem horário fixo de fila) — só sem o
- * valor (R$) por enquanto, e com os asteriscos de negrito balanceados (o
- * template original tinha um número ímpar, quebrando a formatação no WhatsApp). */
+ * atendentes digitavam esse texto na mão a cada agendamento. Endereço e
+ * políticas de prazo/pagamento não entram aqui — só depois que o paciente
+ * confirma (ver buildBridgeConfirmationFollowUp). */
 export function buildBridgeConfirmationMessage(input: BridgeConfirmationInput): string {
-  const doctorText = input.doctorName ? ` com Dr(a). *${input.doctorName}*` : "";
-  const timeText = input.time ? ` às *${input.time}*` : "";
+  const lines = [
+    `Olá, ${input.patientName}! Como vai?`,
+    `Passando para lembrar do seu agendamento na ${input.clinicName}:`,
+    `📅 Data: ${input.dateFormatted}`,
+    `⏰ Horário: ${input.time ?? "A definir"}`,
+  ];
+  if (input.doctorName) {
+    lines.push(`👨‍⚕️ Profissional: Dr(a). ${input.doctorName}`);
+  }
+  lines.push("");
+  lines.push("Por favor, responda com o número da opção desejada:");
+  lines.push("1 - Confirmar presença");
+  lines.push("2 - Preciso remarcar");
+  lines.push("3 - Cancelar agendamento");
+  return lines.join("\n");
+}
 
-  return `Agendado(a) *${input.procedureName}*${doctorText} para o dia *${input.dateFormatted}*${timeText}, por ordem de chegada!
+export type BridgeConfirmationFollowUpInput = {
+  address: string | null;
+  neighborhood: string | null;
+  city: string | null;
+};
 
-📌 *As consultas têm prazo de até 30 dias para retorno — entre em contato antes do prazo para reagendar. Passado esse prazo, será cobrada uma nova consulta.*
-💳 *Formas de pagamento: Dinheiro, Pix, Cartão de Crédito e Débito.*
-
-Por favor, responda com uma das opções abaixo:
-1️⃣ Digite 1 para Confirmar presença
-2️⃣ Digite 2 para Cancelar
-3️⃣ Digite 3 para Remarcar`;
+/** Mandada automaticamente quando o paciente responde "1" (confirmar) — só
+ * pra agendamento de origem bridge, no lugar da confirmação com Guia/QR Code
+ * do marketplace, que não existe pra esses agendamentos. */
+export function buildBridgeConfirmationFollowUp(input: BridgeConfirmationFollowUpInput): string {
+  const addressParts = [input.address, input.neighborhood, input.city].filter(Boolean).join(", ");
+  const addressLine = addressParts ? `📍 Endereço: ${addressParts}\n` : "";
+  return `${addressLine}📌 As consultas têm prazo de até 30 dias para retorno — entre em contato antes do prazo para reagendar. Passado esse prazo, será cobrada uma nova consulta.
+💳 Formas de pagamento: Dinheiro, Pix, Cartão de Crédito e Débito.`;
 }

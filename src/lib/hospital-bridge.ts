@@ -282,7 +282,8 @@ export async function createBridgeAppointment(
     const doctor = doctors.find((d) => String(d.id) === String(input.medicoId));
     const [year, month, day] = input.date.split("-");
     const messageText = buildBridgeConfirmationMessage({
-      procedureName: procedure.nome,
+      patientName: input.patientName,
+      clinicName: clinic.tradeName || clinic.name,
       doctorName: doctor?.nome ?? null,
       dateFormatted: `${day}/${month}/${year}`,
       time: input.timeSlot || null,
