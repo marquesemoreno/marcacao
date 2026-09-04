@@ -4,6 +4,17 @@ import { formatToWhatsAppNumber, sendWhatsAppMessage } from "@/lib/whatsapp";
 import { fetchBridgeDailyAgenda } from "@/lib/hospital-bridge";
 import { buildBridgeReminderMessage } from "@/lib/bridge-reminder";
 
+// Mesmo intervalo do disparo em massa (ver src/lib/broadcast.ts) — espaça os
+// envios como se fosse uma atendente mandando na mão, um por um, em vez de uma
+// rajada automatizada. Reduz o risco de o número ser marcado por spam.
+function randomDelayMs(): number {
+  return 1500 + Math.floor(Math.random() * 1500);
+}
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 /** "Amanhã" no fuso da clínica (Bahia = mesmo horário de Brasília, sem
  * horário de verão hoje) — rodando num servidor em UTC, "amanhã" calculado
  * ingenuamente pode dar o dia errado perto da virada. */
@@ -47,6 +58,7 @@ export async function dispatchBridgeReminders(options?: { clinicId?: string; dat
   let sent = 0;
   let skipped = 0;
   let failed = 0;
+  let attempted = 0;
 
   for (const clinic of clinics) {
     const agendamentos = await fetchBridgeDailyAgenda(clinic.id, dateIso);
@@ -59,6 +71,9 @@ export async function dispatchBridgeReminders(options?: { clinicId?: string; dat
         skipped++;
         continue;
       }
+
+      if (attempted > 0) await sleep(randomDelayMs());
+      attempted++;
 
       const phone = formatToWhatsAppNumber(item.telefone);
       const messageText = buildBridgeReminderMessage({
