@@ -48,6 +48,35 @@ export async function hasHospitalBridgeIntegration(clinicId: string): Promise<bo
   return (await getBridgeConfig(clinicId)) !== null;
 }
 
+/** O NUMERO real da marcação no Firebird só existe hoje dentro do texto livre
+ * de Appointment.notes ("... — NUMERO Firebird: 35774") — não tem coluna
+ * estruturada pra isso ainda. Usado só pra fechar o ciclo de confirmação
+ * (ver confirmBridgeAppointment) nos agendamentos que passaram pelo nosso
+ * chat; agendamento feito direto na recepção não tem Appointment nosso, então
+ * não tem como confirmar de volta no Firebird por essa via ainda. */
+export function extractBridgeNumeroFromNotes(notes: string | null): number | null {
+  const match = notes?.match(/NUMERO Firebird: (\d+)/);
+  return match ? Number(match[1]) : null;
+}
+
+/** Marca CONFIRMADO='S' na marcação real do Firebird quando o paciente confirma
+ * presença pelo WhatsApp — fecha o ciclo que antes só existia do nosso lado
+ * (chat), sem refletir na tela que a recepção usa. Best-effort: chamado com
+ * try/catch por quem usa, uma falha aqui (ex: trigger de reserva do Firebird
+ * bloqueando o UPDATE — ver nota no bridge) não pode derrubar a confirmação
+ * que já é real pro paciente e pra nossa conversa. */
+export async function confirmBridgeAppointment(clinicId: string, numero: number): Promise<boolean> {
+  const config = await getBridgeConfig(clinicId);
+  if (!config) return false;
+  const response = await fetch(`${config.apiUrl}/api/agendamentos/${numero}/confirmar`, {
+    method: "POST",
+    headers: { "x-api-token": config.apiToken },
+    signal: AbortSignal.timeout(10000),
+  });
+  const body = await response.json().catch(() => null);
+  return response.ok && Boolean(body?.success);
+}
+
 /** Sem convenioId, o bridge usa o Particular por padrão (preço exibido reflete
  * esse convênio até o atendente escolher outro). */
 export async function fetchBridgeProcedures(clinicId: string, convenioId?: number): Promise<BridgeProcedure[]> {

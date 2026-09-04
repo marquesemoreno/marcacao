@@ -9,6 +9,7 @@ import { MEDIA_DOWNLOAD_FAILED_PREFIX } from "@/lib/chat-messages";
 import { isBroadcastOptOutReply } from "@/lib/broadcast-csv";
 import { reopenIfResolved } from "@/lib/conversation-reopen";
 import { buildBridgeConfirmationFollowUp } from "@/lib/bridge-confirmation";
+import { extractBridgeNumeroFromNotes, confirmBridgeAppointment } from "@/lib/hospital-bridge";
 import {
   getAiAttendantConfig,
   buildAiDisclosureMessage,
@@ -708,6 +709,23 @@ export async function POST(request: Request) {
           city: updated.clinicProcedure.clinic.city,
         });
         await sendWhatsAppMessage(updated.patientPhone, followUp, "appointment.bridge_confirmation_followup", resolvedClinicId);
+
+        // Fecha o ciclo no sistema real da clínica (Firebird) — testado com um
+        // agendamento de mentira antes de liberar (ver nota em
+        // hospital-bridge.ts sobre o risco dos triggers de reserva). Sem
+        // NUMERO nas notes (não deveria acontecer pra agendamento de origem
+        // bridge, mas por segurança) ou falha no Firebird, não derruba a
+        // confirmação — só fica sem refletir na tela da recepção.
+        // Com `await` — mesmo motivo de sempre (fire-and-forget não sobrevive
+        // ao encerramento da função serverless na Vercel, ver commits anteriores).
+        const numero = extractBridgeNumeroFromNotes(updated.notes);
+        if (numero) {
+          try {
+            await confirmBridgeAppointment(updated.clinicProcedure.clinicId, numero);
+          } catch (error) {
+            console.error("Falha ao confirmar agendamento no Firebird (bridge):", error);
+          }
+        }
       } else {
         await sendAppointmentConfirmation(updated);
       }
