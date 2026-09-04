@@ -271,10 +271,13 @@ export async function createBridgeAppointment(
   // agendamento feito pelo bridge (createAppointment não chama
   // sendAppointmentConfirmation nesse caminho, ela é só pro marketplace), e as
   // atendentes digitavam esse texto na mão a cada vez. Busca o nome do médico
-  // à parte (o bridge só devolve o id na resposta do POST). Fire-and-forget,
-  // igual às outras confirmações — não pode atrasar/derrubar a resposta pro
-  // atendente por causa disso.
-  (async () => {
+  // à parte (o bridge só devolve o id na resposta do POST). Com `await` (não
+  // fire-and-forget): testado em produção e confirmado que, sem esperar, a
+  // função serverless da Vercel pode encerrar antes do envio terminar — o
+  // agendamento gravava certinho no Firebird, mas a mensagem nunca saía.
+  // Em try/catch isolado: o agendamento já é real a essa altura, uma falha só
+  // no envio da confirmação não pode derrubar a resposta de sucesso.
+  try {
     const doctors = input.medicoId ? await fetchBridgeDoctors(clinicId) : [];
     const doctor = doctors.find((d) => String(d.id) === String(input.medicoId));
     const [year, month, day] = input.date.split("-");
@@ -284,10 +287,10 @@ export async function createBridgeAppointment(
       dateFormatted: `${day}/${month}/${year}`,
       time: input.timeSlot || null,
     });
-    return sendWhatsAppMessage(input.patientPhone, messageText, "appointment.bridge_confirmation", clinicId);
-  })().catch((error) => {
+    await sendWhatsAppMessage(input.patientPhone, messageText, "appointment.bridge_confirmation", clinicId);
+  } catch (error) {
     console.error("Falha ao enviar confirmação do agendamento (bridge):", error);
-  });
+  }
 
   // Espelha o agendamento (já real no Firebird a essa altura) num Appointment de
   // verdade no nosso Postgres — só pra relatório (getFinancialReport etc já
