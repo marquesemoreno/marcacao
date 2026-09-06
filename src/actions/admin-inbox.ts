@@ -96,16 +96,24 @@ export async function listChatContactsAdmin(filter: InboxFilter, search?: string
     orderBy: { lastMessageAt: "desc" },
   });
 
-  const unreadCounts = await prisma.message.groupBy({
-    by: ["conversationId"],
-    where: {
-      conversationId: { in: conversations.map((c) => c.id) },
-      direction: "INBOUND",
-      readAt: null,
-    },
-    _count: { id: true },
-  });
-  const unreadByConversation = new Map(unreadCounts.map((u) => [u.conversationId, u._count.id]));
+  // Em lotes de 2000 IDs por vez — o Postgres rejeita a query acima de ~32767
+  // parâmetros de bind, e sem o filtro de clínica (ex: "Todas as Clínicas") a
+  // lista de conversas pode facilmente passar disso.
+  const conversationIds = conversations.map((c) => c.id);
+  const unreadByConversation = new Map<string, number>();
+  for (let i = 0; i < conversationIds.length; i += 2000) {
+    const chunk = conversationIds.slice(i, i + 2000);
+    const unreadCounts = await prisma.message.groupBy({
+      by: ["conversationId"],
+      where: {
+        conversationId: { in: chunk },
+        direction: "INBOUND",
+        readAt: null,
+      },
+      _count: { id: true },
+    });
+    for (const u of unreadCounts) unreadByConversation.set(u.conversationId, u._count.id);
+  }
 
   return conversations.map((c) =>
     toChatContact({
@@ -168,9 +176,13 @@ export type ImportContactsResult = {
   skipped: { name: string; phone: string; reason: string }[];
 };
 
-/** Importação em massa (ver "Importar Contatos" em contacts-app.tsx) — mesma
- * lógica de createContactAdmin por linha (upsert Contact + garante Conversation
- * na clínica escolhida), mas processando uma lista inteira de uma vez. Uma
+/** Importação em massa (ver "Importar Contatos" em contacts-app.tsx) — só cadastra
+ * o Contact (agenda de contatos), sem criar Conversation. Diferente do botão
+ * "Cadastrar novo contato e iniciar conversa" (createContactAdmin), aqui o objetivo
+ * é só ter o número na base pra futuros disparos/atendimento — criar uma Conversation
+ * "OPEN" por linha lotava a fila de atendimento com milhares de conversas vazias
+ * (sem nenhuma mensagem) numa importação grande. A Conversation nasce naturalmente
+ * quando o contato manda a primeira mensagem de verdade (fluxo do webhook). Uma
  * linha com nome/telefone inválido é reportada em `skipped`, não aborta a
  * importação das demais. */
 export async function importContactsAdmin(
@@ -197,23 +209,15 @@ export async function importContactsAdmin(
       continue;
     }
 
-    const contact = await prisma.contact.upsert({
+    await prisma.contact.upsert({
       where: { phone: fullPhone },
       update: row.cpf?.trim() ? { cpf: row.cpf.trim() } : {},
       create: { phone: fullPhone, name: trimmedName, cpf: row.cpf?.trim() || null },
     });
-
-    const conversation = await prisma.conversation.findFirst({ where: { contactId: contact.id, clinicId } });
-    if (!conversation) {
-      await prisma.conversation.create({
-        data: { clinicId, contactId: contact.id, status: "OPEN", lastMessageAt: new Date() },
-      });
-    }
     imported++;
   }
 
-  revalidatePath("/admin/inbox");
-  notifyInboxRealtime().catch(() => {});
+  revalidatePath("/admin/contatos");
   return { imported, skipped };
 }
 

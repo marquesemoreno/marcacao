@@ -151,16 +151,23 @@ export async function listConversations(filter: ConversationFilter, search?: str
     orderBy: { lastMessageAt: "desc" },
   });
 
-  const unreadCounts = await prisma.message.groupBy({
-    by: ["conversationId"],
-    where: {
-      conversationId: { in: conversations.map((c) => c.id) },
-      direction: "INBOUND",
-      readAt: null,
-    },
-    _count: { id: true },
-  });
-  const unreadByConversation = new Map(unreadCounts.map((u) => [u.conversationId, u._count.id]));
+  // Em lotes de 2000 IDs por vez — o Postgres rejeita a query acima de ~32767
+  // parâmetros de bind, o que uma clínica com muitas conversas pode ultrapassar.
+  const conversationIds = conversations.map((c) => c.id);
+  const unreadByConversation = new Map<string, number>();
+  for (let i = 0; i < conversationIds.length; i += 2000) {
+    const chunk = conversationIds.slice(i, i + 2000);
+    const unreadCounts = await prisma.message.groupBy({
+      by: ["conversationId"],
+      where: {
+        conversationId: { in: chunk },
+        direction: "INBOUND",
+        readAt: null,
+      },
+      _count: { id: true },
+    });
+    for (const u of unreadCounts) unreadByConversation.set(u.conversationId, u._count.id);
+  }
 
   return conversations.map((conversation) => ({
     ...conversation,
