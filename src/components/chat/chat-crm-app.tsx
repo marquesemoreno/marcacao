@@ -34,6 +34,8 @@ import {
   suggestIaReply,
   markConversationUnread,
   resendMessage,
+  getUnseenAssignmentNotifications,
+  markAssignmentSeen,
 } from "@/actions/inbox";
 import {
   listChatContactsAdmin,
@@ -69,6 +71,8 @@ import {
   updateConversationClinicAdmin,
   markConversationUnreadAdmin,
   resendMessageAdmin,
+  getUnseenAssignmentNotificationsAdmin,
+  markAssignmentSeenAdmin,
 } from "@/actions/admin-inbox";
 import { toast } from "sonner";
 import { useInboxRealtime } from "@/hooks/use-inbox-realtime";
@@ -111,6 +115,8 @@ const ACTIONS_BY_SCOPE = {
     suggestIaReply: (id: string) => suggestIaReply(id),
     markConversationUnread: (id: string) => markConversationUnread(id),
     resendMessage: (id: string) => resendMessage(id),
+    getUnseenAssignmentNotifications: () => getUnseenAssignmentNotifications(),
+    markAssignmentSeen: (id: string) => markAssignmentSeen(id),
   },
   admin: {
     listChatContacts: ((filter, search, clinicId) =>
@@ -135,6 +141,8 @@ const ACTIONS_BY_SCOPE = {
     suggestIaReply: (id: string) => suggestIaReplyAdmin(id),
     markConversationUnread: (id: string) => markConversationUnreadAdmin(id),
     resendMessage: (id: string) => resendMessageAdmin(id),
+    getUnseenAssignmentNotifications: () => getUnseenAssignmentNotificationsAdmin(),
+    markAssignmentSeen: (id: string) => markAssignmentSeenAdmin(id),
   },
 };
 
@@ -161,6 +169,9 @@ export function ChatCrmApp({ scope, basePath, view }: ChatCrmAppProps) {
 
   const totalUnreadRef = useRef(0);
   const isFirstLoadRef = useRef(true);
+  /** IDs de conversas com atribuição ainda não vista já notificadas nesta sessão —
+   * evita repetir som/notificação a cada poll de 5s enquanto ela continuar sem abrir. */
+  const notifiedAssignmentIdsRef = useRef<Set<string>>(new Set());
   const attemptedPhotoFetchRef = useRef<Set<string>>(new Set());
   const photoFetchQueueRef = useRef<string[]>([]);
   const isDrainingPhotoQueueRef = useRef(false);
@@ -186,6 +197,30 @@ export function ChatCrmApp({ scope, basePath, view }: ChatCrmAppProps) {
     // muito tempo em "Não Atribuídas" mesmo quando o atendente está vendo "Minhas".
     const waitFn = scope === "admin" ? getOldestUnassignedWaitMinutesAdmin : getOldestUnassignedWaitMinutes;
     waitFn().then(setUnassignedWaitMinutes).catch(() => {});
+
+    // Idem — independente da aba, pra avisar (som + notificação de desktop) assim que
+    // alguém transfere/atribui uma conversa a mim, mesmo que eu esteja em "Não
+    // Atribuídas" ou olhando outra conversa quando isso acontecer.
+    actions
+      .getUnseenAssignmentNotifications()
+      .then((pending) => {
+        for (const item of pending) {
+          if (notifiedAssignmentIdsRef.current.has(item.conversationId)) continue;
+          notifiedAssignmentIdsRef.current.add(item.conversationId);
+          if (isFirstLoadRef.current) continue; // não notifica atribuições que já existiam antes de abrir a tela
+          playNotificationSound();
+          showDesktopNotification(`🔄 Você recebeu uma conversa: ${item.contactName}`, {
+            body: "Transferida ou atribuída a você — clique pra abrir.",
+            onClick: () => setSelectedContactId(item.conversationId),
+          });
+        }
+        // Limpa da memória quem não está mais pendente (já foi vista, ex: aberta em outra aba)
+        const stillPending = new Set(pending.map((p) => p.conversationId));
+        for (const id of notifiedAssignmentIdsRef.current) {
+          if (!stillPending.has(id)) notifiedAssignmentIdsRef.current.delete(id);
+        }
+      })
+      .catch(() => {});
 
     const clinicIdArg = scope === "admin" && clinicFilter ? clinicFilter : undefined;
     const result =
@@ -455,6 +490,13 @@ export function ChatCrmApp({ scope, basePath, view }: ChatCrmAppProps) {
     suppressAutoSelectRef.current = false;
     setSelectedContactId(id);
     router.replace(`${basePath}/inbox?c=${id}`);
+
+    const contact = contactCacheRef.current.get(id);
+    if (contact?.hasUnseenAssignment) {
+      notifiedAssignmentIdsRef.current.delete(id);
+      setContacts((prev) => prev.map((c) => (c.id === id ? { ...c, hasUnseenAssignment: false } : c)));
+      actions.markAssignmentSeen(id).catch(() => {});
+    }
   }
 
   async function handleSendMessage(text: string, mode: "whatsapp" | "internal_note") {

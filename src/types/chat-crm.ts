@@ -54,6 +54,9 @@ export interface Contact {
   clinicId?: string;
   clinicName?: string;
   unreadCount: number;
+  /** true quando a conversa foi transferida/atribuída a mim (por outro atendente ou
+   * por um admin) e eu ainda não abri pra ver — vira selo na lista, some ao abrir. */
+  hasUnseenAssignment: boolean;
   lastMessage: string;
   lastMessageTime: string;
   statusTag: {

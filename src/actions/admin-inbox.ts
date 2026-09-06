@@ -12,6 +12,7 @@ import { attachSignedUrls, uploadWhatsAppMedia, getSignedMediaUrl } from "@/lib/
 import { formatFileSize } from "@/lib/format";
 import { notifyInboxRealtime } from "@/lib/supabase-server";
 import { isTeamQueueUser, formatAgentDisplayName } from "@/lib/team-queue";
+import { assignmentSeenAtFor } from "@/lib/conversation-assignment";
 import type { Department, FunnelStage, InboxFilter } from "@/types/chat-crm";
 import {
   sendMessageSchema,
@@ -57,7 +58,7 @@ export async function listAllContactsAdmin(search?: string) {
 }
 
 export async function listChatContactsAdmin(filter: InboxFilter, search?: string, clinicId?: string) {
-  await requireAdminSession();
+  const { userId } = await requireAdminSession();
 
   // Com busca ativa, ignora o filtro de aba e procura em todas as conversas —
   // ver o mesmo comentário em listConversations (inbox.ts).
@@ -116,10 +117,13 @@ export async function listChatContactsAdmin(filter: InboxFilter, search?: string
   }
 
   return conversations.map((c) =>
-    toChatContact({
-      ...c,
-      unreadCount: unreadByConversation.get(c.id) ?? 0,
-    })
+    toChatContact(
+      {
+        ...c,
+        unreadCount: unreadByConversation.get(c.id) ?? 0,
+      },
+      userId
+    )
   );
 }
 
@@ -542,12 +546,17 @@ export async function getOldestUnassignedWaitMinutesAdmin() {
 }
 
 export async function assignConversationToUserAdmin(conversationId: string, targetUserId: string | null) {
-  await requireAdminSession();
+  const { userId } = await requireAdminSession();
   await prisma.conversation.update({
     where: { id: conversationId },
-    data: { assignedUserId: targetUserId, status: "OPEN" },
+    data: {
+      assignedUserId: targetUserId,
+      status: "OPEN",
+      assignmentSeenAt: targetUserId ? assignmentSeenAtFor(targetUserId, userId) : null,
+    },
   });
   revalidatePath("/admin/inbox");
+  notifyInboxRealtime().catch(() => {});
   return { success: true };
 }
 
@@ -565,15 +574,16 @@ export async function claimConversationAdmin(conversationId: string) {
 
   await prisma.conversation.update({
     where: { id: conversationId },
-    data: { assignedUserId: userId, status: "OPEN" },
+    data: { assignedUserId: userId, status: "OPEN", assignmentSeenAt: assignmentSeenAtFor(userId, userId) },
   });
 
   revalidatePath("/admin/inbox");
+  notifyInboxRealtime().catch(() => {});
   return { success: true };
 }
 
 export async function transferConversationAdmin(conversationId: string, targetUserId: string) {
-  await requireAdminSession();
+  const { userId } = await requireAdminSession();
 
   // Mesma regra do lado clínica (ver transferConversation em actions/inbox.ts): a conta
   // genérica "Equipe {nome da clínica}" representa a fila geral, não um atendente de verdade.
@@ -585,11 +595,37 @@ export async function transferConversationAdmin(conversationId: string, targetUs
 
   await prisma.conversation.update({
     where: { id: conversationId },
-    data: { assignedUserId: isTeamQueue ? null : targetUserId, status: "OPEN" },
+    data: {
+      assignedUserId: isTeamQueue ? null : targetUserId,
+      status: "OPEN",
+      assignmentSeenAt: isTeamQueue ? null : assignmentSeenAtFor(targetUserId, userId),
+    },
   });
 
   revalidatePath("/admin/inbox");
+  notifyInboxRealtime().catch(() => {});
   return { success: true };
+}
+
+/** Conversas atribuídas a mim (transferência de outro atendente, ou atribuição
+ * manual feita por outro admin) que eu ainda não abri — ver a versão pro lado
+ * clínica em getUnseenAssignmentNotifications (actions/inbox.ts). */
+export async function getUnseenAssignmentNotificationsAdmin() {
+  const { userId } = await requireAdminSession();
+  const conversations = await prisma.conversation.findMany({
+    where: { assignedUserId: userId, assignmentSeenAt: null, status: { in: ACTIVE_STATUSES } },
+    select: { id: true, contact: { select: { name: true } } },
+  });
+  return conversations.map((c) => ({ conversationId: c.id, contactName: c.contact.name }));
+}
+
+/** Chamado ao abrir a conversa — ver markAssignmentSeen (actions/inbox.ts). */
+export async function markAssignmentSeenAdmin(conversationId: string) {
+  const { userId } = await requireAdminSession();
+  await prisma.conversation.updateMany({
+    where: { id: conversationId, assignedUserId: userId, assignmentSeenAt: null },
+    data: { assignmentSeenAt: new Date() },
+  });
 }
 
 export async function updateConversationTagsAdmin(conversationId: string, tags: string[]) {

@@ -90,6 +90,15 @@ type ConversationWithRelations = Conversation & {
   clinic?: { id: string; tradeName: string };
 };
 
+/** Quando `viewerUserId` for informado (só faz sentido pra atendente logado, cada um
+ * vê seu próprio selo — no admin, que mistura várias clínicas/atendentes na mesma
+ * lista, não passa esse parâmetro) computa se ESSA conversa é uma atribuição que
+ * ele ainda não viu (ver assignmentSeenAtFor em conversation-assignment.ts). */
+function hasUnseenAssignmentFor(conversation: ConversationWithRelations, viewerUserId?: string): boolean {
+  if (!viewerUserId) return false;
+  return conversation.assignedUserId === viewerUserId && conversation.assignmentSeenAt === null;
+}
+
 const REASON_SHORT_LABELS: Record<string, string> = {
   AGENDAMENTO_CONCLUIDO: "🎟️ Agendamento",
   DUVIDA_ESCLARECIDA: "💡 Dúvida Esclarecida",
@@ -105,7 +114,7 @@ const REASON_SHORT_LABELS: Record<string, string> = {
  * O `id` retornado é o conversationId: toda mutação (tag, funil, transferência)
  * opera em cima da conversa, não do contato bruto.
  */
-export function toChatContact(conversation: ConversationWithRelations): Contact {
+export function toChatContact(conversation: ConversationWithRelations, viewerUserId?: string): Contact {
   const lastMessage = conversation.messages[0] ?? null;
   const isResolved = conversation.status === "RESOLVED";
 
@@ -122,6 +131,7 @@ export function toChatContact(conversation: ConversationWithRelations): Contact 
     department: departmentFromDb[conversation.department],
     channel: channelFromDb[conversation.channel],
     unreadCount: conversation.unreadCount ?? 0,
+    hasUnseenAssignment: hasUnseenAssignmentFor(conversation, viewerUserId),
     lastMessage: lastMessage
       ? lastMessage.type === "INTERNAL_NOTE"
         ? `🔒 Nota: ${lastMessage.content}`

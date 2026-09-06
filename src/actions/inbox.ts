@@ -14,6 +14,7 @@ import { formatFileSize } from "@/lib/format";
 import { notifyInboxRealtime } from "@/lib/supabase-server";
 import { APPOINTMENT_CONFIRMED_TEMPLATE } from "@/lib/chat-messages";
 import { isTeamQueueUser, formatAgentDisplayName } from "@/lib/team-queue";
+import { assignmentSeenAtFor } from "@/lib/conversation-assignment";
 
 const ALLOWED_MEDIA_MIME_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif", "application/pdf"];
 const MAX_MEDIA_SIZE_BYTES = 15 * 1024 * 1024; // 15 MB — mesma ordem de grandeza do limite de mídia do WhatsApp
@@ -34,7 +35,7 @@ const ACTIVE_STATUSES: ConversationStatus[] = [ConversationStatus.OPEN, Conversa
  * "Atribuir pra Mim", e ela sumia da aba "Minhas" e não contava pro limite de
  * atendimentos simultâneos do atendente. Espalhar no "data" de um conversation.update. */
 function autoAssignOnReply(conversation: { assignedUserId: string | null }, userId: string) {
-  return conversation.assignedUserId ? {} : { assignedUserId: userId };
+  return conversation.assignedUserId ? {} : { assignedUserId: userId, assignmentSeenAt: new Date() };
 }
 
 /** Cadastra um contato novo (ou reaproveita um já existente pelo telefone) e garante
@@ -536,6 +537,30 @@ export async function getOldestUnassignedWaitMinutes() {
   return Math.floor((Date.now() - oldest.lastMessageAt.getTime()) / 60000);
 }
 
+/** Conversas atribuídas a mim (transferência ou atribuição manual do admin) que eu
+ * ainda não abri — busca independente da aba selecionada, pra tocar som/notificar
+ * mesmo se o atendente estiver em "Não Atribuídas" ou numa conversa diferente
+ * quando a atribuição chegar (ver refreshContacts em chat-crm-app.tsx). */
+export async function getUnseenAssignmentNotifications() {
+  const { clinicId, userId } = await requireClinicSession();
+  const conversations = await prisma.conversation.findMany({
+    where: { clinicId, assignedUserId: userId, assignmentSeenAt: null, status: { in: ACTIVE_STATUSES } },
+    select: { id: true, contact: { select: { name: true } } },
+  });
+  return conversations.map((c) => ({ conversationId: c.id, contactName: c.contact.name }));
+}
+
+/** Chamado ao abrir a conversa — some com o selo de "atribuição não vista" assim
+ * que o atendente de fato olha pra ela. Não faz nada se a conversa não é dela
+ * (ex: ela abriu uma conversa da fila geral só pra espiar, sem se atribuir). */
+export async function markAssignmentSeen(conversationId: string) {
+  const { clinicId, userId } = await requireClinicSession();
+  await prisma.conversation.updateMany({
+    where: { id: conversationId, clinicId, assignedUserId: userId, assignmentSeenAt: null },
+    data: { assignmentSeenAt: new Date() },
+  });
+}
+
 export async function claimConversation(conversationId: string) {
   const { clinicId, userId } = await requireClinicSession();
 
@@ -583,6 +608,7 @@ export async function claimConversation(conversationId: string) {
     data: {
       assignedUserId: userId,
       status: "OPEN",
+      assignmentSeenAt: assignmentSeenAtFor(userId, userId),
     },
   });
 
@@ -599,6 +625,7 @@ export async function claimConversation(conversationId: string) {
 
   revalidatePath("/clinic/inbox");
   revalidatePath("/clinic/crm");
+  notifyInboxRealtime().catch(() => {});
   return { success: true };
 }
 
@@ -655,6 +682,7 @@ export async function transferConversation(
     where: { id: conversationId },
     data: {
       assignedUserId: isTeamQueue ? null : targetUserId,
+      assignmentSeenAt: isTeamQueue ? null : assignmentSeenAtFor(targetUserId, userId),
       ...(department ? { department: departmentToDb[department] } : {}),
     },
   });
@@ -674,6 +702,7 @@ export async function transferConversation(
 
   revalidatePath("/clinic/inbox");
   revalidatePath("/clinic/crm");
+  notifyInboxRealtime().catch(() => {});
   return { success: true };
 }
 
@@ -978,8 +1007,9 @@ const INBOX_FILTER_TO_CONVERSATION_FILTER: Record<InboxFilter, ConversationFilte
 /** Camada visual do módulo de atendimento (src/components/chat/) — mesmo dado de
  * listConversations, mapeado para o formato Contact usado pelo design novo. */
 export async function listChatContacts(filter: InboxFilter, search?: string) {
+  const { userId } = await requireClinicSession();
   const conversations = await listConversations(INBOX_FILTER_TO_CONVERSATION_FILTER[filter], search);
-  return conversations.map(toChatContact);
+  return conversations.map((c) => toChatContact(c, userId));
 }
 
 async function assertClinicOwnsConversation(conversationId: string, clinicId: string) {

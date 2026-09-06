@@ -755,6 +755,8 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                   className={`px-3.5 py-3 transition-colors cursor-pointer relative flex gap-3 items-start border-l-4 ${
                     isSelected
                       ? 'bg-white dark:bg-slate-800/70 border-emerald-600 shadow-sm'
+                      : c.hasUnseenAssignment
+                      ? 'bg-amber-50/60 dark:bg-amber-950/20 border-amber-400 hover:bg-amber-100/60 dark:hover:bg-amber-950/40'
                       : 'hover:bg-slate-200/50 dark:hover:bg-slate-800/40 border-transparent'
                   }`}
                   data-od-id={`contact-card-${c.id}`}
@@ -788,6 +790,12 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                         {c.lastMessageTime}
                       </span>
                     </div>
+
+                    {c.hasUnseenAssignment && (
+                      <p className="text-[10px] font-bold text-amber-700 dark:text-amber-400 mb-0.5 flex items-center gap-1">
+                        <Zap className="w-2.5 h-2.5" /> Transferida pra você
+                      </p>
+                    )}
 
                     {c.clinicName && (
                       <p className="text-[10px] font-semibold text-sky-700 dark:text-sky-400 mb-0.5 truncate">{c.clinicName}</p>

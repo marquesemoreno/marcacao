@@ -421,6 +421,10 @@ model Conversation {
   resolvedAt       DateTime?               @map("resolved_at")
   resolvedByUserId String?                 @map("resolved_by_user_id")
   lastMessageAt    DateTime?               @map("last_message_at")
+  /// `null` = atribuição "não vista" pelo atendente (transferência ou atribuição manual
+  /// do admin) — dispara selo/notificação até ele abrir a conversa. Preenchido na hora
+  /// quando o próprio atendente se atribui (já está olhando). Ver src/lib/conversation-assignment.ts.
+  assignmentSeenAt DateTime?               @map("assignment_seen_at")
   /// Estado do consentimento LGPD pra atendimento automatizado por IA (ver
   /// src/lib/ai-attendant.ts). Por conversa, não por Contact — o mesmo paciente pode
   /// falar com clínicas diferentes e o consentimento é específico daquele atendimento.
