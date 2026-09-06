@@ -392,26 +392,55 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
     setInputText('');
   };
 
-  const handleFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    e.target.value = ''; // permite escolher o mesmo arquivo de novo depois
-    if (!file || !selectedContact) return;
+  const ACCEPTED_MEDIA_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'application/pdf'];
 
-    if (!['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'application/pdf'].includes(file.type)) {
-      toast.error('Envie uma imagem (JPG, PNG, WEBP, GIF) ou um PDF.');
-      return;
+  // Cada arquivo vira uma mensagem própria no WhatsApp (não dá pra agrupar vários
+  // anexos numa única mensagem), então ao selecionar/colar mais de um, envia em
+  // sequência — evita disparos simultâneos fora de ordem no histórico da conversa.
+  const sendFiles = async (files: File[]) => {
+    if (!selectedContact || files.length === 0) return;
+
+    const valid: File[] = [];
+    for (const file of files) {
+      if (!ACCEPTED_MEDIA_TYPES.includes(file.type)) {
+        toast.error(`"${file.name}": envie uma imagem (JPG, PNG, WEBP, GIF) ou um PDF.`);
+        continue;
+      }
+      if (file.size > MAX_MEDIA_SIZE_BYTES) {
+        toast.error(`"${file.name}": arquivo muito grande. O limite é 15 MB.`);
+        continue;
+      }
+      valid.push(file);
     }
-    if (file.size > MAX_MEDIA_SIZE_BYTES) {
-      toast.error('Arquivo muito grande. O limite é 15 MB.');
-      return;
-    }
+    if (valid.length === 0) return;
 
     setIsSendingMedia(true);
     try {
-      await onSendMedia(file);
+      for (const file of valid) {
+        await onSendMedia(file);
+      }
     } finally {
       setIsSendingMedia(false);
     }
+  };
+
+  const handleFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? []);
+    e.target.value = ''; // permite escolher os mesmos arquivos de novo depois
+    await sendFiles(files);
+  };
+
+  // Cola direto na conversa uma imagem copiada (print/Ctrl+C) sem precisar salvar
+  // em arquivo e usar o clipe de papel.
+  const handleComposerPaste = async (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    if (composerMode !== 'whatsapp') return;
+    const files = Array.from(e.clipboardData?.items ?? [])
+      .filter((item) => item.kind === 'file')
+      .map((item) => item.getAsFile())
+      .filter((file): file is File => file !== null);
+    if (files.length === 0) return;
+    e.preventDefault();
+    await sendFiles(files);
   };
 
   const handleAddTag = async () => {
@@ -1157,6 +1186,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                     rows={2}
                     value={inputText}
                     onChange={(e) => handleInputChange(e.target.value)}
+                    onPaste={handleComposerPaste}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' && !e.shiftKey) {
                         e.preventDefault();
@@ -1179,6 +1209,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                             ref={fileInputRef}
                             type="file"
                             accept="image/jpeg,image/png,image/webp,image/gif,application/pdf"
+                            multiple
                             onChange={handleFileSelected}
                             className="hidden"
                           />
