@@ -73,6 +73,7 @@ import {
   resendMessageAdmin,
   getUnseenAssignmentNotificationsAdmin,
   markAssignmentSeenAdmin,
+  getOutboundFromDeviceStatsAdmin,
 } from "@/actions/admin-inbox";
 import { toast } from "sonner";
 import { useInboxRealtime } from "@/hooks/use-inbox-realtime";
@@ -189,10 +190,23 @@ export function ChatCrmApp({ scope, basePath, view }: ChatCrmAppProps) {
   /** Filtro de clínica da fila — só existe no scope admin, que vê todas juntas. "" = todas. */
   const [clinicFilter, setClinicFilter] = useState("");
   const [unassignedWaitMinutes, setUnassignedWaitMinutes] = useState<number | null>(null);
+  const [outboundFromDeviceStats, setOutboundFromDeviceStats] = useState<{
+    total: number;
+    byClinic: { clinicId: string; clinicName: string; count: number }[];
+    unidentified: number;
+  } | null>(null);
 
   const refreshContacts = useCallback(async () => {
+    const clinicIdArg = scope === "admin" && clinicFilter ? clinicFilter : undefined;
+
     const capacityFn = scope === "admin" ? getAttendantCapacityAdmin : getAttendantCapacity;
     capacityFn().then(setAttendantCapacity).catch(() => {});
+
+    // Só existe no admin — quantas respostas foram mandadas hoje direto pelo celular
+    // conectado (fora do painel), ver getOutboundFromDeviceStatsAdmin.
+    if (scope === "admin") {
+      getOutboundFromDeviceStatsAdmin(clinicIdArg).then(setOutboundFromDeviceStats).catch(() => {});
+    }
     // Busca independente da aba selecionada — precisa saber se tem paciente esperando há
     // muito tempo em "Não Atribuídas" mesmo quando o atendente está vendo "Minhas".
     const waitFn = scope === "admin" ? getOldestUnassignedWaitMinutesAdmin : getOldestUnassignedWaitMinutes;
@@ -222,7 +236,6 @@ export function ChatCrmApp({ scope, basePath, view }: ChatCrmAppProps) {
       })
       .catch(() => {});
 
-    const clinicIdArg = scope === "admin" && clinicFilter ? clinicFilter : undefined;
     const result =
       view === "crm"
         ? (
@@ -780,6 +793,7 @@ export function ChatCrmApp({ scope, basePath, view }: ChatCrmAppProps) {
           onReassignClinic={scope === "admin" ? handleReassignClinic : undefined}
           clinicFilter={scope === "admin" ? clinicFilter : undefined}
           onClinicFilterChange={scope === "admin" ? setClinicFilter : undefined}
+          outboundFromDeviceStats={scope === "admin" ? outboundFromDeviceStats : undefined}
           onCreateContact={handleCreateContact}
           onFinishAttendance={handleFinishAttendance}
           fetchProcedures={fetchProcedures}

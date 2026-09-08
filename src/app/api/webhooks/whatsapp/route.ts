@@ -371,7 +371,12 @@ export async function POST(request: Request) {
     // Bug real: atendente respondendo pelo celular parecia "não estar usando a
     // plataforma" (nenhuma conversa nova atribuída a ela), sem nenhum rastro do motivo.
     await logInbound(
-      { kind: "outbound_from_device", remoteJid: keyObj?.remoteJid ?? null, instance: instanceNameFromPayload ?? null },
+      {
+        kind: "outbound_from_device",
+        remoteJid: keyObj?.remoteJid ?? null,
+        instance: instanceNameFromPayload ?? null,
+        clinicId: resolvedClinicId ?? null,
+      },
       "IGNORED"
     );
     return NextResponse.json({ ignored: true, reason: "outbound_message" }, { status: 200 });

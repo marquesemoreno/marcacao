@@ -628,6 +628,67 @@ export async function markAssignmentSeenAdmin(conversationId: string) {
   });
 }
 
+/** Meia-noite de hoje no fuso da Bahia (UTC-3, sem horário de verão) — igual ao já
+ * usado em bridge-reminders.ts, mas aqui precisa virar um instante real (não só os
+ * campos de calendário) pra servir de filtro numa query `createdAt >= since`. */
+function startOfTodayInBahia(): Date {
+  const BAHIA_OFFSET_MS = 3 * 60 * 60 * 1000;
+  const shifted = new Date(Date.now() - BAHIA_OFFSET_MS);
+  shifted.setUTCHours(0, 0, 0, 0);
+  return new Date(shifted.getTime() + BAHIA_OFFSET_MS);
+}
+
+/** Quantas respostas foram mandadas hoje direto pelo celular conectado (fora do
+ * painel) — ver o log criado em "outbound_from_device" no webhook do WhatsApp.
+ * Sem `clinicId`, soma todas as clínicas e devolve o detalhamento por clínica
+ * (visão "Todas as Clínicas" do admin); as que não deram pra identificar a
+ * clínica (instância compartilhada, sem vínculo direto) entram em `unidentified`. */
+export async function getOutboundFromDeviceStatsAdmin(clinicId?: string) {
+  await requireAdminSession();
+  const since = startOfTodayInBahia();
+
+  const logs = await prisma.webhookLog.findMany({
+    where: { event: "whatsapp.inbound", status: "IGNORED", createdAt: { gte: since } },
+    select: { payload: true },
+  });
+
+  const relevant = logs
+    .map((l) => l.payload as Record<string, unknown> | null)
+    .filter((p): p is Record<string, unknown> => Boolean(p) && p?.kind === "outbound_from_device");
+
+  const filtered = clinicId ? relevant.filter((p) => p.clinicId === clinicId) : relevant;
+
+  if (clinicId) {
+    return { total: filtered.length, byClinic: [], unidentified: 0 };
+  }
+
+  const countByClinicId = new Map<string, number>();
+  let unidentified = 0;
+  for (const p of filtered) {
+    if (typeof p.clinicId === "string") {
+      countByClinicId.set(p.clinicId, (countByClinicId.get(p.clinicId) ?? 0) + 1);
+    } else {
+      unidentified++;
+    }
+  }
+
+  const clinicIds = Array.from(countByClinicId.keys());
+  const clinics = clinicIds.length
+    ? await prisma.clinic.findMany({ where: { id: { in: clinicIds } }, select: { id: true, tradeName: true } })
+    : [];
+  const nameById = new Map(clinics.map((c) => [c.id, c.tradeName]));
+
+  return {
+    total: filtered.length,
+    byClinic: Array.from(countByClinicId.entries()).map(([id, count]) => ({
+      clinicId: id,
+      clinicName: nameById.get(id) ?? "Clínica desconhecida",
+      count,
+    })),
+    unidentified,
+  };
+}
+
 export async function updateConversationTagsAdmin(conversationId: string, tags: string[]) {
   await requireAdminSession();
   const data = updateTagsSchema.parse({ conversationId, tags });

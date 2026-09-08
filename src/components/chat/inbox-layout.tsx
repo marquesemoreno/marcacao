@@ -44,6 +44,7 @@ import {
   Clock,
   Trash2,
   Settings2,
+  Smartphone,
 } from 'lucide-react';
 
 const MAX_MEDIA_SIZE_BYTES = 15 * 1024 * 1024; // 15 MB — mesmo limite validado no servidor
@@ -96,6 +97,13 @@ interface InboxLayoutProps {
   /** Minutos desde a última mensagem da conversa mais antiga em "Não Atribuídas" — pisca a
    * aba quando passa do limiar, mesmo se o atendente estiver vendo outra aba no momento. */
   unassignedWaitMinutes?: number | null;
+  /** Só existe no admin — quantas respostas foram mandadas hoje direto pelo celular
+   * conectado (fora do painel), pra flagrar atendente que não está usando o painel. */
+  outboundFromDeviceStats?: {
+    total: number;
+    byClinic: { clinicId: string; clinicName: string; count: number }[];
+    unidentified: number;
+  } | null;
   selectedContactId: string | null;
   /** Objeto completo do contato selecionado, já resolvido pelo pai (com fallback pra um
    * cache quando o contato não está no recorte atual de `contacts` — ver contactCacheRef
@@ -153,6 +161,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
   onLoadOlderMessages,
   attendantCapacity,
   unassignedWaitMinutes,
+  outboundFromDeviceStats,
   selectedContactId,
   selectedContact,
   onSelectContact,
@@ -626,6 +635,26 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                 </option>
               ))}
             </select>
+          )}
+
+          {/* Aviso admin: atendente respondendo direto pelo celular (fora do painel) —
+              some completamente do nosso radar (nenhuma conversa/atribuição registrada),
+              então é bom sinalizar quando isso está acontecendo. */}
+          {outboundFromDeviceStats && outboundFromDeviceStats.total > 0 && (
+            <div
+              className="flex items-center gap-1.5 text-[11px] font-semibold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-800 px-2.5 py-1.5 rounded-lg"
+              title={
+                outboundFromDeviceStats.byClinic.length > 0
+                  ? outboundFromDeviceStats.byClinic.map((c) => `${c.clinicName}: ${c.count}`).join('\n') +
+                    (outboundFromDeviceStats.unidentified > 0 ? `\nNão identificado: ${outboundFromDeviceStats.unidentified}` : '')
+                  : undefined
+              }
+            >
+              <Smartphone className="w-3.5 h-3.5 shrink-0" />
+              <span>
+                {outboundFromDeviceStats.total} resposta{outboundFromDeviceStats.total > 1 ? 's' : ''} hoje direto pelo celular (fora do painel)
+              </span>
+            </div>
           )}
 
           {/* Abas de Filtros: Segmented Control Compacto + botão de escolher quais abas mostrar */}
