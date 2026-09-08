@@ -287,21 +287,22 @@ export async function sendMessage(conversationId: string, content: string, isInt
     data: { lastMessageAt: new Date(), status: "OPEN", aiEnabled: false, ...autoAssignOnReply(conversation, userId) },
   });
 
-  // Dispara o envio ao WhatsApp via Evolution API em segundo plano (assíncrono), liberando a interface instantaneamente
-  whatsappService.sendMessage(conversation.contact.phone, data.content, "chat.outbound", clinicId).then((result) => {
+  // Precisa esperar o envio de verdade (não fire-and-forget): numa função serverless
+  // (Vercel), o processo pode ser encerrado assim que a resposta principal é mandada,
+  // derrubando o ".then()" antes dele salvar o whatsappKeyId — bug real confirmado em
+  // produção (mensagem chegava no paciente, mas nunca ficava editável nem casava os
+  // acks de entrega/leitura, por faltar o key.id). Não trava a UI de forma perceptível
+  // porque o envio já é rápido (~1s) e tem timeout curto (8s) lá dentro.
+  try {
+    const result = await whatsappService.sendMessage(conversation.contact.phone, data.content, "chat.outbound", clinicId);
     if (!result.success && !result.skipped) {
-      prisma.message.update({
-        where: { id: message.id },
-        data: { status: "FAILED" },
-      }).catch(() => {});
+      await prisma.message.update({ where: { id: message.id }, data: { status: "FAILED" } });
     } else if (result.keyId) {
-      // Guarda o key.id do WhatsApp pra casar com os acks de entrega/leitura (webhook messages.update)
-      prisma.message.update({
-        where: { id: message.id },
-        data: { whatsappKeyId: result.keyId },
-      }).catch(() => {});
+      await prisma.message.update({ where: { id: message.id }, data: { whatsappKeyId: result.keyId } });
     }
-  }).catch(() => {});
+  } catch {
+    await prisma.message.update({ where: { id: message.id }, data: { status: "FAILED" } }).catch(() => {});
+  }
 
   revalidatePath("/clinic/inbox");
   revalidatePath("/admin/inbox");
@@ -358,15 +359,17 @@ export async function sendMediaMessage(conversationId: string, formData: FormDat
   // Mesma URL assinada que a UI usa pra exibir — a Evolution API busca o arquivo nela.
   const signedUrl = await getSignedMediaUrl(uploaded.path);
   if (signedUrl) {
-    sendWhatsAppMedia(conversation.contact.phone, signedUrl, file.type, file.name, "", "chat.outbound.media", clinicId)
-      .then((result) => {
-        if (!result.success && !result.skipped) {
-          prisma.message.update({ where: { id: message.id }, data: { status: "FAILED" } }).catch(() => {});
-        } else if (result.keyId) {
-          prisma.message.update({ where: { id: message.id }, data: { whatsappKeyId: result.keyId } }).catch(() => {});
-        }
-      })
-      .catch(() => {});
+    // Await por robustez, não fire-and-forget — ver comentário em sendMessage.
+    try {
+      const result = await sendWhatsAppMedia(conversation.contact.phone, signedUrl, file.type, file.name, "", "chat.outbound.media", clinicId);
+      if (!result.success && !result.skipped) {
+        await prisma.message.update({ where: { id: message.id }, data: { status: "FAILED" } });
+      } else if (result.keyId) {
+        await prisma.message.update({ where: { id: message.id }, data: { whatsappKeyId: result.keyId } });
+      }
+    } catch {
+      await prisma.message.update({ where: { id: message.id }, data: { status: "FAILED" } }).catch(() => {});
+    }
   }
 
   revalidatePath("/clinic/inbox");
@@ -424,15 +427,17 @@ export async function sendAudioMessage(conversationId: string, formData: FormDat
 
   const signedUrl = await getSignedMediaUrl(uploaded.path);
   if (signedUrl) {
-    sendWhatsAppAudio(conversation.contact.phone, signedUrl, "chat.outbound.audio", clinicId)
-      .then((result) => {
-        if (!result.success && !result.skipped) {
-          prisma.message.update({ where: { id: message.id }, data: { status: "FAILED" } }).catch(() => {});
-        } else if (result.keyId) {
-          prisma.message.update({ where: { id: message.id }, data: { whatsappKeyId: result.keyId } }).catch(() => {});
-        }
-      })
-      .catch(() => {});
+    // Await por robustez, não fire-and-forget — ver comentário em sendMessage.
+    try {
+      const result = await sendWhatsAppAudio(conversation.contact.phone, signedUrl, "chat.outbound.audio", clinicId);
+      if (!result.success && !result.skipped) {
+        await prisma.message.update({ where: { id: message.id }, data: { status: "FAILED" } });
+      } else if (result.keyId) {
+        await prisma.message.update({ where: { id: message.id }, data: { whatsappKeyId: result.keyId } });
+      }
+    } catch {
+      await prisma.message.update({ where: { id: message.id }, data: { status: "FAILED" } }).catch(() => {});
+    }
   }
 
   revalidatePath("/clinic/inbox");
