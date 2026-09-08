@@ -4,10 +4,25 @@ import { useState } from "react";
 import { MessageSquarePlus, Loader2, Image as ImageIcon, X, Bug, Lightbulb } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { submitFeedbackReport } from "@/actions/feedback";
+import { submitFeedbackReport, submitFeedbackReportAdmin } from "@/actions/feedback";
 import type { FeedbackType } from "@/lib/feedback";
 
-export function FeedbackWidget() {
+const DEFAULT_TRIGGER_CLASSES =
+  "fixed bottom-5 right-5 z-50 inline-flex items-center justify-center w-12 h-12 rounded-full bg-violet-600 hover:bg-violet-700 text-white shadow-2xl transition-all hover:scale-105 active:scale-95 cursor-pointer print:hidden";
+
+export function FeedbackWidget({
+  admin = false,
+  trigger,
+}: {
+  /** Painel admin não tem uma única clínica dona da sessão — usa a Server Action
+   * equivalente (submitFeedbackReportAdmin) em vez de exigir sessão de clínica. */
+  admin?: boolean;
+  /** Customiza o gatilho (aparência/posição) — sem isso, usa o botão flutuante
+   * padrão no canto da tela. Usado ex. na tela vazia do inbox, onde faz mais
+   * sentido um botão inline do que outro elemento flutuante disputando o canto
+   * da tela. */
+  trigger?: React.ReactNode;
+} = {}) {
   const [open, setOpen] = useState(false);
   const [type, setType] = useState<FeedbackType>("SUGGESTION");
   const [description, setDescription] = useState("");
@@ -46,7 +61,8 @@ export function FeedbackWidget() {
       formData.set("description", description.trim());
       if (image) formData.set("image", image);
 
-      const result = await submitFeedbackReport(formData);
+      const submit = admin ? submitFeedbackReportAdmin : submitFeedbackReport;
+      const result = await submit(formData);
       if (!result.success) {
         toast.error(result.error);
         return;
@@ -63,11 +79,11 @@ export function FeedbackWidget() {
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger
-        className="fixed bottom-5 right-5 z-50 inline-flex items-center justify-center w-12 h-12 rounded-full bg-violet-600 hover:bg-violet-700 text-white shadow-2xl transition-all hover:scale-105 active:scale-95 cursor-pointer print:hidden"
+        className={trigger ? undefined : DEFAULT_TRIGGER_CLASSES}
         title="Enviar sugestão ou reportar bug"
         aria-label="Enviar sugestão ou reportar bug"
       >
-        <MessageSquarePlus className="w-5 h-5" />
+        {trigger ?? <MessageSquarePlus className="w-5 h-5" />}
       </DialogTrigger>
 
       <DialogContent className="max-w-md rounded-3xl p-6 sm:p-8">

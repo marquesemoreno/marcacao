@@ -1,7 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
-import { requireClinicSession } from "@/lib/session";
+import { requireClinicSession, requireAdminSession } from "@/lib/session";
 import { sendWhatsAppMessage, sendWhatsAppMedia } from "@/lib/whatsapp";
 import { uploadWhatsAppMedia, getSignedMediaUrl } from "@/lib/whatsapp-media";
 import { buildFeedbackMessage, type FeedbackType } from "@/lib/feedback";
@@ -11,16 +11,17 @@ const MAX_IMAGE_SIZE_BYTES = 15 * 1024 * 1024;
 
 type FeedbackResult = { success: true } | { success: false; error: string };
 
-/** Atendente reporta bug/sugestão pelo widget flutuante do painel da clínica — vira
- * uma mensagem de WhatsApp direto pro número de operação (FEEDBACK_WHATSAPP_NUMBER),
- * sem tela de admin nova pra abrir (decisão do usuário: usar o canal que já monitora).
- * Retorna um objeto em vez de lançar exceção pros casos esperados — Next.js redige a
- * mensagem de erro de exceções lançadas em Server Action em build de produção, então
- * "throw" aqui viraria sempre o texto genérico "Server Components render..." pro
- * atendente, escondendo até erro de validação simples. */
-export async function submitFeedbackReport(formData: FormData): Promise<FeedbackResult> {
-  const { clinicId, userId } = await requireClinicSession();
-
+/** Extrai/valida os campos comuns do formulário e dispara pro WhatsApp de operação —
+ * compartilhado pelas duas variantes (clínica/admin), que só diferem em como
+ * autenticar e resolver `clinicName`/`userName`. Retorna um objeto em vez de lançar
+ * exceção pros casos esperados — Next.js redige a mensagem de erro de exceções
+ * lançadas em Server Action em build de produção, então "throw" aqui viraria sempre
+ * o texto genérico "Server Components render..." pro atendente, escondendo até erro
+ * de validação simples. */
+async function sendFeedbackReport(
+  formData: FormData,
+  identity: { clinicName: string; userName: string }
+): Promise<FeedbackResult> {
   const type = formData.get("type");
   const description = String(formData.get("description") ?? "").trim();
   if (type !== "BUG" && type !== "SUGGESTION") {
@@ -40,17 +41,7 @@ export async function submitFeedbackReport(formData: FormData): Promise<Feedback
   // deploy quando a numeração mudar (ex: quando a TIVDC tiver instância própria).
   const senderClinicId = process.env.FEEDBACK_SENDER_CLINIC_ID || undefined;
 
-  const [clinic, user] = await Promise.all([
-    prisma.clinic.findUnique({ where: { id: clinicId }, select: { tradeName: true } }),
-    prisma.user.findUnique({ where: { id: userId }, select: { name: true } }),
-  ]);
-
-  const text = buildFeedbackMessage({
-    type: type as FeedbackType,
-    description,
-    clinicName: clinic?.tradeName ?? "Clínica desconhecida",
-    userName: user?.name ?? "Atendente",
-  });
+  const text = buildFeedbackMessage({ type: type as FeedbackType, description, ...identity });
 
   const imageFile = formData.get("image");
   let result: { success: boolean; skipped: boolean };
@@ -89,4 +80,29 @@ export async function submitFeedbackReport(formData: FormData): Promise<Feedback
   }
 
   return { success: true };
+}
+
+/** Atendente reporta bug/sugestão pelo widget flutuante do painel da clínica — vira
+ * uma mensagem de WhatsApp direto pro número de operação (FEEDBACK_WHATSAPP_NUMBER),
+ * sem tela de admin nova pra abrir (decisão do usuário: usar o canal que já monitora). */
+export async function submitFeedbackReport(formData: FormData): Promise<FeedbackResult> {
+  const { clinicId, userId } = await requireClinicSession();
+  const [clinic, user] = await Promise.all([
+    prisma.clinic.findUnique({ where: { id: clinicId }, select: { tradeName: true } }),
+    prisma.user.findUnique({ where: { id: userId }, select: { name: true } }),
+  ]);
+  return sendFeedbackReport(formData, {
+    clinicName: clinic?.tradeName ?? "Clínica desconhecida",
+    userName: user?.name ?? "Atendente",
+  });
+}
+
+/** Mesma coisa, pro painel admin (que não tem uma única clínica dona da sessão). */
+export async function submitFeedbackReportAdmin(formData: FormData): Promise<FeedbackResult> {
+  const { userId } = await requireAdminSession();
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { name: true } });
+  return sendFeedbackReport(formData, {
+    clinicName: "Painel Admin",
+    userName: user?.name ?? "Administrador",
+  });
 }

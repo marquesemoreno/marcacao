@@ -6,7 +6,7 @@ import { SignOutButton } from "@/components/sign-out-button";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Logo } from "@/components/brand/logo";
 import { ClinicNav } from "@/components/clinic/clinic-nav";
-import { FeedbackWidget } from "@/components/clinic/feedback-widget";
+import { FeedbackWidget } from "@/components/feedback-widget";
 import { getClinicInfo } from "@/actions/clinic";
 
 export const dynamic = "force-dynamic";

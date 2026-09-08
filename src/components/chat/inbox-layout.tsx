@@ -12,6 +12,7 @@ import {
 import { MessageBubble } from './message-bubble';
 import { ScheduleModal } from './schedule-modal';
 import { AvatarBadge } from './avatar-badge';
+import { FeedbackWidget } from '@/components/feedback-widget';
 import type { PlainClinicProcedureItem } from '@/lib/serialize';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from '@/components/ui/dialog';
 import { useClickOutside } from '@/hooks/use-click-outside';
@@ -45,6 +46,7 @@ import {
   Trash2,
   Settings2,
   Smartphone,
+  MessageSquarePlus,
 } from 'lucide-react';
 
 const MAX_MEDIA_SIZE_BYTES = 15 * 1024 * 1024; // 15 MB — mesmo limite validado no servidor
@@ -894,6 +896,15 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                 Selecione uma conversa na fila à esquerda para iniciar o atendimento.
               </p>
             )}
+
+            <FeedbackWidget
+              admin={Boolean(onClinicFilterChange)}
+              trigger={
+                <span className="inline-flex items-center gap-1.5 text-xs font-bold text-violet-700 dark:text-violet-300 bg-violet-50 dark:bg-violet-950/60 border border-violet-200 dark:border-violet-800 px-3 py-2 rounded-xl hover:bg-violet-100 dark:hover:bg-violet-900 transition-colors cursor-pointer">
+                  <MessageSquarePlus className="w-3.5 h-3.5" /> Relatar bug ou sugestão
+                </span>
+              }
+            />
           </div>
         ) : (
           <>
