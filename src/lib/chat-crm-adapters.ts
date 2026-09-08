@@ -10,6 +10,7 @@ import type {
 } from "@prisma/client";
 import { formatCurrency } from "@/lib/format";
 import { isMediaDownloadFailedNotice, isAutoSystemMessage } from "@/lib/chat-messages";
+import { canEditMessage } from "@/lib/message-edit";
 import type {
   Channel,
   Contact,
@@ -198,5 +199,7 @@ export function toChatMessage(
     mimeType: message.mimeType ?? undefined,
     isRead: message.direction === "INBOUND" ? message.readAt !== null : undefined,
     deliveryStatus: message.direction === "OUTBOUND" ? deliveryStatusMap[message.status] : undefined,
+    isEdited: Boolean(message.editedAt),
+    canEdit: canEditMessage(message).ok,
   };
 }

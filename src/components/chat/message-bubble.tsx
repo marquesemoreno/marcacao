@@ -21,6 +21,7 @@ import {
   AlertTriangle,
   CheckCircle2,
   Ban,
+  Pencil,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from '@/components/ui/dialog';
@@ -31,6 +32,8 @@ interface MessageBubbleProps {
   onRetry?: () => void;
   /** Manda um texto pedindo pro paciente reenviar o arquivo (só relevante quando mediaDownloadFailed). */
   onRequestResend?: () => void;
+  /** Edita o texto já enviado (só relevante quando message.canEdit). */
+  onEditMessage?: (messageId: string, newText: string) => Promise<{ success: boolean; error?: string }>;
 }
 
 /** Ícone + cor por tipo de arquivo — em vez de um FileText genérico pra qualquer
@@ -78,13 +81,36 @@ const MessageStatusTicks: React.FC<{ status?: Message['deliveryStatus'] }> = ({ 
   return <Clock className="w-3 h-3 text-emerald-200/80" aria-label="Enviando..." />;
 };
 
-export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry, onRequestResend }) => {
+export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry, onRequestResend, onEditMessage }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   const [playbackSpeed, setPlaybackSpeed] = useState<'1x' | '1.5x' | '2x'>('1x');
   const [copied, setCopied] = useState(false);
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editText, setEditText] = useState(message.text ?? '');
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
+
+  async function handleSaveEdit() {
+    if (!onEditMessage) return;
+    const trimmed = editText.trim();
+    if (!trimmed) {
+      toast.error('A mensagem não pode ficar vazia.');
+      return;
+    }
+    setIsSavingEdit(true);
+    try {
+      const result = await onEditMessage(message.id, trimmed);
+      if (result.success) {
+        setIsEditing(false);
+      } else {
+        toast.error(result.error || 'Não foi possível editar a mensagem.');
+      }
+    } finally {
+      setIsSavingEdit(false);
+    }
+  }
 
   const handleCopyText = (text: string) => {
     navigator.clipboard.writeText(text);
@@ -449,22 +475,83 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry, 
         }`}
       >
         {message.deleted && <DeletedBadge />}
-        <p
-          className={`whitespace-pre-wrap font-sans text-xs sm:text-[13.5px] leading-relaxed select-text ${
-            message.deleted ? `italic line-through ${isAgent ? 'text-rose-100' : 'text-rose-500 dark:text-rose-400'}` : ''
-          }`}
-        >
-          {message.text}
-        </p>
-        <div
-          className={`flex items-center justify-end gap-1.5 text-[10px] font-mono mt-1 ${
-            isAgent ? 'text-emerald-100/90' : 'text-slate-500 dark:text-slate-400'
-          }`}
-        >
-          <span>{message.timestamp}</span>
-          {isAgent && <MessageStatusTicks status={message.deliveryStatus} />}
-        </div>
-        {isAgent && message.deliveryStatus === 'failed' && <FailedSendNotice onRetry={onRetry} />}
+
+        {isEditing ? (
+          <div className="space-y-2">
+            <textarea
+              autoFocus
+              value={editText}
+              onChange={(e) => setEditText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') setIsEditing(false);
+              }}
+              rows={3}
+              className={`w-full rounded-lg p-2 text-xs sm:text-[13.5px] leading-relaxed resize-none focus:outline-none focus:ring-2 ${
+                isAgent
+                  ? 'bg-emerald-700/60 dark:bg-emerald-800/60 text-white placeholder-emerald-100/60 focus:ring-white/30'
+                  : 'bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-100 focus:ring-emerald-500/30'
+              }`}
+            />
+            <div className="flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setIsEditing(false)}
+                disabled={isSavingEdit}
+                className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition-colors disabled:opacity-50 ${
+                  isAgent ? 'text-emerald-100 hover:bg-white/10' : 'text-slate-500 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                }`}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveEdit}
+                disabled={isSavingEdit}
+                className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-colors disabled:opacity-60 ${
+                  isAgent ? 'bg-white text-emerald-700 hover:bg-emerald-50' : 'bg-emerald-600 text-white hover:bg-emerald-700'
+                }`}
+              >
+                {isSavingEdit ? 'Salvando...' : 'Salvar'}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <>
+            <p
+              className={`whitespace-pre-wrap font-sans text-xs sm:text-[13.5px] leading-relaxed select-text ${
+                message.deleted ? `italic line-through ${isAgent ? 'text-rose-100' : 'text-rose-500 dark:text-rose-400'}` : ''
+              }`}
+            >
+              {message.text}
+            </p>
+            <div
+              className={`flex items-center justify-end gap-1.5 text-[10px] font-mono mt-1 ${
+                isAgent ? 'text-emerald-100/90' : 'text-slate-500 dark:text-slate-400'
+              }`}
+            >
+              {message.canEdit && onEditMessage && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditText(message.text ?? '');
+                    setIsEditing(true);
+                  }}
+                  aria-label="Editar mensagem"
+                  title="Editar mensagem"
+                  className={`opacity-0 group-hover:opacity-100 -m-1 p-1 rounded transition-opacity ${
+                    isAgent ? 'hover:bg-white/15' : 'hover:bg-slate-200 dark:hover:bg-slate-700'
+                  }`}
+                >
+                  <Pencil className="w-3 h-3" />
+                </button>
+              )}
+              {message.isEdited && <span className="italic opacity-80">editada</span>}
+              <span>{message.timestamp}</span>
+              {isAgent && <MessageStatusTicks status={message.deliveryStatus} />}
+            </div>
+            {isAgent && message.deliveryStatus === 'failed' && <FailedSendNotice onRetry={onRetry} />}
+          </>
+        )}
       </div>
     </div>
   );

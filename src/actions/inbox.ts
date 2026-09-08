@@ -8,7 +8,8 @@ import { whatsappService, formatToWhatsAppNumber, isValidWhatsAppNumber, fetchWh
 import { toPlainClinicProcedureItem } from "@/lib/serialize";
 import { toChatContact, toChatMessage, departmentToDb, funnelStageToDb } from "@/lib/chat-crm-adapters";
 import { attachSignedUrls, uploadWhatsAppMedia, getSignedMediaUrl, formatDuration } from "@/lib/whatsapp-media";
-import { sendWhatsAppMedia, sendWhatsAppAudio } from "@/lib/whatsapp";
+import { sendWhatsAppMedia, sendWhatsAppAudio, editWhatsAppMessage } from "@/lib/whatsapp";
+import { canEditMessage } from "@/lib/message-edit";
 import { hasHospitalBridgeIntegration, fetchBridgeProcedures, fetchBridgeDoctors, fetchBridgeAgenda, fetchBridgeConvenios, fetchBridgePatients, adaptBridgeProcedureToPlainItem } from "@/lib/hospital-bridge";
 import { formatFileSize } from "@/lib/format";
 import { notifyInboxRealtime } from "@/lib/supabase-server";
@@ -501,6 +502,51 @@ export async function resendMessage(messageId: string) {
 
   revalidatePath("/clinic/inbox");
   revalidatePath("/admin/inbox");
+  notifyInboxRealtime().catch(() => {});
+  return { success: true as const };
+}
+
+/** Edita o texto de uma mensagem já enviada — ver regras em canEditMessage
+ * (message-edit.ts). Atualiza no WhatsApp de verdade (Evolution API) antes de
+ * gravar localmente; se a Evolution recusar, não salva o texto novo (senão a
+ * tela mostraria uma edição que o paciente nunca viu). */
+export async function editMessage(messageId: string, newText: string) {
+  const { clinicId } = await requireClinicSession();
+
+  const message = await prisma.message.findUnique({
+    where: { id: messageId },
+    include: { conversation: { include: { contact: true } } },
+  });
+  if (!message || message.conversation.clinicId !== clinicId) {
+    return { success: false as const, error: "Mensagem não encontrada." };
+  }
+
+  const check = canEditMessage(message);
+  if (!check.ok) {
+    return { success: false as const, error: check.reason };
+  }
+
+  const trimmed = newText.trim();
+  if (!trimmed) {
+    return { success: false as const, error: "A mensagem não pode ficar vazia." };
+  }
+  if (trimmed === message.content) {
+    return { success: true as const };
+  }
+
+  const result = await editWhatsAppMessage(
+    message.conversation.contact.phone,
+    message.whatsappKeyId!,
+    trimmed,
+    "chat.edit",
+    clinicId
+  );
+  if (!result.success && !result.skipped) {
+    return { success: false as const, error: "Não foi possível editar no WhatsApp. Tente novamente." };
+  }
+
+  await prisma.message.update({ where: { id: messageId }, data: { content: trimmed, editedAt: new Date() } });
+  revalidatePath("/clinic/inbox");
   notifyInboxRealtime().catch(() => {});
   return { success: true as const };
 }

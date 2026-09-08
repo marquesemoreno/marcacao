@@ -36,6 +36,7 @@ import {
   resendMessage,
   getUnseenAssignmentNotifications,
   markAssignmentSeen,
+  editMessage,
 } from "@/actions/inbox";
 import {
   listChatContactsAdmin,
@@ -74,6 +75,7 @@ import {
   getUnseenAssignmentNotificationsAdmin,
   markAssignmentSeenAdmin,
   getOutboundFromDeviceStatsAdmin,
+  editMessageAdmin,
 } from "@/actions/admin-inbox";
 import { toast } from "sonner";
 import { useInboxRealtime } from "@/hooks/use-inbox-realtime";
@@ -118,6 +120,7 @@ const ACTIONS_BY_SCOPE = {
     resendMessage: (id: string) => resendMessage(id),
     getUnseenAssignmentNotifications: () => getUnseenAssignmentNotifications(),
     markAssignmentSeen: (id: string) => markAssignmentSeen(id),
+    editMessage: (id: string, text: string) => editMessage(id, text),
   },
   admin: {
     listChatContacts: ((filter, search, clinicId) =>
@@ -144,6 +147,7 @@ const ACTIONS_BY_SCOPE = {
     resendMessage: (id: string) => resendMessageAdmin(id),
     getUnseenAssignmentNotifications: () => getUnseenAssignmentNotificationsAdmin(),
     markAssignmentSeen: (id: string) => markAssignmentSeenAdmin(id),
+    editMessage: (id: string, text: string) => editMessageAdmin(id, text),
   },
 };
 
@@ -743,6 +747,16 @@ export function ChatCrmApp({ scope, basePath, view }: ChatCrmAppProps) {
     await refreshMessages();
   }
 
+  async function handleEditMessage(messageId: string, newText: string) {
+    const result = await actions.editMessage(messageId, newText);
+    if (!result.success) {
+      toast.error(result.error || "Não foi possível editar a mensagem.");
+      return result;
+    }
+    await refreshMessages();
+    return result;
+  }
+
   async function handleTransferAgent(agentId: string) {
     if (!selectedContactId) return;
     const transferFn = scope === "admin" ? transferConversationAdmin : transferConversation;
@@ -788,6 +802,7 @@ export function ChatCrmApp({ scope, basePath, view }: ChatCrmAppProps) {
           onClaimConversation={handleClaimConversation}
           onMarkUnread={handleMarkUnread}
           onRetryMessage={handleRetryMessage}
+          onEditMessage={handleEditMessage}
           onTransferAgent={handleTransferAgent}
           availableClinics={scope === "admin" ? availableClinics : undefined}
           onReassignClinic={scope === "admin" ? handleReassignClinic : undefined}

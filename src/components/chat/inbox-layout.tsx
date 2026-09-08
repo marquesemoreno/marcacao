@@ -134,6 +134,7 @@ interface InboxLayoutProps {
   onClaimConversation?: () => Promise<void> | void;
   onMarkUnread?: () => Promise<void> | void;
   onRetryMessage?: (messageId: string) => Promise<void> | void;
+  onEditMessage?: (messageId: string, newText: string) => Promise<{ success: boolean; error?: string }>;
   onTransferAgent: (agentId: string, agentName: string) => Promise<void> | void;
   availableClinics?: { id: string; tradeName: string }[];
   onReassignClinic?: (clinicId: string) => Promise<void> | void;
@@ -184,6 +185,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
   onClaimConversation,
   onMarkUnread,
   onRetryMessage,
+  onEditMessage,
   onTransferAgent,
   availableClinics,
   onReassignClinic,
@@ -1134,6 +1136,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                       key={msg.id}
                       message={msg}
                       onRetry={onRetryMessage ? () => onRetryMessage(msg.id) : undefined}
+                      onEditMessage={onEditMessage}
                       onRequestResend={
                         msg.mediaDownloadFailed
                           ? () => onSendMessage('Oi! Não conseguimos baixar o arquivo que você enviou por aqui. Pode tentar enviar novamente, por favor?', 'whatsapp')

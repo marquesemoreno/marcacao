@@ -467,6 +467,10 @@ model Message {
   /// Preenchido quando o WhatsApp avisa (evento messages.delete) que essa mensagem
   /// foi apagada — mantém o conteúdo original no banco, só marca pra exibição.
   deletedAt      DateTime?        @map("deleted_at")
+  /// Preenchido quando um atendente edita o texto já enviado (ver canEditMessage
+  /// em src/lib/message-edit.ts) — `content` já reflete o texto novo, isso só
+  /// serve pra exibir o selo "editada" (mesma UX do WhatsApp).
+  editedAt       DateTime?        @map("edited_at")
   createdAt      DateTime         @default(now()) @map("created_at")
 
   conversation Conversation @relation(fields: [conversationId], references: [id])

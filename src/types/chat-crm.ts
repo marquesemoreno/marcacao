@@ -38,6 +38,10 @@ export interface Message {
   mediaDownloadFailed?: boolean;
   /** true pra mensagem automática do sistema (ex: confirmação de agendamento) — vira um aviso compacto em vez de bolha de texto normal. */
   isSystemNotice?: boolean;
+  /** true quando o atendente editou o texto depois de enviado — mostra o selo "editada". */
+  isEdited?: boolean;
+  /** true quando ainda dá pra editar essa mensagem (ver canEditMessage em message-edit.ts). */
+  canEdit?: boolean;
 }
 
 export interface Contact {

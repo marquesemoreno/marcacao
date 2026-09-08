@@ -4,7 +4,8 @@ import { revalidatePath } from "next/cache";
 import { ConversationStatus, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireAdminSession } from "@/lib/session";
-import { whatsappService, sendWhatsAppMedia, sendWhatsAppAudio, formatToWhatsAppNumber, isValidWhatsAppNumber, fetchWhatsAppProfilePicture } from "@/lib/whatsapp";
+import { whatsappService, sendWhatsAppMedia, sendWhatsAppAudio, formatToWhatsAppNumber, isValidWhatsAppNumber, fetchWhatsAppProfilePicture, editWhatsAppMessage } from "@/lib/whatsapp";
+import { canEditMessage } from "@/lib/message-edit";
 import { hasHospitalBridgeIntegration, fetchBridgeProcedures, fetchBridgeDoctors, fetchBridgeAgenda, fetchBridgeConvenios, fetchBridgePatients, adaptBridgeProcedureToPlainItem } from "@/lib/hospital-bridge";
 import { toPlainClinicProcedureItem } from "@/lib/serialize";
 import { departmentToDb, funnelStageToDb, toChatContact, toChatMessage } from "@/lib/chat-crm-adapters";
@@ -510,6 +511,49 @@ export async function resendMessageAdmin(messageId: string) {
     }
   }
 
+  revalidatePath("/admin/inbox");
+  notifyInboxRealtime().catch(() => {});
+  return { success: true as const };
+}
+
+/** Ver editMessage (actions/inbox.ts) — mesma regra, sem exigir uma clínica
+ * dona da sessão (o admin enxerga conversas de todas). */
+export async function editMessageAdmin(messageId: string, newText: string) {
+  await requireAdminSession();
+
+  const message = await prisma.message.findUnique({
+    where: { id: messageId },
+    include: { conversation: { include: { contact: true } } },
+  });
+  if (!message) {
+    return { success: false as const, error: "Mensagem não encontrada." };
+  }
+
+  const check = canEditMessage(message);
+  if (!check.ok) {
+    return { success: false as const, error: check.reason };
+  }
+
+  const trimmed = newText.trim();
+  if (!trimmed) {
+    return { success: false as const, error: "A mensagem não pode ficar vazia." };
+  }
+  if (trimmed === message.content) {
+    return { success: true as const };
+  }
+
+  const result = await editWhatsAppMessage(
+    message.conversation.contact.phone,
+    message.whatsappKeyId!,
+    trimmed,
+    "chat.edit_admin",
+    message.conversation.clinicId
+  );
+  if (!result.success && !result.skipped) {
+    return { success: false as const, error: "Não foi possível editar no WhatsApp. Tente novamente." };
+  }
+
+  await prisma.message.update({ where: { id: messageId }, data: { content: trimmed, editedAt: new Date() } });
   revalidatePath("/admin/inbox");
   notifyInboxRealtime().catch(() => {});
   return { success: true as const };

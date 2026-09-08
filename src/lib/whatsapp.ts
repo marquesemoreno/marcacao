@@ -216,6 +216,70 @@ export async function sendWhatsAppMessage(
 }
 
 /**
+ * Edita uma mensagem de texto já enviada, via Evolution API v2.
+ * POST ${EVOLUTION_API_URL}/chat/updateMessage/${EVOLUTION_INSTANCE_NAME}
+ * Payload: { number, key: { id, remoteJid, fromMe: true }, text }
+ * `keyId` é o `key.id` (Baileys) guardado em `Message.whatsappKeyId` no envio original —
+ * `remoteJid` é reconstruído a partir do telefone porque nunca precisamos guardar o
+ * objeto `key` inteiro pra nada além disso (`fromMe` é sempre true: só editamos
+ * mensagem nossa). O WhatsApp só aceita edição dentro de ~15 min do envio original
+ * (ver canEditMessage em src/lib/message-edit.ts) — passado isso a própria Meta
+ * rejeita/ignora, então essa checagem já acontece antes de chegar aqui.
+ */
+export async function editWhatsAppMessage(
+  to: string,
+  keyId: string,
+  newText: string,
+  event: string = "whatsapp.edit",
+  clinicId?: string
+): Promise<{ success: boolean; skipped: boolean; responseCode?: number | null }> {
+  const { apiUrl, apiKey, instanceName } = await getEvolutionConfig(clinicId);
+  const target = formatToWhatsAppNumber(to);
+
+  if (!apiUrl || !apiKey || !instanceName) {
+    await prisma.webhookLog.create({
+      data: { event, payload: { phone: target, keyId, text: newText }, status: "SKIPPED", responseCode: null },
+    });
+    return { success: false, skipped: true };
+  }
+
+  const baseUrl = apiUrl.replace(/\/$/, "");
+  const targetUrl = `${baseUrl}/chat/updateMessage/${instanceName}`;
+
+  let result: SendAttemptResult = { success: false, responseCode: null };
+  try {
+    const response = await fetch(targetUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", apikey: apiKey },
+      body: JSON.stringify({
+        number: target,
+        key: { id: keyId, remoteJid: `${target}@s.whatsapp.net`, fromMe: true },
+        text: newText,
+      }),
+      signal: AbortSignal.timeout(8000),
+    });
+    result = { success: response.ok, responseCode: response.status };
+  } catch (error) {
+    result = {
+      success: false,
+      responseCode: null,
+      error: error instanceof Error ? error.message : "Erro na conexão com Evolution API",
+    };
+  }
+
+  await prisma.webhookLog.create({
+    data: {
+      event,
+      payload: { provider: "evolution_v2", phone: target, keyId, text: newText, error: result.error ?? null },
+      status: result.success ? "SUCCESS" : "FAILED",
+      responseCode: result.responseCode,
+    },
+  });
+
+  return { success: result.success, skipped: false, responseCode: result.responseCode };
+}
+
+/**
  * Envio de mídia (imagem/documento) via Evolution API v2.
  * POST ${EVOLUTION_API_URL}/message/sendMedia/${EVOLUTION_INSTANCE_NAME}
  * `media` é uma URL (a assinada do Supabase Storage) — a Evolution API busca
