@@ -8,6 +8,7 @@ import { notifyInboxRealtime } from "@/lib/supabase-server";
 import { MEDIA_DOWNLOAD_FAILED_PREFIX } from "@/lib/chat-messages";
 import { isBroadcastOptOutReply } from "@/lib/broadcast-csv";
 import { reopenIfResolved } from "@/lib/conversation-reopen";
+import { resolveStatusFromReply, isRescheduleReply } from "@/lib/appointment-reply";
 import { buildBridgeConfirmationFollowUp } from "@/lib/bridge-confirmation";
 import { extractBridgeNumeroFromNotes, confirmBridgeAppointment } from "@/lib/hospital-bridge";
 import {
@@ -170,24 +171,6 @@ async function handleMessageDelete(data: Record<string, unknown>) {
   await prisma.message.update({ where: { id: message.id }, data: { deletedAt: new Date() } });
   notifyInboxRealtime().catch(() => {});
   await logInbound({ kind: "message_delete", ...data, messageDbId: message.id }, "SUCCESS");
-}
-
-/** Numeração combinada com o texto das mensagens (bridge-confirmation.ts e
- * bridge-reminder.ts): 1 confirma, 2 pede remarcação, 3 cancela. */
-function resolveStatusFromReply(text: string): AppointmentStatus | null {
-  const normalized = text.trim().toUpperCase();
-  if (normalized === "1" || normalized === "SIM" || normalized === "SIM, CONFIRMO") return "CONFIRMED";
-  if (normalized === "3" || normalized === "CANCELAR" || normalized === "NÃO" || normalized === "NAO") return "CANCELLED";
-  return null;
-}
-
-/** "Remarcar" não é um AppointmentStatus (não temos automação de reagendar
- * sozinho) — só sinaliza que um atendente precisa assumir e remarcar na mão.
- * Checado só quando resolveStatusFromReply não bateu, senão "2" nunca chegaria
- * aqui de propósito (não colide hoje, mas mantém a prioridade clara). */
-function isRescheduleReply(text: string): boolean {
-  const normalized = text.trim().toUpperCase();
-  return normalized === "2" || normalized === "REMARCAR" || normalized === "REAGENDAR";
 }
 
 async function logInbound(payload: Prisma.InputJsonValue, status: string) {
