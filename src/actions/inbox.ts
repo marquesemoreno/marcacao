@@ -1191,35 +1191,67 @@ export async function updateConversationFunnelStage(conversationId: string, stag
   });
 
   if (stage === "agendado") {
-    const appointment = await prisma.appointment.findFirst({
+    // Se a atendente já mandou alguma mensagem manual pro paciente há pouco tempo,
+    // ela já está confirmando na mão — mandar essa automática por cima só duplica.
+    // Bug real (relatado com print): paciente recebia a confirmação manual da
+    // atendente e, segundos depois, essa automática genérica em cima, às vezes
+    // com o nome errado (usava o nome do Contact, que pode ser só o nome de
+    // usuário salvo do WhatsApp em vez do nome real do paciente).
+    const recentHumanMessage = await prisma.message.findFirst({
       where: {
-        patientPhone: { endsWith: conversation.contact.phone.slice(-11) },
-        status: { in: ["PENDING", "CONFIRMED"] },
-      },
-      orderBy: { createdAt: "desc" },
-      include: { clinicProcedure: { include: { procedure: true } } },
-    });
-
-    const patientFirstName = conversation.contact.name.split(" ")[0];
-    const clinicName = conversation.clinic.tradeName;
-    const procedureName = appointment?.clinicProcedure.procedure.name || "Consulta";
-
-    const confirmMessage = applyMessageVariables(APPOINTMENT_CONFIRMED_TEMPLATE, {
-      nome: patientFirstName,
-      clinica: clinicName,
-      procedimento: procedureName,
-    });
-
-    await prisma.message.create({
-      data: {
         conversationId,
         direction: "OUTBOUND",
-        content: confirmMessage,
-        status: "DELIVERED",
+        senderUserId: { not: null },
+        createdAt: { gte: new Date(Date.now() - 5 * 60 * 1000) },
       },
     });
 
-    whatsappService.sendMessage(conversation.contact.phone, confirmMessage, "appointment.confirmed.crm_kanban", clinicId).catch(() => {});
+    if (!recentHumanMessage) {
+      const appointment = await prisma.appointment.findFirst({
+        where: {
+          patientPhone: { endsWith: conversation.contact.phone.slice(-11) },
+          status: { in: ["PENDING", "CONFIRMED"] },
+        },
+        orderBy: { createdAt: "desc" },
+        include: { clinicProcedure: { include: { procedure: true } } },
+      });
+
+      // Nome do agendamento (digitado por alguém no ato de agendar) é mais confiável
+      // que o nome do Contact, que em conversas iniciadas pelo paciente às vezes é só
+      // o nome de usuário/perfil do WhatsApp dele, não o nome real.
+      const patientFirstName = (appointment?.patientName || conversation.contact.name).split(" ")[0];
+      const clinicName = conversation.clinic.tradeName;
+      const procedureName = appointment?.clinicProcedure.procedure.name || "Consulta";
+
+      const confirmMessage = applyMessageVariables(APPOINTMENT_CONFIRMED_TEMPLATE, {
+        nome: patientFirstName,
+        clinica: clinicName,
+        procedimento: procedureName,
+      });
+
+      const message = await prisma.message.create({
+        data: { conversationId, direction: "OUTBOUND", content: confirmMessage, status: "SENT" },
+      });
+
+      // Await + status real — mesmo motivo de sempre (fire-and-forget não sobrevive
+      // ao encerramento da função serverless na Vercel, e sem o whatsappKeyId real
+      // essa mensagem nunca ficaria editável nem casaria os acks de entrega/leitura).
+      try {
+        const result = await whatsappService.sendMessage(
+          conversation.contact.phone,
+          confirmMessage,
+          "appointment.confirmed.crm_kanban",
+          clinicId
+        );
+        if (!result.success && !result.skipped) {
+          await prisma.message.update({ where: { id: message.id }, data: { status: "FAILED" } });
+        } else if (result.keyId) {
+          await prisma.message.update({ where: { id: message.id }, data: { whatsappKeyId: result.keyId } });
+        }
+      } catch {
+        await prisma.message.update({ where: { id: message.id }, data: { status: "FAILED" } }).catch(() => {});
+      }
+    }
   }
 
   revalidatePath("/clinic/inbox");
