@@ -429,9 +429,14 @@ function formatDateBR(date: Date): string {
 }
 
 /**
- * Dispara a mensagem oficial de confirmação de agendamento via WhatsApp
+ * Dispara a mensagem oficial de confirmação de agendamento via WhatsApp.
+ * `conversationId`, quando informado, também grava essa mensagem no histórico do
+ * chat da plataforma — sem isso ela só aparecia no WhatsApp de verdade (web/
+ * celular), nunca no inbox (bug real relatado por atendente). Opcional porque
+ * nem toda chamada tem uma Conversation em mãos (ex: agendamento feito direto
+ * pelo site público, antes de qualquer troca de mensagem por WhatsApp).
  */
-export async function sendAppointmentConfirmation(appointment: AppointmentWithRelations) {
+export async function sendAppointmentConfirmation(appointment: AppointmentWithRelations, conversationId?: string) {
   const patientName = appointment.patientName.trim();
   const procedureName = appointment.clinicProcedure.procedure.name;
   const clinicName = appointment.clinicProcedure.clinic.tradeName;
@@ -448,7 +453,13 @@ export async function sendAppointmentConfirmation(appointment: AppointmentWithRe
 
 🎟️ Sua Guia Oficial com QR Code: ${comprovanteUrl}`;
 
-  return sendWhatsAppMessage(appointment.patientPhone, messageText, "appointment.confirmation");
+  const result = await sendWhatsAppMessage(appointment.patientPhone, messageText, "appointment.confirmation");
+  if (conversationId) {
+    await prisma.message.create({
+      data: { conversationId, direction: "OUTBOUND", content: messageText, status: "DELIVERED" },
+    });
+  }
+  return result;
 }
 
 /**

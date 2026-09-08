@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { resolveStatusFromReply, isRescheduleReply } from "./appointment-reply";
+import { resolveStatusFromReply, isRescheduleReply, wasSentConfirmationPrompt } from "./appointment-reply";
 
 describe("resolveStatusFromReply", () => {
   it("reconhece o número da opção", () => {
@@ -50,5 +50,28 @@ describe("isRescheduleReply", () => {
 
   it("ignora mensagens não relacionadas", () => {
     expect(isRescheduleReply("Bom dia")).toBe(false);
+  });
+});
+
+describe("wasSentConfirmationPrompt", () => {
+  it("reconhece as 3 variações de template que pedem confirmação", () => {
+    expect(
+      wasSentConfirmationPrompt(
+        "Olá João! Lembrando da sua consulta amanhã às 10h. Por favor, responda com o número da opção desejada:\n1️⃣ Digite 1 para Confirmar presença\n2️⃣ Digite 2 para Remarcar\n3️⃣ Digite 3 para Cancelar"
+      )
+    ).toBe(true);
+  });
+
+  it("bloqueia quando a última mensagem nossa não foi um pedido de confirmação", () => {
+    // Bug real: paciente respondia "Sim" pra uma pergunta qualquer da atendente
+    // ("seria biópsia de próstata, correto?") e o sistema tratava como confirmação
+    // de agendamento, disparando a mensagem automática no meio da conversa manual.
+    expect(wasSentConfirmationPrompt("Seria uma Biópsia de próstata, correto?")).toBe(false);
+    expect(wasSentConfirmationPrompt("Olá boa tarde! Tudo bem?")).toBe(false);
+  });
+
+  it("trata ausência de mensagem anterior como não-confirmação", () => {
+    expect(wasSentConfirmationPrompt(null)).toBe(false);
+    expect(wasSentConfirmationPrompt(undefined)).toBe(false);
   });
 });

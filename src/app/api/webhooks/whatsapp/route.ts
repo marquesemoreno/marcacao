@@ -8,7 +8,7 @@ import { notifyInboxRealtime } from "@/lib/supabase-server";
 import { MEDIA_DOWNLOAD_FAILED_PREFIX } from "@/lib/chat-messages";
 import { isBroadcastOptOutReply } from "@/lib/broadcast-csv";
 import { reopenIfResolved } from "@/lib/conversation-reopen";
-import { resolveStatusFromReply, isRescheduleReply } from "@/lib/appointment-reply";
+import { resolveStatusFromReply, isRescheduleReply, wasSentConfirmationPrompt } from "@/lib/appointment-reply";
 import { buildBridgeConfirmationFollowUp } from "@/lib/bridge-confirmation";
 import { extractBridgeNumeroFromNotes, confirmBridgeAppointment } from "@/lib/hospital-bridge";
 import {
@@ -613,12 +613,25 @@ export async function POST(request: Request) {
   // =========================================================================
   // 3. TRATAMENTO DE COMANDOS DO PACIENTE (1 - CONFIRMAR / 2 - CANCELAR / 3 - REMARCAR)
   // =========================================================================
-  const newStatus = resolveStatusFromReply(incoming.text);
+  // Só interpreta como comando de confirmação se a ÚLTIMA mensagem NOSSA nessa
+  // conversa foi de fato um pedido de confirmação — bug real (relatado com print):
+  // paciente respondia "Sim" pra uma pergunta qualquer da atendente no meio de uma
+  // conversa manual e o sistema mandava a confirmação automática por cima, sem
+  // nenhuma relação com o que estava sendo conversado.
+  const lastOutbound = conversation
+    ? await prisma.message.findFirst({
+        where: { conversationId: conversation.id, direction: "OUTBOUND", type: { not: "INTERNAL_NOTE" } },
+        orderBy: { createdAt: "desc" },
+        select: { content: true },
+      })
+    : null;
+  const isConfirmationContext = wasSentConfirmationPrompt(lastOutbound?.content);
+  const newStatus = isConfirmationContext ? resolveStatusFromReply(incoming.text) : null;
 
   // "Remarcar" não muda o status do agendamento (não temos automação de
   // reagendar sozinho) — só desatribui a conversa (some pra "Não Atribuídas")
   // pra alguém assumir e remarcar na mão, e avisa o paciente que entendeu.
-  if (!newStatus && isRescheduleReply(incoming.text)) {
+  if (!newStatus && isConfirmationContext && isRescheduleReply(incoming.text)) {
     if (conversation) {
       await prisma.message.create({
         data: {
@@ -636,6 +649,12 @@ export async function POST(request: Request) {
       const ackText = "Entendido! Nossa equipe vai entrar em contato em breve pra reagendar sua consulta. 😊";
       try {
         await sendWhatsAppMessage(incoming.phone, ackText, "appointment.reschedule_ack", resolvedClinicId);
+        // Sem isso, o texto de verdade mandado ao paciente só aparecia no WhatsApp
+        // em si (web/celular) — na plataforma só existia a nota interna acima,
+        // resumida, nunca a mensagem real (bug real relatado por atendente).
+        await prisma.message.create({
+          data: { conversationId: conversation.id, direction: "OUTBOUND", content: ackText, status: "DELIVERED" },
+        });
       } catch (error) {
         console.error("Falha ao enviar confirmação de remarcação:", error);
       }
@@ -709,6 +728,11 @@ export async function POST(request: Request) {
       // ao encerramento da função serverless na Vercel.
       try {
         await sendWhatsAppMessage(incoming.phone, ackText, "appointment.bridge_reply_ack", resolvedClinicId);
+        // Sem isso, o texto real só aparecia no WhatsApp em si — na plataforma só
+        // existia a nota interna acima, resumida (bug real relatado por atendente).
+        await prisma.message.create({
+          data: { conversationId: conversation.id, direction: "OUTBOUND", content: ackText, status: "DELIVERED" },
+        });
       } catch (error) {
         console.error("Falha ao enviar confirmação de resposta ao lembrete (bridge):", error);
       }
@@ -752,6 +776,13 @@ export async function POST(request: Request) {
           city: updated.clinicProcedure.clinic.city,
         });
         await sendWhatsAppMessage(updated.patientPhone, followUp, "appointment.bridge_confirmation_followup", resolvedClinicId);
+        // Sem isso, o texto real só aparecia no WhatsApp em si, nunca na plataforma
+        // (bug real relatado por atendente).
+        if (conversation) {
+          await prisma.message.create({
+            data: { conversationId: conversation.id, direction: "OUTBOUND", content: followUp, status: "DELIVERED" },
+          });
+        }
 
         // Fecha o ciclo no sistema real da clínica (Firebird) — testado com um
         // agendamento de mentira antes de liberar (ver nota em
@@ -770,7 +801,7 @@ export async function POST(request: Request) {
           }
         }
       } else {
-        await sendAppointmentConfirmation(updated);
+        await sendAppointmentConfirmation(updated, conversation?.id);
       }
     } catch (error) {
       console.error("Falha ao enviar confirmação com Guia QR Code:", error);
@@ -779,6 +810,11 @@ export async function POST(request: Request) {
     const cancelMsg = `Olá ${updated.patientName}! Seu agendamento para ${updated.clinicProcedure.procedure.name} na ${updated.clinicProcedure.clinic.tradeName} foi cancelado com sucesso. Caso precise remarcar, acesse nosso site!`;
     try {
       await sendWhatsAppMessage(updated.patientPhone, cancelMsg, "appointment.cancelled.ack");
+      if (conversation) {
+        await prisma.message.create({
+          data: { conversationId: conversation.id, direction: "OUTBOUND", content: cancelMsg, status: "DELIVERED" },
+        });
+      }
     } catch (error) {
       console.error("Falha ao enviar confirmação de cancelamento:", error);
     }

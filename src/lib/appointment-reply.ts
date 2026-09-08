@@ -39,3 +39,18 @@ export function resolveStatusFromReply(text: string): AppointmentStatus | null {
 export function isRescheduleReply(text: string): boolean {
   return RESCHEDULE_REPLIES.includes(normalizeReply(text));
 }
+
+/** Linha repetida em TODOS os templates que pedem confirmação de agendamento (lembrete
+ * D-1, confirmação do marketplace, confirmação do bridge) — ver bridge-reminder.ts,
+ * bridge-confirmation.ts e sendAppointmentConfirmation em whatsapp.ts. */
+const CONFIRMATION_PROMPT_MARKER = "Digite 1 para Confirmar presença";
+
+/** Bug real (relatado por atendente, com print do WhatsApp): paciente respondia "Sim"
+ * pra uma pergunta qualquer da atendente no meio de uma conversa manual (ex: "seria
+ * biópsia de próstata, correto?") e o sistema entendia como confirmação de agendamento,
+ * disparando por cima a mensagem automática de confirmação — sem nenhuma relação com o
+ * que estava sendo conversado. resolveStatusFromReply/isRescheduleReply só devem valer
+ * quando a ÚLTIMA mensagem NOSSA nessa conversa foi de fato um pedido de confirmação. */
+export function wasSentConfirmationPrompt(lastOutboundContent: string | null | undefined): boolean {
+  return Boolean(lastOutboundContent?.includes(CONFIRMATION_PROMPT_MARKER));
+}
