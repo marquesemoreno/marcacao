@@ -3,13 +3,20 @@
 import { useEffect, useRef } from "react";
 import { getSupabaseClient } from "@/lib/supabase-client";
 
-const DEFAULT_POLL_INTERVAL_MS = 5000;
+// Era 5s — com o Realtime Broadcast (abaixo) já entregando update instantâneo em
+// toda mudança de verdade, esse polling é só uma rede de segurança pro caso raro
+// de o broadcast falhar/não estar configurado. Em 5s, cada aba aberta de inbox
+// refaz a busca inteira (conversas + mensagens) 720x/hora — foi o que estourou o
+// Egress do Supabase (226% do limite do plano Free em poucos dias). 30s reduz
+// esse tráfego de fundo em 6x sem perder a atualização "de verdade" (que continua
+// instantânea via broadcast).
+const DEFAULT_POLL_INTERVAL_MS = 30000;
 
 /**
  * Mantém o inbox atualizado por dois caminhos, ao mesmo tempo:
  *
- * 1. Polling (`setInterval`) — sempre ativo, é a base funcional real.
- *    Funciona hoje, sem depender de nenhuma configuração extra.
+ * 1. Polling (`setInterval`) — rede de segurança, não a via principal (ver nota
+ *    acima). Funciona hoje, sem depender de nenhuma configuração extra.
  * 2. Supabase Realtime Broadcast (canal "inbox-changes", evento "changed")
  *    — só ativa se NEXT_PUBLIC_SUPABASE_URL/ANON_KEY estiverem definidas.
  *    Deliberadamente NÃO usa `postgres_changes`: isso exigiria RLS liberando
