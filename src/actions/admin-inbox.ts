@@ -9,7 +9,8 @@ import { canEditMessage } from "@/lib/message-edit";
 import { hasHospitalBridgeIntegration, fetchBridgeProcedures, fetchBridgeDoctors, fetchBridgeAgenda, fetchBridgeConvenios, fetchBridgePatients, adaptBridgeProcedureToPlainItem } from "@/lib/hospital-bridge";
 import { toPlainClinicProcedureItem } from "@/lib/serialize";
 import { departmentToDb, funnelStageToDb, toChatContact, toChatMessage } from "@/lib/chat-crm-adapters";
-import { attachSignedUrls, uploadWhatsAppMedia, getSignedMediaUrl } from "@/lib/whatsapp-media";
+import { attachSignedUrls, uploadWhatsAppMedia, getSignedMediaUrl, downloadWhatsAppMedia } from "@/lib/whatsapp-media";
+import { transcribeAudio } from "@/lib/ai-transcription";
 import { formatFileSize } from "@/lib/format";
 import { notifyInboxRealtime } from "@/lib/supabase-server";
 import { isTeamQueueUser, formatAgentDisplayName } from "@/lib/team-queue";
@@ -93,7 +94,9 @@ export async function listChatContactsAdmin(filter: InboxFilter, search?: string
       contact: true,
       clinic: { select: { id: true, tradeName: true } },
       assignedUser: { select: { id: true, name: true } },
-      messages: { orderBy: { createdAt: "desc" }, take: 1 },
+      // take: 3 (não 1) — a prévia da lista pula nota interna e mostra a última
+      // mensagem de verdade (ver toChatContact em chat-crm-adapters.ts).
+      messages: { orderBy: { createdAt: "desc" }, take: 3 },
     },
     orderBy: { lastMessageAt: "desc" },
   });
@@ -559,6 +562,35 @@ export async function editMessageAdmin(messageId: string, newText: string) {
   revalidatePath("/admin/inbox");
   notifyInboxRealtime().catch(() => {});
   return { success: true as const };
+}
+
+/** Espelho de transcribeMessageAudio (src/actions/inbox.ts) pro escopo admin. */
+export async function transcribeMessageAudioAdmin(messageId: string) {
+  await requireAdminSession();
+
+  const message = await prisma.message.findUnique({ where: { id: messageId } });
+  if (!message) {
+    return { success: false as const, error: "Mensagem não encontrada." };
+  }
+  if (message.type !== "AUDIO" || !message.mediaPath) {
+    return { success: false as const, error: "Esta mensagem não tem áudio pra transcrever." };
+  }
+  if (message.transcription) {
+    return { success: true as const, transcription: message.transcription };
+  }
+
+  const buffer = await downloadWhatsAppMedia(message.mediaPath);
+  if (!buffer) {
+    return { success: false as const, error: "Não consegui baixar o áudio pra transcrever." };
+  }
+
+  const transcription = await transcribeAudio(buffer, message.mimeType || "audio/ogg");
+  if (!transcription) {
+    return { success: false as const, error: "Não foi possível transcrever esse áudio. Tente de novo." };
+  }
+
+  await prisma.message.update({ where: { id: messageId }, data: { transcription } });
+  return { success: true as const, transcription };
 }
 
 export async function getAttendantCapacityAdmin() {

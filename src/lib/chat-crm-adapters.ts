@@ -116,6 +116,12 @@ const REASON_SHORT_LABELS: Record<string, string> = {
  * opera em cima da conversa, não do contato bruto.
  */
 export function toChatContact(conversation: ConversationWithRelations, viewerUserId?: string): Contact {
+  // Prévia da lista: pula nota interna se houver mensagem de verdade mais recente
+  // no lote buscado (ver `take: 3` na query) — sem isso, finalizar/transferir um
+  // atendimento fazia a prévia mostrar "🔒 Nota: ..." em cima do texto real do
+  // paciente, escondendo do que a conversa realmente trata.
+  const previewMessage =
+    conversation.messages.find((m) => m.type !== "INTERNAL_NOTE") ?? conversation.messages[0] ?? null;
   const lastMessage = conversation.messages[0] ?? null;
   const isResolved = conversation.status === "RESOLVED";
 
@@ -133,17 +139,17 @@ export function toChatContact(conversation: ConversationWithRelations, viewerUse
     channel: channelFromDb[conversation.channel],
     unreadCount: conversation.unreadCount ?? 0,
     hasUnseenAssignment: hasUnseenAssignmentFor(conversation, viewerUserId),
-    lastMessage: lastMessage
-      ? lastMessage.type === "INTERNAL_NOTE"
-        ? `🔒 Nota: ${lastMessage.content}`
-        : lastMessage.content ||
-          (lastMessage.type === "ATTACHMENT"
-            ? lastMessage.mimeType?.startsWith("image/")
+    lastMessage: previewMessage
+      ? previewMessage.type === "INTERNAL_NOTE"
+        ? `🔒 Nota: ${previewMessage.content}`
+        : previewMessage.content ||
+          (previewMessage.type === "ATTACHMENT"
+            ? previewMessage.mimeType?.startsWith("image/")
               ? "📷 Imagem"
               : "📄 Documento"
-            : lastMessage.type === "AUDIO"
+            : previewMessage.type === "AUDIO"
               ? "🎤 Áudio"
-              : lastMessage.content)
+              : previewMessage.content)
       : "Sem mensagens ainda.",
     lastMessageTime: lastMessage ? formatMessageTimestamp(lastMessage.createdAt) : "",
     statusTag: isResolved
@@ -201,5 +207,6 @@ export function toChatMessage(
     deliveryStatus: message.direction === "OUTBOUND" ? deliveryStatusMap[message.status] : undefined,
     isEdited: Boolean(message.editedAt),
     canEdit: canEditMessage(message).ok,
+    transcription: message.transcription ?? undefined,
   };
 }

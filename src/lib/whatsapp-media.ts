@@ -120,6 +120,18 @@ export async function getSignedMediaUrl(path: string): Promise<string | null> {
   return data.signedUrl;
 }
 
+/** Baixa o arquivo direto do bucket privado (sem passar por URL assinada) —
+ * usado quando precisamos do conteúdo em si no servidor (ex: mandar pra API
+ * de transcrição), não só exibir na tela. */
+export async function downloadWhatsAppMedia(path: string): Promise<Buffer | null> {
+  const supabase = getSupabaseServerClient();
+  if (!supabase) return null;
+
+  const { data, error } = await supabase.storage.from(WHATSAPP_MEDIA_BUCKET).download(path);
+  if (error || !data) return null;
+  return Buffer.from(await data.arrayBuffer());
+}
+
 /** Gera as URLs assinadas para uma lista de mensagens em paralelo (evita N chamadas sequenciais). */
 export async function attachSignedUrls<T extends { mediaPath: string | null }>(
   messages: T[]

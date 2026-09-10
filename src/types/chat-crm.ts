@@ -42,6 +42,8 @@ export interface Message {
   isEdited?: boolean;
   /** true quando ainda dá pra editar essa mensagem (ver canEditMessage em message-edit.ts). */
   canEdit?: boolean;
+  /** Texto transcrito do áudio (ver botão "Transcrever" em message-bubble.tsx) — undefined até a atendente pedir. */
+  transcription?: string;
 }
 
 export interface Contact {

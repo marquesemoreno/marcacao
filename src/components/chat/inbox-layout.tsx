@@ -15,6 +15,8 @@ import { AvatarBadge } from './avatar-badge';
 import { FeedbackWidget } from '@/components/feedback-widget';
 import type { PlainClinicProcedureItem } from '@/lib/serialize';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from '@/components/ui/dialog';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from '@/components/ui/command';
 import { useClickOutside } from '@/hooks/use-click-outside';
 import { toast } from "sonner";
 import {
@@ -47,6 +49,7 @@ import {
   Settings2,
   Smartphone,
   MessageSquarePlus,
+  ChevronsUpDown,
 } from 'lucide-react';
 
 const MAX_MEDIA_SIZE_BYTES = 15 * 1024 * 1024; // 15 MB — mesmo limite validado no servidor
@@ -135,6 +138,8 @@ interface InboxLayoutProps {
   onMarkUnread?: () => Promise<void> | void;
   onRetryMessage?: (messageId: string) => Promise<void> | void;
   onEditMessage?: (messageId: string, newText: string) => Promise<{ success: boolean; error?: string }>;
+  /** Transcreve um áudio recebido sob demanda (botão no balão) — ver transcribeMessageAudio em actions/inbox.ts. */
+  onTranscribeAudio?: (messageId: string) => Promise<{ success: boolean; transcription?: string; error?: string }>;
   onTransferAgent: (agentId: string, agentName: string) => Promise<void> | void;
   availableClinics?: { id: string; tradeName: string }[];
   onReassignClinic?: (clinicId: string) => Promise<void> | void;
@@ -186,6 +191,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
   onMarkUnread,
   onRetryMessage,
   onEditMessage,
+  onTranscribeAudio,
   onTransferAgent,
   availableClinics,
   onReassignClinic,
@@ -264,6 +270,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
   const [isFinishModalOpen, setIsFinishModalOpen] = useState(false);
   const [selectedReason, setSelectedReason] = useState<string | null>(null);
   const [finishNotes, setFinishNotes] = useState('');
+  const [isFinishingAttendance, setIsFinishingAttendance] = useState(false);
 
 
   // Edição inline de dados do paciente
@@ -277,6 +284,8 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
   // atendente é tão irreversível quanto finalizar o atendimento, mas antes bastava
   // 1 clique sem chance de voltar atrás.
   const [pendingTransferAgentId, setPendingTransferAgentId] = useState<string | null>(null);
+  const [isTransferPopoverOpen, setIsTransferPopoverOpen] = useState(false);
+  const [isTransferring, setIsTransferring] = useState(false);
 
   // Confirmação ao pular etapas do funil — avançar/voltar 1 etapa por vez é o
   // fluxo normal e continua em 1 clique; pular 2+ etapas de uma vez (ex: Novo
@@ -785,7 +794,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                 <div
                   key={c.id}
                   onClick={() => handleSelectContactMobile(c.id)}
-                  className={`px-3.5 py-3 transition-colors cursor-pointer relative flex gap-3 items-start border-l-4 ${
+                  className={`px-3 py-2 transition-colors cursor-pointer relative flex gap-2.5 items-start border-l-4 ${
                     isSelected
                       ? 'bg-white dark:bg-slate-800/70 border-emerald-600 shadow-sm'
                       : c.hasUnseenAssignment
@@ -794,22 +803,14 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                   }`}
                   data-od-id={`contact-card-${c.id}`}
                 >
-                  <div className="relative shrink-0 mt-0.5">
-                    <AvatarBadge name={c.name} photoUrl={c.avatar} size={38} className="ring-2 ring-white dark:ring-slate-900 shadow-sm" />
+                  <div className="relative shrink-0">
+                    <AvatarBadge name={c.name} photoUrl={c.avatar} size={34} className="ring-2 ring-white dark:ring-slate-900 shadow-sm" />
                     {c.channel === 'whatsapp' && (
                       <span
                         className="absolute -bottom-1 -right-1 w-3.5 h-3.5 bg-emerald-500 border-2 border-white dark:border-slate-900 rounded-full flex items-center justify-center text-white"
                         title="Canal: WhatsApp"
                       >
                         <MessageSquare className="w-2 h-2 fill-current" />
-                      </span>
-                    )}
-                    {c.unreadCount > 0 && (
-                      <span
-                        className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-emerald-600 border-2 border-white dark:border-slate-900 text-white text-[9px] font-bold flex items-center justify-center"
-                        title={`${c.unreadCount} mensagem(ns) não lida(s)`}
-                      >
-                        {c.unreadCount > 9 ? '9+' : c.unreadCount}
                       </span>
                     )}
                   </div>
@@ -819,8 +820,18 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                       <h4 className={`text-xs sm:text-[13px] truncate ${c.unreadCount > 0 ? 'font-bold text-slate-900 dark:text-slate-100' : 'font-semibold text-slate-900 dark:text-slate-100'}`}>
                         {c.name}
                       </h4>
-                      <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium shrink-0">
-                        {c.lastMessageTime}
+                      <span className="flex items-center gap-1.5 shrink-0">
+                        <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">
+                          {c.lastMessageTime}
+                        </span>
+                        {c.unreadCount > 0 && (
+                          <span
+                            className="min-w-[16px] h-4 px-1 rounded-full bg-emerald-600 text-white text-[9px] font-bold flex items-center justify-center"
+                            title={`${c.unreadCount} mensagem(ns) não lida(s)`}
+                          >
+                            {c.unreadCount > 9 ? '9+' : c.unreadCount}
+                          </span>
+                        )}
                       </span>
                     </div>
 
@@ -925,7 +936,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                 <AvatarBadge name={selectedContact.name} photoUrl={selectedContact.avatar} size={38} className="ring-2 ring-slate-100 dark:ring-slate-800 shadow-sm shrink-0" />
                 <div className="min-w-0">
                   <div className="flex items-center gap-1.5 flex-wrap">
-                    <h3 className="font-bold text-slate-900 dark:text-slate-100 text-xs sm:text-sm truncate">
+                    <h3 className="font-semibold text-slate-900 dark:text-slate-100 text-xs sm:text-sm truncate">
                       {selectedContact.name}
                     </h3>
                     <span
@@ -1017,11 +1028,11 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
 
                 <button
                   onClick={() => setIsScheduleModalOpen(true)}
-                  className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-emerald-700 dark:text-emerald-400 bg-white dark:bg-transparent hover:bg-emerald-50 dark:hover:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-lg transition-all"
+                  className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-md shadow-xs transition-all active:scale-[0.98]"
                   title="Criar novo agendamento de consulta ou exame"
                 >
                   <Calendar className="w-3.5 h-3.5" />
-                  <span>Agendar</span>
+                  <span>Novo Agendamento</span>
                 </button>
 
                 {/* Menu de Ações da Conversa (...) */}
@@ -1137,6 +1148,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                       message={msg}
                       onRetry={onRetryMessage ? () => onRetryMessage(msg.id) : undefined}
                       onEditMessage={onEditMessage}
+                      onTranscribeAudio={onTranscribeAudio}
                       onRequestResend={
                         msg.mediaDownloadFailed
                           ? () => onSendMessage('Oi! Não conseguimos baixar o arquivo que você enviou por aqui. Pode tentar enviar novamente, por favor?', 'whatsapp')
@@ -1504,7 +1516,9 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
               )}
             </div>
 
-            {/* Card 3: Transferir Atendimento — movido da barra do chat pra cá */}
+            {/* Card 3: Transferir Atendimento — combobox pesquisável em vez da lista
+                aberta de botões (que, com muitos atendentes, empurrava o resto do
+                CRM pra fora da tela) + confirmação em modal rápido. */}
             <div className="bg-white dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-700/80 rounded-xl p-4 shadow-sm space-y-2">
               <label className="text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
                 <UserPlus className="w-3.5 h-3.5 text-slate-400" /> Transferir Atendimento Para
@@ -1512,60 +1526,90 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
               {agents.length === 0 ? (
                 <p className="text-[11px] text-slate-500 dark:text-slate-400">Nenhum outro atendente disponível.</p>
               ) : (
-                <div className="space-y-1">
-                  {agents.map((agent) => {
-                    const isCurrent = agent.name === selectedContact.responsibleAgent;
-
-                    if (pendingTransferAgentId === agent.id) {
-                      return (
-                        <div key={agent.id} className="rounded-lg border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/40 p-2 space-y-1.5">
-                          <p className="text-[11px] font-medium text-amber-800 dark:text-amber-300">
-                            Transferir para {agent.name}?
-                          </p>
-                          <div className="flex gap-1.5">
-                            <button
-                              type="button"
-                              onClick={async () => {
-                                await onTransferAgent(agent.id, agent.name);
-                                setPendingTransferAgentId(null);
-                              }}
-                              className="flex-1 px-2 py-1.5 rounded-md bg-emerald-600 text-white text-[11px] font-semibold hover:bg-emerald-700"
-                            >
-                              Confirmar
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setPendingTransferAgentId(null)}
-                              className="flex-1 px-2 py-1.5 rounded-md border border-slate-300 dark:border-slate-600 text-[11px] font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
-                            >
-                              Cancelar
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    }
-
-                    return (
+                <Popover open={isTransferPopoverOpen} onOpenChange={setIsTransferPopoverOpen}>
+                  <PopoverTrigger
+                    render={
                       <button
-                        key={agent.id}
-                        onClick={() => setPendingTransferAgentId(agent.id)}
-                        disabled={isCurrent}
-                        className={`w-full px-3 py-2 rounded-lg text-left flex items-center justify-between text-xs transition-colors ${
-                          isCurrent
-                            ? 'bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 cursor-default'
-                            : 'hover:bg-slate-50 dark:hover:bg-slate-800 border border-transparent'
-                        }`}
-                      >
-                        <span className={`font-semibold ${isCurrent ? 'text-emerald-800 dark:text-emerald-300' : 'text-slate-700 dark:text-slate-200'}`}>
-                          {agent.name}
-                        </span>
-                        <span className="text-[10px] text-slate-500 dark:text-slate-400">{isCurrent ? 'Atual' : agent.role}</span>
-                      </button>
-                    );
-                  })}
-                </div>
+                        type="button"
+                        className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 flex items-center justify-between text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
+                      />
+                    }
+                  >
+                    <span className="font-semibold truncate">{selectedContact.responsibleAgent}</span>
+                    <ChevronsUpDown className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                  </PopoverTrigger>
+                  <PopoverContent align="start" className="p-0 w-[--anchor-width]">
+                    <Command>
+                      <CommandInput placeholder="Buscar atendente..." />
+                      <CommandList>
+                        <CommandEmpty className="text-xs text-slate-500 dark:text-slate-400">Nenhum atendente encontrado.</CommandEmpty>
+                        <CommandGroup>
+                          {agents.map((agent) => {
+                            const isCurrent = agent.name === selectedContact.responsibleAgent;
+                            return (
+                              <CommandItem
+                                key={agent.id}
+                                value={agent.name}
+                                disabled={isCurrent}
+                                onSelect={() => {
+                                  setIsTransferPopoverOpen(false);
+                                  setPendingTransferAgentId(agent.id);
+                                }}
+                                className="justify-between text-xs"
+                              >
+                                <span className={isCurrent ? 'font-semibold text-emerald-700 dark:text-emerald-400' : 'font-medium'}>
+                                  {agent.name}
+                                </span>
+                                <span className="text-[10px] text-slate-500 dark:text-slate-400">{isCurrent ? 'Atual' : agent.role}</span>
+                              </CommandItem>
+                            );
+                          })}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               )}
             </div>
+
+            {/* Modal de confirmação rápida da transferência */}
+            <Dialog open={pendingTransferAgentId !== null} onOpenChange={(open) => !open && setPendingTransferAgentId(null)}>
+              <DialogContent className="max-w-xs rounded-2xl p-5" showCloseButton={false}>
+                <DialogHeader>
+                  <DialogTitle className="text-sm font-bold text-slate-900 dark:text-slate-100">
+                    Transferir para {agents.find((a) => a.id === pendingTransferAgentId)?.name}?
+                  </DialogTitle>
+                </DialogHeader>
+                <div className="flex gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setPendingTransferAgentId(null)}
+                    disabled={isTransferring}
+                    className="flex-1 px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-50"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isTransferring}
+                    onClick={async () => {
+                      const agent = agents.find((a) => a.id === pendingTransferAgentId);
+                      if (!agent) return;
+                      setIsTransferring(true);
+                      try {
+                        await onTransferAgent(agent.id, agent.name);
+                        setPendingTransferAgentId(null);
+                      } finally {
+                        setIsTransferring(false);
+                      }
+                    }}
+                    className="flex-1 px-3 py-2 rounded-lg bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 disabled:opacity-60"
+                  >
+                    {isTransferring ? 'Transferindo...' : 'Confirmar'}
+                  </button>
+                </div>
+              </DialogContent>
+            </Dialog>
 
             {/* Card 4: Etapa do Atendimento (seleção única — só a etapa atual fica em destaque) */}
             <div className="bg-white dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-700/80 rounded-xl p-4 shadow-sm space-y-2.5">
@@ -1979,22 +2023,27 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
               </button>
               <button
                 type="button"
-                disabled={!selectedReason}
+                disabled={!selectedReason || isFinishingAttendance}
                 onClick={async () => {
-                  if (!selectedReason) return;
-                  await onFinishAttendance({ reason: selectedReason, notes: finishNotes });
-                  setIsFinishModalOpen(false);
-                  setSelectedReason(null);
-                  setFinishNotes("");
-                  setInputText("");
+                  if (!selectedReason || isFinishingAttendance) return;
+                  setIsFinishingAttendance(true);
+                  try {
+                    await onFinishAttendance({ reason: selectedReason, notes: finishNotes });
+                    setIsFinishModalOpen(false);
+                    setSelectedReason(null);
+                    setFinishNotes("");
+                    setInputText("");
+                  } finally {
+                    setIsFinishingAttendance(false);
+                  }
                 }}
                 className={`px-5 py-2.5 font-semibold text-xs rounded-lg shadow-sm transition-all ${
-                  !selectedReason
+                  !selectedReason || isFinishingAttendance
                     ? "bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-600 cursor-not-allowed"
                     : "bg-emerald-600 hover:bg-emerald-700 text-white active:scale-95"
                 }`}
               >
-                Confirmar e Finalizar Atendimento
+                {isFinishingAttendance ? "Finalizando..." : "Confirmar e Finalizar Atendimento"}
               </button>
               </div>
             </div>

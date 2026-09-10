@@ -7,9 +7,10 @@ import { requireClinicSession } from "@/lib/session";
 import { whatsappService, formatToWhatsAppNumber, isValidWhatsAppNumber, fetchWhatsAppProfilePicture } from "@/lib/whatsapp";
 import { toPlainClinicProcedureItem } from "@/lib/serialize";
 import { toChatContact, toChatMessage, departmentToDb, funnelStageToDb } from "@/lib/chat-crm-adapters";
-import { attachSignedUrls, uploadWhatsAppMedia, getSignedMediaUrl, formatDuration } from "@/lib/whatsapp-media";
+import { attachSignedUrls, uploadWhatsAppMedia, getSignedMediaUrl, downloadWhatsAppMedia, formatDuration } from "@/lib/whatsapp-media";
 import { sendWhatsAppMedia, sendWhatsAppAudio, editWhatsAppMessage } from "@/lib/whatsapp";
 import { canEditMessage } from "@/lib/message-edit";
+import { transcribeAudio } from "@/lib/ai-transcription";
 import { hasHospitalBridgeIntegration, fetchBridgeProcedures, fetchBridgeDoctors, fetchBridgeAgenda, fetchBridgeConvenios, fetchBridgePatients, adaptBridgeProcedureToPlainItem } from "@/lib/hospital-bridge";
 import { formatFileSize } from "@/lib/format";
 import { notifyInboxRealtime } from "@/lib/supabase-server";
@@ -148,7 +149,10 @@ export async function listConversations(filter: ConversationFilter, search?: str
     include: {
       contact: true,
       assignedUser: { select: { id: true, name: true } },
-      messages: { orderBy: { createdAt: "desc" }, take: 1 },
+      // take: 3 (não 1) — a prévia da lista pula nota interna e mostra a última
+      // mensagem de verdade (ver toChatContact em chat-crm-adapters.ts); raramente
+      // há mais de 2 notas internas seguidas antes de uma mensagem real.
+      messages: { orderBy: { createdAt: "desc" }, take: 3 },
     },
     orderBy: { lastMessageAt: "desc" },
   });
@@ -556,6 +560,40 @@ export async function editMessage(messageId: string, newText: string) {
   return { success: true as const };
 }
 
+/** Transcreve um áudio recebido — botão manual no balão (ver message-bubble.tsx),
+ * nunca automático: é a atendente quem decide gastar a chamada de IA. Guarda o
+ * resultado em Message.transcription pra não pagar de novo se reabrir a conversa. */
+export async function transcribeMessageAudio(messageId: string) {
+  const { clinicId } = await requireClinicSession();
+
+  const message = await prisma.message.findUnique({
+    where: { id: messageId },
+    include: { conversation: { select: { clinicId: true } } },
+  });
+  if (!message || message.conversation.clinicId !== clinicId) {
+    return { success: false as const, error: "Mensagem não encontrada." };
+  }
+  if (message.type !== "AUDIO" || !message.mediaPath) {
+    return { success: false as const, error: "Esta mensagem não tem áudio pra transcrever." };
+  }
+  if (message.transcription) {
+    return { success: true as const, transcription: message.transcription };
+  }
+
+  const buffer = await downloadWhatsAppMedia(message.mediaPath);
+  if (!buffer) {
+    return { success: false as const, error: "Não consegui baixar o áudio pra transcrever." };
+  }
+
+  const transcription = await transcribeAudio(buffer, message.mimeType || "audio/ogg");
+  if (!transcription) {
+    return { success: false as const, error: "Não foi possível transcrever esse áudio. Tente de novo." };
+  }
+
+  await prisma.message.update({ where: { id: messageId }, data: { transcription } });
+  return { success: true as const, transcription };
+}
+
 export async function getAttendantCapacity() {
   const { userId } = await requireClinicSession();
   const user = await prisma.user.findUnique({
@@ -781,10 +819,19 @@ export async function resolveConversation(
 
   const conversation = await prisma.conversation.findUnique({
     where: { id: conversationId },
-    select: { clinicId: true },
+    select: { clinicId: true, status: true },
   });
   if (!conversation || conversation.clinicId !== clinicId) {
     throw new Error("Conversa não encontrada");
+  }
+
+  // Idempotência: um duplo clique no botão "Finalizar Atendimento" (resposta lenta
+  // do servidor + sem `disabled` durante o await, ver inbox-layout.tsx) chamava isto
+  // duas vezes antes do modal fechar, gerando duas notas internas idênticas no mesmo
+  // minuto (confirmado em produção: 17 pares duplicados encontrados no histórico).
+  // Já estar RESOLVED é o sinal de que a primeira chamada já fez o trabalho.
+  if (conversation.status === "RESOLVED") {
+    return;
   }
 
   const currentUser = await prisma.user.findUnique({

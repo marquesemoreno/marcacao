@@ -471,6 +471,10 @@ model Message {
   /// em src/lib/message-edit.ts) — `content` já reflete o texto novo, isso só
   /// serve pra exibir o selo "editada" (mesma UX do WhatsApp).
   editedAt       DateTime?        @map("edited_at")
+  /// Transcrição gerada sob demanda (botão "Transcrever" no balão de áudio, ver
+  /// transcribeMessageAudio em src/actions/inbox.ts) — null até a atendente pedir.
+  /// Guardado pra não pagar de novo pela mesma transcrição toda vez que reabre a conversa.
+  transcription  String?          @db.Text
   createdAt      DateTime         @default(now()) @map("created_at")
 
   conversation Conversation @relation(fields: [conversationId], references: [id])

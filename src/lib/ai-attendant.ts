@@ -1,6 +1,7 @@
 import "server-only";
 import OpenAI from "openai";
 import { prisma } from "@/lib/prisma";
+import { AI_TOOL_DEFINITIONS, executeAiTool } from "@/lib/ai-tools";
 
 /**
  * Regras fixas de LGPD/compliance que valem pra toda clínica, somadas às instruções
@@ -72,11 +73,17 @@ function getOpenAiClient(): OpenAI | null {
 /** Gera a resposta da IA a partir só do histórico DESSA conversa (data minimization —
  * nunca manda CPF, nunca manda outras conversas do mesmo contato). Retorna `null` se a
  * IA não está configurada (sem API key) ou se a chamada falhar — chamador deve tratar
- * isso como sinal pra escalar pra humano em vez de deixar o paciente sem resposta. */
+ * isso como sinal pra escalar pra humano em vez de deixar o paciente sem resposta.
+ *
+ * `clinicId` habilita as tools de agenda/pré-agendamento (ver ai-tools.ts) — no máximo
+ * 1 rodada de tool calls (chama as tools pedidas, manda o resultado de volta, pega a
+ * resposta final em texto); não é um loop de agente de verdade, é o suficiente pro
+ * caso comum ("que horário tem?" -> 1 consulta -> resposta). */
 export async function generateAiReply(
   conversationId: string,
   clinicName: string,
-  instructions: string
+  instructions: string,
+  clinicId: string
 ): Promise<string | null> {
   const openai = getOpenAiClient();
   if (!openai) return null;
@@ -90,20 +97,56 @@ export async function generateAiReply(
 
   const systemPrompt = `${BASE_SYSTEM_PROMPT.replace("{clinicName}", clinicName)}\n\nInstruções específicas desta clínica:\n${instructions}`;
 
+  const conversationMessages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
+    { role: "system", content: systemPrompt },
+    ...messages.map((m) => ({
+      role: (m.direction === "INBOUND" ? "user" : "assistant") as "user" | "assistant",
+      content: m.content,
+    })),
+  ];
+
   try {
-    const completion = await openai.chat.completions.create({
+    const first = await openai.chat.completions.create({
+      model: process.env.OPENAI_MODEL || "gpt-4o-mini",
+      messages: conversationMessages,
+      tools: AI_TOOL_DEFINITIONS,
+      max_tokens: 400,
+      temperature: 0.4,
+    });
+    const firstMessage = first.choices[0]?.message;
+    const toolCalls = firstMessage?.tool_calls;
+    if (!toolCalls || toolCalls.length === 0) {
+      return firstMessage?.content?.trim() || null;
+    }
+
+    // Só usamos "function tools" (ver AI_TOOL_DEFINITIONS) — a SDK também permite
+    // "custom tools" (formato mais novo, sem `.function`), que não geramos aqui,
+    // então ignora qualquer tool_call que não seja do tipo function.
+    const functionToolCalls = toolCalls.filter(
+      (call): call is OpenAI.Chat.Completions.ChatCompletionMessageFunctionToolCall => call.type === "function"
+    );
+    const toolResults = await Promise.all(
+      functionToolCalls.map(async (call) => ({
+        call,
+        result: await executeAiTool(call.function.name, call.function.arguments, { conversationId, clinicId }),
+      }))
+    );
+
+    const second = await openai.chat.completions.create({
       model: process.env.OPENAI_MODEL || "gpt-4o-mini",
       messages: [
-        { role: "system", content: systemPrompt },
-        ...messages.map((m) => ({
-          role: (m.direction === "INBOUND" ? "user" : "assistant") as "user" | "assistant",
-          content: m.content,
+        ...conversationMessages,
+        firstMessage!,
+        ...toolResults.map(({ call, result }) => ({
+          role: "tool" as const,
+          tool_call_id: call.id,
+          content: JSON.stringify(result),
         })),
       ],
       max_tokens: 400,
       temperature: 0.4,
     });
-    return completion.choices[0]?.message?.content?.trim() || null;
+    return second.choices[0]?.message?.content?.trim() || null;
   } catch (error) {
     console.error("Falha ao gerar resposta do atendente de IA:", error);
     return null;

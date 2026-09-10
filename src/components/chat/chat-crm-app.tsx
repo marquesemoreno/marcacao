@@ -37,6 +37,7 @@ import {
   getUnseenAssignmentNotifications,
   markAssignmentSeen,
   editMessage,
+  transcribeMessageAudio,
 } from "@/actions/inbox";
 import {
   listChatContactsAdmin,
@@ -76,6 +77,7 @@ import {
   markAssignmentSeenAdmin,
   getOutboundFromDeviceStatsAdmin,
   editMessageAdmin,
+  transcribeMessageAudioAdmin,
 } from "@/actions/admin-inbox";
 import { toast } from "sonner";
 import { useInboxRealtime } from "@/hooks/use-inbox-realtime";
@@ -121,6 +123,7 @@ const ACTIONS_BY_SCOPE = {
     getUnseenAssignmentNotifications: () => getUnseenAssignmentNotifications(),
     markAssignmentSeen: (id: string) => markAssignmentSeen(id),
     editMessage: (id: string, text: string) => editMessage(id, text),
+    transcribeMessageAudio: (id: string) => transcribeMessageAudio(id),
   },
   admin: {
     listChatContacts: ((filter, search, clinicId) =>
@@ -148,6 +151,7 @@ const ACTIONS_BY_SCOPE = {
     getUnseenAssignmentNotifications: () => getUnseenAssignmentNotificationsAdmin(),
     markAssignmentSeen: (id: string) => markAssignmentSeenAdmin(id),
     editMessage: (id: string, text: string) => editMessageAdmin(id, text),
+    transcribeMessageAudio: (id: string) => transcribeMessageAudioAdmin(id),
   },
 };
 
@@ -757,6 +761,10 @@ export function ChatCrmApp({ scope, basePath, view }: ChatCrmAppProps) {
     return result;
   }
 
+  async function handleTranscribeAudio(messageId: string) {
+    return actions.transcribeMessageAudio(messageId);
+  }
+
   async function handleTransferAgent(agentId: string) {
     if (!selectedContactId) return;
     const transferFn = scope === "admin" ? transferConversationAdmin : transferConversation;
@@ -803,6 +811,7 @@ export function ChatCrmApp({ scope, basePath, view }: ChatCrmAppProps) {
           onMarkUnread={handleMarkUnread}
           onRetryMessage={handleRetryMessage}
           onEditMessage={handleEditMessage}
+          onTranscribeAudio={handleTranscribeAudio}
           onTransferAgent={handleTransferAgent}
           availableClinics={scope === "admin" ? availableClinics : undefined}
           onReassignClinic={scope === "admin" ? handleReassignClinic : undefined}

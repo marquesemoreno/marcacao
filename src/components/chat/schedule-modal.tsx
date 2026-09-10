@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { Contact } from '@/types/chat-crm';
-import { X, Calendar, Clock, Stethoscope, IdCard, CheckCircle2, UserRound, CreditCard } from 'lucide-react';
+import { X, Calendar, CheckCircle2 } from 'lucide-react';
 import { createAppointment } from '@/actions/appointments';
 import { formatCurrency, appointmentTypeLabels } from '@/lib/format';
 import type { PlainClinicProcedureItem } from '@/lib/serialize';
@@ -77,6 +77,7 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
   const [timeMode, setTimeMode] = useState<'scheduled' | 'arrival'>('scheduled');
   const [submitting, setSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false);
   const [occupiedTimes, setOccupiedTimes] = useState<string[]>([]);
   const [loadingAgenda, setLoadingAgenda] = useState(false);
   const [doctorQuery, setDoctorQuery] = useState('');
@@ -100,6 +101,7 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
     setTime('');
     setTimeMode('scheduled');
     setIsSuccess(false);
+    setHasAttemptedSubmit(false);
     setOccupiedTimes([]);
     setDoctorQuery('');
     setIsDoctorDropdownOpen(false);
@@ -229,10 +231,29 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
     requiresDoctor && !doctorId && "médico",
   ].filter((field): field is string => Boolean(field));
 
+  // Campo pendente só ganha destaque de erro depois da primeira tentativa de
+  // envio — sem isso, um formulário recém-aberto (tudo vazio, por design) já
+  // nasceria com bordas vermelhas em todo campo, o que é mais ruído que ajuda.
+  const nameError = hasAttemptedSubmit && !hasFullName;
+  const doctorError = hasAttemptedSubmit && requiresDoctor && !doctorId;
+  const procedureError = hasAttemptedSubmit && !procedureId;
+  const dateError = hasAttemptedSubmit && !date;
+
+  const labelClass = "block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5";
+  const inputClass = (hasError: boolean) =>
+    `w-full h-10 text-sm rounded-lg border bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 px-3 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 transition-colors disabled:opacity-60 disabled:cursor-not-allowed ${
+      hasError
+        ? 'border-red-400 focus:ring-red-200 dark:focus:ring-red-900/40'
+        : 'border-slate-200 dark:border-slate-700 focus:ring-emerald-500/20 focus:border-emerald-400'
+    }`;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!procedureId || !date || !selectedProcedure || !hasFullName) return;
-    if (requiresDoctor && !doctorId) return;
+    if (missingFields.length > 0) {
+      setHasAttemptedSubmit(true);
+      return;
+    }
+    if (!procedureId || !date || !selectedProcedure) return;
 
     setSubmitting(true);
     try {
@@ -275,7 +296,7 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
     // com o painel "Perfil & CRM". Sem fundo escurecido, atendente continua conversando
     // com o paciente enquanto preenche o agendamento. Em telas pequenas continua como
     // modal de tela cheia sobreposto, já que não sobra espaço pra mostrar os dois juntos.
-    <div className="fixed sm:static inset-0 sm:inset-auto sm:h-full sm:w-[420px] sm:shrink-0 z-50 sm:z-auto flex items-end sm:items-stretch justify-center p-0 bg-slate-900/60 sm:bg-transparent backdrop-blur-sm sm:backdrop-blur-none animate-in fade-in duration-200">
+    <div className="fixed sm:static inset-0 sm:inset-auto sm:h-full sm:w-[640px] sm:shrink-0 z-50 sm:z-auto flex items-end sm:items-stretch justify-center p-0 bg-slate-900/60 sm:bg-transparent backdrop-blur-sm sm:backdrop-blur-none animate-in fade-in duration-200">
       <div
         ref={dialogRef}
         role="dialog"
@@ -285,6 +306,8 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
         // max-h garante um limite de altura mesmo no modal de tela cheia do mobile — sem
         // isso o rodapé com "Confirmar/Cancelar" podia ficar fora da área visível quando o
         // formulário crescia (médico, convênio, agenda ocupada), sem jeito de rolar até ele.
+        // Largura maior (640px, não mais 420px) + grid de 2 colunas abaixo elimina a rolagem
+        // vertical excessiva que existia com os campos empilhados um por um.
         className="bg-white dark:bg-slate-900 rounded-t-2xl sm:rounded-none shadow-2xl sm:shadow-none sm:border-l border-slate-100 dark:border-slate-800 max-w-lg sm:max-w-none w-full max-h-[92dvh] sm:max-h-none sm:h-full animate-in slide-in-from-bottom-6 sm:slide-in-from-right duration-200 outline-none flex flex-col"
       >
         <div className="shrink-0 flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/40">
@@ -319,10 +342,9 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
         ) : (
           <form onSubmit={handleSubmit} className="flex-1 min-h-0 flex flex-col">
           <div className="flex-1 min-h-0 overflow-y-auto p-5 sm:p-6 space-y-4">
+            {/* Linha 1 (full width): Nome Completo */}
             <div className="relative" ref={patientDropdownRef}>
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5 flex items-center gap-1.5 font-mono">
-                <UserRound className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" /> Nome Completo
-              </label>
+              <label className={labelClass}>Nome Completo</label>
               <div className="relative">
                 <input
                   type="text"
@@ -333,18 +355,15 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
                   }}
                   onFocus={() => fetchPatients && setIsPatientDropdownOpen(true)}
                   placeholder="Nome e sobrenome do paciente"
-                  className={`w-full text-xs sm:text-sm border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 ${
-                    patientId ? 'pr-9' : ''
-                  } bg-slate-50/50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-medium`}
+                  className={`${inputClass(nameError)} ${patientId ? 'pr-9' : ''}`}
                   autoComplete="off"
-                  required
                 />
                 {patientId && (
                   <CheckCircle2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-500" />
                 )}
               </div>
               {fetchPatients && isPatientDropdownOpen && patientSuggestions.length > 0 && (
-                <div className="absolute left-0 right-0 mt-1 max-h-56 overflow-y-auto bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-lg py-1.5 z-50 animate-in fade-in zoom-in-95 duration-100">
+                <div className="absolute left-0 right-0 mt-1 max-h-56 overflow-y-auto bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg shadow-lg py-1.5 z-50 animate-in fade-in zoom-in-95 duration-100">
                   {patientSuggestions.map((patient) => (
                     <button
                       key={patient.id}
@@ -357,258 +376,181 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
                       }}
                       className="w-full px-3 py-2 text-left hover:bg-slate-50 dark:hover:bg-slate-800"
                     >
-                      <p className="text-xs sm:text-sm text-slate-700 dark:text-slate-200">{patient.nome}</p>
-                      <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">
+                      <p className="text-sm text-slate-700 dark:text-slate-200">{patient.nome}</p>
+                      <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
                         {patient.cpf ? `CPF: ${formatCpfMask(patient.cpf)}` : 'Sem CPF cadastrado'}
                       </p>
                     </button>
                   ))}
                 </div>
               )}
-              <p className="mt-1 text-[10px] text-slate-400 dark:text-slate-500">
+              <p className="mt-1 text-xs text-muted-foreground">
                 {patientId
                   ? 'Paciente já cadastrado no sistema da clínica — edite o nome pra buscar outro.'
                   : 'O nome do contato no WhatsApp costuma vir incompleto — confirme ou corrija aqui antes de agendar.'}
               </p>
             </div>
 
-            {requiresDoctor && (
-              <div className="relative" ref={doctorDropdownRef}>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5 flex items-center gap-1.5 font-mono">
-                  <UserRound className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" /> Médico / Especialista
-                </label>
+            {/* Linha 2: Médico | Convênio */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {requiresDoctor && (
+                <div className="relative" ref={doctorDropdownRef}>
+                  <label className={labelClass}>Médico / Especialista</label>
+                  <input
+                    type="text"
+                    value={
+                      isDoctorDropdownOpen
+                        ? doctorQuery
+                        : selectedDoctor
+                          ? `Dr(a). ${selectedDoctor.nome}${selectedDoctor.especialidade ? ` — ${selectedDoctor.especialidade}` : ''}`
+                          : doctorQuery
+                    }
+                    onChange={(e) => {
+                      setDoctorQuery(e.target.value);
+                      setDoctorId('');
+                    }}
+                    onFocus={() => {
+                      setDoctorQuery('');
+                      setIsDoctorDropdownOpen(true);
+                    }}
+                    placeholder="Digite pra buscar um médico..."
+                    className={inputClass(doctorError)}
+                    autoComplete="off"
+                  />
+                  {isDoctorDropdownOpen && (
+                    <div className="absolute left-0 right-0 mt-1 max-h-56 overflow-y-auto bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg shadow-lg py-1.5 z-50 animate-in fade-in zoom-in-95 duration-100">
+                      {filteredDoctors.length === 0 ? (
+                        <p className="px-3 py-2 text-xs text-slate-500 dark:text-slate-400">Nenhum médico encontrado.</p>
+                      ) : (
+                        <>
+                          {filteredDoctors.slice(0, 50).map((doctor) => (
+                            <button
+                              key={doctor.id}
+                              type="button"
+                              onClick={() => {
+                                setDoctorId(String(doctor.id));
+                                setDoctorQuery('');
+                                setIsDoctorDropdownOpen(false);
+                              }}
+                              className="w-full px-3 py-2 text-left hover:bg-slate-50 dark:hover:bg-slate-800"
+                            >
+                              <p className="text-sm text-slate-700 dark:text-slate-200">
+                                Dr(a). {doctor.nome} <span className="text-slate-400 dark:text-slate-500">(CRM: {doctor.crm})</span>
+                              </p>
+                              {doctor.especialidade && (
+                                <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{doctor.especialidade}</p>
+                              )}
+                            </button>
+                          ))}
+                          {filteredDoctors.length > 50 && (
+                            <p className="px-3 py-1.5 text-xs text-slate-400 dark:text-slate-500 border-t border-slate-100 dark:border-slate-800 mt-1">
+                              +{filteredDoctors.length - 50} médicos — digite pra refinar a busca.
+                            </p>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {fetchConvenios && convenios.length > 0 && (
+                <div>
+                  <label className={labelClass}>Convênio</label>
+                  <select
+                    value={convenioId}
+                    onChange={(e) => setConvenioId(e.target.value)}
+                    className={inputClass(false)}
+                  >
+                    {convenios.map((convenio) => (
+                      <option key={convenio.id} value={convenio.id}>
+                        {convenio.nome}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+
+            {/* Linha 3: Procedimento | CPF */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="relative" ref={procedureDropdownRef}>
+                <label className={labelClass}>Procedimento Médico</label>
                 <input
                   type="text"
                   value={
-                    isDoctorDropdownOpen
-                      ? doctorQuery
-                      : selectedDoctor
-                        ? `Dr(a). ${selectedDoctor.nome}${selectedDoctor.especialidade ? ` — ${selectedDoctor.especialidade}` : ''}`
-                        : doctorQuery
+                    isProcedureDropdownOpen
+                      ? procedureQuery
+                      : selectedProcedure
+                        ? `${selectedProcedure.procedure.name}${selectedProcedure.procedure.tussCode ? ` (${selectedProcedure.procedure.tussCode})` : ''}`
+                        : procedureQuery
                   }
                   onChange={(e) => {
-                    setDoctorQuery(e.target.value);
-                    setDoctorId('');
+                    setProcedureQuery(e.target.value);
+                    setProcedureId('');
                   }}
                   onFocus={() => {
-                    setDoctorQuery('');
-                    setIsDoctorDropdownOpen(true);
+                    setProcedureQuery('');
+                    setIsProcedureDropdownOpen(true);
                   }}
-                  placeholder="Digite pra buscar um médico..."
-                  className="w-full text-xs sm:text-sm border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 bg-slate-50/50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-medium"
+                  placeholder={loadingProcedures ? 'Carregando opções...' : 'Nome ou código do procedimento...'}
+                  className={inputClass(procedureError)}
                   autoComplete="off"
-                  required
+                  disabled={loadingProcedures}
                 />
-                {isDoctorDropdownOpen && (
-                  <div className="absolute left-0 right-0 mt-1 max-h-56 overflow-y-auto bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-lg py-1.5 z-50 animate-in fade-in zoom-in-95 duration-100">
-                    {filteredDoctors.length === 0 ? (
-                      <p className="px-3 py-2 text-xs text-slate-500 dark:text-slate-400">Nenhum médico encontrado.</p>
+                {isProcedureDropdownOpen && (
+                  <div className="absolute left-0 right-0 mt-1 max-h-56 overflow-y-auto bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg shadow-lg py-1.5 z-50 animate-in fade-in zoom-in-95 duration-100">
+                    {filteredProcedures.length === 0 ? (
+                      <p className="px-3 py-2 text-xs text-slate-500 dark:text-slate-400">Nenhum procedimento encontrado.</p>
                     ) : (
                       <>
-                        {filteredDoctors.slice(0, 50).map((doctor) => (
-                          <button
-                            key={doctor.id}
-                            type="button"
-                            onClick={() => {
-                              setDoctorId(String(doctor.id));
-                              setDoctorQuery('');
-                              setIsDoctorDropdownOpen(false);
-                            }}
-                            className="w-full px-3 py-2 text-left hover:bg-slate-50 dark:hover:bg-slate-800"
-                          >
-                            <p className="text-xs sm:text-sm text-slate-700 dark:text-slate-200">
-                              Dr(a). {doctor.nome} <span className="text-slate-400 dark:text-slate-500">(CRM: {doctor.crm})</span>
-                            </p>
-                            {doctor.especialidade && (
-                              <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">{doctor.especialidade}</p>
-                            )}
-                          </button>
-                        ))}
-                        {filteredDoctors.length > 50 && (
-                          <p className="px-3 py-1.5 text-[10px] text-slate-400 dark:text-slate-500 border-t border-slate-100 dark:border-slate-800 mt-1">
-                            +{filteredDoctors.length - 50} médicos — digite pra refinar a busca.
+                        {filteredProcedures.slice(0, 50).map((procedure) => {
+                          const effectivePrice = procedure.promotionalPrice ?? procedure.price;
+                          return (
+                            <button
+                              key={procedure.id}
+                              type="button"
+                              onClick={() => {
+                                setProcedureId(procedure.id);
+                                setProcedureQuery('');
+                                setIsProcedureDropdownOpen(false);
+                              }}
+                              className="w-full px-3 py-2 text-left hover:bg-slate-50 dark:hover:bg-slate-800"
+                            >
+                              <p className="text-sm text-slate-700 dark:text-slate-200">
+                                {procedure.procedure.name}
+                                {procedure.procedure.tussCode && (
+                                  <span className="text-slate-400 dark:text-slate-500"> ({procedure.procedure.tussCode})</span>
+                                )}
+                              </p>
+                              {/* Preço 0 normalmente é "ainda não cadastrado" (ex: procedimentos vindos da
+                                  integração hospitalar) — melhor omitir do que mostrar R$ 0,00. */}
+                              {effectivePrice > 0 && (
+                                <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{formatCurrency(effectivePrice)}</p>
+                              )}
+                            </button>
+                          );
+                        })}
+                        {filteredProcedures.length > 50 && (
+                          <p className="px-3 py-1.5 text-xs text-slate-400 dark:text-slate-500 border-t border-slate-100 dark:border-slate-800 mt-1">
+                            +{filteredProcedures.length - 50} procedimentos — digite pra refinar a busca.
                           </p>
                         )}
                       </>
                     )}
                   </div>
                 )}
-              </div>
-            )}
-
-            {fetchConvenios && convenios.length > 0 && (
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5 flex items-center gap-1.5 font-mono">
-                  <CreditCard className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" /> Convênio
-                </label>
-                <select
-                  value={convenioId}
-                  onChange={(e) => setConvenioId(e.target.value)}
-                  className="w-full text-xs sm:text-sm border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 bg-slate-50/50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-medium"
-                >
-                  {convenios.map((convenio) => (
-                    <option key={convenio.id} value={convenio.id}>
-                      {convenio.nome}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-
-            <div className="relative" ref={procedureDropdownRef}>
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5 flex items-center gap-1.5 font-mono">
-                <Stethoscope className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" /> Procedimento Médico
-              </label>
-              <input
-                type="text"
-                value={
-                  isProcedureDropdownOpen
-                    ? procedureQuery
-                    : selectedProcedure
-                      ? `${selectedProcedure.procedure.name}${selectedProcedure.procedure.tussCode ? ` (${selectedProcedure.procedure.tussCode})` : ''}`
-                      : procedureQuery
-                }
-                onChange={(e) => {
-                  setProcedureQuery(e.target.value);
-                  setProcedureId('');
-                }}
-                onFocus={() => {
-                  setProcedureQuery('');
-                  setIsProcedureDropdownOpen(true);
-                }}
-                placeholder={loadingProcedures ? 'Carregando opções...' : 'Digite o nome ou código do procedimento...'}
-                className="w-full text-xs sm:text-sm border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 bg-slate-50/50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-medium"
-                autoComplete="off"
-                required
-                disabled={loadingProcedures}
-              />
-              {isProcedureDropdownOpen && (
-                <div className="absolute left-0 right-0 mt-1 max-h-56 overflow-y-auto bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-lg py-1.5 z-50 animate-in fade-in zoom-in-95 duration-100">
-                  {filteredProcedures.length === 0 ? (
-                    <p className="px-3 py-2 text-xs text-slate-500 dark:text-slate-400">Nenhum procedimento encontrado.</p>
-                  ) : (
-                    <>
-                      {filteredProcedures.slice(0, 50).map((procedure) => {
-                        const effectivePrice = procedure.promotionalPrice ?? procedure.price;
-                        return (
-                          <button
-                            key={procedure.id}
-                            type="button"
-                            onClick={() => {
-                              setProcedureId(procedure.id);
-                              setProcedureQuery('');
-                              setIsProcedureDropdownOpen(false);
-                            }}
-                            className="w-full px-3 py-2 text-left hover:bg-slate-50 dark:hover:bg-slate-800"
-                          >
-                            <p className="text-xs sm:text-sm text-slate-700 dark:text-slate-200">
-                              {procedure.procedure.name}
-                              {procedure.procedure.tussCode && (
-                                <span className="text-slate-400 dark:text-slate-500"> ({procedure.procedure.tussCode})</span>
-                              )}
-                            </p>
-                            {/* Preço 0 normalmente é "ainda não cadastrado" (ex: procedimentos vindos da
-                                integração hospitalar) — melhor omitir do que mostrar R$ 0,00. */}
-                            {effectivePrice > 0 && (
-                              <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">{formatCurrency(effectivePrice)}</p>
-                            )}
-                          </button>
-                        );
-                      })}
-                      {filteredProcedures.length > 50 && (
-                        <p className="px-3 py-1.5 text-[10px] text-slate-400 dark:text-slate-500 border-t border-slate-100 dark:border-slate-800 mt-1">
-                          +{filteredProcedures.length - 50} procedimentos — digite pra refinar a busca.
-                        </p>
-                      )}
-                    </>
-                  )}
-                </div>
-              )}
-              {selectedProcedure && (
-                <p className="mt-1.5 text-[11px] text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 p-2 rounded-lg border border-slate-100 dark:border-slate-700">
-                  <span className="font-semibold text-slate-700 dark:text-slate-300">{appointmentTypeLabels[selectedProcedure.appointmentType]}</span>
-                  {selectedProcedure.procedure.preparationInstructions &&
-                    ` · Preparo: ${selectedProcedure.procedure.preparationInstructions}`}
-                </p>
-              )}
-            </div>
-
-            {/* Horário fica sozinho na linha (label + toggle Marcado/Chegada não cabem
-                dividindo espaço com mais 2 campos nos 420px do painel) — Data e CPF, mais
-                simples, dividem a linha de baixo. */}
-            <div>
-              <div className="flex items-center justify-between mb-1.5 gap-2">
-                <label className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 flex items-center gap-1.5 font-mono">
-                  <Clock className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" /> Horário
-                </label>
-                <div className="inline-flex rounded-lg border border-slate-200 dark:border-slate-700 p-0.5 bg-slate-50 dark:bg-slate-950 shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => setTimeMode('scheduled')}
-                    className={`px-2 py-1 rounded-md text-[10px] font-bold transition-colors ${
-                      timeMode === 'scheduled'
-                        ? 'bg-emerald-600 text-white shadow-2xs'
-                        : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
-                    }`}
-                  >
-                    Marcado
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setTimeMode('arrival');
-                      setTime('');
-                    }}
-                    className={`px-2 py-1 rounded-md text-[10px] font-bold transition-colors ${
-                      timeMode === 'arrival'
-                        ? 'bg-emerald-600 text-white shadow-2xs'
-                        : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
-                    }`}
-                  >
-                    Chegada
-                  </button>
-                </div>
-              </div>
-              {timeMode === 'scheduled' ? (
-                <>
-                  <input
-                    type="time"
-                    value={time}
-                    onChange={(e) => setTime(e.target.value)}
-                    className="w-full text-xs sm:text-sm border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 bg-slate-50/50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
-                  />
-                  {time && occupiedTimes.includes(time) && (
-                    <p className="mt-1 text-[10px] text-amber-600 dark:text-amber-400 font-semibold">
-                      ⚠️ Esse médico já tem uma marcação às {time} nesse dia.
-                    </p>
-                  )}
-                </>
-              ) : (
-                <div className="w-full text-xs sm:text-sm border border-dashed border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 bg-slate-50/50 dark:bg-slate-950 text-slate-500 dark:text-slate-400 font-medium">
-                  Por ordem de chegada
-                </div>
-              )}
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5 flex items-center gap-1.5 font-mono">
-                  <Calendar className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" /> Data
-                </label>
-                <input
-                  type="date"
-                  value={date}
-                  onChange={(e) => setDate(e.target.value)}
-                  min={new Date().toISOString().slice(0, 10)}
-                  className="w-full text-xs sm:text-sm border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 bg-slate-50/50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
-                  required
-                />
+                {selectedProcedure && (
+                  <p className="mt-1.5 text-xs text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 p-2 rounded-lg border border-slate-100 dark:border-slate-700">
+                    <span className="font-medium text-slate-700 dark:text-slate-300">{appointmentTypeLabels[selectedProcedure.appointmentType]}</span>
+                    {selectedProcedure.procedure.preparationInstructions &&
+                      ` · Preparo: ${selectedProcedure.procedure.preparationInstructions}`}
+                  </p>
+                )}
               </div>
 
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5 flex items-center gap-1.5 font-mono">
-                  <IdCard className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" /> CPF (opcional)
-                </label>
+                <label className={labelClass}>CPF (opcional)</label>
                 <input
                   type="text"
                   inputMode="numeric"
@@ -616,8 +558,74 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
                   onChange={(e) => setCpf(formatCpfMask(e.target.value))}
                   placeholder="000.000.000-00"
                   maxLength={14}
-                  className="w-full text-xs sm:text-sm border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 bg-slate-50/50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-mono"
+                  className={`${inputClass(false)} font-mono`}
                 />
+              </div>
+            </div>
+
+            {/* Linha 4: Data | Horário (com switch segmentado Marcado/Chegada) */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <label className={labelClass}>Data</label>
+                <input
+                  type="date"
+                  value={date}
+                  onChange={(e) => setDate(e.target.value)}
+                  min={new Date().toISOString().slice(0, 10)}
+                  className={inputClass(dateError)}
+                />
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1.5 gap-2">
+                  <label className={`${labelClass} mb-0`}>Horário</label>
+                  <div className="inline-flex rounded-md border border-slate-200 dark:border-slate-700 p-0.5 bg-slate-50 dark:bg-slate-950 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setTimeMode('scheduled')}
+                      className={`px-2 py-1 rounded text-[10px] font-semibold transition-colors ${
+                        timeMode === 'scheduled'
+                          ? 'bg-emerald-600 text-white shadow-2xs'
+                          : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                      }`}
+                    >
+                      Marcado
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setTimeMode('arrival');
+                        setTime('');
+                      }}
+                      className={`px-2 py-1 rounded text-[10px] font-semibold transition-colors ${
+                        timeMode === 'arrival'
+                          ? 'bg-emerald-600 text-white shadow-2xs'
+                          : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                      }`}
+                    >
+                      Chegada
+                    </button>
+                  </div>
+                </div>
+                {timeMode === 'scheduled' ? (
+                  <>
+                    <input
+                      type="time"
+                      value={time}
+                      onChange={(e) => setTime(e.target.value)}
+                      className={inputClass(false)}
+                    />
+                    {time && occupiedTimes.includes(time) && (
+                      <p className="mt-1 text-xs text-amber-600 dark:text-amber-400 font-medium">
+                        ⚠️ Esse médico já tem uma marcação às {time} nesse dia.
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <div className="w-full h-10 flex items-center text-sm border border-dashed border-slate-200 dark:border-slate-700 rounded-lg px-3 text-slate-500 dark:text-slate-400">
+                    Por ordem de chegada
+                  </div>
+                )}
               </div>
             </div>
 
@@ -651,23 +659,23 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
           </div>
 
           <div className="shrink-0 px-5 sm:px-6 py-3 border-t border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col items-end gap-1.5">
-            {!submitting && missingFields.length > 0 && (
-              <p className="text-[10px] text-amber-600 dark:text-amber-400 font-medium">
-                Falta preencher: {missingFields.join(", ")}
+            {hasAttemptedSubmit && missingFields.length > 0 && (
+              <p className="text-xs text-red-500 dark:text-red-400 font-medium">
+                Confira os campos destacados acima antes de continuar.
               </p>
             )}
             <div className="flex items-center gap-2.5">
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2.5 text-xs sm:text-sm font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors min-h-[44px]"
+                className="px-4 py-2.5 text-sm font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors min-h-[44px]"
               >
                 Cancelar
               </button>
               <button
                 type="submit"
-                disabled={submitting || missingFields.length > 0}
-                className="px-5 py-2.5 text-xs sm:text-sm font-semibold bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white rounded-xl shadow-xs hover:shadow-md transition-all active:scale-[0.99] flex items-center gap-2 min-h-[44px]"
+                disabled={submitting}
+                className="px-5 py-2.5 text-sm font-semibold bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white rounded-md shadow-xs hover:shadow-md transition-all active:scale-[0.99] flex items-center gap-2 min-h-[44px]"
               >
                 {submitting ? 'Criando...' : 'Confirmar Agendamento'}
               </button>

@@ -5,7 +5,6 @@ import { Message } from '@/types/chat-crm';
 import {
   Play,
   Pause,
-  Lock,
   CheckCheck,
   FileText,
   FileSpreadsheet,
@@ -34,6 +33,8 @@ interface MessageBubbleProps {
   onRequestResend?: () => void;
   /** Edita o texto já enviado (só relevante quando message.canEdit). */
   onEditMessage?: (messageId: string, newText: string) => Promise<{ success: boolean; error?: string }>;
+  /** Transcreve um áudio sob demanda (só relevante pra message.type === 'audio'). */
+  onTranscribeAudio?: (messageId: string) => Promise<{ success: boolean; transcription?: string; error?: string }>;
 }
 
 /** Ícone + cor por tipo de arquivo — em vez de um FileText genérico pra qualquer
@@ -58,10 +59,10 @@ function getAttachmentTypeStyle(mimeType?: string, fileName?: string) {
 /** Aviso + botão de reenviar pra mensagens que falharam ao sair — sem isso o
  * atendente só via um ícone vermelho sem explicação nem como corrigir. */
 const FailedSendNotice: React.FC<{ onRetry?: () => void }> = ({ onRetry }) => (
-  <div className="mt-1 flex items-center justify-end gap-1.5 text-[10.5px] font-semibold text-red-100">
+  <div className="mt-1 flex items-center justify-end gap-1.5 text-[10.5px] font-semibold text-red-500">
     <span>Falha ao enviar.</span>
     {onRetry && (
-      <button onClick={onRetry} className="underline decoration-red-100/70 hover:text-white" type="button">
+      <button onClick={onRetry} className="underline decoration-red-500/70 hover:text-red-600" type="button">
         Reenviar
       </button>
     )}
@@ -74,14 +75,14 @@ const MessageStatusTicks: React.FC<{ status?: Message['deliveryStatus'] }> = ({ 
   // aria-label existe porque "entregue" e "lida" só se diferenciam pela cor do
   // ícone (verde vs. azul, mesmo CheckCheck) — sem texto, fica invisível pra
   // leitor de tela e difícil de distinguir por daltonismo.
-  if (status === 'failed') return <AlertCircle className="w-3.5 h-3.5 text-red-300" aria-label="Falha ao enviar" />;
-  if (status === 'read') return <CheckCheck className="w-3.5 h-3.5 text-sky-300" aria-label="Lida pelo paciente" />;
-  if (status === 'delivered') return <CheckCheck className="w-3.5 h-3.5 text-emerald-200" aria-label="Entregue" />;
-  if (status === 'sent') return <Check className="w-3.5 h-3.5 text-emerald-200" aria-label="Enviada" />;
-  return <Clock className="w-3 h-3 text-emerald-200/80" aria-label="Enviando..." />;
+  if (status === 'failed') return <AlertCircle className="w-3.5 h-3.5 text-red-500" aria-label="Falha ao enviar" />;
+  if (status === 'read') return <CheckCheck className="w-3.5 h-3.5 text-sky-500" aria-label="Lida pelo paciente" />;
+  if (status === 'delivered') return <CheckCheck className="w-3.5 h-3.5 text-slate-400" aria-label="Entregue" />;
+  if (status === 'sent') return <Check className="w-3.5 h-3.5 text-slate-400" aria-label="Enviada" />;
+  return <Clock className="w-3 h-3 text-slate-400" aria-label="Enviando..." />;
 };
 
-export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry, onRequestResend, onEditMessage }) => {
+export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry, onRequestResend, onEditMessage, onTranscribeAudio }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   const [playbackSpeed, setPlaybackSpeed] = useState<'1x' | '1.5x' | '2x'>('1x');
@@ -90,7 +91,24 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry, 
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState(message.text ?? '');
   const [isSavingEdit, setIsSavingEdit] = useState(false);
+  const [transcription, setTranscription] = useState(message.transcription ?? '');
+  const [isTranscribing, setIsTranscribing] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
+
+  async function handleTranscribeAudio() {
+    if (!onTranscribeAudio || isTranscribing) return;
+    setIsTranscribing(true);
+    try {
+      const result = await onTranscribeAudio(message.id);
+      if (result.success && result.transcription) {
+        setTranscription(result.transcription);
+      } else {
+        toast.error(result.error || 'Não foi possível transcrever esse áudio.');
+      }
+    } finally {
+      setIsTranscribing(false);
+    }
+  }
 
   async function handleSaveEdit() {
     if (!onEditMessage) return;
@@ -137,34 +155,31 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry, 
     }
   };
 
-  // 1. Nota Interna
+  // 1. Nota Interna — pill neutro e centralizado (estilo timeline Slack/Telegram),
+  // não mais um cartão amarelo grande: numa conversa com várias transições de
+  // status/transferência, os cartões dominavam visualmente a tela. O texto da
+  // nota já costuma trazer seu próprio emoji (🏁 finalizado, 🔄 remarcação, ✅
+  // confirmação) — por isso nenhum ícone fixo aqui, só o texto.
   if (message.type === 'internal_note') {
     return (
-      <div className="flex justify-center my-3.5 w-full px-2 sm:px-4 animate-in fade-in slide-in-from-bottom-2 duration-200" data-od-id={`internal-note-${message.id}`}>
-        <div className="max-w-xl w-full bg-amber-50/95 dark:bg-amber-950/40 border border-amber-200/90 dark:border-amber-800/80 rounded-2xl p-3.5 sm:p-4 shadow-2xs text-amber-950 dark:text-amber-200 text-xs sm:text-sm space-y-2 relative group">
-          <div className="flex items-center justify-between pb-2 border-b border-amber-200/70 dark:border-amber-800/60">
-            <span className="inline-flex items-center gap-1.5 font-bold text-[11px] text-amber-800 dark:text-amber-300 bg-amber-100/90 dark:bg-amber-900/60 px-2.5 py-0.5 rounded-full uppercase tracking-wider font-mono">
-              <Lock className="w-3 h-3 text-amber-700 dark:text-amber-400" />
-              🔒 Nota Interna (Equipe)
-            </span>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => message.text && handleCopyText(message.text)}
-                aria-label="Copiar nota"
-                className="opacity-0 group-hover:opacity-100 p-2 -m-1 text-amber-700 dark:text-amber-300 hover:text-amber-900 dark:hover:text-amber-100 transition-opacity rounded"
-                title="Copiar nota"
-              >
-                {copied ? <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-              </button>
-              <span className="text-[11px] text-amber-700/80 dark:text-amber-300/80 font-mono font-medium">{message.timestamp}</span>
-            </div>
-          </div>
-          <p className="leading-relaxed text-amber-950 dark:text-amber-100 font-sans text-xs sm:text-sm whitespace-pre-wrap">{message.text}</p>
-          {message.senderName && (
-            <div className="pt-1 text-[11px] text-amber-800/80 dark:text-amber-300/80 flex items-center justify-end font-semibold font-mono">
-              — {message.senderName}
-            </div>
-          )}
+      <div
+        className="group flex items-center justify-center my-3 w-full px-4 animate-in fade-in duration-200"
+        data-od-id={`internal-note-${message.id}`}
+      >
+        <div className="inline-flex max-w-xl items-center gap-1.5 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-3 py-1 text-xs font-medium text-slate-600 dark:text-slate-300">
+          <span className="truncate" title={message.text}>
+            {message.text}
+          </span>
+          {message.senderName && <span className="shrink-0 text-slate-400 dark:text-slate-500">• {message.senderName}</span>}
+          <span className="shrink-0 text-slate-400 dark:text-slate-500">• {message.timestamp}</span>
+          <button
+            onClick={() => message.text && handleCopyText(message.text)}
+            aria-label="Copiar nota"
+            className="shrink-0 opacity-0 group-hover:opacity-100 -m-1 p-1 text-slate-400 hover:text-slate-700 dark:hover:text-slate-100 transition-opacity rounded"
+            title="Copiar nota"
+          >
+            {copied ? <Check className="w-3 h-3 text-emerald-600 dark:text-emerald-400" /> : <Copy className="w-3 h-3" />}
+          </button>
         </div>
       </div>
     );
@@ -239,10 +254,10 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry, 
         data-od-id={`audio-msg-${message.id}`}
       >
         <div
-          className={`max-w-md w-72 sm:w-80 rounded-2xl p-3 sm:p-3.5 shadow-2xs transition-all ${
+          className={`max-w-md w-72 sm:w-80 rounded-2xl p-3 sm:p-3.5 shadow-sm transition-all ${
             isAgent
-              ? 'bg-emerald-600 dark:bg-emerald-700 text-white rounded-tr-xs'
-              : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-tl-xs hover:border-slate-300 dark:hover:border-slate-600'
+              ? 'bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-100 dark:border-emerald-900 text-slate-900 dark:text-slate-100 rounded-tr-sm'
+              : 'bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-tl-sm hover:border-slate-200 dark:hover:border-slate-600'
           }`}
         >
           {message.deleted && <DeletedBadge />}
@@ -269,11 +284,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry, 
             <button
               onClick={togglePlayback}
               disabled={!hasRealAudio}
-              className={`w-10 h-10 rounded-full flex items-center justify-center transition-transform active:scale-95 shrink-0 shadow-2xs disabled:opacity-40 disabled:cursor-not-allowed ${
-                isAgent
-                  ? 'bg-emerald-500 hover:bg-emerald-400 text-white'
-                  : 'bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 dark:hover:bg-emerald-900 text-emerald-700 dark:text-emerald-400'
-              }`}
+              className="w-10 h-10 rounded-full flex items-center justify-center transition-transform active:scale-95 shrink-0 shadow-2xs disabled:opacity-40 disabled:cursor-not-allowed bg-emerald-600 hover:bg-emerald-500 text-white"
               title={!hasRealAudio ? 'Áudio indisponível' : isPlaying ? 'Pausar áudio' : 'Reproduzir áudio'}
             >
               {isPlaying ? <Pause className="w-5 h-5 fill-current animate-pulse" /> : <Play className="w-5 h-5 fill-current ml-0.5" />}
@@ -287,9 +298,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry, 
                     <div
                       key={idx}
                       className={`w-1 rounded-full transition-all duration-200 ${
-                        isAgent
-                          ? active ? 'bg-white' : 'bg-emerald-400/60'
-                          : active ? 'bg-emerald-600 dark:bg-emerald-400' : 'bg-slate-300 dark:bg-slate-600'
+                        active ? 'bg-emerald-600 dark:bg-emerald-400' : 'bg-slate-300 dark:bg-slate-600'
                       }`}
                       style={{ height: `${Math.max(16, height * 0.28)}px` }}
                     />
@@ -304,11 +313,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry, 
                   <button
                     onClick={cycleSpeed}
                     disabled={!hasRealAudio}
-                    className={`px-1.5 py-0.5 rounded font-mono font-extrabold text-[10px] transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
-                      isAgent
-                        ? 'bg-emerald-700 dark:bg-emerald-800 hover:bg-emerald-800 text-emerald-100'
-                        : 'bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200'
-                    }`}
+                    className="px-1.5 py-0.5 rounded font-mono font-extrabold text-[10px] transition-colors disabled:opacity-40 disabled:cursor-not-allowed bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200"
                     title="Alternar velocidade de reprodução (1x, 1.5x, 2x)"
                   >
                     {playbackSpeed}
@@ -322,6 +327,27 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry, 
               </div>
             </div>
           </div>
+
+          {/* Transcrição sob demanda — botão manual, nunca automático (custa
+              uma chamada de IA por clique). Ver onTranscribeAudio. */}
+          {transcription ? (
+            <p className="mt-2.5 pt-2.5 border-t border-black/5 dark:border-white/10 text-xs italic text-slate-600 dark:text-slate-300 leading-relaxed">
+              📝 {transcription}
+            </p>
+          ) : (
+            onTranscribeAudio &&
+            hasRealAudio && (
+              <button
+                type="button"
+                onClick={handleTranscribeAudio}
+                disabled={isTranscribing}
+                className="mt-2.5 pt-2.5 border-t border-black/5 dark:border-white/10 w-full text-left text-[10.5px] font-semibold text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-300 disabled:opacity-60 flex items-center gap-1"
+              >
+                <FileText className="w-3 h-3" />
+                {isTranscribing ? 'Transcrevendo...' : 'Transcrever áudio (IA)'}
+              </button>
+            )
+          )}
         </div>
       </div>
     );
@@ -342,10 +368,10 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry, 
           data-od-id={`attachment-msg-${message.id}`}
         >
           <div
-            className={`max-w-md rounded-2xl p-3.5 shadow-2xs transition-all ${hasRealFile ? 'cursor-pointer' : 'cursor-not-allowed opacity-80'} ${
+            className={`max-w-md rounded-2xl p-3.5 shadow-sm transition-all ${hasRealFile ? 'cursor-pointer' : 'cursor-not-allowed opacity-80'} ${
               isAgent
-                ? 'bg-emerald-600 dark:bg-emerald-700 text-white rounded-tr-xs'
-                : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-tl-xs hover:border-slate-300 dark:hover:border-slate-600'
+                ? 'bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-100 dark:border-emerald-900 text-slate-900 dark:text-slate-100 rounded-tr-sm'
+                : 'bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-tl-sm hover:border-slate-200 dark:hover:border-slate-600'
             }`}
             onClick={() => hasRealFile && setIsLightboxOpen(true)}
           >
@@ -378,7 +404,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry, 
                       onClick={(e) => e.stopPropagation()}
                       aria-label="Baixar arquivo"
                       title="Baixar arquivo"
-                      className={`p-1.5 rounded-lg transition-colors ${isAgent ? 'hover:bg-white/20' : 'hover:bg-slate-200 dark:hover:bg-slate-600'}`}
+                      className="p-1.5 rounded-lg transition-colors hover:bg-slate-200 dark:hover:bg-slate-600"
                     >
                       <Download className="w-4 h-4 opacity-90" />
                     </a>
@@ -388,7 +414,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry, 
               </div>
             )}
             {message.text && <p className="text-xs sm:text-sm mb-1 leading-relaxed">{message.text}</p>}
-            <div className={`flex items-center justify-end gap-1 text-[10.5px] font-mono opacity-85 mt-1`}>
+            <div className="flex items-center justify-end gap-1 text-[10px] text-slate-400 mt-1">
               <span>{message.timestamp}</span>
               {isAgent && <MessageStatusTicks status={message.deliveryStatus} />}
             </div>
@@ -470,8 +496,8 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry, 
       <div
         className={`relative max-w-[85%] sm:max-w-md md:max-w-lg rounded-2xl p-3.5 shadow-sm text-sm leading-relaxed transition-all ${
           isAgent
-            ? 'bg-emerald-600 dark:bg-emerald-700 text-white rounded-tr-xs hover:bg-emerald-600/95 dark:hover:bg-emerald-700/95'
-            : 'bg-white dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-tl-xs hover:border-slate-300 dark:hover:border-slate-600'
+            ? 'bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-100 dark:border-emerald-900 text-slate-900 dark:text-slate-100 rounded-tr-sm'
+            : 'bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-tl-sm hover:border-slate-200 dark:hover:border-slate-600'
         }`}
       >
         {message.deleted && <DeletedBadge />}
@@ -486,20 +512,14 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry, 
                 if (e.key === 'Escape') setIsEditing(false);
               }}
               rows={3}
-              className={`w-full rounded-lg p-2 text-xs sm:text-[13.5px] leading-relaxed resize-none focus:outline-none focus:ring-2 ${
-                isAgent
-                  ? 'bg-emerald-700/60 dark:bg-emerald-800/60 text-white placeholder-emerald-100/60 focus:ring-white/30'
-                  : 'bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-100 focus:ring-emerald-500/30'
-              }`}
+              className="w-full rounded-lg p-2 text-xs sm:text-[13.5px] leading-relaxed resize-none focus:outline-none focus:ring-2 bg-white/80 dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:ring-emerald-500/30"
             />
             <div className="flex items-center justify-end gap-2">
               <button
                 type="button"
                 onClick={() => setIsEditing(false)}
                 disabled={isSavingEdit}
-                className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition-colors disabled:opacity-50 ${
-                  isAgent ? 'text-emerald-100 hover:bg-white/10' : 'text-slate-500 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-                }`}
+                className="px-2.5 py-1 rounded-md text-[11px] font-semibold transition-colors disabled:opacity-50 text-slate-500 dark:text-slate-300 hover:bg-slate-200/70 dark:hover:bg-slate-700"
               >
                 Cancelar
               </button>
@@ -507,9 +527,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry, 
                 type="button"
                 onClick={handleSaveEdit}
                 disabled={isSavingEdit}
-                className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-colors disabled:opacity-60 ${
-                  isAgent ? 'bg-white text-emerald-700 hover:bg-emerald-50' : 'bg-emerald-600 text-white hover:bg-emerald-700'
-                }`}
+                className="px-2.5 py-1 rounded-md text-[11px] font-bold transition-colors disabled:opacity-60 bg-emerald-600 text-white hover:bg-emerald-700"
               >
                 {isSavingEdit ? 'Salvando...' : 'Salvar'}
               </button>
@@ -519,16 +537,12 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry, 
           <>
             <p
               className={`whitespace-pre-wrap font-sans text-xs sm:text-[13.5px] leading-relaxed select-text ${
-                message.deleted ? `italic line-through ${isAgent ? 'text-rose-100' : 'text-rose-500 dark:text-rose-400'}` : ''
+                message.deleted ? 'italic line-through text-rose-500 dark:text-rose-400' : ''
               }`}
             >
               {message.text}
             </p>
-            <div
-              className={`flex items-center justify-end gap-1.5 text-[10px] font-mono mt-1 ${
-                isAgent ? 'text-emerald-100/90' : 'text-slate-500 dark:text-slate-400'
-              }`}
-            >
+            <div className="flex items-center justify-end gap-1.5 text-[10px] text-slate-400 mt-1">
               {message.canEdit && onEditMessage && (
                 <button
                   type="button"
@@ -538,9 +552,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry, 
                   }}
                   aria-label="Editar mensagem"
                   title="Editar mensagem"
-                  className={`opacity-0 group-hover:opacity-100 -m-1 p-1 rounded transition-opacity ${
-                    isAgent ? 'hover:bg-white/15' : 'hover:bg-slate-200 dark:hover:bg-slate-700'
-                  }`}
+                  className="opacity-0 group-hover:opacity-100 -m-1 p-1 rounded transition-opacity hover:bg-slate-200/70 dark:hover:bg-slate-700"
                 >
                   <Pencil className="w-3 h-3" />
                 </button>

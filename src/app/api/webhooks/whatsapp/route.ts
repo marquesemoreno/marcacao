@@ -36,7 +36,13 @@ function extractIncomingMessage(body: unknown): IncomingMessage | null {
   if (!body || typeof body !== "object") return null;
   const payload = body as Record<string, unknown>;
 
+  // Formato simplificado (curl/teste manual, compatível com UAZAPI/Z-API — ver
+  // docs/obsidian/03 - APIs e Webhooks n8n.md). Nunca é o formato que a Evolution
+  // API de verdade manda (ela sempre usa `data.key`/`data.message`, tratado abaixo),
+  // mas se `fromMe` vier presente aqui mesmo assim, respeita — a trava anti-loop no
+  // POST já lê `bodyRec?.fromMe` como fallback, então isto é só clareza extra.
   if (typeof payload.phone === "string" && typeof payload.text === "string") {
+    if (payload.fromMe === true) return null;
     return {
       phone: formatToWhatsAppNumber(payload.phone),
       text: payload.text,
@@ -358,6 +364,15 @@ export async function POST(request: Request) {
 
   // =========================================================================
   // 1. TRAVA ANTI-LOOP: ignora mensagens enviadas pela própria instância / bot / atendente
+  //
+  // Investigado (09/2026) um relato de mensagem do celular do operador aparecendo
+  // trocada/invertida na conversa do paciente: auditoria no banco (webhookLog +
+  // Message) não achou nenhum par de mensagens com direção invertida e mesmo
+  // conteúdo — o `isFromMe` abaixo já cobre os 3 formatos de payload que a
+  // Evolution API manda (key.fromMe, data.fromMe, fromMe na raiz) e, quando
+  // verdadeiro, a mensagem é só logada como "outbound_from_device" (ver abaixo),
+  // nunca vira Message. Se o sintoma voltar, o primeiro lugar a olhar é o
+  // `webhookLog` com esse `kind` pra achar o payload bruto do evento suspeito.
   // =========================================================================
   const keyObj = (dataPayload?.key || bodyRec?.key) as Record<string, unknown> | undefined;
   const isFromMe = Boolean(
@@ -559,7 +574,7 @@ export async function POST(request: Request) {
             data: { conversationId: conversation.id, userMessage: incoming.text, escalated: true, escalationReason },
           });
         } else {
-          const reply = await generateAiReply(conversation.id, clinicName, aiConfig.instructions);
+          const reply = await generateAiReply(conversation.id, clinicName, aiConfig.instructions, conversation.clinicId);
           if (reply) {
             await prisma.message.create({
               data: { conversationId: conversation.id, direction: "OUTBOUND", content: reply, status: "DELIVERED" },
