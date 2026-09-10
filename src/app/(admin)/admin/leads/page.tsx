@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { listPartnerLeads } from "@/actions/partner-leads";
 import { PartnerLeadStatusForm } from "@/components/admin/partner-lead-status-form";
 import { ApproveClinicDialog } from "@/components/admin/approve-clinic-dialog";
+import { AiOutreachControl } from "@/components/admin/ai-outreach-control";
 import {
   partnerLeadStatusLabels,
   partnerLeadStatusVariant,
@@ -41,6 +42,8 @@ export default async function AdminLeadsPage() {
           Página de Credenciamento
         </Button>
       </div>
+
+      <AiOutreachControl />
 
       {leads.length === 0 ? (
         <p className="text-sm text-muted-foreground">Nenhum lead recebido ainda.</p>

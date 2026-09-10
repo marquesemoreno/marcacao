@@ -18,6 +18,33 @@ export async function listPartnerLeads() {
   return prisma.partnerLead.findMany({ orderBy: { createdAt: "desc" } });
 }
 
+/** Estado do contato automático via IA (ver src/lib/ai-lead-outreach.ts) — cria
+ * a linha singleton na primeira leitura, sempre desligada por padrão. */
+export async function getOutreachStatus() {
+  await requireAdminSession();
+  const state = await prisma.aiOutreachState.upsert({
+    where: { id: "singleton" },
+    update: {},
+    create: { id: "singleton" },
+  });
+  const pendingCount = await prisma.partnerLead.count({ where: { status: "NEW" } });
+  return { enabled: state.enabled, nextRunAt: state.nextRunAt, pendingCount };
+}
+
+/** Liga/desliga o disparo automático — nunca começa sozinho, só quando o admin
+ * decide aqui. Ao ligar, zera nextRunAt pra "agora" (primeira mensagem sai já
+ * no próximo tick do cron, não espera o intervalo de 4-6min de um envio que
+ * nunca aconteceu). */
+export async function setOutreachEnabled(enabled: boolean) {
+  await requireAdminSession();
+  await prisma.aiOutreachState.upsert({
+    where: { id: "singleton" },
+    update: { enabled, ...(enabled ? { nextRunAt: new Date() } : {}) },
+    create: { id: "singleton", enabled },
+  });
+  revalidatePath("/admin/leads");
+}
+
 export async function updatePartnerLeadStatus(leadId: string, status: PartnerLeadStatus) {
   await requireAdminSession();
   await prisma.partnerLead.update({ where: { id: leadId }, data: { status } });

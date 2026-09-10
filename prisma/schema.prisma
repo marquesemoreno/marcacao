@@ -513,6 +513,22 @@ model PartnerLead {
   @@map("partner_leads")
 }
 
+/// Singleton (1 linha só, id fixo "singleton") — controla o disparo automático de
+/// contato via IA pros leads de parceria (ver src/lib/ai-lead-outreach.ts). Fica
+/// desligado até o admin ativar em /admin/leads: nunca começa a mandar mensagem
+/// sozinho só por existir a funcionalidade no código.
+model AiOutreachState {
+  id        String   @id @default("singleton")
+  enabled   Boolean  @default(false)
+  /// Só é lido quando `enabled`. Recalculado a cada envio (agora + 4~6min
+  /// aleatório) — é o que faz o intervalo ser "por volta de 5 minutos", não
+  /// cravado, pra não parecer disparo robótico.
+  nextRunAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("ai_outreach_state")
+}
+
 model WebhookLog {
   id           String   @id @default(cuid())
   event        String
