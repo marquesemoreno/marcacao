@@ -185,6 +185,11 @@ export function ChatCrmApp({ scope, basePath, view }: ChatCrmAppProps) {
   const photoFetchQueueRef = useRef<string[]>([]);
   const isDrainingPhotoQueueRef = useRef(false);
   const contactCacheRef = useRef<Map<string, Contact>>(new Map());
+  /** Sempre reflete o selectedContactId MAIS RECENTE, síncrono — ao contrário do
+   * valor capturado no closure de refreshMessages (que fica congelado no momento
+   * da chamada). Usado só pra descartar respostas atrasadas (ver refreshMessages). */
+  const selectedContactIdRef = useRef(selectedContactId);
+  selectedContactIdRef.current = selectedContactId;
   /** Começa true: abrir a tela de chat não deve escolher uma conversa sozinho (só a
    * barra lateral), a menos que tenha link direto pra uma (searchParams "c" na URL,
    * que já entra no selectedContactId inicial e passa direto pelo "if (current)"
@@ -433,12 +438,21 @@ export function ChatCrmApp({ scope, basePath, view }: ChatCrmAppProps) {
       setHasMoreMessages(false);
       return;
     }
+    // Guarda o id no momento da chamada (fica congelado no closure) — comparado
+    // de volta com selectedContactIdRef (sempre atual) depois do await, pra jogar
+    // fora a resposta se a atendente já trocou de conversa nesse meio-tempo.
+    // Bug real: trocar de conversa rápido (ou o polling de 30s/broadcast em voo
+    // junto com a troca) podia fazer a resposta da conversa ANTERIOR chegar
+    // depois e sobrescrever a tela com a conversa errada — parecia que a tela
+    // "não atualizava" ao trocar de contato.
+    const requestedContactId = selectedContactId;
     // As duas chamadas são independentes (mensagens vs. histórico de agendamentos
     // do contato) — rodar em paralelo evita pagar 2x a latência de rede/DB por ciclo.
     const [{ messages: result, hasMore }, history] = await Promise.all([
-      actions.getChatMessages(selectedContactId),
-      actions.getChatContactHistory(selectedContactId),
+      actions.getChatMessages(requestedContactId),
+      actions.getChatContactHistory(requestedContactId),
     ]);
+    if (selectedContactIdRef.current !== requestedContactId) return;
     setMessages((prev) => {
       // O polling só traz a página mais recente (MESSAGE_PAGE_SIZE mensagens) —
       // preserva quaisquer mensagens mais antigas já carregadas via "Carregar
@@ -481,10 +495,12 @@ export function ChatCrmApp({ scope, basePath, view }: ChatCrmAppProps) {
 
   async function handleLoadOlderMessages() {
     if (!selectedContactId || messages.length === 0 || isLoadingOlderMessages) return;
+    const requestedContactId = selectedContactId;
     setIsLoadingOlderMessages(true);
     try {
       const oldestId = messages[0].id;
-      const { messages: older, hasMore } = await actions.getOlderChatMessages(selectedContactId, oldestId);
+      const { messages: older, hasMore } = await actions.getOlderChatMessages(requestedContactId, oldestId);
+      if (selectedContactIdRef.current !== requestedContactId) return;
       setMessages((prev) => [...older, ...prev]);
       setHasMoreMessages(hasMore);
     } finally {
