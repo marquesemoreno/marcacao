@@ -4,10 +4,6 @@
     {
       "path": "/api/cron/appointment-reminders",
       "schedule": "0 12 * * *"
-    },
-    {
-      "path": "/api/cron/lead-outreach",
-      "schedule": "* * * * *"
     }
   ]
 }

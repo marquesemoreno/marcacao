@@ -1,0 +1,22 @@
+name: Lead outreach dispatch
+
+# Vercel Hobby recusa cron sub-diario no deploy inteiro (mesmo problema já visto em
+# broadcast-dispatch.yml) — por isso esse cron NÃO pode ir no vercel.json. Chama o
+# mesmo endpoint /api/cron/lead-outreach a cada 5 minutos; a frequência do disparo de
+# verdade é controlada dentro de runLeadOutreachTick (nextRunAt, jitter de 4-6min),
+# não por esse intervalo.
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch: {}
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Chamar endpoint de contato automático via IA
+        # www (não o domínio apex) — o apex redireciona pra www, e o curl descarta o
+        # header Authorization ao seguir redirect pra outro host.
+        run: |
+          curl -sf -X GET "https://www.conectasaudevc.com.br/api/cron/lead-outreach" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
