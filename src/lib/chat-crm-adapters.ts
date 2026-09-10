@@ -83,10 +83,20 @@ function formatMessageTimestamp(date: Date) {
   return date.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", timeZone: BR_TIMEZONE });
 }
 
+/** Só os campos que toChatContact realmente lê da prévia (type/content/mimeType/
+ * createdAt) — a lista de conversas é buscada inteira sem paginação e é pollada
+ * a cada 30s (ver useInboxRealtime), então cada campo a mais aqui multiplica por
+ * "todas as conversas ativas" a cada ciclo. Bug real: trocar de `take: 1` pra
+ * `take: 3` (pra pular nota interna na prévia) sem também restringir os campos
+ * triplicou o tráfego dessa query — foi um dos motivos do Egress do Supabase
+ * estourar de novo (406% em 11 dias, ver histórico do projeto).
+ */
+type ConversationPreviewMessage = Pick<PrismaMessage, "type" | "content" | "mimeType" | "createdAt">;
+
 type ConversationWithRelations = Conversation & {
   contact: PrismaContact;
   assignedUser: Pick<User, "id" | "name"> | null;
-  messages: PrismaMessage[];
+  messages: ConversationPreviewMessage[];
   unreadCount?: number;
   clinic?: { id: string; tradeName: string };
 };

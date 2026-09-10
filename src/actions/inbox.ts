@@ -152,7 +152,15 @@ export async function listConversations(filter: ConversationFilter, search?: str
       // take: 3 (não 1) — a prévia da lista pula nota interna e mostra a última
       // mensagem de verdade (ver toChatContact em chat-crm-adapters.ts); raramente
       // há mais de 2 notas internas seguidas antes de uma mensagem real.
-      messages: { orderBy: { createdAt: "desc" }, take: 3 },
+      // select explícito (não a linha inteira): essa lista não pagina e é pollada
+      // a cada 30s (ver useInboxRealtime) — trazer mediaPath/whatsappKeyId/etc. de
+      // 3 mensagens por conversa, pra TODAS as conversas, a cada ciclo, foi um dos
+      // motivos do Egress do Supabase estourar de novo.
+      messages: {
+        orderBy: { createdAt: "desc" },
+        take: 3,
+        select: { type: true, content: true, mimeType: true, createdAt: true },
+      },
     },
     orderBy: { lastMessageAt: "desc" },
   });
