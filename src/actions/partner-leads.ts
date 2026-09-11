@@ -60,8 +60,9 @@ export async function createPartnerLeadManually(input: SubmitPartnerLeadInput) {
  * independente do interruptor automático estar ligado. */
 export async function sendOutreachNow(leadId: string) {
   await requireAdminSession();
-  await sendOutreachMessageNow(leadId);
+  const result = await sendOutreachMessageNow(leadId);
   revalidatePath("/admin/leads");
+  return result;
 }
 
 export async function updatePartnerLeadStatus(leadId: string, status: PartnerLeadStatus) {

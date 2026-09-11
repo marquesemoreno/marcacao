@@ -14,10 +14,20 @@ export function SendOutreachButton({ leadId }: { leadId: string }) {
   function handleClick() {
     startTransition(async () => {
       try {
-        await sendOutreachNow(leadId);
-        toast.success("Mensagem enviada via IA.");
-      } catch (error) {
-        toast.error(error instanceof Error ? error.message : "Não foi possível enviar a mensagem.");
+        const result = await sendOutreachNow(leadId);
+        if (result.success) {
+          toast.success("Mensagem enviada via IA.");
+          return;
+        }
+        const reasonMessages: Record<typeof result.reason, string> = {
+          lead_not_found: "Lead não encontrado.",
+          clinic_not_found: "Clínica TIVDC não encontrada.",
+          ai_unavailable: "IA indisponível no momento — tente de novo em instantes.",
+          send_failed: "Não foi possível enviar a mensagem pelo WhatsApp.",
+        };
+        toast.error(reasonMessages[result.reason]);
+      } catch {
+        toast.error("Não foi possível enviar a mensagem. Tente novamente.");
       }
     });
   }

@@ -115,22 +115,28 @@ export async function runLeadOutreachTick(): Promise<OutreachTickResult> {
   return { sent: true, leadId: lead.id };
 }
 
+export type SendOutreachNowResult =
+  | { success: true }
+  | { success: false; reason: "lead_not_found" | "clinic_not_found" | "ai_unavailable" | "send_failed" };
+
 /** Disparo manual, fora do ciclo automático (ver AiOutreachControl / botão "Enviar
  * agora" em admin/leads) — o admin escolhe o lead e a hora, sem depender do
- * interruptor geral estar ligado nem esperar o `nextRunAt`. Lança erro com
- * mensagem em pt-BR pro toast mostrar o motivo real, em vez de genérico. */
-export async function sendOutreachMessageNow(leadId: string): Promise<void> {
+ * interruptor geral estar ligado nem esperar o `nextRunAt`. Retorna um resultado
+ * tipado em vez de lançar erro: Server Actions em produção escondem a mensagem de
+ * erros lançados (só chega um "digest" genérico no cliente), então o motivo real
+ * só chega no toast se vier no valor de retorno. */
+export async function sendOutreachMessageNow(leadId: string): Promise<SendOutreachNowResult> {
   const lead = await prisma.partnerLead.findUnique({ where: { id: leadId } });
-  if (!lead) throw new Error("Lead não encontrado.");
+  if (!lead) return { success: false, reason: "lead_not_found" };
 
   const clinicId = await getTivdcClinicId();
-  if (!clinicId) throw new Error("Clínica TIVDC não encontrada.");
+  if (!clinicId) return { success: false, reason: "clinic_not_found" };
 
   const message = await generateOutreachMessage(lead);
-  if (!message) throw new Error("IA indisponível no momento — tente de novo em instantes.");
+  if (!message) return { success: false, reason: "ai_unavailable" };
 
   const result = await sendWhatsAppMessage(lead.phone, message, "ai_outreach.sent", clinicId);
-  if (!result.success) throw new Error("Não foi possível enviar a mensagem pelo WhatsApp.");
+  if (!result.success) return { success: false, reason: "send_failed" };
 
   const sentNote = `[Contato via IA (manual), ${new Date().toLocaleString("pt-BR", { timeZone: "America/Bahia" })}]:\n${message}`;
   await prisma.partnerLead.update({
@@ -140,4 +146,6 @@ export async function sendOutreachMessageNow(leadId: string): Promise<void> {
       notes: lead.notes ? `${lead.notes}\n\n${sentNote}` : sentNote,
     },
   });
+
+  return { success: true };
 }
