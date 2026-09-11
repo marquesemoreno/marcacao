@@ -114,3 +114,30 @@ export async function runLeadOutreachTick(): Promise<OutreachTickResult> {
 
   return { sent: true, leadId: lead.id };
 }
+
+/** Disparo manual, fora do ciclo automático (ver AiOutreachControl / botão "Enviar
+ * agora" em admin/leads) — o admin escolhe o lead e a hora, sem depender do
+ * interruptor geral estar ligado nem esperar o `nextRunAt`. Lança erro com
+ * mensagem em pt-BR pro toast mostrar o motivo real, em vez de genérico. */
+export async function sendOutreachMessageNow(leadId: string): Promise<void> {
+  const lead = await prisma.partnerLead.findUnique({ where: { id: leadId } });
+  if (!lead) throw new Error("Lead não encontrado.");
+
+  const clinicId = await getTivdcClinicId();
+  if (!clinicId) throw new Error("Clínica TIVDC não encontrada.");
+
+  const message = await generateOutreachMessage(lead);
+  if (!message) throw new Error("IA indisponível no momento — tente de novo em instantes.");
+
+  const result = await sendWhatsAppMessage(lead.phone, message, "ai_outreach.sent", clinicId);
+  if (!result.success) throw new Error("Não foi possível enviar a mensagem pelo WhatsApp.");
+
+  const sentNote = `[Contato via IA (manual), ${new Date().toLocaleString("pt-BR", { timeZone: "America/Bahia" })}]:\n${message}`;
+  await prisma.partnerLead.update({
+    where: { id: lead.id },
+    data: {
+      status: lead.status === "NEW" ? "CONTACTED" : lead.status,
+      notes: lead.notes ? `${lead.notes}\n\n${sentNote}` : sentNote,
+    },
+  });
+}

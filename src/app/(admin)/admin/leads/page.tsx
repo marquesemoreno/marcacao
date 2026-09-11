@@ -7,6 +7,8 @@ import { listPartnerLeads } from "@/actions/partner-leads";
 import { PartnerLeadStatusForm } from "@/components/admin/partner-lead-status-form";
 import { ApproveClinicDialog } from "@/components/admin/approve-clinic-dialog";
 import { AiOutreachControl } from "@/components/admin/ai-outreach-control";
+import { AddLeadDialog } from "@/components/admin/add-lead-dialog";
+import { SendOutreachButton } from "@/components/admin/send-outreach-button";
 import {
   partnerLeadStatusLabels,
   partnerLeadStatusVariant,
@@ -31,16 +33,19 @@ export default async function AdminLeadsPage() {
             Contatos recebidos pelo formulário público em <code>/seja-parceiro</code>.
           </p>
         </div>
-        <Button
-          render={<a href="/seja-parceiro" target="_blank" rel="noopener noreferrer" />}
-          nativeButton={false}
-          variant="outline"
-          size="sm"
-          className="gap-1.5"
-        >
-          <FileText className="h-4 w-4" />
-          Página de Credenciamento
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <AddLeadDialog />
+          <Button
+            render={<a href="/seja-parceiro" target="_blank" rel="noopener noreferrer" />}
+            nativeButton={false}
+            variant="outline"
+            size="sm"
+            className="gap-1.5"
+          >
+            <FileText className="h-4 w-4" />
+            Página de Credenciamento
+          </Button>
+        </div>
       </div>
 
       <AiOutreachControl />
@@ -133,6 +138,7 @@ export default async function AdminLeadsPage() {
                       <FileText className="h-4 w-4" />
                       Enviar Proposta
                     </Button>
+                    <SendOutreachButton leadId={lead.id} />
                     {lead.status !== "PARTNER" && (
                       <ApproveClinicDialog
                         leadId={lead.id}

@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { requireAdminSession } from "@/lib/session";
 import { submitPartnerLeadSchema, type SubmitPartnerLeadInput } from "@/lib/schemas/partner-lead";
 import { createClinicSchema } from "@/lib/schemas/admin";
+import { sendOutreachMessageNow } from "@/lib/ai-lead-outreach";
 
 /** Formulário público de "Seja um Parceiro" — sem autenticação, guest-checkout como o agendamento. */
 export async function submitPartnerLead(input: SubmitPartnerLeadInput) {
@@ -42,6 +43,24 @@ export async function setOutreachEnabled(enabled: boolean) {
     update: { enabled, ...(enabled ? { nextRunAt: new Date() } : {}) },
     create: { id: "singleton", enabled },
   });
+  revalidatePath("/admin/leads");
+}
+
+/** Cadastro manual pelo admin (ver AddLeadDialog em admin/leads) — mesmo schema do
+ * formulário público de /seja-parceiro, só que autenticado, pra leads que o admin
+ * já tem de fontes externas e quer colocar na fila de contato via IA. */
+export async function createPartnerLeadManually(input: SubmitPartnerLeadInput) {
+  await requireAdminSession();
+  const data = submitPartnerLeadSchema.parse(input);
+  await prisma.partnerLead.create({ data });
+  revalidatePath("/admin/leads");
+}
+
+/** Disparo manual pra um lead específico (ver botão "Enviar agora" em admin/leads),
+ * independente do interruptor automático estar ligado. */
+export async function sendOutreachNow(leadId: string) {
+  await requireAdminSession();
+  await sendOutreachMessageNow(leadId);
   revalidatePath("/admin/leads");
 }
 
