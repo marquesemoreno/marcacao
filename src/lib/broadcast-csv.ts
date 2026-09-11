@@ -41,8 +41,11 @@ export function buildBroadcastMessage(template: string, vars: Record<string, str
 const DEFAULT_HEADERS = ["telefone", "nome", "procedimento", "data"];
 
 /** Excel/Sheets em pt-BR exporta CSV com ; (porque , é separador decimal) — detecta
- * pela linha que tiver mais ocorrências, em vez de assumir vírgula sempre. */
-function detectDelimiter(firstLine: string): "," | ";" {
+ * pela linha que tiver mais ocorrências, em vez de assumir vírgula sempre. Colar
+ * direto de uma planilha vem com \t entre colunas, não , nem ; — sem checar tab
+ * antes, isso quebrava a detecção de cabeçalho. */
+function detectDelimiter(firstLine: string): "," | ";" | "\t" {
+  if (firstLine.includes("\t")) return "\t";
   const semicolons = (firstLine.match(/;/g) ?? []).length;
   const commas = (firstLine.match(/,/g) ?? []).length;
   return semicolons > commas ? ";" : ",";

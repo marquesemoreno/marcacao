@@ -46,8 +46,11 @@ const HEADER_ALIASES: Record<string, Field> = {
 };
 
 // Excel/Sheets em pt-BR exporta CSV com ; (porque , é separador decimal) — mesma
-// detecção usada em parseBroadcastCsv.
-function detectDelimiter(firstLine: string): "," | ";" {
+// detecção usada em parseBroadcastCsv. Colar direto de uma planilha (Ctrl+C numas
+// células, Ctrl+V aqui) vem com \t entre colunas, não , nem ; — sem checar tab
+// antes, isso caía no fallback de vírgula e quebrava a detecção de cabeçalho.
+function detectDelimiter(firstLine: string): "," | ";" | "\t" {
+  if (firstLine.includes("\t")) return "\t";
   const semicolons = (firstLine.match(/;/g) ?? []).length;
   const commas = (firstLine.match(/,/g) ?? []).length;
   return semicolons > commas ? ";" : ",";
