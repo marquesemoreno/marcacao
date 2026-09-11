@@ -6,7 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { requireAdminSession } from "@/lib/session";
 import { submitPartnerLeadSchema, type SubmitPartnerLeadInput } from "@/lib/schemas/partner-lead";
 import { createClinicSchema } from "@/lib/schemas/admin";
-import { sendOutreachMessageNow } from "@/lib/ai-lead-outreach";
+import { generateOutreachDraft as generateOutreachDraftLib, sendOutreachMessageNow } from "@/lib/ai-lead-outreach";
 
 /** Formulário público de "Seja um Parceiro" — sem autenticação, guest-checkout como o agendamento. */
 export async function submitPartnerLead(input: SubmitPartnerLeadInput) {
@@ -81,11 +81,18 @@ export async function createPartnerLeadsFromCsv(rows: SubmitPartnerLeadInput[]) 
   return { created, errors };
 }
 
-/** Disparo manual pra um lead específico (ver botão "Enviar agora" em admin/leads),
- * independente do interruptor automático estar ligado. */
-export async function sendOutreachNow(leadId: string) {
+/** Gera a mensagem pro admin revisar antes de mandar (ver botão "Enviar agora" em
+ * admin/leads) — não envia nada ainda. */
+export async function generateOutreachDraft(leadId: string) {
   await requireAdminSession();
-  const result = await sendOutreachMessageNow(leadId);
+  return generateOutreachDraftLib(leadId);
+}
+
+/** Envia o texto já revisado (e possivelmente editado) pelo admin — independente do
+ * interruptor automático estar ligado. */
+export async function sendOutreachNow(leadId: string, message: string) {
+  await requireAdminSession();
+  const result = await sendOutreachMessageNow(leadId, message);
   revalidatePath("/admin/leads");
   return result;
 }

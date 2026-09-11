@@ -115,25 +115,39 @@ export async function runLeadOutreachTick(): Promise<OutreachTickResult> {
   return { sent: true, leadId: lead.id };
 }
 
+export type GenerateOutreachDraftResult =
+  | { success: true; message: string }
+  | { success: false; reason: "lead_not_found" | "ai_unavailable" };
+
+/** Só gera o texto (ver botão "Enviar agora" em admin/leads) — separado do envio pra
+ * o admin poder ler/editar antes de mandar de verdade pelo WhatsApp. */
+export async function generateOutreachDraft(leadId: string): Promise<GenerateOutreachDraftResult> {
+  const lead = await prisma.partnerLead.findUnique({ where: { id: leadId } });
+  if (!lead) return { success: false, reason: "lead_not_found" };
+
+  const message = await generateOutreachMessage(lead);
+  if (!message) return { success: false, reason: "ai_unavailable" };
+
+  return { success: true, message };
+}
+
 export type SendOutreachNowResult =
   | { success: true }
-  | { success: false; reason: "lead_not_found" | "clinic_not_found" | "ai_unavailable" | "send_failed" };
+  | { success: false; reason: "lead_not_found" | "clinic_not_found" | "send_failed" };
 
 /** Disparo manual, fora do ciclo automático (ver AiOutreachControl / botão "Enviar
- * agora" em admin/leads) — o admin escolhe o lead e a hora, sem depender do
- * interruptor geral estar ligado nem esperar o `nextRunAt`. Retorna um resultado
- * tipado em vez de lançar erro: Server Actions em produção escondem a mensagem de
- * erros lançados (só chega um "digest" genérico no cliente), então o motivo real
- * só chega no toast se vier no valor de retorno. */
-export async function sendOutreachMessageNow(leadId: string): Promise<SendOutreachNowResult> {
+ * agora" em admin/leads) — recebe o texto já revisado (e possivelmente editado) pelo
+ * admin em vez de gerar de novo (ver generateOutreachDraft), pra não mandar um texto
+ * diferente do que foi aprovado na prévia. Retorna um resultado tipado em vez de
+ * lançar erro: Server Actions em produção escondem a mensagem de erros lançados (só
+ * chega um "digest" genérico no cliente), então o motivo real só chega no toast se
+ * vier no valor de retorno. */
+export async function sendOutreachMessageNow(leadId: string, message: string): Promise<SendOutreachNowResult> {
   const lead = await prisma.partnerLead.findUnique({ where: { id: leadId } });
   if (!lead) return { success: false, reason: "lead_not_found" };
 
   const clinicId = await getTivdcClinicId();
   if (!clinicId) return { success: false, reason: "clinic_not_found" };
-
-  const message = await generateOutreachMessage(lead);
-  if (!message) return { success: false, reason: "ai_unavailable" };
 
   const result = await sendWhatsAppMessage(lead.phone, message, "ai_outreach.sent", clinicId);
   if (!result.success) return { success: false, reason: "send_failed" };
