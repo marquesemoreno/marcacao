@@ -56,6 +56,31 @@ export async function createPartnerLeadManually(input: SubmitPartnerLeadInput) {
   revalidatePath("/admin/leads");
 }
 
+/** Importação em lote via CSV (ver ImportLeadsCsvDialog) — o cliente só faz o parse
+ * (parsePartnerLeadCsv), a validação de verdade (mesmo schema do form público e do
+ * cadastro manual) acontece aqui, linha a linha, pra não travar o lote inteiro por
+ * causa de uma linha ruim. */
+export async function createPartnerLeadsFromCsv(rows: SubmitPartnerLeadInput[]) {
+  await requireAdminSession();
+
+  let created = 0;
+  const errors: string[] = [];
+
+  for (const [index, row] of rows.entries()) {
+    const parsed = submitPartnerLeadSchema.safeParse(row);
+    if (!parsed.success) {
+      const message = parsed.error.issues[0]?.message ?? "dados inválidos";
+      errors.push(`Linha ${index + 2}: ${message}`);
+      continue;
+    }
+    await prisma.partnerLead.create({ data: parsed.data });
+    created++;
+  }
+
+  revalidatePath("/admin/leads");
+  return { created, errors };
+}
+
 /** Disparo manual pra um lead específico (ver botão "Enviar agora" em admin/leads),
  * independente do interruptor automático estar ligado. */
 export async function sendOutreachNow(leadId: string) {

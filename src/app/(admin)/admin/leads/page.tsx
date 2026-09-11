@@ -8,6 +8,7 @@ import { PartnerLeadStatusForm } from "@/components/admin/partner-lead-status-fo
 import { ApproveClinicDialog } from "@/components/admin/approve-clinic-dialog";
 import { AiOutreachControl } from "@/components/admin/ai-outreach-control";
 import { AddLeadDialog } from "@/components/admin/add-lead-dialog";
+import { ImportLeadsCsvDialog } from "@/components/admin/import-leads-csv-dialog";
 import { SendOutreachButton } from "@/components/admin/send-outreach-button";
 import {
   partnerLeadStatusLabels,
@@ -35,6 +36,7 @@ export default async function AdminLeadsPage() {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <AddLeadDialog />
+          <ImportLeadsCsvDialog />
           <Button
             render={<a href="/seja-parceiro" target="_blank" rel="noopener noreferrer" />}
             nativeButton={false}
