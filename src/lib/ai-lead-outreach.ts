@@ -27,7 +27,7 @@ async function generateOutreachMessage(lead: PartnerLead): Promise<string | null
 
 Dados do lead:
 - Clínica/consultório: ${lead.clinicName}
-- Contato: ${lead.contactName}
+${lead.contactName ? `- Contato: ${lead.contactName}` : "- Contato: não informado, não é uma pessoa específica ainda — trate como \"vocês\"/\"a clínica\", não invente um nome."}
 - Bairro/região: ${lead.neighborhood}
 - Especialidades/exames: ${lead.specialties}
 ${lead.notes ? `- Observações: ${lead.notes}` : ""}

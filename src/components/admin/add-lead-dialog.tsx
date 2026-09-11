@@ -69,16 +69,16 @@ export function AddLeadDialog() {
             <Input name="clinicName" className="h-9" required />
           </div>
           <div className="space-y-1">
-            <Label className="text-xs">Nome do contato</Label>
-            <Input name="contactName" className="h-9" required />
+            <Label className="text-xs">Nome do contato (opcional)</Label>
+            <Input name="contactName" className="h-9" />
           </div>
           <div className="space-y-1">
             <Label className="text-xs">Telefone/WhatsApp</Label>
             <Input name="phone" placeholder="77999998888" className="h-9" required />
           </div>
           <div className="col-span-2 space-y-1">
-            <Label className="text-xs">E-mail</Label>
-            <Input name="email" type="email" className="h-9" required />
+            <Label className="text-xs">E-mail (opcional)</Label>
+            <Input name="email" type="email" className="h-9" />
           </div>
           <div className="space-y-1">
             <Label className="text-xs">Bairro/região</Label>

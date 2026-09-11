@@ -81,8 +81,10 @@ export function ImportLeadsCsvDialog() {
         <DialogHeader>
           <DialogTitle>Importar leads via CSV</DialogTitle>
           <DialogDescription>
-            Cabeçalho com as colunas: clinica, contato, telefone, email, bairro, especialidades e
-            observacoes (opcional). Aceita vírgula ou ponto-e-vírgula.
+            Cabeçalho com as colunas: clinica, telefone, bairro (ou endereco) e especialidades (ou
+            categoria) são obrigatórias. Contato e email são opcionais — útil pra listas vindas de
+            extensão de scraping (Google Maps etc.), que não trazem essa informação. Aceita vírgula,
+            ponto-e-vírgula ou colar direto de uma planilha.
           </DialogDescription>
         </DialogHeader>
 

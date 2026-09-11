@@ -4,7 +4,12 @@ import { revalidatePath } from "next/cache";
 import type { PartnerLeadStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireAdminSession } from "@/lib/session";
-import { submitPartnerLeadSchema, type SubmitPartnerLeadInput } from "@/lib/schemas/partner-lead";
+import {
+  submitPartnerLeadSchema,
+  type SubmitPartnerLeadInput,
+  adminPartnerLeadSchema,
+  type AdminPartnerLeadInput,
+} from "@/lib/schemas/partner-lead";
 import { createClinicSchema } from "@/lib/schemas/admin";
 import { generateOutreachDraft as generateOutreachDraftLib, sendOutreachMessageNow } from "@/lib/ai-lead-outreach";
 
@@ -46,28 +51,29 @@ export async function setOutreachEnabled(enabled: boolean) {
   revalidatePath("/admin/leads");
 }
 
-/** Cadastro manual pelo admin (ver AddLeadDialog em admin/leads) — mesmo schema do
- * formulário público de /seja-parceiro, só que autenticado, pra leads que o admin
- * já tem de fontes externas e quer colocar na fila de contato via IA. */
-export async function createPartnerLeadManually(input: SubmitPartnerLeadInput) {
+/** Cadastro manual pelo admin (ver AddLeadDialog em admin/leads) — schema mais
+ * permissivo que o do formulário público (contato/email opcionais, ver
+ * adminPartnerLeadSchema), pra leads que o admin já tem de fontes externas (ex:
+ * scraping de Google Maps) e quer colocar na fila de contato via IA. */
+export async function createPartnerLeadManually(input: AdminPartnerLeadInput) {
   await requireAdminSession();
-  const data = submitPartnerLeadSchema.parse(input);
+  const data = adminPartnerLeadSchema.parse(input);
   await prisma.partnerLead.create({ data });
   revalidatePath("/admin/leads");
 }
 
 /** Importação em lote via CSV (ver ImportLeadsCsvDialog) — o cliente só faz o parse
- * (parsePartnerLeadCsv), a validação de verdade (mesmo schema do form público e do
- * cadastro manual) acontece aqui, linha a linha, pra não travar o lote inteiro por
- * causa de uma linha ruim. */
-export async function createPartnerLeadsFromCsv(rows: SubmitPartnerLeadInput[]) {
+ * (parsePartnerLeadCsv), a validação de verdade (mesmo schema do cadastro manual)
+ * acontece aqui, linha a linha, pra não travar o lote inteiro por causa de uma
+ * linha ruim. */
+export async function createPartnerLeadsFromCsv(rows: AdminPartnerLeadInput[]) {
   await requireAdminSession();
 
   let created = 0;
   const errors: string[] = [];
 
   for (const [index, row] of rows.entries()) {
-    const parsed = submitPartnerLeadSchema.safeParse(row);
+    const parsed = adminPartnerLeadSchema.safeParse(row);
     if (!parsed.success) {
       const message = parsed.error.issues[0]?.message ?? "dados inválidos";
       errors.push(`Linha ${index + 2}: ${message}`);

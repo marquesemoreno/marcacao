@@ -5,9 +5,9 @@
 
 export type ParsedPartnerLeadRow = {
   clinicName: string;
-  contactName: string;
+  contactName?: string;
   phone: string;
-  email: string;
+  email?: string;
   neighborhood: string;
   specialties: string;
   notes?: string;
@@ -36,9 +36,14 @@ const HEADER_ALIASES: Record<string, Field> = {
   neighborhood: "neighborhood",
   regiao: "neighborhood",
   "região": "neighborhood",
+  endereco: "neighborhood",
+  "endereço": "neighborhood",
+  address: "neighborhood",
   especialidades: "specialties",
   specialties: "specialties",
   exames: "specialties",
+  categoria: "specialties",
+  category: "specialties",
   observacoes: "notes",
   "observações": "notes",
   obs: "notes",
@@ -81,9 +86,9 @@ export function parsePartnerLeadCsv(csv: string): ParsedPartnerLeadRow[] {
     });
     return {
       clinicName: row.clinicName ?? "",
-      contactName: row.contactName ?? "",
+      contactName: row.contactName,
       phone: row.phone ?? "",
-      email: row.email ?? "",
+      email: row.email,
       neighborhood: row.neighborhood ?? "",
       specialties: row.specialties ?? "",
       notes: row.notes,

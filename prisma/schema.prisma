@@ -497,12 +497,17 @@ model CannedResponse {
   @@map("canned_responses")
 }
 
+/// contactName e email são opcionais pra dar suporte a leads importados de fontes
+/// que não têm essa informação (ex: Google Maps via extensão de scraping, que só
+/// traz dados do negócio, não de uma pessoa) — o formulário público continua
+/// exigindo os dois (ver submitPartnerLeadSchema), só o cadastro/importação feitos
+/// pelo admin (ver adminPartnerLeadSchema) que aceitam sem.
 model PartnerLead {
   id           String            @id @default(cuid())
   clinicName   String            @map("clinic_name")
-  contactName  String            @map("contact_name")
+  contactName  String?           @map("contact_name")
   phone        String
-  email        String
+  email        String?
   neighborhood String
   specialties  String
   notes        String?

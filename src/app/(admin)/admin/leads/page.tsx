@@ -56,7 +56,9 @@ export default async function AdminLeadsPage() {
         <p className="text-sm text-muted-foreground">Nenhum lead recebido ainda.</p>
       ) : (
         <div className="space-y-3">
-          {leads.map((lead) => (
+          {leads.map((lead) => {
+            const greeting = lead.contactName ? `Olá, ${lead.contactName}!` : "Olá!";
+            return (
             <Card key={lead.id}>
               <CardHeader className="pb-2">
                 <CardTitle className="flex flex-wrap items-center gap-2 text-base">
@@ -66,7 +68,8 @@ export default async function AdminLeadsPage() {
                   </Badge>
                 </CardTitle>
                 <p className="text-sm text-muted-foreground">
-                  {lead.contactName} · {lead.neighborhood}
+                  {lead.contactName ? `${lead.contactName} · ` : ""}
+                  {lead.neighborhood}
                 </p>
               </CardHeader>
               <CardContent className="flex flex-col gap-3">
@@ -77,7 +80,7 @@ export default async function AdminLeadsPage() {
                   </p>
                   <p>
                     <span className="text-muted-foreground">E-mail: </span>
-                    {lead.email}
+                    {lead.email ?? "—"}
                   </p>
                   <p className="sm:col-span-2">
                     <span className="text-muted-foreground">Especialidades/exames: </span>
@@ -98,7 +101,7 @@ export default async function AdminLeadsPage() {
                         <a
                           href={buildWhatsAppLink(
                             lead.phone,
-                            `Olá, ${lead.contactName}! Vi seu cadastro de interesse em ser parceiro da Conecta Saúde. Podemos conversar?`
+                            `${greeting} Vi seu cadastro de interesse em ser parceiro da Conecta Saúde. Podemos conversar?`
                           )}
                           target="_blank"
                           rel="noopener noreferrer"
@@ -111,22 +114,24 @@ export default async function AdminLeadsPage() {
                       <WhatsAppIcon className="h-4 w-4" />
                       Chamar no WhatsApp
                     </Button>
-                    <Button
-                      render={<a href={`mailto:${lead.email}`} />}
-                      nativeButton={false}
-                      variant="outline"
-                      size="sm"
-                      className="gap-1.5"
-                    >
-                      <Mail className="h-4 w-4" />
-                      E-mail
-                    </Button>
+                    {lead.email && (
+                      <Button
+                        render={<a href={`mailto:${lead.email}`} />}
+                        nativeButton={false}
+                        variant="outline"
+                        size="sm"
+                        className="gap-1.5"
+                      >
+                        <Mail className="h-4 w-4" />
+                        E-mail
+                      </Button>
+                    )}
                     <Button
                       render={
                         <a
                           href={buildWhatsAppLink(
                             lead.phone,
-                            `Olá, ${lead.contactName}! Segue o link de credenciamento da Conecta Saúde para a ${lead.clinicName}: ${partnerUrl}`
+                            `${greeting} Segue o link de credenciamento da Conecta Saúde para a ${lead.clinicName}: ${partnerUrl}`
                           )}
                           target="_blank"
                           rel="noopener noreferrer"
@@ -154,7 +159,8 @@ export default async function AdminLeadsPage() {
                 </div>
               </CardContent>
             </Card>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
