@@ -74,6 +74,7 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
   const [cpf, setCpf] = useState(contact.cpf || '');
   const [date, setDate] = useState('');
   const [time, setTime] = useState('');
+  const [notes, setNotes] = useState('');
   const [timeMode, setTimeMode] = useState<'scheduled' | 'arrival'>('scheduled');
   const [submitting, setSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
@@ -99,6 +100,7 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
     setConvenioId('');
     setDate('');
     setTime('');
+    setNotes('');
     setTimeMode('scheduled');
     setIsSuccess(false);
     setHasAttemptedSubmit(false);
@@ -267,6 +269,7 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
         medicoId: doctorId || undefined,
         convenioId: convenioId || undefined,
         patientId: patientId || undefined,
+        notes: notes.trim() || undefined,
       });
 
       setIsSuccess(true);
@@ -656,6 +659,18 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
                 )}
               </div>
             )}
+
+            {/* Linha 5 (full width): Observação */}
+            <div>
+              <label className={labelClass}>Observação (opcional)</label>
+              <textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Ex: prefere período da tarde, já fez exame antes, alergias..."
+                rows={2}
+                className={`${inputClass(false)} h-auto py-2 resize-none`}
+              />
+            </div>
           </div>
 
           <div className="shrink-0 px-5 sm:px-6 py-3 border-t border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col items-end gap-1.5">

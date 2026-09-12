@@ -64,6 +64,7 @@ export async function createAppointment(input: CreateAppointmentInput) {
       medicoId: data.medicoId,
       convenioId: data.convenioId,
       patientId: data.patientId,
+      notes: data.notes,
     });
   }
 

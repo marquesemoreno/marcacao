@@ -269,6 +269,11 @@ export async function createBridgeAppointment(
     patientId?: string;
     /** Sem escolha do atendente, o bridge usa o Particular por padrão. */
     convenioId?: string;
+    /** Observação livre do atendente (ex: "prefere período da tarde", "já fez
+     * exame X antes") — vai pro espelho no Postgres sempre; pro Firebird da
+     * clínica só se o bridge dela já aceitar o campo `observacao` (Urolaser
+     * aceita, ver index.js do bridge; extra ignorado pelas que ainda não). */
+    notes?: string;
   }
 ): Promise<PlainAppointment> {
   const config = await getBridgeConfig(clinicId);
@@ -298,6 +303,7 @@ export async function createBridgeAppointment(
         convenio_id: convenioId,
         data: input.date,
         hora: input.timeSlot || undefined,
+        observacao: input.notes || undefined,
       }),
       signal: AbortSignal.timeout(15000),
     });
@@ -407,7 +413,9 @@ export async function createBridgeAppointment(
         date: new Date(`${input.date}T00:00:00Z`),
         timeSlot: input.timeSlot || null,
         status: "CONFIRMED",
-        notes: `Agendado via bridge ${clinic.tradeName} — NUMERO Firebird: ${body?.numero ?? "?"}`,
+        notes: input.notes
+          ? `Agendado via bridge ${clinic.tradeName} — NUMERO Firebird: ${body?.numero ?? "?"}\n\n${input.notes}`
+          : `Agendado via bridge ${clinic.tradeName} — NUMERO Firebird: ${body?.numero ?? "?"}`,
       },
     });
   } catch (error) {
