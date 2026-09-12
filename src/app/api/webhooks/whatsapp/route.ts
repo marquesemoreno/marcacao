@@ -10,7 +10,7 @@ import { isBroadcastOptOutReply } from "@/lib/broadcast-csv";
 import { reopenIfResolved } from "@/lib/conversation-reopen";
 import { resolveStatusFromReply, isRescheduleReply, wasSentConfirmationPrompt } from "@/lib/appointment-reply";
 import { buildBridgeConfirmationFollowUp } from "@/lib/bridge-confirmation";
-import { extractBridgeNumeroFromNotes, confirmBridgeAppointment } from "@/lib/hospital-bridge";
+import { extractBridgeNumeroFromNotes, confirmBridgeAppointment, verifyBridgeAppointmentPersisted } from "@/lib/hospital-bridge";
 import {
   getAiAttendantConfig,
   buildAiDisclosureMessage,
@@ -809,10 +809,35 @@ export async function POST(request: Request) {
         // ao encerramento da função serverless na Vercel, ver commits anteriores).
         const numero = extractBridgeNumeroFromNotes(updated.notes);
         if (numero) {
+          let confirmedInFirebird = false;
           try {
             await confirmBridgeAppointment(updated.clinicProcedure.clinicId, numero);
+            confirmedInFirebird = true;
           } catch (error) {
             console.error("Falha ao confirmar agendamento no Firebird (bridge):", error);
+          }
+
+          // Risco conhecido (documentado no index.js do bridge da Urolaser): os
+          // triggers de reserva de horário deles disparam em QUALQUER UPDATE em
+          // MARCACAO, inclusive esse só de CONFIRMADO — visto na prática o
+          // agendamento sumir da agenda do dia depois dessa chamada. Não dá pra
+          // evitar sem parar de sincronizar de vez (decisão consciente de manter
+          // tentando), então só confere e avisa a atendente pra ligar na clínica
+          // antes que o paciente chegue achando que está tudo certo.
+          const dateIso = updated.date.toISOString().slice(0, 10);
+          const persisted =
+            confirmedInFirebird && (await verifyBridgeAppointmentPersisted(updated.clinicProcedure.clinicId, dateIso, numero));
+          if (!persisted && conversation) {
+            await prisma.message.create({
+              data: {
+                conversationId: conversation.id,
+                direction: "OUTBOUND",
+                type: "INTERNAL_NOTE",
+                content: `⚠️ ATENÇÃO: o paciente confirmou, mas o agendamento (NUMERO ${numero}) não aparece mais na agenda do sistema da clínica — pode ter sido corrompido ao sincronizar a confirmação. Ligue pra recepção e confirme o horário manualmente antes que o paciente compareça.`,
+                status: "SENT",
+              },
+            });
+            notifyInboxRealtime().catch(() => {});
           }
         }
       } else {

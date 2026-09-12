@@ -1,7 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import type { PlainClinicProcedureItem, PlainAppointment } from "@/lib/serialize";
-import { sendWhatsAppMessage } from "@/lib/whatsapp";
+import { sendWhatsAppMessage, formatToWhatsAppNumber } from "@/lib/whatsapp";
 import { buildBridgeConfirmationMessage } from "@/lib/bridge-confirmation";
 
 /**
@@ -209,6 +209,23 @@ export async function fetchBridgeDailyAgenda(clinicId: string, date: string): Pr
   }
 }
 
+/** Confere se um NUMERO continua de pé na agenda do Firebird pro dia dele — usado
+ * depois de criar/confirmar um agendamento pra pegar o caso em que o bridge
+ * respondeu sucesso mas o registro não sobrevive de verdade (visto na prática na
+ * Urolaser: confirmar via WhatsApp aciona um UPDATE em MARCACAO que os triggers de
+ * reserva de horário deles interceptam e corrompem — ver risco documentado no
+ * index.js do bridge). `false` cobre tanto "sumiu mesmo" quanto "não deu pra
+ * checar" (erro de rede) — quem chama decide o que fazer, mas em ambos os casos
+ * o certo é desconfiar e avisar alguém, não assumir sucesso. */
+export async function verifyBridgeAppointmentPersisted(
+  clinicId: string,
+  dateIso: string,
+  numero: number
+): Promise<boolean> {
+  const agenda = await fetchBridgeDailyAgenda(clinicId, dateIso);
+  return agenda.some((item) => item.numero === numero);
+}
+
 export function adaptBridgeProcedureToPlainItem(clinicId: string, proc: BridgeProcedure): PlainClinicProcedureItem {
   const now = new Date();
   const id = toBridgeProcedureId(clinicId, proc.id);
@@ -320,6 +337,39 @@ export async function createBridgeAppointment(
     await sendWhatsAppMessage(input.patientPhone, messageText, "appointment.bridge_confirmation", clinicId);
   } catch (error) {
     console.error("Falha ao enviar confirmação do agendamento (bridge):", error);
+  }
+
+  // Confere se o agendamento sobreviveu no Firebird — na criação isso normalmente é
+  // confiável (o bridge só faz INSERT aqui, e os triggers de reserva de horário só
+  // disparam em UPDATE, ver risco documentado no index.js do bridge da Urolaser),
+  // mas serve de rede de segurança caso mude. Não bloqueia o fluxo (o paciente já
+  // recebeu a confirmação acima) nem cria conversa do zero só pra isso — só avisa
+  // numa conversa que já exista.
+  try {
+    const numero = body?.numero;
+    if (numero) {
+      const persisted = await verifyBridgeAppointmentPersisted(clinicId, input.date, numero);
+      if (!persisted) {
+        const phone = formatToWhatsAppNumber(input.patientPhone);
+        const contact = await prisma.contact.findUnique({ where: { phone } });
+        const conversation = contact
+          ? await prisma.conversation.findFirst({ where: { clinicId, contactId: contact.id } })
+          : null;
+        if (conversation) {
+          await prisma.message.create({
+            data: {
+              conversationId: conversation.id,
+              direction: "OUTBOUND",
+              type: "INTERNAL_NOTE",
+              content: `⚠️ ATENÇÃO: o paciente ${input.patientName} recebeu confirmação de agendamento (NUMERO ${numero}), mas ele não aparece na agenda do sistema da clínica. Confirme manualmente com a recepção.`,
+              status: "SENT",
+            },
+          });
+        }
+      }
+    }
+  } catch (error) {
+    console.error("Falha ao conferir persistência do agendamento recém-criado (bridge):", error);
   }
 
   // Espelha o agendamento (já real no Firebird a essa altura) num Appointment de
