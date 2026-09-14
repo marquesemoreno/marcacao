@@ -3,6 +3,11 @@ export type BridgeConfirmationInput = {
   doctorName: string | null;
   dateFormatted: string;
   time: string | null;
+  /** Aviso extra específico da clínica (ex: política de retorno/pagamento da
+   * Urolaser) — quem chama decide se manda, não é regra genérica do bridge.
+   * Sem isso, cada clínica com bridge (Urolaser, Santa Clara, RC) receberia o
+   * mesmo texto de política mesmo tendo regras diferentes. */
+  policyNotice?: string;
 };
 
 /** Confirmação enviada quando um agendamento é feito pelo bridge (Firebird) —
@@ -28,12 +33,18 @@ export function buildBridgeConfirmationMessage(input: BridgeConfirmationInput): 
   if (input.doctorName) {
     lines.push(`👨‍⚕️ Profissional: Dr(a). ${input.doctorName}`);
   }
-  lines.push("");
-  lines.push(
-    "📌 *As consultas têm o prazo de no máximo 30 dias para retorno, gentileza entrar em contato antes do prazo para agendar. Caso passe do prazo será cobrado uma nova consulta! Formas de pagamento: Dinheiro, Pix, Cartão de Crédito e Débito.*"
-  );
+  if (input.policyNotice) {
+    lines.push("");
+    lines.push(`📌 *${input.policyNotice}*`);
+  }
   return lines.join("\n");
 }
+
+/** Política de retorno/pagamento específica da Urolaser (ver
+ * buildBridgeConfirmationMessage) — Santa Clara e RC não usam essa regra, por
+ * isso fica isolada aqui em vez de embutida na mensagem genérica. */
+export const UROLASER_RETURN_POLICY_NOTICE =
+  "As consultas têm o prazo de no máximo 30 dias para retorno, gentileza entrar em contato antes do prazo para agendar. Caso passe do prazo será cobrado uma nova consulta! Formas de pagamento: Dinheiro, Pix, Cartão de Crédito e Débito.";
 
 export type BridgeConfirmationFollowUpInput = {
   address: string | null;

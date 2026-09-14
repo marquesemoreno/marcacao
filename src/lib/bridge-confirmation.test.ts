@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { buildBridgeConfirmationMessage, buildBridgeConfirmationFollowUp } from "./bridge-confirmation";
+import {
+  buildBridgeConfirmationMessage,
+  buildBridgeConfirmationFollowUp,
+  UROLASER_RETURN_POLICY_NOTICE,
+} from "./bridge-confirmation";
 
 describe("buildBridgeConfirmationMessage", () => {
   const base = {
@@ -9,12 +13,22 @@ describe("buildBridgeConfirmationMessage", () => {
     time: "08:00",
   };
 
-  it("monta a mensagem com paciente, data, horário, médico e a política de retorno/pagamento", () => {
+  it("monta a mensagem com paciente, data, horário e médico", () => {
     const message = buildBridgeConfirmationMessage(base);
     expect(message).toContain("Maria Silva");
     expect(message).toContain("Alan Pascoal Silva Santos");
     expect(message).toContain("08/09/2026");
     expect(message).toContain("08:00");
+  });
+
+  it("não inclui nenhum aviso de política quando policyNotice não é passado (Santa Clara/RC)", () => {
+    const message = buildBridgeConfirmationMessage(base);
+    expect(message).not.toContain("📌");
+    expect(message).not.toContain("30 dias");
+  });
+
+  it("inclui o aviso de política só quando policyNotice é passado (Urolaser)", () => {
+    const message = buildBridgeConfirmationMessage({ ...base, policyNotice: UROLASER_RETURN_POLICY_NOTICE });
     expect(message).toContain("30 dias para retorno");
     expect(message).toContain("Formas de pagamento");
   });

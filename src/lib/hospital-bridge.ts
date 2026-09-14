@@ -2,7 +2,7 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import type { PlainClinicProcedureItem, PlainAppointment } from "@/lib/serialize";
 import { sendWhatsAppMessage, formatToWhatsAppNumber } from "@/lib/whatsapp";
-import { buildBridgeConfirmationMessage } from "@/lib/bridge-confirmation";
+import { buildBridgeConfirmationMessage, UROLASER_RETURN_POLICY_NOTICE } from "@/lib/bridge-confirmation";
 
 /**
  * Prefixo que marca um id de procedimento/agendamento como vindo do sistema
@@ -338,6 +338,7 @@ export async function createBridgeAppointment(
       doctorName: doctor?.nome ?? null,
       dateFormatted: `${day}/${month}/${year}`,
       time: input.timeSlot || null,
+      policyNotice: clinic.tradeName.includes("Urolaser") ? UROLASER_RETURN_POLICY_NOTICE : undefined,
     });
     await sendWhatsAppMessage(input.patientPhone, messageText, "appointment.bridge_confirmation", clinicId);
 
