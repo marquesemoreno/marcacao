@@ -40,10 +40,12 @@ export function isRescheduleReply(text: string): boolean {
   return RESCHEDULE_REPLIES.includes(normalizeReply(text));
 }
 
-/** Linha repetida em TODOS os templates que pedem confirmação de agendamento (lembrete
+/** Frases fixas presentes nos templates que pedem confirmação de agendamento (lembrete
  * D-1, confirmação do marketplace, confirmação do bridge) — ver bridge-reminder.ts,
- * bridge-confirmation.ts e sendAppointmentConfirmation em whatsapp.ts. */
-const CONFIRMATION_PROMPT_MARKER = "Digite 1 para Confirmar presença";
+ * bridge-confirmation.ts e sendAppointmentConfirmation em whatsapp.ts. A versão "Lara"
+ * do lembrete (só Urolaser) não tem menu numerado, por isso tem seu próprio marcador
+ * (ver LARA_CONFIRMATION_MARKER em bridge-reminder.ts) somado à lista aqui. */
+const CONFIRMATION_PROMPT_MARKERS = ["Digite 1 para Confirmar presença", "responda esta mensagem para confirmar sua presença"];
 
 /** Bug real (relatado por atendente, com print do WhatsApp): paciente respondia "Sim"
  * pra uma pergunta qualquer da atendente no meio de uma conversa manual (ex: "seria
@@ -52,5 +54,6 @@ const CONFIRMATION_PROMPT_MARKER = "Digite 1 para Confirmar presença";
  * que estava sendo conversado. resolveStatusFromReply/isRescheduleReply só devem valer
  * quando a ÚLTIMA mensagem NOSSA nessa conversa foi de fato um pedido de confirmação. */
 export function wasSentConfirmationPrompt(lastOutboundContent: string | null | undefined): boolean {
-  return Boolean(lastOutboundContent?.includes(CONFIRMATION_PROMPT_MARKER));
+  if (!lastOutboundContent) return false;
+  return CONFIRMATION_PROMPT_MARKERS.some((marker) => lastOutboundContent.includes(marker));
 }

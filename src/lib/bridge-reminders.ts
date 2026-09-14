@@ -1,8 +1,14 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
-import { formatToWhatsAppNumber, sendWhatsAppMessage } from "@/lib/whatsapp";
+import { formatToWhatsAppNumber, sendWhatsAppMessage, sendWhatsAppMedia } from "@/lib/whatsapp";
 import { fetchBridgeDailyAgenda } from "@/lib/hospital-bridge";
-import { buildBridgeReminderMessage } from "@/lib/bridge-reminder";
+import { buildBridgeReminderMessage, buildUrolaserLaraReminderMessage } from "@/lib/bridge-reminder";
+import { getBaseUrl } from "@/lib/format";
+
+/** Imagem da "Lara" (mascote/atendente virtual da Urolaser, ver buildUrolaserLaraReminderMessage)
+ * servida como asset estático — permanente e sem custo de Storage, ao contrário de um
+ * upload no bucket privado do Supabase (que exigiria gerar signed URL a cada envio). */
+const UROLASER_LARA_IMAGE_PATH = "/urolaser-lara-lembrete.jpg";
 
 // Mesmo intervalo do disparo em massa (ver src/lib/broadcast.ts) — espaça os
 // envios como se fosse uma atendente mandando na mão, um por um, em vez de uma
@@ -76,16 +82,33 @@ export async function dispatchBridgeReminders(options?: { clinicId?: string; dat
       attempted++;
 
       const phone = formatToWhatsAppNumber(item.telefone);
-      const messageText = buildBridgeReminderMessage({
+      const isUrolaser = (clinic.tradeName || clinic.name).includes("Urolaser");
+      const reminderInput = {
         patientName: item.paciente || "Paciente",
         clinicName: clinic.tradeName || clinic.name,
         procedureName: item.procedimento,
         doctorName: item.medico,
         time: item.hora,
         dateFormatted,
-      });
+      };
+      const messageText = isUrolaser
+        ? buildUrolaserLaraReminderMessage(reminderInput)
+        : buildBridgeReminderMessage(reminderInput);
 
-      const result = await sendWhatsAppMessage(phone, messageText, "appointment.bridge_reminder_d1", clinic.id);
+      // Urolaser pediu pra recriar a persona "Lara" (atendente virtual deles num
+      // sistema anterior) com a imagem/mascote original — as outras clínicas com
+      // bridge continuam só com texto (ver buildBridgeReminderMessage).
+      const result = isUrolaser
+        ? await sendWhatsAppMedia(
+            phone,
+            `${getBaseUrl()}${UROLASER_LARA_IMAGE_PATH}`,
+            "image/jpeg",
+            "lara.jpg",
+            messageText,
+            "appointment.bridge_reminder_d1",
+            clinic.id
+          )
+        : await sendWhatsAppMessage(phone, messageText, "appointment.bridge_reminder_d1", clinic.id);
 
       // Espelha no chat independente do resultado — se falhar, a atendente já vê
       // "Falha ao enviar" no inbox e pode reenviar por lá (ver resendMessage).

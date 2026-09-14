@@ -62,6 +62,14 @@ describe("wasSentConfirmationPrompt", () => {
     ).toBe(true);
   });
 
+  it("reconhece também a versão sem menu numerado (Lara, Urolaser)", () => {
+    expect(
+      wasSentConfirmationPrompt(
+        "Olá Vivaldo! Eu sou a Lara, atendente virtual da Urolaser 😊\n\nEstou passando para te lembrar que você tem um atendimento agendado para o dia 20/02/2026 a partir de 09:30 (horário para fazer a ficha).\n\nPor favor, responda esta mensagem para confirmar sua presença. Se não puder comparecer ou precisar remarcar, é só nos avisar por aqui mesmo!\n\nObrigada! 💙"
+      )
+    ).toBe(true);
+  });
+
   it("bloqueia quando a última mensagem nossa não foi um pedido de confirmação", () => {
     // Bug real: paciente respondia "Sim" pra uma pergunta qualquer da atendente
     // ("seria biópsia de próstata, correto?") e o sistema tratava como confirmação
