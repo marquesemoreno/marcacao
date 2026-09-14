@@ -135,7 +135,7 @@ async function handleMessageStatusUpdate(data: Record<string, unknown>) {
 
   const message = await prisma.message.findUnique({
     where: { whatsappKeyId: keyId },
-    select: { id: true, status: true },
+    select: { id: true, status: true, conversation: { select: { clinicId: true } } },
   });
   if (!message) {
     await logInbound({ kind: "message_status_update", ...data, mapped }, "IGNORED");
@@ -150,7 +150,7 @@ async function handleMessageStatusUpdate(data: Record<string, unknown>) {
     where: { id: message.id },
     data: { status: mapped, ...(mapped === "READ" ? { readAt: new Date() } : {}) },
   });
-  notifyInboxRealtime().catch(() => {});
+  notifyInboxRealtime(message.conversation.clinicId).catch(() => {});
   await logInbound({ kind: "message_status_update", ...data, mapped, messageDbId: message.id }, "SUCCESS");
 }
 
@@ -168,14 +168,17 @@ async function handleMessageDelete(data: Record<string, unknown>) {
     return;
   }
 
-  const message = await prisma.message.findUnique({ where: { whatsappKeyId: keyId }, select: { id: true } });
+  const message = await prisma.message.findUnique({
+    where: { whatsappKeyId: keyId },
+    select: { id: true, conversation: { select: { clinicId: true } } },
+  });
   if (!message) {
     await logInbound({ kind: "message_delete", ...data }, "IGNORED");
     return;
   }
 
   await prisma.message.update({ where: { id: message.id }, data: { deletedAt: new Date() } });
-  notifyInboxRealtime().catch(() => {});
+  notifyInboxRealtime(message.conversation.clinicId).catch(() => {});
   await logInbound({ kind: "message_delete", ...data, messageDbId: message.id }, "SUCCESS");
 }
 
@@ -425,7 +428,7 @@ export async function POST(request: Request) {
       });
     }
     sendWhatsAppMessage(incoming.phone, optOutReply, "broadcast.opt_out", resolvedClinicId).catch(() => {});
-    notifyInboxRealtime().catch(() => {});
+    notifyInboxRealtime(conversation?.clinicId).catch(() => {});
     return NextResponse.json({ ok: true, status: "opted_out" }, { status: 200 });
   }
 
@@ -622,7 +625,7 @@ export async function POST(request: Request) {
       }
     }
 
-    notifyInboxRealtime().catch(() => {});
+    notifyInboxRealtime(conversation.clinicId).catch(() => {});
   }
 
   // =========================================================================
@@ -673,7 +676,7 @@ export async function POST(request: Request) {
       } catch (error) {
         console.error("Falha ao enviar confirmação de remarcação:", error);
       }
-      notifyInboxRealtime().catch(() => {});
+      notifyInboxRealtime(conversation.clinicId).catch(() => {});
     }
     await logInbound(
       { phone: incoming.phone, text: incoming.text, reason: "paciente pediu remarcação" },
@@ -751,7 +754,7 @@ export async function POST(request: Request) {
       } catch (error) {
         console.error("Falha ao enviar confirmação de resposta ao lembrete (bridge):", error);
       }
-      notifyInboxRealtime().catch(() => {});
+      notifyInboxRealtime(conversation.clinicId).catch(() => {});
     }
     await logInbound(
       { phone: incoming.phone, text: incoming.text, reason: "nenhum agendamento ativo encontrado para este número" },
@@ -837,7 +840,7 @@ export async function POST(request: Request) {
                 status: "SENT",
               },
             });
-            notifyInboxRealtime().catch(() => {});
+            notifyInboxRealtime(updated.clinicProcedure.clinicId).catch(() => {});
           }
         }
       } else {

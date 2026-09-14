@@ -159,9 +159,12 @@ interface ChatCrmAppProps {
   scope: Scope;
   basePath: string;
   view: View;
+  /** Só existe no scope="clinic" — segmenta o canal Realtime (ver
+   * useInboxRealtime) pra essa clínica não ouvir mudanças de outras. */
+  clinicId?: string;
 }
 
-export function ChatCrmApp({ scope, basePath, view }: ChatCrmAppProps) {
+export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const actions = ACTIONS_BY_SCOPE[scope];
@@ -511,7 +514,7 @@ export function ChatCrmApp({ scope, basePath, view }: ChatCrmAppProps) {
   useInboxRealtime(() => {
     refreshContacts();
     refreshMessages();
-  });
+  }, clinicId);
 
   // `contacts` é substituído por inteiro a cada busca (escopada pela aba/busca atual) — sem
   // esse cache, a conversa aberta desaparecia da tela assim que a atendente trocava de aba

@@ -78,7 +78,7 @@ export async function createContact(name: string, phone: string) {
   });
 
   revalidatePath("/clinic/inbox");
-  notifyInboxRealtime().catch(() => {});
+  notifyInboxRealtime(clinicId).catch(() => {});
   return conversation.id;
 }
 
@@ -280,7 +280,7 @@ export async function sendMessage(conversationId: string, content: string, isInt
       data: { lastMessageAt: new Date(), ...autoAssignOnReply(conversation, userId) },
     });
     revalidatePath("/clinic/inbox");
-    notifyInboxRealtime().catch(() => {});
+    notifyInboxRealtime(clinicId).catch(() => {});
     return note;
   }
 
@@ -386,7 +386,7 @@ export async function sendMediaMessage(conversationId: string, formData: FormDat
 
   revalidatePath("/clinic/inbox");
   revalidatePath("/admin/inbox");
-  notifyInboxRealtime().catch(() => {});
+  notifyInboxRealtime(clinicId).catch(() => {});
   return message;
 }
 
@@ -454,7 +454,7 @@ export async function sendAudioMessage(conversationId: string, formData: FormDat
 
   revalidatePath("/clinic/inbox");
   revalidatePath("/admin/inbox");
-  notifyInboxRealtime().catch(() => {});
+  notifyInboxRealtime(clinicId).catch(() => {});
   return message;
 }
 
@@ -519,7 +519,7 @@ export async function resendMessage(messageId: string) {
 
   revalidatePath("/clinic/inbox");
   revalidatePath("/admin/inbox");
-  notifyInboxRealtime().catch(() => {});
+  notifyInboxRealtime(clinicId).catch(() => {});
   return { success: true as const };
 }
 
@@ -564,7 +564,7 @@ export async function editMessage(messageId: string, newText: string) {
 
   await prisma.message.update({ where: { id: messageId }, data: { content: trimmed, editedAt: new Date() } });
   revalidatePath("/clinic/inbox");
-  notifyInboxRealtime().catch(() => {});
+  notifyInboxRealtime(clinicId).catch(() => {});
   return { success: true as const };
 }
 
@@ -722,7 +722,7 @@ export async function claimConversation(conversationId: string) {
 
   revalidatePath("/clinic/inbox");
   revalidatePath("/clinic/crm");
-  notifyInboxRealtime().catch(() => {});
+  notifyInboxRealtime(clinicId).catch(() => {});
   return { success: true };
 }
 
@@ -799,7 +799,7 @@ export async function transferConversation(
 
   revalidatePath("/clinic/inbox");
   revalidatePath("/clinic/crm");
-  notifyInboxRealtime().catch(() => {});
+  notifyInboxRealtime(clinicId).catch(() => {});
   return { success: true };
 }
 

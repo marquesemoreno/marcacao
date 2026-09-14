@@ -29,8 +29,17 @@ export function getSupabaseServerClient(): SupabaseClient | null {
 
 export const WHATSAPP_MEDIA_BUCKET = "whatsapp-media";
 
-/** Mesmo nome de canal usado pelo cliente em src/hooks/use-inbox-realtime.ts. */
-export const INBOX_REALTIME_CHANNEL = "inbox-changes";
+/** Mesmo esquema de nome usado pelo cliente em src/hooks/use-inbox-realtime.ts —
+ * um canal por clínica, mais um canal à parte só pro admin (que enxerga todas
+ * juntas). Antes disso era um único canal global ("inbox-changes"): toda
+ * mensagem de QUALQUER clínica disparava refetch em TODO atendente conectado de
+ * QUALQUER outra clínica — não é vazamento de dado (o payload é vazio, o
+ * refetch em si já é escopado pela Server Action), mas é tráfego jogado fora
+ * que cresce com o número de clínicas — mesma raiz do estouro de Egress do
+ * Supabase já visto nesta sessão. */
+export function getInboxRealtimeChannelName(clinicId?: string): string {
+  return clinicId ? `inbox-changes:${clinicId}` : "inbox-changes:admin";
+}
 
 /**
  * Avisa (via Supabase Realtime Broadcast) que algo mudou no inbox — sem
@@ -38,6 +47,10 @@ export const INBOX_REALTIME_CHANNEL = "inbox-changes";
  * reage refazendo a busca pela mesma Server Action de sempre (que já exige
  * sessão de clínica/admin) — o broadcast nunca é a fonte do dado, só o
  * gatilho pra buscar de novo mais rápido do que esperar o próximo poll.
+ *
+ * `clinicId` informado: avisa só quem está naquela clínica, mais o canal do
+ * admin (que precisa ver tudo). Sem `clinicId` (raro — ponto do código que não
+ * tem uma clínica única em mãos): avisa só o admin.
  *
  * Deliberadamente NÃO usa `postgres_changes` (replicação direta das tabelas
  * messages/conversations): isso exigiria política de RLS liberando leitura
@@ -47,19 +60,31 @@ export const INBOX_REALTIME_CHANNEL = "inbox-changes";
  * tempo real, um vazamento de dado de saúde (LGPD). Broadcast não depende
  * de RLS nenhuma — o payload é só o que o servidor decide mandar.
  */
-export async function notifyInboxRealtime() {
+export async function notifyInboxRealtime(clinicId?: string) {
   const supabase = getSupabaseServerClient();
   if (!supabase) return;
 
-  const channel = supabase.channel(INBOX_REALTIME_CHANNEL);
-  await new Promise<void>((resolve) => {
-    channel.subscribe((status) => {
-      if (status === "SUBSCRIBED") {
-        channel.send({ type: "broadcast", event: "changed", payload: {} }).finally(resolve);
-      } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
-        resolve();
-      }
-    });
-  });
-  supabase.removeChannel(channel);
+  const channelNames = clinicId
+    ? [getInboxRealtimeChannelName(clinicId), getInboxRealtimeChannelName()]
+    : [getInboxRealtimeChannelName()];
+
+  await Promise.all(
+    channelNames.map(
+      (name) =>
+        new Promise<void>((resolve) => {
+          const channel = supabase.channel(name);
+          channel.subscribe((status) => {
+            if (status === "SUBSCRIBED") {
+              channel.send({ type: "broadcast", event: "changed", payload: {} }).finally(() => {
+                supabase.removeChannel(channel);
+                resolve();
+              });
+            } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+              supabase.removeChannel(channel);
+              resolve();
+            }
+          });
+        })
+    )
+  );
 }

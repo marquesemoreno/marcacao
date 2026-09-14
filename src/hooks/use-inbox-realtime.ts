@@ -17,8 +17,8 @@ const DEFAULT_POLL_INTERVAL_MS = 30000;
  *
  * 1. Polling (`setInterval`) — rede de segurança, não a via principal (ver nota
  *    acima). Funciona hoje, sem depender de nenhuma configuração extra.
- * 2. Supabase Realtime Broadcast (canal "inbox-changes", evento "changed")
- *    — só ativa se NEXT_PUBLIC_SUPABASE_URL/ANON_KEY estiverem definidas.
+ * 2. Supabase Realtime Broadcast (canal por clínica, evento "changed") — só
+ *    ativa se NEXT_PUBLIC_SUPABASE_URL/ANON_KEY estiverem definidas.
  *    Deliberadamente NÃO usa `postgres_changes`: isso exigiria RLS liberando
  *    leitura das tabelas messages/conversations pra role `anon` (que é
  *    pública, embutida no bundle do navegador), vazando dado de saúde de
@@ -27,8 +27,15 @@ const DEFAULT_POLL_INTERVAL_MS = 30000;
  *    notifyInboxRealtime em src/lib/supabase-server.ts) e quem escuta
  *    refaz a busca pela mesma Server Action de sempre. Quando o sinal
  *    chega, chama `onUpdate` imediatamente ao invés de esperar o próximo poll.
+ *
+ * `clinicId`: passa o da própria clínica (scope="clinic") pra só ouvir
+ * mudanças dela — sem isso (scope="admin", que enxerga todas as clínicas
+ * juntas), ouve o canal geral do admin. Antes disso era um único canal global
+ * pra todo mundo: toda mensagem de qualquer clínica acordava toda aba aberta de
+ * toda outra clínica, ampliando o mesmo padrão de polling que já tinha estourado
+ * o Egress do Supabase.
  */
-export function useInboxRealtime(onUpdate: () => void, pollIntervalMs = DEFAULT_POLL_INTERVAL_MS) {
+export function useInboxRealtime(onUpdate: () => void, clinicId?: string, pollIntervalMs = DEFAULT_POLL_INTERVAL_MS) {
   const onUpdateRef = useRef(onUpdate);
   onUpdateRef.current = onUpdate;
 
@@ -40,8 +47,9 @@ export function useInboxRealtime(onUpdate: () => void, pollIntervalMs = DEFAULT_
       return () => clearInterval(interval);
     }
 
+    const channelName = clinicId ? `inbox-changes:${clinicId}` : "inbox-changes:admin";
     const channel = supabase
-      .channel("inbox-changes")
+      .channel(channelName)
       .on("broadcast", { event: "changed" }, () => onUpdateRef.current())
       .subscribe();
 
@@ -49,5 +57,5 @@ export function useInboxRealtime(onUpdate: () => void, pollIntervalMs = DEFAULT_
       clearInterval(interval);
       supabase.removeChannel(channel);
     };
-  }, [pollIntervalMs]);
+  }, [pollIntervalMs, clinicId]);
 }

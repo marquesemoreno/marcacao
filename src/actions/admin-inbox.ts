@@ -183,7 +183,7 @@ export async function createContactAdmin(name: string, phone: string, clinicId: 
   }
 
   revalidatePath("/admin/inbox");
-  notifyInboxRealtime().catch(() => {});
+  notifyInboxRealtime(clinicId).catch(() => {});
   return conversation.id;
 }
 
@@ -245,12 +245,18 @@ export async function updateConversationClinicAdmin(conversationId: string, clin
   const clinic = await prisma.clinic.findUnique({ where: { id: clinicId }, select: { id: true } });
   if (!clinic) throw new Error("Clínica não encontrada");
 
+  const previous = await prisma.conversation.findUnique({ where: { id: conversationId }, select: { clinicId: true } });
+
   await prisma.conversation.update({
     where: { id: conversationId },
     data: { clinicId },
   });
   revalidatePath("/admin/inbox");
-  notifyInboxRealtime().catch(() => {});
+  // Avisa as duas clínicas — a conversa sai da fila de uma e entra na da outra.
+  notifyInboxRealtime(clinicId).catch(() => {});
+  if (previous && previous.clinicId !== clinicId) {
+    notifyInboxRealtime(previous.clinicId).catch(() => {});
+  }
 }
 
 export async function listChatAgentsAdmin() {
@@ -361,7 +367,7 @@ export async function sendMessageAdmin(conversationId: string, content: string, 
       data: { lastMessageAt: new Date() },
     });
     revalidatePath("/admin/inbox");
-    notifyInboxRealtime().catch(() => {});
+    notifyInboxRealtime(conversation.clinicId).catch(() => {});
     return note;
   }
 
@@ -396,7 +402,7 @@ export async function sendMessageAdmin(conversationId: string, content: string, 
   }
 
   revalidatePath("/admin/inbox");
-  notifyInboxRealtime().catch(() => {});
+  notifyInboxRealtime(conversation.clinicId).catch(() => {});
   return message;
 }
 
@@ -463,7 +469,7 @@ export async function sendMediaMessageAdmin(conversationId: string, formData: Fo
   }
 
   revalidatePath("/admin/inbox");
-  notifyInboxRealtime().catch(() => {});
+  notifyInboxRealtime(conversation.clinicId).catch(() => {});
   return message;
 }
 
@@ -525,7 +531,7 @@ export async function resendMessageAdmin(messageId: string) {
   }
 
   revalidatePath("/admin/inbox");
-  notifyInboxRealtime().catch(() => {});
+  notifyInboxRealtime(clinicId).catch(() => {});
   return { success: true as const };
 }
 
@@ -568,7 +574,7 @@ export async function editMessageAdmin(messageId: string, newText: string) {
 
   await prisma.message.update({ where: { id: messageId }, data: { content: trimmed, editedAt: new Date() } });
   revalidatePath("/admin/inbox");
-  notifyInboxRealtime().catch(() => {});
+  notifyInboxRealtime(message.conversation.clinicId).catch(() => {});
   return { success: true as const };
 }
 
@@ -633,16 +639,17 @@ export async function getOldestUnassignedWaitMinutesAdmin() {
 
 export async function assignConversationToUserAdmin(conversationId: string, targetUserId: string | null) {
   const { userId } = await requireAdminSession();
-  await prisma.conversation.update({
+  const updated = await prisma.conversation.update({
     where: { id: conversationId },
     data: {
       assignedUserId: targetUserId,
       status: "OPEN",
       assignmentSeenAt: targetUserId ? assignmentSeenAtFor(targetUserId, userId) : null,
     },
+    select: { clinicId: true },
   });
   revalidatePath("/admin/inbox");
-  notifyInboxRealtime().catch(() => {});
+  notifyInboxRealtime(updated.clinicId).catch(() => {});
   return { success: true };
 }
 
@@ -664,7 +671,7 @@ export async function claimConversationAdmin(conversationId: string) {
   });
 
   revalidatePath("/admin/inbox");
-  notifyInboxRealtime().catch(() => {});
+  notifyInboxRealtime(conversation.clinicId).catch(() => {});
   return { success: true };
 }
 
@@ -679,17 +686,18 @@ export async function transferConversationAdmin(conversationId: string, targetUs
   });
   const isTeamQueue = targetUser ? isTeamQueueUser(targetUser) : false;
 
-  await prisma.conversation.update({
+  const updated = await prisma.conversation.update({
     where: { id: conversationId },
     data: {
       assignedUserId: isTeamQueue ? null : targetUserId,
       status: "OPEN",
       assignmentSeenAt: isTeamQueue ? null : assignmentSeenAtFor(targetUserId, userId),
     },
+    select: { clinicId: true },
   });
 
   revalidatePath("/admin/inbox");
-  notifyInboxRealtime().catch(() => {});
+  notifyInboxRealtime(updated.clinicId).catch(() => {});
   return { success: true };
 }
 
