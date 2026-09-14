@@ -10,6 +10,7 @@ import { isBroadcastOptOutReply } from "@/lib/broadcast-csv";
 import { reopenIfResolved } from "@/lib/conversation-reopen";
 import { URGENCY_TAG } from "@/lib/conversation-tags";
 import { resolveStatusFromReply, isRescheduleReply, wasSentConfirmationPrompt } from "@/lib/appointment-reply";
+import { classifyAppointmentReply } from "@/lib/appointment-reply-ai";
 import { buildBridgeConfirmationFollowUp } from "@/lib/bridge-confirmation";
 import { extractBridgeNumeroFromNotes, confirmBridgeAppointment, verifyBridgeAppointmentPersisted } from "@/lib/hospital-bridge";
 import {
@@ -666,19 +667,42 @@ export async function POST(request: Request) {
       })
     : null;
   const isConfirmationContext = wasSentConfirmationPrompt(lastOutbound?.content);
-  const newStatus = isConfirmationContext ? resolveStatusFromReply(incoming.text) : null;
+
+  let newStatus: AppointmentStatus | null = isConfirmationContext ? resolveStatusFromReply(incoming.text) : null;
+  let rescheduleRequested = Boolean(!newStatus && isConfirmationContext && isRescheduleReply(incoming.text));
+  let classifiedByAi = false;
+
+  // Function calling fluido (item 6 do roadmap): o match determinístico acima só
+  // reconhece uma lista fixa de frases (ver appointment-reply.ts) — qualquer coisa
+  // fora dela (ex: "não vou poder ir amanhã, pode ser sexta?") caía direto pro
+  // atendimento manual, mesmo com intenção óbvia. Só roda depois do match
+  // determinístico falhar, então "1"/"sim"/"não" nunca geram custo de IA.
+  // "Executiva": a ação decidida aqui é executada de verdade (confirma/cancela o
+  // agendamento), sem revisão humana antes — ver aviso de auditoria abaixo.
+  if (isConfirmationContext && !newStatus && !rescheduleRequested) {
+    const aiAction = await classifyAppointmentReply(incoming.text);
+    if (aiAction === "CONFIRMED" || aiAction === "CANCELLED") {
+      newStatus = aiAction;
+      classifiedByAi = true;
+    } else if (aiAction === "RESCHEDULE") {
+      rescheduleRequested = true;
+      classifiedByAi = true;
+    }
+  }
 
   // "Remarcar" não muda o status do agendamento (não temos automação de
   // reagendar sozinho) — só desatribui a conversa (some pra "Não Atribuídas")
   // pra alguém assumir e remarcar na mão, e avisa o paciente que entendeu.
-  if (!newStatus && isConfirmationContext && isRescheduleReply(incoming.text)) {
+  if (rescheduleRequested) {
     if (conversation) {
       await prisma.message.create({
         data: {
           conversationId: conversation.id,
           direction: "OUTBOUND",
           type: "INTERNAL_NOTE",
-          content: "🔄 Paciente pediu para remarcar a consulta via WhatsApp.",
+          content: classifiedByAi
+            ? `🤖 IA interpretou como pedido de remarcação: "${incoming.text}"`
+            : "🔄 Paciente pediu para remarcar a consulta via WhatsApp.",
           status: "SENT",
         },
       });
@@ -745,10 +769,11 @@ export async function POST(request: Request) {
     // a resposta na conversa pra atendente ver e agir manualmente — não dá pra
     // atualizar de volta o Firebird, o bridge hoje só insere, nunca atualiza.
     if (conversation) {
+      const aiSuffix = classifiedByAi ? ` (interpretado pela IA a partir de: "${incoming.text}")` : "";
       const noteText =
         newStatus === "CONFIRMED"
-          ? "✅ Paciente confirmou presença via WhatsApp (resposta ao lembrete)."
-          : "❌ Paciente avisou que não vai comparecer / quer cancelar (resposta ao lembrete).";
+          ? `✅ Paciente confirmou presença via WhatsApp (resposta ao lembrete).${aiSuffix}`
+          : `❌ Paciente avisou que não vai comparecer / quer cancelar (resposta ao lembrete).${aiSuffix}`;
       await prisma.message.create({
         data: { conversationId: conversation.id, direction: "OUTBOUND", type: "INTERNAL_NOTE", content: noteText, status: "SENT" },
       });
@@ -798,6 +823,24 @@ export async function POST(request: Request) {
     { phone: incoming.phone, text: incoming.text, appointmentId: appointment.id, newStatus },
     "SUCCESS"
   );
+
+  // Ação decidida pela IA (não bateu com nenhuma frase da lista fixa, ver
+  // classifyAppointmentReply) muda o status do agendamento de verdade, sem
+  // revisão humana antes — registra nota interna pra atendente conseguir
+  // auditar o motivo caso o paciente reclame depois.
+  if (classifiedByAi && conversation) {
+    await prisma.message.create({
+      data: {
+        conversationId: conversation.id,
+        direction: "OUTBOUND",
+        type: "INTERNAL_NOTE",
+        content: `🤖 IA interpretou a resposta do paciente ("${incoming.text}") como ${
+          newStatus === "CONFIRMED" ? "confirmação de presença" : "cancelamento"
+        } e atualizou o agendamento automaticamente.`,
+        status: "SENT",
+      },
+    });
+  }
 
   // Se confirmado com "1" ou "SIM": agendamento de origem bridge (ver o marcador
   // "(Bridge)" gravado no nome do procedimento em hospital-bridge.ts) não tem
