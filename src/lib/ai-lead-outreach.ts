@@ -2,6 +2,7 @@ import "server-only";
 import OpenAI from "openai";
 import { prisma } from "@/lib/prisma";
 import { sendWhatsAppMessage } from "@/lib/whatsapp";
+import { getTivdcClinicId } from "@/lib/tivdc";
 import type { PartnerLead } from "@prisma/client";
 
 const OUTREACH_STATE_ID = "singleton";
@@ -53,10 +54,6 @@ Regras:
   }
 }
 
-async function getTivdcClinicId(): Promise<string | null> {
-  const clinic = await prisma.clinic.findFirst({ where: { tradeName: "TIVDC" }, select: { id: true } });
-  return clinic?.id ?? null;
-}
 
 /** Próximo intervalo até o disparo seguinte — "por volta de 5 minutos", nunca
  * cravado (não quer parecer robótico/detectável como automação em massa). */

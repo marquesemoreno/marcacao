@@ -8,6 +8,9 @@ import {
   fetchBridgeProcedures,
   adaptBridgeProcedureToPlainItem,
 } from "@/lib/hospital-bridge";
+import { getTivdcClinicId } from "@/lib/tivdc";
+import { createGlpiTicket } from "@/lib/glpi";
+import { formatPhone } from "@/lib/format";
 
 /**
  * Function calling do atendente de IA (ver generateAiReply em ai-attendant.ts).
@@ -18,7 +21,7 @@ import {
  * é a base pra isso, não o produto final — testar com dado de mentira antes de
  * confiar a IA marcando consulta real de paciente.
  */
-export const AI_TOOL_DEFINITIONS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
+const BASE_TOOL_DEFINITIONS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
   {
     type: "function",
     function: {
@@ -54,6 +57,35 @@ export const AI_TOOL_DEFINITIONS: OpenAI.Chat.Completions.ChatCompletionTool[] =
     },
   },
 ];
+
+const GLPI_TOOL_DEFINITION: OpenAI.Chat.Completions.ChatCompletionTool = {
+  type: "function",
+  function: {
+    name: "abrirChamadoSuporte",
+    description:
+      "Abre um chamado de suporte técnico no GLPI (help desk interno) quando o cliente relata um problema técnico ou pede suporte explicitamente. Só use quando o pedido for claramente um problema/solicitação de suporte de TI, não pra dúvida geral.",
+    parameters: {
+      type: "object",
+      properties: {
+        resumo: { type: "string", description: "Resumo curto do problema, em poucas palavras (vira o título do chamado)." },
+        descricao: { type: "string", description: "Descrição completa do problema relatado pelo cliente, com o máximo de detalhe que ele deu." },
+      },
+      required: ["descricao"],
+    },
+  },
+};
+
+/** Monta a lista de tools disponíveis pra essa clínica — abrirChamadoSuporte só
+ * entra pra TIVDC (ver getTivdcClinicId): é o help desk INTERNO da própria
+ * empresa, não faz sentido oferecer isso pro atendente de IA de uma clínica
+ * médica. As demais tools (agenda/pré-agendamento) valem pra qualquer clínica. */
+export async function getAiToolDefinitions(clinicId: string): Promise<OpenAI.Chat.Completions.ChatCompletionTool[]> {
+  const tivdcClinicId = await getTivdcClinicId();
+  if (clinicId === tivdcClinicId) {
+    return [...BASE_TOOL_DEFINITIONS, GLPI_TOOL_DEFINITION];
+  }
+  return BASE_TOOL_DEFINITIONS;
+}
 
 type ToolContext = { conversationId: string; clinicId: string };
 
@@ -117,6 +149,44 @@ async function runCriarPreAgendamento(
   }
 }
 
+/** Só chamada quando a tool já foi oferecida (getAiToolDefinitions só inclui
+ * pra TIVDC), mas confere de novo o clinicId aqui dentro também — sem confiar
+ * só em "o modelo não deveria ter chamado isso", já que quem decide chamar a
+ * tool é o próprio modelo, não um portão nosso. */
+async function runAbrirChamadoSuporte(context: ToolContext, args: { resumo?: string; descricao: string }) {
+  const tivdcClinicId = await getTivdcClinicId();
+  if (context.clinicId !== tivdcClinicId) {
+    return { erro: "Chamado no GLPI não está disponível pra esta clínica." };
+  }
+
+  const conversation = await prisma.conversation.findUnique({
+    where: { id: context.conversationId },
+    select: { contact: { select: { name: true, phone: true } } },
+  });
+  if (!conversation) return { erro: "Conversa não encontrada." };
+
+  const descricao = args.descricao?.trim();
+  if (!descricao) return { erro: "Descrição do problema vazia — peça mais detalhes ao cliente antes de tentar de novo." };
+
+  const resumo = args.resumo?.trim() || descricao.split("\n")[0].slice(0, 80);
+  const content = `Chamado aberto pela IA a partir de uma conversa do WhatsApp.\nContato: ${conversation.contact.name} (${formatPhone(conversation.contact.phone)})\n\nDescrição do cliente:\n${descricao}`;
+
+  const result = await createGlpiTicket(resumo, content);
+  if (!result.success) return { erro: result.error };
+
+  await prisma.message.create({
+    data: {
+      conversationId: context.conversationId,
+      direction: "OUTBOUND",
+      type: "INTERNAL_NOTE",
+      content: `🎫 Chamado #${result.ticketId} aberto no GLPI pela IA.`,
+      status: "SENT",
+    },
+  });
+
+  return { success: true, ticketId: result.ticketId };
+}
+
 /** Executa uma tool call pelo nome, devolvendo sempre um objeto serializável em
  * JSON (nunca lança) — o conteúdo vira a `content` da mensagem `role: "tool"`
  * de volta pro modelo, que decide como explicar o resultado pro paciente. */
@@ -137,6 +207,8 @@ export async function executeAiTool(
       return runConsultarHorariosDisponiveis(context.clinicId, args as { medicoId: number; data: string });
     case "criarPreAgendamento":
       return runCriarPreAgendamento(context, args as { procedimento: string; data: string; horario?: string; medicoId?: number });
+    case "abrirChamadoSuporte":
+      return runAbrirChamadoSuporte(context, args as { resumo?: string; descricao: string });
     default:
       return { erro: `Tool desconhecida: ${name}` };
   }

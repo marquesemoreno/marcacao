@@ -1,7 +1,7 @@
 import "server-only";
 import OpenAI from "openai";
 import { prisma } from "@/lib/prisma";
-import { AI_TOOL_DEFINITIONS, executeAiTool } from "@/lib/ai-tools";
+import { getAiToolDefinitions, executeAiTool } from "@/lib/ai-tools";
 
 /**
  * Regras fixas de LGPD/compliance que valem pra toda clínica, somadas às instruções
@@ -109,7 +109,7 @@ export async function generateAiReply(
     const first = await openai.chat.completions.create({
       model: process.env.OPENAI_MODEL || "gpt-4o-mini",
       messages: conversationMessages,
-      tools: AI_TOOL_DEFINITIONS,
+      tools: await getAiToolDefinitions(clinicId),
       max_tokens: 400,
       temperature: 0.4,
     });
@@ -119,7 +119,7 @@ export async function generateAiReply(
       return firstMessage?.content?.trim() || null;
     }
 
-    // Só usamos "function tools" (ver AI_TOOL_DEFINITIONS) — a SDK também permite
+    // Só usamos "function tools" (ver getAiToolDefinitions) — a SDK também permite
     // "custom tools" (formato mais novo, sem `.function`), que não geramos aqui,
     // então ignora qualquer tool_call que não seja do tipo function.
     const functionToolCalls = toolCalls.filter(
