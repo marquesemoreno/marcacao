@@ -2176,6 +2176,12 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                     setSelectedReason(null);
                     setFinishNotes("");
                     setInputText("");
+                  } catch (error) {
+                    // Bug real relatado por atendente: sem isso, uma falha aqui (ex:
+                    // sessão expirada, erro de rede) deixava o modal travado sem
+                    // nenhum aviso — nem sucesso nem erro, parecia que o botão não
+                    // fazia nada.
+                    toast.error(error instanceof Error ? error.message : "Não foi possível finalizar o atendimento. Tente novamente.");
                   } finally {
                     setIsFinishingAttendance(false);
                   }
