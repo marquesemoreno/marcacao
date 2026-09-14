@@ -276,6 +276,11 @@ model AiAttendantConfig {
   clinicId     String   @unique @map("clinic_id")
   active       Boolean  @default(false)
   instructions String   @db.Text
+  /// Nome de exibição do atendente (ex: "Lara", "TI") — usado na mensagem de
+  /// consentimento LGPD (ver buildAiDisclosureMessage) pra soar como uma
+  /// apresentação, não um aviso legal seco. Sem isso, cai no texto genérico
+  /// "Assistente Virtual da {clínica}".
+  assistantName String? @map("assistant_name")
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 

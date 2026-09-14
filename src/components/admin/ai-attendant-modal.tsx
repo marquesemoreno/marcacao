@@ -12,6 +12,7 @@ export function AiAttendantModal({ clinicId, clinicName }: { clinicId: string; c
   const [saving, setSaving] = useState(false);
   const [active, setActive] = useState(false);
   const [instructions, setInstructions] = useState("");
+  const [assistantName, setAssistantName] = useState("");
 
   async function loadConfig() {
     setLoading(true);
@@ -19,6 +20,7 @@ export function AiAttendantModal({ clinicId, clinicName }: { clinicId: string; c
       const data = await getAiAttendantConfig(clinicId);
       setActive(data?.active ?? false);
       setInstructions(data?.instructions ?? "");
+      setAssistantName(data?.assistantName ?? "");
     } catch {
       toast.error("Erro ao carregar o atendente de IA.");
     } finally {
@@ -34,7 +36,7 @@ export function AiAttendantModal({ clinicId, clinicName }: { clinicId: string; c
   async function handleSave() {
     setSaving(true);
     try {
-      await saveAiAttendantConfig(clinicId, { active, instructions });
+      await saveAiAttendantConfig(clinicId, { active, instructions, assistantName });
       toast.success("Atendente de IA salvo.");
       await loadConfig();
     } catch (error) {
@@ -62,9 +64,10 @@ export function AiAttendantModal({ clinicId, clinicName }: { clinicId: string; c
           </DialogTitle>
           <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
             Responde os pacientes automaticamente pelo WhatsApp. Antes de qualquer resposta,
-            o paciente sempre recebe um aviso de que é um atendimento por IA e precisa
-            confirmar que quer continuar (consentimento LGPD) — isso e a transferência
-            automática para um humano em situações de risco não são editáveis por aqui.
+            o paciente sempre recebe um aviso de que é um atendimento por IA (com o nome
+            abaixo, se preenchido) e precisa confirmar que quer continuar (consentimento
+            LGPD) — isso e a transferência automática para um humano em situações de risco
+            não são editáveis por aqui.
           </p>
         </DialogHeader>
 
@@ -95,6 +98,20 @@ export function AiAttendantModal({ clinicId, clinicName }: { clinicId: string; c
               >
                 {active ? "Desativar" : "Ativar"}
               </button>
+            </div>
+
+            <div>
+              <label htmlFor="ai-assistant-name" className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+                Nome do assistente (opcional)
+              </label>
+              <input
+                id="ai-assistant-name"
+                type="text"
+                placeholder='Ex: "Lara", "TI" — sem isso, usa um aviso genérico'
+                value={assistantName}
+                onChange={(e) => setAssistantName(e.target.value)}
+                className="w-full mt-1 px-3 py-2 text-xs font-medium rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500"
+              />
             </div>
 
             <div>

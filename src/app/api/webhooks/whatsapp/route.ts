@@ -565,7 +565,7 @@ export async function POST(request: Request) {
 
     if (aiConfig) {
       if (conversation.aiConsentStatus === "NOT_ASKED") {
-        const disclosure = buildAiDisclosureMessage(clinicName);
+        const disclosure = buildAiDisclosureMessage(clinicName, aiConfig.assistantName);
         // `await` — ver nota em "welcome_message.sent" acima: sem isso, um envio que falha
         // (ex: timeout) ainda marcava aiConsentStatus como PENDING e a próxima resposta do
         // paciente virava "recusa" de consentimento sem ele nunca ter visto a pergunta.

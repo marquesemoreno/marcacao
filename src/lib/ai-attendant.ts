@@ -20,9 +20,19 @@ Regras obrigatórias, nesta ordem de prioridade:
 5. Se perceber urgência médica, reclamação grave ou pedido explícito de falar com humano, apenas informe que vai transferir o atendimento — o sistema cuida da transferência automaticamente, você não precisa (nem deve) tentar resolver isso sozinho.`;
 
 /** Mensagem de transparência + pedido de consentimento (Art. 9/11 LGPD), enviada antes
- * de qualquer resposta gerada por IA nessa conversa. Consentimento é por conversa. */
-export function buildAiDisclosureMessage(clinicName: string): string {
-  return `Olá! Este é um atendimento automatizado por Inteligência Artificial da ${clinicName}. Deseja continuar? Responda *SIM* para continuar.\n\nA qualquer momento você pode pedir para falar com um atendente humano.`;
+ * de qualquer resposta gerada por IA nessa conversa. Consentimento é por conversa.
+ *
+ * `assistantName` (opcional, ver AiAttendantConfig.assistantName) troca o aviso seco por
+ * uma apresentação com nome — pedido explícito do cliente pra soar menos como um aviso
+ * legal e mais como alguém se apresentando. Continua obrigatório dizer "atendente
+ * virtual" e pedir confirmação explícita: só o nome sozinho (ex: "TI") não deixa claro
+ * que é automatizado, e a LGPD exige transparência real, não só um nome amigável. */
+export function buildAiDisclosureMessage(clinicName: string, assistantName?: string | null): string {
+  const name = assistantName?.trim();
+  const intro = name
+    ? `Oi! Eu sou ${name}, atendente virtual do ${clinicName} 😊`
+    : `Olá! Este é um atendimento automatizado por Inteligência Artificial da ${clinicName}.`;
+  return `${intro} Posso te ajudar por aqui? Responda *SIM* para continuar.\n\nA qualquer momento você pode pedir para falar com um atendente humano.`;
 }
 
 export const AI_CONSENT_ACCEPTED_REPLY = "Perfeito! Como posso te ajudar?";
