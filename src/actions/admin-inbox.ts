@@ -11,6 +11,7 @@ import { toPlainClinicProcedureItem } from "@/lib/serialize";
 import { departmentToDb, funnelStageToDb, toChatContact, toChatMessage } from "@/lib/chat-crm-adapters";
 import { attachSignedUrls, uploadWhatsAppMedia, getSignedMediaUrl, downloadWhatsAppMedia } from "@/lib/whatsapp-media";
 import { transcribeAudio } from "@/lib/ai-transcription";
+import { generateReplySuggestions } from "@/lib/ai-copilot";
 import { formatFileSize } from "@/lib/format";
 import { notifyInboxRealtime } from "@/lib/supabase-server";
 import { isTeamQueueUser, formatAgentDisplayName } from "@/lib/team-queue";
@@ -607,6 +608,19 @@ export async function transcribeMessageAudioAdmin(messageId: string) {
   return { success: true as const, transcription };
 }
 
+/** Espelho de getReplySuggestions (src/actions/inbox.ts) pro escopo admin. */
+export async function getReplySuggestionsAdmin(conversationId: string): Promise<string[]> {
+  await requireAdminSession();
+
+  const conversation = await prisma.conversation.findUnique({
+    where: { id: conversationId },
+    select: { clinicId: true, clinic: { select: { tradeName: true, name: true } } },
+  });
+  if (!conversation) return [];
+
+  return generateReplySuggestions(conversationId, conversation.clinicId, conversation.clinic.tradeName || conversation.clinic.name);
+}
+
 export async function getAttendantCapacityAdmin() {
   const { userId } = await requireAdminSession();
   const user = await prisma.user.findUnique({
@@ -1002,34 +1016,9 @@ export async function listClinicPatientsForAppointmentAdmin(clinicId: string, qu
   return fetchBridgePatients(clinicId, query);
 }
 
-export async function suggestIaReplyAdmin(conversationId: string) {
-  await requireAdminSession();
-  const conversation = await prisma.conversation.findUnique({
-    where: { id: conversationId },
-    include: {
-      contact: true,
-      clinic: true,
-      messages: { orderBy: { createdAt: "desc" }, take: 3 },
-    },
-  });
-
-  if (!conversation) {
-    throw new Error("Conversa não encontrada");
-  }
-
-  const patientName = conversation.contact.name.split(" ")[0];
-  const lastInbound = conversation.messages.find((m) => m.direction === "INBOUND");
-  const lastText = lastInbound?.content.toLowerCase() || "";
-
-  if (lastText.includes("jejum") || lastText.includes("preparo")) {
-    return `Olá, ${patientName}! 👋 Para exames de ultrassonografia e laboratoriais, recomendamos jejum de 8 a 12 horas. Como posso te auxiliar com seu atendimento hoje?`;
-  }
-  if (lastText.includes("valor") || lastText.includes("preço") || lastText.includes("quanto")) {
-    return `Olá, ${patientName}! 👋 Nossas consultas e exames são particulares com valores negociados sob consulta e sem mensalidade. Qual especialidade você precisa?`;
-  }
-  if (lastText.includes("endereco") || lastText.includes("localizacao") || lastText.includes("onde")) {
-    return `Olá, ${patientName}! 👋 Ficamos localizados na ${conversation.clinic.address}, no bairro ${conversation.clinic.neighborhood}. Gostaria de agendar seu horário?`;
-  }
-
-  return `Olá, ${patientName}! 👋 Obrigado por entrar em contato com a Conecta Saúde. Como posso te ajudar com o seu agendamento hoje?`;
+/** Espelho de suggestIaReply (src/actions/inbox.ts) pro escopo admin — mesma
+ * troca do stub de palavra-chave pelo Copilot real. */
+export async function suggestIaReplyAdmin(conversationId: string): Promise<string> {
+  const suggestions = await getReplySuggestionsAdmin(conversationId);
+  return suggestions[0] || "";
 }

@@ -11,6 +11,7 @@ import { attachSignedUrls, uploadWhatsAppMedia, getSignedMediaUrl, downloadWhats
 import { sendWhatsAppMedia, sendWhatsAppAudio, editWhatsAppMessage } from "@/lib/whatsapp";
 import { canEditMessage } from "@/lib/message-edit";
 import { transcribeAudio } from "@/lib/ai-transcription";
+import { generateReplySuggestions } from "@/lib/ai-copilot";
 import { hasHospitalBridgeIntegration, fetchBridgeProcedures, fetchBridgeDoctors, fetchBridgeAgenda, fetchBridgeConvenios, fetchBridgePatients, adaptBridgeProcedureToPlainItem } from "@/lib/hospital-bridge";
 import { formatFileSize } from "@/lib/format";
 import { notifyInboxRealtime } from "@/lib/supabase-server";
@@ -600,6 +601,20 @@ export async function transcribeMessageAudio(messageId: string) {
 
   await prisma.message.update({ where: { id: messageId }, data: { transcription } });
   return { success: true as const, transcription };
+}
+
+/** Sugestões de resposta pro Copilot do atendente (ver ai-copilot.ts) — nunca
+ * envia nada sozinho, só devolve rascunhos pro atendente escolher. */
+export async function getReplySuggestions(conversationId: string): Promise<string[]> {
+  const { clinicId } = await requireClinicSession();
+
+  const conversation = await prisma.conversation.findUnique({
+    where: { id: conversationId },
+    select: { clinicId: true, clinic: { select: { tradeName: true, name: true } } },
+  });
+  if (!conversation || conversation.clinicId !== clinicId) return [];
+
+  return generateReplySuggestions(conversationId, clinicId, conversation.clinic.tradeName || conversation.clinic.name);
 }
 
 export async function getAttendantCapacity() {
@@ -1330,34 +1345,11 @@ export async function updateConversationDepartment(conversationId: string, depar
   revalidatePath("/clinic/inbox");
 }
 
-export async function suggestIaReply(conversationId: string) {
-  const { clinicId } = await requireClinicSession();
-  const conversation = await prisma.conversation.findUnique({
-    where: { id: conversationId },
-    include: {
-      contact: true,
-      clinic: true,
-      messages: { orderBy: { createdAt: "desc" }, take: 6 },
-    },
-  });
-
-  if (!conversation || conversation.clinicId !== clinicId) {
-    throw new Error("Conversa não encontrada");
-  }
-
-  const patientName = conversation.contact.name.split(" ")[0];
-  const lastInbound = conversation.messages.find((m) => m.direction === "INBOUND");
-  const lastText = lastInbound?.content.toLowerCase() || "";
-
-  if (lastText.includes("jejum") || lastText.includes("preparo")) {
-    return `Olá, ${patientName}! 👋 Para exames de ultrassonografia e laboratoriais, recomendamos jejum de 8 a 12 horas. Como posso te auxiliar com seu atendimento hoje?`;
-  }
-  if (lastText.includes("valor") || lastText.includes("preço") || lastText.includes("quanto")) {
-    return `Olá, ${patientName}! 👋 Nossas consultas e exames são particulares com valores negociados sob consulta e sem mensalidade. Qual especialidade você precisa?`;
-  }
-  if (lastText.includes("endereco") || lastText.includes("localizacao") || lastText.includes("onde")) {
-    return `Olá, ${patientName}! 👋 Ficamos localizados na ${conversation.clinic.address}, no bairro ${conversation.clinic.neighborhood}. Gostaria de agendar seu horário?`;
-  }
-
-  return `Olá, ${patientName}! 👋 Obrigado por entrar em contato com a ${conversation.clinic.tradeName}. Como posso te ajudar com o seu agendamento hoje?`;
+/** Botão "Melhorar com IA" do composer — 1 sugestão direto na caixa de texto.
+ * Antes era um stub com busca de palavra-chave fixa, nunca chamava IA de
+ * verdade; agora reaproveita o Copilot real (ver getReplySuggestions/
+ * ai-copilot.ts), só pegando a primeira sugestão. */
+export async function suggestIaReply(conversationId: string): Promise<string> {
+  const suggestions = await getReplySuggestions(conversationId);
+  return suggestions[0] || "";
 }

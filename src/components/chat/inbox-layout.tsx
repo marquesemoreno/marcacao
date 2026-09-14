@@ -158,6 +158,10 @@ interface InboxLayoutProps {
   fetchPatients?: (query: string) => Promise<{ id: number; nome: string; cpf: string | null }[]>;
   onScheduleConfirmed: (data: { appointmentId: string; specialty: string; doctor: string; date: string; time: string; price: string }) => void;
   onSuggestIaReply?: () => Promise<string>;
+  /** Copilot: 2-3 rascunhos de resposta pro atendente escolher (nunca envia
+   * sozinho) — ver ai-copilot.ts. Diferente de onSuggestIaReply (1 sugestão
+   * direto na caixa de texto). */
+  onGenerateCopilotSuggestions?: () => Promise<string[]>;
 }
 
 export const InboxLayout: React.FC<InboxLayoutProps> = ({
@@ -206,9 +210,12 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
   fetchPatients,
   onScheduleConfirmed,
   onSuggestIaReply,
+  onGenerateCopilotSuggestions,
 }) => {
   const [composerMode, setComposerMode] = useState<'whatsapp' | 'internal_note'>('whatsapp');
   const [inputText, setInputText] = useState('');
+  const [copilotSuggestions, setCopilotSuggestions] = useState<string[]>([]);
+  const [isLoadingCopilot, setIsLoadingCopilot] = useState(false);
   const [selectedDept] = useState<'todos' | Department>('todos');
   const [selectedTagFilter, setSelectedTagFilter] = useState<string | null>(null);
   const [isTagFilterOpen, setIsTagFilterOpen] = useState(false);
@@ -314,6 +321,30 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
     }
   }
 
+  async function handleGenerateCopilotSuggestions() {
+    if (!onGenerateCopilotSuggestions || isLoadingCopilot) return;
+    // Mesma proteção de handleGenerateIaReply — descarta se a conversa mudou
+    // antes da IA terminar, pra sugestão de um paciente não aparecer na tela
+    // de outro.
+    const requestedContactId = selectedContactId;
+    setIsLoadingCopilot(true);
+    try {
+      const suggestions = await onGenerateCopilotSuggestions();
+      if (requestedContactId !== selectedContactId) {
+        toast('Sugestões descartadas: a conversa foi trocada antes de terminar de gerar.', { icon: '⚠️' });
+        return;
+      }
+      setCopilotSuggestions(suggestions);
+      if (suggestions.length === 0) {
+        toast.error("Não foi possível gerar sugestões pra essa conversa.");
+      }
+    } catch {
+      toast.error("Não foi possível gerar sugestões pra essa conversa.");
+    } finally {
+      setIsLoadingCopilot(false);
+    }
+  }
+
   // Responsividade Móvel: controle de visão ('queue' | 'chat' | 'crm')
   const [mobileView, setMobileView] = useState<'queue' | 'chat' | 'crm'>(
     selectedContactId ? 'chat' : 'queue'
@@ -339,6 +370,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
     setComposerMode('whatsapp');
     setPendingTransferAgentId(null);
     setPendingFunnelStage(null);
+    setCopilotSuggestions([]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedContactId]);
 
@@ -1363,6 +1395,70 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
           </div>
 
           <div className="p-4 space-y-4">
+            {/* Card 0: Copilot de sugestões de resposta */}
+            {onGenerateCopilotSuggestions && (
+              <div className="bg-white dark:bg-slate-800/40 border border-emerald-200/80 dark:border-emerald-800/60 rounded-xl p-4 space-y-3 shadow-sm">
+                <div className="flex items-center justify-between gap-2">
+                  <h4 className="text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                    Copilot — sugestões de resposta
+                  </h4>
+                  <button
+                    type="button"
+                    onClick={handleGenerateCopilotSuggestions}
+                    disabled={isLoadingCopilot}
+                    className="shrink-0 text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-300 disabled:opacity-50 flex items-center gap-1"
+                  >
+                    <Sparkles className={`w-3 h-3 ${isLoadingCopilot ? 'animate-spin' : ''}`} />
+                    {isLoadingCopilot ? 'Gerando...' : copilotSuggestions.length > 0 ? 'Gerar de novo' : 'Gerar sugestões'}
+                  </button>
+                </div>
+
+                {!isLoadingCopilot && copilotSuggestions.length === 0 && (
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                    Peça pra IA rascunhar 2-3 respostas com base no histórico dessa conversa. Nada é enviado sem você escolher.
+                  </p>
+                )}
+
+                {copilotSuggestions.length > 0 && (
+                  <div className="space-y-2">
+                    {copilotSuggestions.map((suggestion, index) => (
+                      <div
+                        key={index}
+                        className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60 p-2.5 space-y-2"
+                      >
+                        <p className="text-[11.5px] text-slate-700 dark:text-slate-200 leading-relaxed whitespace-pre-wrap">
+                          {suggestion}
+                        </p>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setInputText(suggestion);
+                              toast.success("Sugestão inserida na resposta!");
+                            }}
+                            className="flex-1 px-2 py-1 text-[10.5px] font-semibold rounded-md border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                          >
+                            Inserir no chat
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              onSendMessage(suggestion, 'whatsapp');
+                              setCopilotSuggestions([]);
+                            }}
+                            className="flex-1 px-2 py-1 text-[10.5px] font-semibold rounded-md bg-emerald-600 hover:bg-emerald-700 text-white transition-colors"
+                          >
+                            Enviar direto
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Card 1: Perfil do Contato */}
             <div className="bg-white dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-700/80 rounded-xl p-4 space-y-3 shadow-sm">
               <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-700/60 pb-3">

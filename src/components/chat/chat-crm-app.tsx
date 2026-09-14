@@ -38,6 +38,7 @@ import {
   markAssignmentSeen,
   editMessage,
   transcribeMessageAudio,
+  getReplySuggestions,
 } from "@/actions/inbox";
 import {
   listChatContactsAdmin,
@@ -78,6 +79,7 @@ import {
   getOutboundFromDeviceStatsAdmin,
   editMessageAdmin,
   transcribeMessageAudioAdmin,
+  getReplySuggestionsAdmin,
 } from "@/actions/admin-inbox";
 import { toast } from "sonner";
 import { useInboxRealtime } from "@/hooks/use-inbox-realtime";
@@ -124,6 +126,7 @@ const ACTIONS_BY_SCOPE = {
     markAssignmentSeen: (id: string) => markAssignmentSeen(id),
     editMessage: (id: string, text: string) => editMessage(id, text),
     transcribeMessageAudio: (id: string) => transcribeMessageAudio(id),
+    getReplySuggestions: (id: string) => getReplySuggestions(id),
   },
   admin: {
     listChatContacts: ((filter, search, clinicId) =>
@@ -152,6 +155,7 @@ const ACTIONS_BY_SCOPE = {
     markAssignmentSeen: (id: string) => markAssignmentSeenAdmin(id),
     editMessage: (id: string, text: string) => editMessageAdmin(id, text),
     transcribeMessageAudio: (id: string) => transcribeMessageAudioAdmin(id),
+    getReplySuggestions: (id: string) => getReplySuggestionsAdmin(id),
   },
 };
 
@@ -848,6 +852,10 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
           onSuggestIaReply={async () => {
             if (!selectedContactId) return "";
             return actions.suggestIaReply(selectedContactId);
+          }}
+          onGenerateCopilotSuggestions={async () => {
+            if (!selectedContactId) return [];
+            return actions.getReplySuggestions(selectedContactId);
           }}
         />
       ) : (
