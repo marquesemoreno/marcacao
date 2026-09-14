@@ -99,12 +99,18 @@ export async function generateAiReply(
   const openai = getOpenAiClient();
   if (!openai) return null;
 
-  const messages = await prisma.message.findMany({
+  // `orderBy: desc` + `take: 20` + reverse — pega as 20 mensagens MAIS RECENTES. Bug real
+  // encontrado testando: com `orderBy: asc` (como estava antes), `take: 20` pegava as 20
+  // mensagens MAIS ANTIGAS em qualquer conversa com mais de 20 mensagens no total — a IA
+  // respondia com base em contexto de semanas atrás, sem nenhuma visibilidade da
+  // pergunta real que acabou de chegar.
+  const recentMessages = await prisma.message.findMany({
     where: { conversationId, type: { not: "INTERNAL_NOTE" }, deletedAt: null },
-    orderBy: { createdAt: "asc" },
+    orderBy: { createdAt: "desc" },
     take: 20,
     select: { direction: true, content: true },
   });
+  const messages = recentMessages.reverse();
 
   const knowledgeContext = await buildClinicKnowledgeContext(clinicId);
   const systemPrompt = `${BASE_SYSTEM_PROMPT.replace("{clinicName}", clinicName)}\n\nInstruções específicas desta clínica:\n${instructions}${

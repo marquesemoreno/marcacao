@@ -33,16 +33,20 @@ export async function generateReplySuggestions(
   const openai = getOpenAiClient();
   if (!openai) return [];
 
-  const [messages, config, knowledgeContext] = await Promise.all([
+  // `orderBy: desc` + `take: 20` + reverse — ver mesma correção e nota em ai-attendant.ts
+  // (generateAiReply): com `orderBy: asc`, `take: 20` pegava as 20 mensagens mais ANTIGAS
+  // em vez das mais recentes em qualquer conversa com mais de 20 mensagens no total.
+  const [recentMessages, config, knowledgeContext] = await Promise.all([
     prisma.message.findMany({
       where: { conversationId, type: { not: "INTERNAL_NOTE" }, deletedAt: null },
-      orderBy: { createdAt: "asc" },
+      orderBy: { createdAt: "desc" },
       take: 20,
       select: { direction: true, content: true },
     }),
     prisma.aiAttendantConfig.findUnique({ where: { clinicId }, select: { instructions: true } }),
     buildClinicKnowledgeContext(clinicId),
   ]);
+  const messages = recentMessages.reverse();
 
   if (messages.length === 0) return [];
 
