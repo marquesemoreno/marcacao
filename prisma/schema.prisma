@@ -198,6 +198,7 @@ model Clinic {
   aiAttendantConfig   AiAttendantConfig?
   broadcastCampaigns  BroadcastCampaign[]
   bridgeReminderLogs  BridgeReminderLog[]
+  knowledgeEntries    ClinicKnowledgeEntry[]
 
   @@map("clinics")
 }
@@ -281,6 +282,42 @@ model AiAttendantConfig {
   clinic Clinic @relation(fields: [clinicId], references: [id])
 
   @@map("ai_attendant_configs")
+}
+
+enum ClinicKnowledgeCategory {
+  CORPO_CLINICO
+  HORARIO_ATENDIMENTO
+  CONVENIOS
+  VALORES
+  REGRAS_RETORNO
+  PREPARO_EXAME
+  OUTRO
+
+  @@map("clinic_knowledge_category")
+}
+
+/// Base de conhecimento estruturada por clínica — corpo clínico, horários,
+/// convênios, valores, regras de retorno, preparo de exames. Cada entrada
+/// ativa entra literalmente no prompt do atendente de IA e do Copilot (ver
+/// buildClinicKnowledgeContext em clinic-knowledge.ts), pra eliminar risco de
+/// alucinação sobre preço/procedimento: a IA consulta isso, não inventa.
+/// Escala pequena de propósito (uma clínica tem dezenas de entradas, não
+/// milhares) — cabe inteira no prompt, sem precisar de busca vetorial/RAG de
+/// verdade.
+model ClinicKnowledgeEntry {
+  id        String                  @id @default(cuid())
+  clinicId  String                  @map("clinic_id")
+  category  ClinicKnowledgeCategory
+  title     String
+  content   String                  @db.Text
+  active    Boolean                 @default(true)
+  createdAt DateTime                @default(now()) @map("created_at")
+  updatedAt DateTime                @updatedAt @map("updated_at")
+
+  clinic Clinic @relation(fields: [clinicId], references: [id])
+
+  @@index([clinicId, active])
+  @@map("clinic_knowledge_entries")
 }
 
 model Specialty {

@@ -1,6 +1,7 @@
 import "server-only";
 import OpenAI from "openai";
 import { prisma } from "@/lib/prisma";
+import { buildClinicKnowledgeContext } from "@/lib/clinic-knowledge";
 
 const DEFAULT_INSTRUCTIONS =
   "Responda dúvidas gerais sobre agendamento, horários e procedimentos com cordialidade e objetividade.";
@@ -32,7 +33,7 @@ export async function generateReplySuggestions(
   const openai = getOpenAiClient();
   if (!openai) return [];
 
-  const [messages, config] = await Promise.all([
+  const [messages, config, knowledgeContext] = await Promise.all([
     prisma.message.findMany({
       where: { conversationId, type: { not: "INTERNAL_NOTE" }, deletedAt: null },
       orderBy: { createdAt: "asc" },
@@ -40,6 +41,7 @@ export async function generateReplySuggestions(
       select: { direction: true, content: true },
     }),
     prisma.aiAttendantConfig.findUnique({ where: { clinicId }, select: { instructions: true } }),
+    buildClinicKnowledgeContext(clinicId),
   ]);
 
   if (messages.length === 0) return [];
@@ -49,12 +51,12 @@ export async function generateReplySuggestions(
 
 Regras obrigatórias:
 - Nunca dê diagnóstico médico, interpretação de exame, laudo ou prescrição.
-- Nunca invente preço, procedimento, convênio ou horário que você não tem certeza.
+- Nunca invente preço, procedimento, convênio, horário ou preparo de exame — use ESTRITAMENTE a "Base de conhecimento da clínica" abaixo (quando existir); se não estiver lá, sugira dizer que um atendente vai confirmar.
 - Seja objetivo e cordial (2-4 frases por sugestão).
 - As sugestões devem ser genuinamente diferentes entre si (tom ou abordagem diferente), não variações triviais da mesma frase.
 
 Instruções específicas desta clínica:
-${instructions}
+${instructions}${knowledgeContext ? `\n\nBase de conhecimento da clínica (fonte da verdade — não invente nada fora daqui):\n${knowledgeContext}` : ""}
 
 Responda em JSON, exatamente neste formato: {"suggestions": ["sugestão 1", "sugestão 2", "sugestão 3"]}`;
 

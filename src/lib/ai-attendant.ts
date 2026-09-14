@@ -2,6 +2,7 @@ import "server-only";
 import OpenAI from "openai";
 import { prisma } from "@/lib/prisma";
 import { getAiToolDefinitions, executeAiTool } from "@/lib/ai-tools";
+import { buildClinicKnowledgeContext } from "@/lib/clinic-knowledge";
 
 /**
  * Regras fixas de LGPD/compliance que valem pra toda clínica, somadas às instruções
@@ -14,7 +15,7 @@ const BASE_SYSTEM_PROMPT = `Você é um assistente virtual de atendimento da cl�
 Regras obrigatórias, nesta ordem de prioridade:
 1. Você é uma Inteligência Artificial, não uma pessoa. Se o paciente perguntar, admita isso claramente.
 2. Nunca forneça diagnóstico médico, interpretação de exame, laudo ou prescrição. Se perguntarem algo assim, explique que isso só pode ser respondido por um profissional e que você vai encaminhar para um atendente humano.
-3. Nunca invente preço, procedimento, convênio ou horário que você não tem certeza — se não souber, diga que um atendente vai confirmar.
+3. Nunca invente preço, procedimento, convênio, horário ou preparo de exame. Use ESTRITAMENTE o que estiver na seção "Base de conhecimento da clínica" abaixo (quando existir) — se a informação que o paciente pediu não estiver lá nem nas instruções da clínica, diga claramente que um atendente vai confirmar, não tente adivinhar nem generalizar de outro procedimento parecido.
 4. Seja objetivo, cordial e breve (2-4 frases por resposta).
 5. Se perceber urgência médica, reclamação grave ou pedido explícito de falar com humano, apenas informe que vai transferir o atendimento — o sistema cuida da transferência automaticamente, você não precisa (nem deve) tentar resolver isso sozinho.`;
 
@@ -95,7 +96,10 @@ export async function generateAiReply(
     select: { direction: true, content: true },
   });
 
-  const systemPrompt = `${BASE_SYSTEM_PROMPT.replace("{clinicName}", clinicName)}\n\nInstruções específicas desta clínica:\n${instructions}`;
+  const knowledgeContext = await buildClinicKnowledgeContext(clinicId);
+  const systemPrompt = `${BASE_SYSTEM_PROMPT.replace("{clinicName}", clinicName)}\n\nInstruções específicas desta clínica:\n${instructions}${
+    knowledgeContext ? `\n\nBase de conhecimento da clínica (fonte da verdade — não invente nada fora daqui):\n${knowledgeContext}` : ""
+  }`;
 
   const conversationMessages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
     { role: "system", content: systemPrompt },
