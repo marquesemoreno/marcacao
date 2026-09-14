@@ -19,12 +19,11 @@ describe("buildBridgeConfirmationMessage", () => {
     expect(message).toContain("08:00");
   });
 
-  it("dá as três opções com emoji numerado, na ordem certa (1 confirmar / 2 remarcar / 3 cancelar)", () => {
+  it("não pede pra confirmar/remarcar/cancelar (isso é só no lembrete D-1, não faz sentido logo após agendar)", () => {
     const message = buildBridgeConfirmationMessage(base);
-    const lines = message.split("\n").map((l) => l.trim());
-    expect(lines).toContain("1️⃣ Digite 1 para Confirmar presença");
-    expect(lines).toContain("2️⃣ Digite 2 para Remarcar");
-    expect(lines).toContain("3️⃣ Digite 3 para Cancelar");
+    expect(message).not.toContain("Digite 1");
+    expect(message).not.toContain("Digite 2");
+    expect(message).not.toContain("Digite 3");
   });
 
   it("não quebra sem médico ou horário (nem sempre vêm do bridge)", () => {

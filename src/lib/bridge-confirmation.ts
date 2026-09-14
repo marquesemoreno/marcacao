@@ -10,11 +10,17 @@ export type BridgeConfirmationInput = {
  * antes disso, nenhuma mensagem automática existia nesse fluxo, e as
  * atendentes digitavam esse texto na mão a cada agendamento. Endereço e
  * políticas de prazo/pagamento não entram aqui — só depois que o paciente
- * confirma (ver buildBridgeConfirmationFollowUp). */
+ * confirma (ver buildBridgeConfirmationFollowUp).
+ *
+ * Bug real relatado: essa mensagem reaproveitava o mesmo texto do lembrete D-1
+ * (ver bridge-reminder.ts), com "Passando para lembrar..." e o menu "Digite
+ * 1/2/3" — sem sentido logo depois de criar o agendamento (o paciente acabou de
+ * pedir isso, não faz sentido perguntar se ele quer confirmar/remarcar/cancelar
+ * na mesma hora). O menu com opções fica só no lembrete D-1, que é quando faz
+ * sentido pedir confirmação de presença. */
 export function buildBridgeConfirmationMessage(input: BridgeConfirmationInput): string {
   const lines = [
-    `Olá, ${input.patientName}! Como vai?`,
-    `Passando para lembrar do seu agendamento na ${input.clinicName}:`,
+    `Olá, ${input.patientName}! Seu agendamento na ${input.clinicName} foi confirmado:`,
     `📅 Data: ${input.dateFormatted}`,
     `⏰ Horário: ${input.time ?? "A definir"}`,
   ];
@@ -22,10 +28,7 @@ export function buildBridgeConfirmationMessage(input: BridgeConfirmationInput): 
     lines.push(`👨‍⚕️ Profissional: Dr(a). ${input.doctorName}`);
   }
   lines.push("");
-  lines.push("Por favor, responda com o número da opção desejada:");
-  lines.push("1️⃣ Digite 1 para Confirmar presença");
-  lines.push("2️⃣ Digite 2 para Remarcar");
-  lines.push("3️⃣ Digite 3 para Cancelar");
+  lines.push("Qualquer dúvida ou se precisar remarcar, é só chamar por aqui.");
   return lines.join("\n");
 }
 
