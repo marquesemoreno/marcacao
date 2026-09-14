@@ -1,6 +1,5 @@
 export type BridgeConfirmationInput = {
   patientName: string;
-  clinicName: string;
   doctorName: string | null;
   dateFormatted: string;
   time: string | null;
@@ -8,27 +7,31 @@ export type BridgeConfirmationInput = {
 
 /** Confirmação enviada quando um agendamento é feito pelo bridge (Firebird) —
  * antes disso, nenhuma mensagem automática existia nesse fluxo, e as
- * atendentes digitavam esse texto na mão a cada agendamento. Endereço e
- * políticas de prazo/pagamento não entram aqui — só depois que o paciente
- * confirma (ver buildBridgeConfirmationFollowUp).
+ * atendentes digitavam esse texto na mão a cada agendamento.
  *
  * Bug real relatado: essa mensagem reaproveitava o mesmo texto do lembrete D-1
  * (ver bridge-reminder.ts), com "Passando para lembrar..." e o menu "Digite
  * 1/2/3" — sem sentido logo depois de criar o agendamento (o paciente acabou de
  * pedir isso, não faz sentido perguntar se ele quer confirmar/remarcar/cancelar
  * na mesma hora). O menu com opções fica só no lembrete D-1, que é quando faz
- * sentido pedir confirmação de presença. */
+ * sentido pedir confirmação de presença.
+ *
+ * Sem horário marcado (`time` vazio — atendente escolheu o modo "Chegada" no
+ * modal, ver schedule-modal.tsx) mostra "Por ordem de chegada" em vez de
+ * inventar um horário. */
 export function buildBridgeConfirmationMessage(input: BridgeConfirmationInput): string {
   const lines = [
-    `Olá, ${input.patientName}! Seu agendamento na ${input.clinicName} foi confirmado:`,
+    `Olá, ${input.patientName}! Seu agendamento foi realizado:`,
     `📅 Data: ${input.dateFormatted}`,
-    `⏰ Horário: ${input.time ?? "A definir"}`,
+    `⏰ Horário: ${input.time || "Por ordem de chegada"}`,
   ];
   if (input.doctorName) {
     lines.push(`👨‍⚕️ Profissional: Dr(a). ${input.doctorName}`);
   }
   lines.push("");
-  lines.push("Qualquer dúvida ou se precisar remarcar, é só chamar por aqui.");
+  lines.push(
+    "📌 *As consultas têm o prazo de no máximo 30 dias para retorno, gentileza entrar em contato antes do prazo para agendar. Caso passe do prazo será cobrado uma nova consulta! Formas de pagamento: Dinheiro, Pix, Cartão de Crédito e Débito.*"
+  );
   return lines.join("\n");
 }
 

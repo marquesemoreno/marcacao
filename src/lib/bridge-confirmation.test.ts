@@ -4,19 +4,24 @@ import { buildBridgeConfirmationMessage, buildBridgeConfirmationFollowUp } from 
 describe("buildBridgeConfirmationMessage", () => {
   const base = {
     patientName: "Maria Silva",
-    clinicName: "Clínica Urolaser",
     doctorName: "Alan Pascoal Silva Santos",
     dateFormatted: "08/09/2026",
     time: "08:00",
   };
 
-  it("monta a mensagem com paciente, clínica, data, horário e médico", () => {
+  it("monta a mensagem com paciente, data, horário, médico e a política de retorno/pagamento", () => {
     const message = buildBridgeConfirmationMessage(base);
     expect(message).toContain("Maria Silva");
-    expect(message).toContain("Clínica Urolaser");
     expect(message).toContain("Alan Pascoal Silva Santos");
     expect(message).toContain("08/09/2026");
     expect(message).toContain("08:00");
+    expect(message).toContain("30 dias para retorno");
+    expect(message).toContain("Formas de pagamento");
+  });
+
+  it("mostra 'Por ordem de chegada' quando não tem horário marcado (modo Chegada no modal)", () => {
+    const message = buildBridgeConfirmationMessage({ ...base, time: null });
+    expect(message).toContain("Por ordem de chegada");
   });
 
   it("não pede pra confirmar/remarcar/cancelar (isso é só no lembrete D-1, não faz sentido logo após agendar)", () => {
