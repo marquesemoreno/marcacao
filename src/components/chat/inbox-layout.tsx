@@ -168,6 +168,12 @@ interface InboxLayoutProps {
    * glpi.ts) — só passado (então só aparece no menu) pras conversas da
    * clínica TIVDC, escopo admin. */
   onOpenGlpiTicket?: () => Promise<{ success: boolean; error?: string; ticketId?: number }>;
+  /** Lista as empresas (entidades) do GLPI pro seletor no cadastro do contato — mesmo
+   * escopo de onOpenGlpiTicket (só TIVDC, admin). Buscado sob demanda ao abrir a edição,
+   * não a cada render. */
+  onListGlpiEntities?: () => Promise<{ id: number; name: string }[]>;
+  /** Vincula/desvincula o contato a uma empresa do GLPI (ver Contact.glpiEntityId). */
+  onUpdateContactGlpiEntity?: (glpiEntityId: number | null) => Promise<{ success: boolean; error?: string }>;
 }
 
 export const InboxLayout: React.FC<InboxLayoutProps> = ({
@@ -218,6 +224,8 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
   onSuggestIaReply,
   onGenerateCopilotSuggestions,
   onOpenGlpiTicket,
+  onListGlpiEntities,
+  onUpdateContactGlpiEntity,
 }) => {
   const [composerMode, setComposerMode] = useState<'whatsapp' | 'internal_note'>('whatsapp');
   const [inputText, setInputText] = useState('');
@@ -294,6 +302,11 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
   const [editPatientCpf, setEditPatientCpf] = useState('');
   const [editPatientPhone, setEditPatientPhone] = useState('');
   const [isSavingPatientEdits, setIsSavingPatientEdits] = useState(false);
+  // Empresa (GLPI) — só existe pra conversas do TIVDC (ver onUpdateContactGlpiEntity).
+  // Lista buscada sob demanda ao abrir a edição, não a cada render.
+  const [editPatientGlpiEntityId, setEditPatientGlpiEntityId] = useState<number | null>(null);
+  const [glpiEntities, setGlpiEntities] = useState<{ id: number; name: string }[]>([]);
+  const [isLoadingGlpiEntities, setIsLoadingGlpiEntities] = useState(false);
 
   // Confirmação de transferência de atendimento — reatribuir um paciente pra outro
   // atendente é tão irreversível quanto finalizar o atendimento, mas antes bastava
@@ -576,6 +589,13 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
       if (result && !result.success) {
         toast.error(result.error || "Não foi possível atualizar os dados do paciente.");
         return;
+      }
+      if (onUpdateContactGlpiEntity && editPatientGlpiEntityId !== (selectedContact?.glpiEntityId ?? null)) {
+        const glpiResult = await onUpdateContactGlpiEntity(editPatientGlpiEntityId);
+        if (!glpiResult.success) {
+          toast.error(glpiResult.error || "Não foi possível salvar a empresa do GLPI.");
+          return;
+        }
       }
       toast.success("Dados do paciente atualizados com sucesso!");
       setIsEditingPatient(false);
@@ -1543,6 +1563,13 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                     setEditPatientName(selectedContact.name);
                     setEditPatientCpf(selectedContact.cpf || '');
                     setEditPatientPhone(selectedContact.phone);
+                    setEditPatientGlpiEntityId(selectedContact.glpiEntityId ?? null);
+                    if (!isEditingPatient && onListGlpiEntities && glpiEntities.length === 0) {
+                      setIsLoadingGlpiEntities(true);
+                      onListGlpiEntities()
+                        .then(setGlpiEntities)
+                        .finally(() => setIsLoadingGlpiEntities(false));
+                    }
                     setIsEditingPatient(!isEditingPatient);
                   }}
                   className="p-2.5 -m-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 shrink-0"
@@ -1582,6 +1609,26 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                       className="w-full px-2 py-1 text-xs border rounded-lg bg-white dark:bg-slate-900 dark:border-slate-700 text-slate-900 dark:text-slate-100"
                     />
                   </div>
+                  {onUpdateContactGlpiEntity && (
+                    <div>
+                      <label className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">Empresa (GLPI):</label>
+                      <select
+                        value={editPatientGlpiEntityId ?? ""}
+                        onChange={(e) => setEditPatientGlpiEntityId(e.target.value ? Number(e.target.value) : null)}
+                        disabled={isLoadingGlpiEntities}
+                        className="w-full px-2 py-1 text-xs border rounded-lg bg-white dark:bg-slate-900 dark:border-slate-700 text-slate-900 dark:text-slate-100 disabled:opacity-50"
+                      >
+                        <option value="">
+                          {isLoadingGlpiEntities ? "Carregando..." : "Nenhuma (chamado cai na raiz)"}
+                        </option>
+                        {glpiEntities.map((entity) => (
+                          <option key={entity.id} value={entity.id}>
+                            {entity.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
                   <button
                     onClick={handleSavePatientEdits}
                     disabled={isSavingPatientEdits || !editPatientName.trim()}

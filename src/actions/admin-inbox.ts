@@ -13,7 +13,7 @@ import { attachSignedUrls, uploadWhatsAppMedia, getSignedMediaUrl, downloadWhats
 import { transcribeAudio } from "@/lib/ai-transcription";
 import { generateReplySuggestions } from "@/lib/ai-copilot";
 import { formatFileSize, formatPhone } from "@/lib/format";
-import { createGlpiTicket, buildGlpiTicketUrl } from "@/lib/glpi";
+import { createGlpiTicket, buildGlpiTicketUrl, listGlpiEntities } from "@/lib/glpi";
 import { notifyInboxRealtime } from "@/lib/supabase-server";
 import { isTeamQueueUser, formatAgentDisplayName } from "@/lib/team-queue";
 import { assignmentSeenAtFor } from "@/lib/conversation-assignment";
@@ -655,7 +655,7 @@ export async function openGlpiTicketAdmin(conversationId: string) {
   const name = firstLine.length > 80 ? `${firstLine.slice(0, 77)}...` : firstLine || "Solicitação via WhatsApp";
   const content = `Chamado aberto a partir de uma conversa do WhatsApp.\nContato: ${conversation.contact.name} (${formatPhone(conversation.contact.phone)})\n\nMensagem do paciente:\n${lastInbound}`;
 
-  const result = await createGlpiTicket(name, content);
+  const result = await createGlpiTicket(name, content, conversation.contact.glpiEntityId ?? undefined);
 
   if (result.success) {
     const ticketUrl = buildGlpiTicketUrl(result.ticketId);
@@ -673,6 +673,26 @@ export async function openGlpiTicketAdmin(conversationId: string) {
   }
 
   return result;
+}
+
+/** Lista as empresas (entidades) cadastradas no GLPI, pro admin vincular um contato
+ * (ver updateContactGlpiEntity) — usado só na conversa do TIVDC. */
+export async function listGlpiEntitiesAdmin() {
+  await requireAdminSession();
+  return listGlpiEntities();
+}
+
+/** Vincula (ou desvincula, com `glpiEntityId: null`) o contato dessa conversa a uma
+ * empresa do GLPI — todo chamado aberto depois disso (manual ou pela IA) já cai na
+ * entidade certa. `conversationId` (não o id do Contact) pelo mesmo motivo de
+ * updateContactInfoAdmin: é o que a tela tem em mãos (ver Contact.id em chat-crm.ts). */
+export async function updateContactGlpiEntity(conversationId: string, glpiEntityId: number | null) {
+  await requireAdminSession();
+  const conversation = await prisma.conversation.findUnique({ where: { id: conversationId }, select: { contactId: true } });
+  if (!conversation) return { success: false as const, error: "Conversa não encontrada." };
+  await prisma.contact.update({ where: { id: conversation.contactId }, data: { glpiEntityId } });
+  revalidatePath("/admin/inbox");
+  return { success: true as const };
 }
 
 export async function getAttendantCapacityAdmin() {

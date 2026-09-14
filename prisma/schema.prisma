@@ -439,6 +439,11 @@ model Contact {
   /// webhook) — permanente e vale pra qualquer clínica, nunca mais entra em disparo
   /// em massa (ver src/lib/broadcast.ts) enquanto isso estiver preenchido.
   optedOutOfBroadcastsAt DateTime? @map("opted_out_of_broadcasts_at")
+  /// Entidade (empresa cliente) do GLPI vinculada a este contato — só usado pelo TIVDC,
+  /// que atende várias empresas clientes de TI (ver abrirChamadoSuporte em ai-tools.ts).
+  /// Sem isso, todo chamado aberto pela IA caía na Entidade raiz do GLPI, sem separar
+  /// por empresa. Cadastrado uma vez pelo atendente, reaproveitado em todo chamado futuro.
+  glpiEntityId   Int?      @map("glpi_entity_id")
   createdAt      DateTime  @default(now()) @map("created_at")
   updatedAt      DateTime  @updatedAt @map("updated_at")
 

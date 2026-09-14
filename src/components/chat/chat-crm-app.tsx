@@ -81,6 +81,8 @@ import {
   transcribeMessageAudioAdmin,
   getReplySuggestionsAdmin,
   openGlpiTicketAdmin,
+  listGlpiEntitiesAdmin,
+  updateContactGlpiEntity,
 } from "@/actions/admin-inbox";
 import { toast } from "sonner";
 import { useInboxRealtime } from "@/hooks/use-inbox-realtime";
@@ -868,6 +870,16 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
           onOpenGlpiTicket={
             scope === "admin" && tivdcClinicId && selectedContact?.clinicId === tivdcClinicId
               ? () => openGlpiTicketAdmin(selectedContactId!)
+              : undefined
+          }
+          onListGlpiEntities={
+            scope === "admin" && tivdcClinicId && selectedContact?.clinicId === tivdcClinicId
+              ? () => listGlpiEntitiesAdmin()
+              : undefined
+          }
+          onUpdateContactGlpiEntity={
+            scope === "admin" && tivdcClinicId && selectedContact?.clinicId === tivdcClinicId
+              ? (glpiEntityId) => updateContactGlpiEntity(selectedContact!.id, glpiEntityId)
               : undefined
           }
         />

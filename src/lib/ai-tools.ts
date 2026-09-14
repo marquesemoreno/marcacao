@@ -161,7 +161,7 @@ async function runAbrirChamadoSuporte(context: ToolContext, args: { resumo?: str
 
   const conversation = await prisma.conversation.findUnique({
     where: { id: context.conversationId },
-    select: { contact: { select: { name: true, phone: true } } },
+    select: { contact: { select: { name: true, phone: true, glpiEntityId: true } } },
   });
   if (!conversation) return { erro: "Conversa não encontrada." };
 
@@ -171,7 +171,7 @@ async function runAbrirChamadoSuporte(context: ToolContext, args: { resumo?: str
   const resumo = args.resumo?.trim() || descricao.split("\n")[0].slice(0, 80);
   const content = `Chamado aberto pela IA a partir de uma conversa do WhatsApp.\nContato: ${conversation.contact.name} (${formatPhone(conversation.contact.phone)})\n\nDescrição do cliente:\n${descricao}`;
 
-  const result = await createGlpiTicket(resumo, content);
+  const result = await createGlpiTicket(resumo, content, conversation.contact.glpiEntityId ?? undefined);
   if (!result.success) return { erro: result.error };
 
   await prisma.message.create({

@@ -66,10 +66,13 @@ async function killGlpiSession(config: NonNullable<ReturnType<typeof getGlpiConf
 export type CreateGlpiTicketResult = { success: true; ticketId: number } | { success: false; error: string };
 
 /** Cria um Ticket no GLPI. `name` é o resumo curto (título), `content` o corpo
- * completo (mensagem + telefone do contato, já formatado por quem chama). Nunca
+ * completo (mensagem + telefone do contato, já formatado por quem chama).
+ * `entitiesId` (opcional) vincula o chamado à empresa cliente certa no GLPI (ver
+ * Contact.glpiEntityId) — sem isso, o GLPI usa a entidade padrão do usuário da
+ * API (a raiz, na prática), misturando chamados de empresas diferentes. Nunca
  * lança erro — sempre um resultado tipado, pra quem chama decidir o que mostrar
  * ao atendente sem travar o atendimento do WhatsApp por causa de uma falha aqui. */
-export async function createGlpiTicket(name: string, content: string): Promise<CreateGlpiTicketResult> {
+export async function createGlpiTicket(name: string, content: string, entitiesId?: number): Promise<CreateGlpiTicketResult> {
   const config = getGlpiConfig();
   if (!config) return { success: false, error: "GLPI não está configurado nesta instância." };
 
@@ -89,6 +92,7 @@ export async function createGlpiTicket(name: string, content: string): Promise<C
           name,
           content,
           ...(config.requestTypeId ? { requesttypes_id: config.requestTypeId } : {}),
+          ...(entitiesId !== undefined ? { entities_id: entitiesId } : {}),
         },
       }),
       signal: AbortSignal.timeout(15000),
@@ -103,6 +107,38 @@ export async function createGlpiTicket(name: string, content: string): Promise<C
   } catch (error) {
     console.error("Falha ao criar chamado no GLPI:", error instanceof Error ? error.message : error);
     return { success: false, error: "Erro de rede ao falar com o GLPI." };
+  } finally {
+    await killGlpiSession(config, sessionToken);
+  }
+}
+
+export type GlpiEntity = { id: number; name: string };
+
+/** Lista as entidades (empresas clientes) cadastradas no GLPI, pro admin escolher qual
+ * vincular a um contato (ver Contact.glpiEntityId). Exclui a Entidade raiz (id 0) — ela
+ * não representa uma empresa cliente de verdade, é só o nó topo da hierarquia. Nunca
+ * lança erro — devolve lista vazia se o GLPI não estiver configurado ou a chamada falhar. */
+export async function listGlpiEntities(): Promise<GlpiEntity[]> {
+  const config = getGlpiConfig();
+  if (!config) return [];
+
+  const sessionToken = await initGlpiSession(config);
+  if (!sessionToken) return [];
+
+  try {
+    const response = await fetch(`${config.url}/apirest.php/Entity?range=0-200`, {
+      headers: { "App-Token": config.appToken, "Session-Token": sessionToken },
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!response.ok) return [];
+    const body = await response.json().catch(() => null);
+    if (!Array.isArray(body)) return [];
+    return body
+      .filter((entity): entity is { id: number; name: string } => typeof entity?.id === "number" && entity.id !== 0)
+      .map((entity) => ({ id: entity.id, name: entity.name }));
+  } catch (error) {
+    console.error("Falha ao listar entidades do GLPI:", error instanceof Error ? error.message : error);
+    return [];
   } finally {
     await killGlpiSession(config, sessionToken);
   }

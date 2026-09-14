@@ -52,6 +52,9 @@ export interface Contact {
   phone: string;
   cpf: string;
   neighborhood: string;
+  /** Entidade (empresa cliente) do GLPI vinculada a este contato — só relevante pro
+   * TIVDC, que usa isso pra abrir chamado na empresa certa (ver Contact.glpiEntityId). */
+  glpiEntityId?: number | null;
   avatar?: string;
   responsibleAgent: string;
   department: Department;

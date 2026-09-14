@@ -141,6 +141,7 @@ export function toChatContact(conversation: ConversationWithRelations, viewerUse
     phone: conversation.contact.phone,
     cpf: conversation.contact.cpf ?? "",
     neighborhood: "",
+    glpiEntityId: conversation.contact.glpiEntityId,
     avatar: conversation.contact.photoUrl ?? "",
     clinicId: conversation.clinic?.id,
     clinicName: conversation.clinic?.tradeName,
