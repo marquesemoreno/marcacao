@@ -424,12 +424,12 @@ export async function POST(request: Request) {
       await prisma.contact.update({ where: { id: contact.id }, data: { optedOutOfBroadcastsAt: new Date() } });
     }
     const optOutReply = "Você não vai mais receber nossos avisos. Se quiser voltar a receber, é só nos chamar por aqui.";
+    const optOutResult = await sendWhatsAppMessage(incoming.phone, optOutReply, "broadcast.opt_out", resolvedClinicId);
     if (conversation) {
       await prisma.message.create({
-        data: { conversationId: conversation.id, direction: "OUTBOUND", content: optOutReply, status: "DELIVERED" },
+        data: { conversationId: conversation.id, direction: "OUTBOUND", content: optOutReply, status: optOutResult.success ? "DELIVERED" : "FAILED" },
       });
     }
-    sendWhatsAppMessage(incoming.phone, optOutReply, "broadcast.opt_out", resolvedClinicId).catch(() => {});
     notifyInboxRealtime(conversation?.clinicId).catch(() => {});
     return NextResponse.json({ ok: true, status: "opted_out" }, { status: 200 });
   }
@@ -537,15 +537,19 @@ export async function POST(request: Request) {
     if (isNewConversation) {
       const welcomeText = clinic?.welcomeMessageEnabled ? clinic.welcomeMessageText?.trim() : null;
       if (welcomeText) {
+        // `await` — sem isso, uma falha silenciosa (timeout, instância caindo) marcava a
+        // mensagem como "entregue" mesmo sem o paciente nunca ter recebido nada (bug real
+        // encontrado testando a reconexão do TIVDC: a IA seguiu como se o paciente tivesse
+        // visto e recusado uma pergunta que na verdade nunca chegou no WhatsApp dele).
+        const result = await sendWhatsAppMessage(incoming.phone, welcomeText, "welcome_message.sent", resolvedClinicId);
         await prisma.message.create({
           data: {
             conversationId: conversation.id,
             direction: "OUTBOUND",
             content: welcomeText,
-            status: "DELIVERED",
+            status: result.success ? "DELIVERED" : "FAILED",
           },
         });
-        sendWhatsAppMessage(incoming.phone, welcomeText, "welcome_message.sent", resolvedClinicId).catch(() => {});
       }
     }
 
@@ -562,11 +566,18 @@ export async function POST(request: Request) {
     if (aiConfig) {
       if (conversation.aiConsentStatus === "NOT_ASKED") {
         const disclosure = buildAiDisclosureMessage(clinicName);
+        // `await` — ver nota em "welcome_message.sent" acima: sem isso, um envio que falha
+        // (ex: timeout) ainda marcava aiConsentStatus como PENDING e a próxima resposta do
+        // paciente virava "recusa" de consentimento sem ele nunca ter visto a pergunta.
+        const result = await sendWhatsAppMessage(incoming.phone, disclosure, "ai_attendant.disclosure_sent", resolvedClinicId);
         await prisma.message.create({
-          data: { conversationId: conversation.id, direction: "OUTBOUND", content: disclosure, status: "DELIVERED" },
+          data: { conversationId: conversation.id, direction: "OUTBOUND", content: disclosure, status: result.success ? "DELIVERED" : "FAILED" },
         });
-        await prisma.conversation.update({ where: { id: conversation.id }, data: { aiConsentStatus: "PENDING" } });
-        sendWhatsAppMessage(incoming.phone, disclosure, "ai_attendant.disclosure_sent", resolvedClinicId).catch(() => {});
+        // Só avança pra PENDING (aguardando resposta de consentimento) se o envio realmente
+        // saiu — se falhou, mantém NOT_ASKED pra tentar de novo na próxima mensagem do paciente.
+        if (result.success) {
+          await prisma.conversation.update({ where: { id: conversation.id }, data: { aiConsentStatus: "PENDING" } });
+        }
         aiHandled = true;
       } else if (conversation.aiConsentStatus === "PENDING") {
         // Ambíguo conta como recusa: consentimento LGPD precisa ser uma afirmação
@@ -577,10 +588,10 @@ export async function POST(request: Request) {
             where: { id: conversation.id },
             data: { aiConsentStatus: "ACCEPTED", aiEnabled: true },
           });
+          const result = await sendWhatsAppMessage(incoming.phone, AI_CONSENT_ACCEPTED_REPLY, "ai_attendant.consent_accepted", resolvedClinicId);
           await prisma.message.create({
-            data: { conversationId: conversation.id, direction: "OUTBOUND", content: AI_CONSENT_ACCEPTED_REPLY, status: "DELIVERED" },
+            data: { conversationId: conversation.id, direction: "OUTBOUND", content: AI_CONSENT_ACCEPTED_REPLY, status: result.success ? "DELIVERED" : "FAILED" },
           });
-          sendWhatsAppMessage(incoming.phone, AI_CONSENT_ACCEPTED_REPLY, "ai_attendant.consent_accepted", resolvedClinicId).catch(() => {});
         } else {
           await prisma.conversation.update({
             where: { id: conversation.id },
@@ -592,20 +603,20 @@ export async function POST(request: Request) {
         const escalationReason = matchEscalationTrigger(incoming.text);
         if (escalationReason) {
           await prisma.conversation.update({ where: { id: conversation.id }, data: { aiEnabled: false } });
+          const result = await sendWhatsAppMessage(incoming.phone, AI_HANDOFF_MESSAGE, "ai_attendant.escalated", resolvedClinicId);
           await prisma.message.create({
-            data: { conversationId: conversation.id, direction: "OUTBOUND", content: AI_HANDOFF_MESSAGE, status: "DELIVERED" },
+            data: { conversationId: conversation.id, direction: "OUTBOUND", content: AI_HANDOFF_MESSAGE, status: result.success ? "DELIVERED" : "FAILED" },
           });
-          sendWhatsAppMessage(incoming.phone, AI_HANDOFF_MESSAGE, "ai_attendant.escalated", resolvedClinicId).catch(() => {});
           await prisma.aiInteractionLog.create({
             data: { conversationId: conversation.id, userMessage: incoming.text, escalated: true, escalationReason },
           });
         } else {
           const reply = await generateAiReply(conversation.id, clinicName, aiConfig.instructions, conversation.clinicId);
           if (reply) {
+            const result = await sendWhatsAppMessage(incoming.phone, reply, "ai_attendant.replied", resolvedClinicId);
             await prisma.message.create({
-              data: { conversationId: conversation.id, direction: "OUTBOUND", content: reply, status: "DELIVERED" },
+              data: { conversationId: conversation.id, direction: "OUTBOUND", content: reply, status: result.success ? "DELIVERED" : "FAILED" },
             });
-            sendWhatsAppMessage(incoming.phone, reply, "ai_attendant.replied", resolvedClinicId).catch(() => {});
             await prisma.aiInteractionLog.create({
               data: { conversationId: conversation.id, userMessage: incoming.text, aiResponse: reply },
             });
@@ -613,10 +624,10 @@ export async function POST(request: Request) {
             // Falha ao gerar resposta (sem API key, erro da OpenAI etc): escala pra
             // humano em vez de deixar o paciente sem nenhuma resposta.
             await prisma.conversation.update({ where: { id: conversation.id }, data: { aiEnabled: false } });
+            const result = await sendWhatsAppMessage(incoming.phone, AI_HANDOFF_MESSAGE, "ai_attendant.failed_escalated", resolvedClinicId);
             await prisma.message.create({
-              data: { conversationId: conversation.id, direction: "OUTBOUND", content: AI_HANDOFF_MESSAGE, status: "DELIVERED" },
+              data: { conversationId: conversation.id, direction: "OUTBOUND", content: AI_HANDOFF_MESSAGE, status: result.success ? "DELIVERED" : "FAILED" },
             });
-            sendWhatsAppMessage(incoming.phone, AI_HANDOFF_MESSAGE, "ai_attendant.failed_escalated", resolvedClinicId).catch(() => {});
             await prisma.aiInteractionLog.create({
               data: { conversationId: conversation.id, userMessage: incoming.text, escalated: true, escalationReason: "Falha ao gerar resposta da IA" },
             });
@@ -636,15 +647,15 @@ export async function POST(request: Request) {
       );
 
       if (matchedAutomation) {
+        const result = await sendWhatsAppMessage(incoming.phone, matchedAutomation.responseText, "chat_automation.triggered", resolvedClinicId);
         await prisma.message.create({
           data: {
             conversationId: conversation.id,
             direction: "OUTBOUND",
             content: matchedAutomation.responseText,
-            status: "DELIVERED",
+            status: result.success ? "DELIVERED" : "FAILED",
           },
         });
-        sendWhatsAppMessage(incoming.phone, matchedAutomation.responseText, "chat_automation.triggered", resolvedClinicId).catch(() => {});
       }
     }
 
