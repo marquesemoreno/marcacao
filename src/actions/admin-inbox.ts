@@ -12,7 +12,8 @@ import { departmentToDb, funnelStageToDb, toChatContact, toChatMessage } from "@
 import { attachSignedUrls, uploadWhatsAppMedia, getSignedMediaUrl, downloadWhatsAppMedia } from "@/lib/whatsapp-media";
 import { transcribeAudio } from "@/lib/ai-transcription";
 import { generateReplySuggestions } from "@/lib/ai-copilot";
-import { formatFileSize } from "@/lib/format";
+import { formatFileSize, formatPhone } from "@/lib/format";
+import { createGlpiTicket, buildGlpiTicketUrl } from "@/lib/glpi";
 import { notifyInboxRealtime } from "@/lib/supabase-server";
 import { isTeamQueueUser, formatAgentDisplayName } from "@/lib/team-queue";
 import { assignmentSeenAtFor } from "@/lib/conversation-assignment";
@@ -619,6 +620,59 @@ export async function getReplySuggestionsAdmin(conversationId: string): Promise<
   if (!conversation) return [];
 
   return generateReplySuggestions(conversationId, conversation.clinicId, conversation.clinic.tradeName || conversation.clinic.name);
+}
+
+/** Abre um chamado no GLPI (help desk interno da TIVDC) a partir da última
+ * mensagem do paciente nessa conversa — decisão manual do atendente (botão
+ * "Abrir Chamado no GLPI" no menu da conversa), nunca automático. Ver
+ * src/lib/glpi.ts pro cliente da API em si; aqui só monta nome/conteúdo do
+ * chamado e registra o resultado como nota interna na conversa. */
+export async function openGlpiTicketAdmin(conversationId: string) {
+  await requireAdminSession();
+
+  const conversation = await prisma.conversation.findUnique({
+    where: { id: conversationId },
+    include: {
+      contact: true,
+      messages: {
+        where: { type: { not: "INTERNAL_NOTE" }, direction: "INBOUND", deletedAt: null },
+        orderBy: { createdAt: "desc" },
+        take: 1,
+        select: { content: true },
+      },
+    },
+  });
+  if (!conversation) {
+    return { success: false as const, error: "Conversa não encontrada." };
+  }
+
+  const lastInbound = conversation.messages[0]?.content?.trim();
+  if (!lastInbound) {
+    return { success: false as const, error: "Não há mensagem do paciente nessa conversa pra virar chamado." };
+  }
+
+  const firstLine = lastInbound.split("\n")[0].trim();
+  const name = firstLine.length > 80 ? `${firstLine.slice(0, 77)}...` : firstLine || "Solicitação via WhatsApp";
+  const content = `Chamado aberto a partir de uma conversa do WhatsApp.\nContato: ${conversation.contact.name} (${formatPhone(conversation.contact.phone)})\n\nMensagem do paciente:\n${lastInbound}`;
+
+  const result = await createGlpiTicket(name, content);
+
+  if (result.success) {
+    const ticketUrl = buildGlpiTicketUrl(result.ticketId);
+    await prisma.message.create({
+      data: {
+        conversationId,
+        direction: "OUTBOUND",
+        type: "INTERNAL_NOTE",
+        content: `🎫 Chamado #${result.ticketId} aberto no GLPI.${ticketUrl ? ` ${ticketUrl}` : ""}`,
+        status: "SENT",
+      },
+    });
+    revalidatePath("/admin/inbox");
+    notifyInboxRealtime(conversation.clinicId).catch(() => {});
+  }
+
+  return result;
 }
 
 export async function getAttendantCapacityAdmin() {

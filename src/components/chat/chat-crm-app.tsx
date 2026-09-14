@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   listChatContacts,
@@ -80,6 +80,7 @@ import {
   editMessageAdmin,
   transcribeMessageAudioAdmin,
   getReplySuggestionsAdmin,
+  openGlpiTicketAdmin,
 } from "@/actions/admin-inbox";
 import { toast } from "sonner";
 import { useInboxRealtime } from "@/hooks/use-inbox-realtime";
@@ -207,6 +208,13 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
 
   const [attendantCapacity, setAttendantCapacity] = useState<{ activeCount: number; maxLimit: number } | null>(null);
   const [availableClinics, setAvailableClinics] = useState<{ id: string; tradeName: string }[]>([]);
+  /** GLPI (help desk interno) só faz sentido pras conversas da própria TIVDC, não
+   * das clínicas médicas — acha o id dela na mesma lista já usada pro filtro de
+   * clínica do admin, sem precisar de outra consulta. */
+  const tivdcClinicId = useMemo(
+    () => availableClinics.find((c) => c.tradeName === "TIVDC")?.id,
+    [availableClinics]
+  );
   /** Filtro de clínica da fila — só existe no scope admin, que vê todas juntas. "" = todas. */
   const [clinicFilter, setClinicFilter] = useState("");
   const [unassignedWaitMinutes, setUnassignedWaitMinutes] = useState<number | null>(null);
@@ -857,6 +865,11 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
             if (!selectedContactId) return [];
             return actions.getReplySuggestions(selectedContactId);
           }}
+          onOpenGlpiTicket={
+            scope === "admin" && tivdcClinicId && selectedContact?.clinicId === tivdcClinicId
+              ? () => openGlpiTicketAdmin(selectedContactId!)
+              : undefined
+          }
         />
       ) : (
         <CRMKanban

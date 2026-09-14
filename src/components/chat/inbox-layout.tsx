@@ -162,6 +162,10 @@ interface InboxLayoutProps {
    * sozinho) — ver ai-copilot.ts. Diferente de onSuggestIaReply (1 sugestão
    * direto na caixa de texto). */
   onGenerateCopilotSuggestions?: () => Promise<string[]>;
+  /** Abre chamado no GLPI a partir da última mensagem do paciente (ver
+   * glpi.ts) — só passado (então só aparece no menu) pras conversas da
+   * clínica TIVDC, escopo admin. */
+  onOpenGlpiTicket?: () => Promise<{ success: boolean; error?: string; ticketId?: number }>;
 }
 
 export const InboxLayout: React.FC<InboxLayoutProps> = ({
@@ -211,11 +215,13 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
   onScheduleConfirmed,
   onSuggestIaReply,
   onGenerateCopilotSuggestions,
+  onOpenGlpiTicket,
 }) => {
   const [composerMode, setComposerMode] = useState<'whatsapp' | 'internal_note'>('whatsapp');
   const [inputText, setInputText] = useState('');
   const [copilotSuggestions, setCopilotSuggestions] = useState<string[]>([]);
   const [isLoadingCopilot, setIsLoadingCopilot] = useState(false);
+  const [isOpeningGlpiTicket, setIsOpeningGlpiTicket] = useState(false);
   const [selectedDept] = useState<'todos' | Department>('todos');
   const [selectedTagFilter, setSelectedTagFilter] = useState<string | null>(null);
   const [isTagFilterOpen, setIsTagFilterOpen] = useState(false);
@@ -1127,6 +1133,32 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                         <Copy className="w-3.5 h-3.5 text-emerald-600" />
                         <span>Copiar Link da Conversa</span>
                       </button>
+
+                      {onOpenGlpiTicket && (
+                        <button
+                          disabled={isOpeningGlpiTicket}
+                          onClick={async () => {
+                            setIsMoreMenuOpen(false);
+                            setIsOpeningGlpiTicket(true);
+                            try {
+                              const result = await onOpenGlpiTicket();
+                              if (result.success) {
+                                toast.success(`Chamado #${result.ticketId} aberto no GLPI!`);
+                              } else {
+                                toast.error(result.error || "Não foi possível abrir o chamado no GLPI.");
+                              }
+                            } catch (error) {
+                              toast.error(error instanceof Error ? error.message : "Não foi possível abrir o chamado no GLPI.");
+                            } finally {
+                              setIsOpeningGlpiTicket(false);
+                            }
+                          }}
+                          className="w-full px-3 py-2 text-left hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center gap-2 text-slate-700 dark:text-slate-200 disabled:opacity-50"
+                        >
+                          <MessageSquarePlus className="w-3.5 h-3.5 text-indigo-600" />
+                          <span>{isOpeningGlpiTicket ? "Abrindo chamado..." : "Abrir Chamado no GLPI"}</span>
+                        </button>
+                      )}
 
                       <button
                         onClick={() => {
