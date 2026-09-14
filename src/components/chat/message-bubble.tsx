@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from '@/components/ui/dialog';
+import { mentionsInvoiceRequest, type InvoiceData } from '@/lib/chat-messages';
 
 interface MessageBubbleProps {
   message: Message;
@@ -35,7 +36,16 @@ interface MessageBubbleProps {
   onEditMessage?: (messageId: string, newText: string) => Promise<{ success: boolean; error?: string }>;
   /** Transcreve um áudio sob demanda (só relevante pra message.type === 'audio'). */
   onTranscribeAudio?: (messageId: string) => Promise<{ success: boolean; transcription?: string; error?: string }>;
+  /** Extrai dados de nota fiscal sob demanda (só relevante quando mentionsInvoiceRequest(message.text)). */
+  onExtractInvoiceData?: (messageId: string) => Promise<{ success: boolean; data?: InvoiceData; error?: string }>;
 }
+
+const INVOICE_FIELD_LABELS: Record<keyof InvoiceData, string> = {
+  cpf: 'CPF',
+  endereco: 'Endereço',
+  dependentes: 'Dependentes',
+  valor: 'Valor',
+};
 
 /** Ícone + cor por tipo de arquivo — em vez de um FileText genérico pra qualquer
  * anexo, ajuda a reconhecer o tipo (PDF, planilha, compactado) sem precisar abrir. */
@@ -82,7 +92,7 @@ const MessageStatusTicks: React.FC<{ status?: Message['deliveryStatus'] }> = ({ 
   return <Clock className="w-3 h-3 text-slate-400" aria-label="Enviando..." />;
 };
 
-export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry, onRequestResend, onEditMessage, onTranscribeAudio }) => {
+export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry, onRequestResend, onEditMessage, onTranscribeAudio, onExtractInvoiceData }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   const [playbackSpeed, setPlaybackSpeed] = useState<'1x' | '1.5x' | '2x'>('1x');
@@ -93,7 +103,24 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry, 
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [transcription, setTranscription] = useState(message.transcription ?? '');
   const [isTranscribing, setIsTranscribing] = useState(false);
+  const [invoiceData, setInvoiceData] = useState<InvoiceData | undefined>(message.extractedInvoiceData);
+  const [isExtractingInvoiceData, setIsExtractingInvoiceData] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
+
+  async function handleExtractInvoiceData() {
+    if (!onExtractInvoiceData || isExtractingInvoiceData) return;
+    setIsExtractingInvoiceData(true);
+    try {
+      const result = await onExtractInvoiceData(message.id);
+      if (result.success && result.data) {
+        setInvoiceData(result.data);
+      } else {
+        toast.error(result.error || 'Não foi possível extrair os dados dessa mensagem.');
+      }
+    } finally {
+      setIsExtractingInvoiceData(false);
+    }
+  }
 
   async function handleTranscribeAudio() {
     if (!onTranscribeAudio || isTranscribing) return;
@@ -562,6 +589,52 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry, 
               {isAgent && <MessageStatusTicks status={message.deliveryStatus} />}
             </div>
             {isAgent && message.deliveryStatus === 'failed' && <FailedSendNotice onRetry={onRetry} />}
+
+            {/* Extração de dados de nota fiscal — sob demanda, só em mensagem do paciente
+                que menciona "nota fiscal" (ver mentionsInvoiceRequest). Mesmo padrão de
+                custo do "Transcrever áudio (IA)": nunca roda automático. */}
+            {!isAgent && !message.deleted && mentionsInvoiceRequest(message.text ?? '') && (
+              <div className="mt-2.5 pt-2.5 border-t border-black/5 dark:border-white/10">
+                {invoiceData ? (
+                  <div className="space-y-1">
+                    {(Object.keys(INVOICE_FIELD_LABELS) as (keyof InvoiceData)[])
+                      .filter((field) => invoiceData[field])
+                      .map((field) => (
+                        <p key={field} className="text-[11px] text-slate-600 dark:text-slate-300">
+                          <span className="font-bold">{INVOICE_FIELD_LABELS[field]}:</span> {invoiceData[field]}
+                        </p>
+                      ))}
+                    <button
+                      type="button"
+                      onClick={() =>
+                        handleCopyText(
+                          (Object.keys(INVOICE_FIELD_LABELS) as (keyof InvoiceData)[])
+                            .filter((field) => invoiceData[field])
+                            .map((field) => `${INVOICE_FIELD_LABELS[field]}: ${invoiceData[field]}`)
+                            .join('\n')
+                        )
+                      }
+                      className="mt-1 text-[10.5px] font-semibold text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-300 flex items-center gap-1"
+                    >
+                      {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                      {copied ? 'Copiado!' : 'Copiar dados'}
+                    </button>
+                  </div>
+                ) : (
+                  onExtractInvoiceData && (
+                    <button
+                      type="button"
+                      onClick={handleExtractInvoiceData}
+                      disabled={isExtractingInvoiceData}
+                      className="w-full text-left text-[10.5px] font-semibold text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-300 disabled:opacity-60 flex items-center gap-1"
+                    >
+                      <FileText className="w-3 h-3" />
+                      {isExtractingInvoiceData ? 'Extraindo...' : 'Extrair dados (IA)'}
+                    </button>
+                  )
+                )}
+              </div>
+            )}
           </>
         )}
       </div>

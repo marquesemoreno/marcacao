@@ -12,11 +12,15 @@ import { departmentToDb, funnelStageToDb, toChatContact, toChatMessage } from "@
 import { attachSignedUrls, uploadWhatsAppMedia, getSignedMediaUrl, downloadWhatsAppMedia } from "@/lib/whatsapp-media";
 import { transcribeAudio } from "@/lib/ai-transcription";
 import { generateReplySuggestions } from "@/lib/ai-copilot";
-import { formatFileSize, formatPhone } from "@/lib/format";
+import { formatFileSize, formatPhone, formatCurrency } from "@/lib/format";
 import { createGlpiTicket, buildGlpiTicketUrl, listGlpiEntities } from "@/lib/glpi";
 import { notifyInboxRealtime } from "@/lib/supabase-server";
 import { isTeamQueueUser, formatAgentDisplayName } from "@/lib/team-queue";
 import { assignmentSeenAtFor } from "@/lib/conversation-assignment";
+import { getAiAttendantConfig } from "@/lib/ai-attendant";
+import { analyzeConversationQuality } from "@/lib/conversation-quality";
+import { extractInvoiceData, type InvoiceData } from "@/lib/invoice-extraction";
+import { mentionsInvoiceRequest } from "@/lib/chat-messages";
 import type { Department, FunnelStage, InboxFilter } from "@/types/chat-crm";
 import {
   sendMessageSchema,
@@ -105,7 +109,7 @@ export async function listChatContactsAdmin(filter: InboxFilter, search?: string
       messages: {
         orderBy: { createdAt: "desc" },
         take: 3,
-        select: { type: true, content: true, mimeType: true, createdAt: true },
+        select: { type: true, content: true, mimeType: true, createdAt: true, direction: true },
       },
     },
     orderBy: { lastMessageAt: "desc" },
@@ -330,14 +334,21 @@ export async function getChatContactHistoryAdmin(conversationId: string) {
   });
 
   const statusMap = { PENDING: "agendada", CONFIRMED: "agendada", COMPLETED: "concluida", CANCELLED: "cancelada", NO_SHOW: "cancelada" } as const;
+  const todayUtc = new Date(new Date().toISOString().slice(0, 10) + "T00:00:00.000Z");
 
-  return appointments.map((a) => ({
-    id: a.id,
-    specialty: a.clinicProcedure.procedure.name,
-    doctor: a.clinicProcedure.clinic.tradeName,
-    date: new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeZone: "UTC" }).format(a.date),
-    status: statusMap[a.status],
-  }));
+  return appointments.map((a) => {
+    const effectivePrice = a.clinicProcedure.promotionalPrice ?? a.clinicProcedure.price;
+    return {
+      id: a.id,
+      specialty: a.clinicProcedure.procedure.name,
+      doctor: a.clinicProcedure.clinic.tradeName,
+      date: new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeZone: "UTC" }).format(a.date),
+      status: statusMap[a.status],
+      price: Number(effectivePrice) > 0 ? formatCurrency(effectivePrice.toString()) : undefined,
+      preparationInstructions: a.clinicProcedure.procedure.preparationInstructions ?? undefined,
+      isUpcoming: a.date.getTime() >= todayUtc.getTime() && (a.status === "PENDING" || a.status === "CONFIRMED"),
+    };
+  });
 }
 
 export async function sendMessageAdmin(conversationId: string, content: string, isInternalNote?: boolean) {
@@ -609,6 +620,30 @@ export async function transcribeMessageAudioAdmin(messageId: string) {
   return { success: true as const, transcription };
 }
 
+/** Espelho de extractMessageInvoiceData (src/actions/inbox.ts) pro escopo admin. */
+export async function extractMessageInvoiceDataAdmin(messageId: string) {
+  await requireAdminSession();
+
+  const message = await prisma.message.findUnique({ where: { id: messageId } });
+  if (!message) {
+    return { success: false as const, error: "Mensagem não encontrada." };
+  }
+  if (!mentionsInvoiceRequest(message.content)) {
+    return { success: false as const, error: "Esta mensagem não parece ser um pedido de nota fiscal." };
+  }
+  if (message.extractedInvoiceData) {
+    return { success: true as const, data: message.extractedInvoiceData as InvoiceData };
+  }
+
+  const data = await extractInvoiceData(message.content);
+  if (!data) {
+    return { success: false as const, error: "Não foi possível extrair dados dessa mensagem. Tente de novo." };
+  }
+
+  await prisma.message.update({ where: { id: messageId }, data: { extractedInvoiceData: data } });
+  return { success: true as const, data };
+}
+
 /** Espelho de getReplySuggestions (src/actions/inbox.ts) pro escopo admin. */
 export async function getReplySuggestionsAdmin(conversationId: string): Promise<string[]> {
   await requireAdminSession();
@@ -756,6 +791,41 @@ export async function claimConversationAdmin(conversationId: string) {
   await prisma.conversation.update({
     where: { id: conversationId },
     data: { assignedUserId: userId, status: "OPEN", assignmentSeenAt: assignmentSeenAtFor(userId, userId) },
+  });
+
+  revalidatePath("/admin/inbox");
+  notifyInboxRealtime(conversation.clinicId).catch(() => {});
+  return { success: true };
+}
+
+/** "Devolver pra IA" (admin) — ver reactivateAiForConversation em actions/inbox.ts pra
+ * detalhe da decisão de não pular o consentimento LGPD. */
+export async function reactivateAiForConversationAdmin(conversationId: string) {
+  await requireAdminSession();
+
+  const conversation = await prisma.conversation.findUnique({ where: { id: conversationId } });
+  if (!conversation) {
+    return { success: false, message: "Conversa não encontrada." };
+  }
+
+  const aiConfig = await getAiAttendantConfig(conversation.clinicId);
+  if (!aiConfig) {
+    return { success: false, message: "Esta clínica não tem atendente de IA ativo." };
+  }
+
+  await prisma.conversation.update({
+    where: { id: conversationId },
+    data: { aiEnabled: true },
+  });
+
+  await prisma.message.create({
+    data: {
+      conversationId,
+      direction: "OUTBOUND",
+      type: "INTERNAL_NOTE",
+      content: "🤖 Atendimento devolvido pra IA.",
+      status: "SENT",
+    },
   });
 
   revalidatePath("/admin/inbox");
@@ -969,6 +1039,9 @@ export async function resolveConversationAdmin(conversationId: string, resolutio
   });
   revalidatePath("/admin/inbox");
   revalidatePath("/admin/crm");
+
+  // Fire-and-forget — ver nota em resolveConversation (actions/inbox.ts).
+  analyzeConversationQuality(conversationId).catch(() => {});
 }
 
 export async function reopenConversationAdmin(conversationId: string) {

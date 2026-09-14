@@ -369,3 +369,48 @@ export async function getAttendantPerformanceReport() {
     },
   };
 }
+
+/** Auditoria de qualidade gerada por analyzeConversationQuality (ver conversation-quality.ts)
+ * ao finalizar cada atendimento — sem backfill: só conversas resolvidas depois dessa
+ * funcionalidade existir têm dado aqui, por isso pode aparecer vazio no começo. */
+export async function getConversationQualityReport() {
+  await requireAdminSession();
+
+  const audits = await prisma.conversationQualityAudit.findMany({
+    include: { conversation: { select: { clinic: { select: { tradeName: true } } } } },
+    orderBy: { createdAt: "desc" },
+  });
+
+  const withFrt = audits.filter((a) => a.firstResponseSec !== null);
+  const withTtr = audits.filter((a) => a.resolutionSec !== null);
+  const avgFrtSec = withFrt.length > 0 ? Math.round(withFrt.reduce((acc, a) => acc + a.firstResponseSec!, 0) / withFrt.length) : null;
+  const avgTtrSec = withTtr.length > 0 ? Math.round(withTtr.reduce((acc, a) => acc + a.resolutionSec!, 0) / withTtr.length) : null;
+
+  const withSentiment = audits.filter((a) => a.sentiment !== null);
+  const sentimentCounts = { POSITIVO: 0, NEUTRO: 0, NEGATIVO: 0 } as Record<string, number>;
+  for (const a of withSentiment) {
+    if (a.sentiment) sentimentCounts[a.sentiment] = (sentimentCounts[a.sentiment] ?? 0) + 1;
+  }
+  const sentimentPct = (key: string) =>
+    withSentiment.length > 0 ? Math.round(((sentimentCounts[key] ?? 0) / withSentiment.length) * 1000) / 10 : 0;
+
+  const negativeConversations = audits
+    .filter((a) => a.sentiment === "NEGATIVO")
+    .slice(0, 10)
+    .map((a) => ({
+      conversationId: a.conversationId,
+      clinicName: a.conversation.clinic.tradeName,
+      date: a.createdAt,
+      summary: a.summary || "",
+    }));
+
+  return {
+    totalAudited: audits.length,
+    avgFrtSec,
+    avgTtrSec,
+    sentimentPositivePct: sentimentPct("POSITIVO"),
+    sentimentNeutroPct: sentimentPct("NEUTRO"),
+    sentimentNegativoPct: sentimentPct("NEGATIVO"),
+    negativeConversations,
+  };
+}

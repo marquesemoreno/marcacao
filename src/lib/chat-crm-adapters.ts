@@ -9,14 +9,16 @@ import type {
   User,
 } from "@prisma/client";
 import { formatCurrency } from "@/lib/format";
-import { isMediaDownloadFailedNotice, isAutoSystemMessage } from "@/lib/chat-messages";
+import { isMediaDownloadFailedNotice, isAutoSystemMessage, type InvoiceData } from "@/lib/chat-messages";
 import { canEditMessage } from "@/lib/message-edit";
+import { URGENCY_TAG } from "@/lib/conversation-tags";
 import type {
   Channel,
   Contact,
   Department,
   FunnelStage,
   Message,
+  ConversationQueueState,
 } from "@/types/chat-crm";
 
 const departmentFromDb: Record<ConversationDepartment, Department> = {
@@ -91,7 +93,7 @@ function formatMessageTimestamp(date: Date) {
  * triplicou o tráfego dessa query — foi um dos motivos do Egress do Supabase
  * estourar de novo (406% em 11 dias, ver histórico do projeto).
  */
-type ConversationPreviewMessage = Pick<PrismaMessage, "type" | "content" | "mimeType" | "createdAt">;
+type ConversationPreviewMessage = Pick<PrismaMessage, "type" | "content" | "mimeType" | "createdAt" | "direction">;
 
 type ConversationWithRelations = Conversation & {
   contact: PrismaContact;
@@ -108,6 +110,23 @@ type ConversationWithRelations = Conversation & {
 function hasUnseenAssignmentFor(conversation: ConversationWithRelations, viewerUserId?: string): boolean {
   if (!viewerUserId) return false;
   return conversation.assignedUserId === viewerUserId && conversation.assignmentSeenAt === null;
+}
+
+/**
+ * Estado único e priorizável da conversa pra fila (Coluna 1 do inbox) — calculado na
+ * hora a partir de campos que já existem (aiEnabled, assignedUserId, tags, direção da
+ * última mensagem), nunca persistido. Decisão consciente: um campo novo no banco
+ * (`ConversationAiState`, como o esboço original do roadmap sugeria) precisaria ser
+ * mantido atualizado em todo lugar que muda esses campos — fácil de ficar
+ * dessincronizado. Deriva de novo a cada leitura, sempre certo.
+ */
+function computeQueueState(conversation: ConversationWithRelations): ConversationQueueState {
+  if (conversation.status === "OPEN" && conversation.tags.includes(URGENCY_TAG)) return "URGENCIA_CLINICA";
+  if (conversation.aiEnabled) return "IA_ATENDENDO";
+  const lastMessage = conversation.messages[0];
+  if (lastMessage?.direction === "OUTBOUND" && conversation.status === "OPEN") return "AGUARDANDO_PACIENTE";
+  if (conversation.assignedUserId) return "HUMANO_ATENDENDO";
+  return "SEM_DONO";
 }
 
 const REASON_SHORT_LABELS: Record<string, string> = {
@@ -168,6 +187,7 @@ export function toChatContact(conversation: ConversationWithRelations, viewerUse
       : { label: funnelStageLabels[funnelStageFromDb[conversation.funnelStage]], variant: funnelStageBadgeVariant[funnelStageFromDb[conversation.funnelStage]] },
     funnelStage: funnelStageFromDb[conversation.funnelStage],
     tags: conversation.tags,
+    queueState: computeQueueState(conversation),
     consultationHistory: [],
     estimatedValue: conversation.estimatedValue ? formatCurrency(conversation.estimatedValue.toString()) : undefined,
   };
@@ -219,5 +239,6 @@ export function toChatMessage(
     isEdited: Boolean(message.editedAt),
     canEdit: canEditMessage(message).ok,
     transcription: message.transcription ?? undefined,
+    extractedInvoiceData: (message.extractedInvoiceData as InvoiceData | null) ?? undefined,
   };
 }

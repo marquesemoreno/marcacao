@@ -488,6 +488,7 @@ model Conversation {
   messages     Message[]
   aiLogs       AiInteractionLog[]
   triages      MessageTriage[]
+  qualityAudit ConversationQualityAudit?
 
   @@index([clinicId, status])
   @@index([contactId])
@@ -523,6 +524,11 @@ model Message {
   /// transcribeMessageAudio em src/actions/inbox.ts) — null até a atendente pedir.
   /// Guardado pra não pagar de novo pela mesma transcrição toda vez que reabre a conversa.
   transcription  String?          @db.Text
+  /// Dados de nota fiscal (cpf/endereco/dependentes/valor) extraídos sob demanda de uma
+  /// mensagem de texto do paciente (botão "Extrair dados", ver extractInvoiceData em
+  /// src/lib/invoice-extraction.ts) — null até a atendente pedir. Mesmo motivo de cache
+  /// de `transcription`: não pagar de novo pela mesma extração ao reabrir a conversa.
+  extractedInvoiceData Json?       @map("extracted_invoice_data")
   createdAt      DateTime         @default(now()) @map("created_at")
 
   conversation Conversation @relation(fields: [conversationId], references: [id])
@@ -628,6 +634,27 @@ model MessageTriage {
 
   @@index([conversationId])
   @@map("message_triage")
+}
+
+/// Gerado uma vez por conversa, ao finalizar o atendimento (ver analyzeConversationQuality
+/// em conversation-quality.ts) — nunca pelo webhook nem em tempo real. firstResponseSec/
+/// resolutionSec são aritmética pura de timestamp (sem IA); sentiment/summary/
+/// complianceNotes vêm de uma chamada de IA opcional (ficam null sem OPENAI_API_KEY).
+model ConversationQualityAudit {
+  id               String   @id @default(cuid())
+  conversationId   String   @unique @map("conversation_id")
+  /// "POSITIVO" | "NEUTRO" | "NEGATIVO"
+  sentiment        String?
+  summary          String?  @db.Text
+  complianceNotes  String?  @db.Text @map("compliance_notes")
+  firstResponseSec Int?     @map("first_response_sec")
+  resolutionSec    Int?     @map("resolution_sec")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  conversation Conversation @relation(fields: [conversationId], references: [id])
+
+  @@index([conversationId])
+  @@map("conversation_quality_audits")
 }
 
 enum BroadcastCampaignStatus {

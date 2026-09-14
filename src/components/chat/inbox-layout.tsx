@@ -8,12 +8,14 @@ import {
   InboxFilter,
   FunnelStage,
   Agent,
+  ConversationQueueState,
 } from '@/types/chat-crm';
 import { MessageBubble } from './message-bubble';
 import { ScheduleModal } from './schedule-modal';
 import { AvatarBadge } from './avatar-badge';
 import { FeedbackWidget } from '@/components/feedback-widget';
 import type { PlainClinicProcedureItem } from '@/lib/serialize';
+import type { InvoiceData } from '@/lib/chat-messages';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from '@/components/ui/dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from '@/components/ui/command';
@@ -50,9 +52,8 @@ import {
   Smartphone,
   MessageSquarePlus,
   ChevronsUpDown,
-  AlertTriangle,
+  Bot,
 } from 'lucide-react';
-import { URGENCY_TAG } from '@/lib/conversation-tags';
 
 const MAX_MEDIA_SIZE_BYTES = 15 * 1024 * 1024; // 15 MB — mesmo limite validado no servidor
 
@@ -67,6 +68,25 @@ const PRESET_TAGS: { label: string; classes: string }[] = [
 function tagClasses(tag: string) {
   return PRESET_TAGS.find((preset) => preset.label === tag)?.classes ?? 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700';
 }
+
+/** Prioridade da fila (menor primeiro) — só urgência e "sem dono" furam a ordem
+ * cronológica normal; humano/IA/aguardando paciente ficam no mesmo nível, mantendo a
+ * ordem por `lastMessageAt` que já vem do banco (sort é estável). */
+const QUEUE_STATE_PRIORITY: Record<ConversationQueueState, number> = {
+  URGENCIA_CLINICA: 0,
+  SEM_DONO: 1,
+  HUMANO_ATENDENDO: 2,
+  IA_ATENDENDO: 2,
+  AGUARDANDO_PACIENTE: 2,
+};
+
+const QUEUE_STATE_BADGE: Record<ConversationQueueState, { label: string; classes: string }> = {
+  URGENCIA_CLINICA: { label: '🚨 Urgência clínica', classes: 'bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300' },
+  SEM_DONO: { label: '⏳ Sem dono', classes: 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300' },
+  HUMANO_ATENDENDO: { label: '🧑 Humano atendendo', classes: 'bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300' },
+  IA_ATENDENDO: { label: '🤖 IA atendendo', classes: 'bg-violet-50 dark:bg-violet-950/60 text-violet-700 dark:text-violet-300' },
+  AGUARDANDO_PACIENTE: { label: '💬 Aguardando paciente', classes: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300' },
+};
 
 /** A partir de quantos minutos parado em "Não Atribuídas" a aba pisca pra alertar o atendente. */
 const UNASSIGNED_ALERT_THRESHOLD_MINUTES = 10;
@@ -137,11 +157,17 @@ interface InboxLayoutProps {
   }) => Promise<{ success: boolean; error?: string } | void> | { success: boolean; error?: string } | void;
   onUpdateFunnelStage: (stage: FunnelStage) => Promise<void> | void;
   onClaimConversation?: () => Promise<void> | void;
+  /** "Devolver pra IA" — reativa aiEnabled numa conversa que um humano assumiu (ver
+   * reactivateAiForConversation em actions/inbox.ts). Só mostrado quando a conversa
+   * está com queueState "HUMANO_ATENDENDO". */
+  onReactivateAi?: () => Promise<{ success: boolean; message?: string }>;
   onMarkUnread?: () => Promise<void> | void;
   onRetryMessage?: (messageId: string) => Promise<void> | void;
   onEditMessage?: (messageId: string, newText: string) => Promise<{ success: boolean; error?: string }>;
   /** Transcreve um áudio recebido sob demanda (botão no balão) — ver transcribeMessageAudio em actions/inbox.ts. */
   onTranscribeAudio?: (messageId: string) => Promise<{ success: boolean; transcription?: string; error?: string }>;
+  /** Extrai dados de nota fiscal sob demanda (botão no balão) — ver extractMessageInvoiceData em actions/inbox.ts. */
+  onExtractInvoiceData?: (messageId: string) => Promise<{ success: boolean; data?: InvoiceData; error?: string }>;
   onTransferAgent: (agentId: string, agentName: string) => Promise<void> | void;
   availableClinics?: { id: string; tradeName: string }[];
   onReassignClinic?: (clinicId: string) => Promise<void> | void;
@@ -204,10 +230,12 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
   onUpdatePatient,
   onUpdateFunnelStage,
   onClaimConversation,
+  onReactivateAi,
   onMarkUnread,
   onRetryMessage,
   onEditMessage,
   onTranscribeAudio,
+  onExtractInvoiceData,
   onTransferAgent,
   availableClinics,
   onReassignClinic,
@@ -232,6 +260,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
   const [copilotSuggestions, setCopilotSuggestions] = useState<string[]>([]);
   const [isLoadingCopilot, setIsLoadingCopilot] = useState(false);
   const [isOpeningGlpiTicket, setIsOpeningGlpiTicket] = useState(false);
+  const [isReactivatingAi, setIsReactivatingAi] = useState(false);
   const [selectedDept] = useState<'todos' | Department>('todos');
   const [selectedTagFilter, setSelectedTagFilter] = useState<string | null>(null);
   const [isTagFilterOpen, setIsTagFilterOpen] = useState(false);
@@ -446,19 +475,23 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
     return [...PRESET_TAGS, ...customTags.map((label) => ({ label, classes: tagClasses(label) }))];
   }, [contacts]);
 
-  const filteredContacts = contacts.filter((contact) => {
-    if (selectedDept !== 'todos' && contact.department !== selectedDept) return false;
-    if (selectedTagFilter && !contact.tags.includes(selectedTagFilter)) return false;
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      return (
-        contact.name.toLowerCase().includes(q) ||
-        contact.phone.includes(q) ||
-        contact.lastMessage.toLowerCase().includes(q)
-      );
-    }
-    return true;
-  });
+  const filteredContacts = contacts
+    .filter((contact) => {
+      if (selectedDept !== 'todos' && contact.department !== selectedDept) return false;
+      if (selectedTagFilter && !contact.tags.includes(selectedTagFilter)) return false;
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        return (
+          contact.name.toLowerCase().includes(q) ||
+          contact.phone.includes(q) ||
+          contact.lastMessage.toLowerCase().includes(q)
+        );
+      }
+      return true;
+    })
+    // Estável: só reordena por prioridade (urgência > sem dono > resto), preserva a
+    // ordem por lastMessageAt que já vem do banco dentro de cada nível.
+    .sort((a, b) => QUEUE_STATE_PRIORITY[a.queueState] - QUEUE_STATE_PRIORITY[b.queueState]);
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -850,24 +883,24 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
           ) : (
             filteredContacts.map((c) => {
               const isSelected = c.id === selectedContact?.id;
-              // Maior prioridade visual de todas — mesmo selecionada ou já vista,
-              // uma conversa com red flag clínico continua chamando atenção (ver
-              // matchEscalationTrigger no webhook, que agora roda em toda mensagem,
-              // de qualquer clínica, não só quando a IA está ativa).
-              const isUrgent = c.tags.includes(URGENCY_TAG);
+              // Prioridade visual = mesma prioridade da ordenação da fila (urgência >
+              // sem dono > resto) — "selecionada" só desempata dentro do último grupo,
+              // nunca esconde uma urgência clínica ou uma conversa sem dono nenhum
+              // (ver matchEscalationTrigger no webhook e computeQueueState em
+              // chat-crm-adapters.ts).
+              const rowColorClasses =
+                c.queueState === 'URGENCIA_CLINICA'
+                  ? 'bg-rose-50 dark:bg-rose-950/30 border-rose-600 hover:bg-rose-100/70 dark:hover:bg-rose-950/50'
+                  : c.queueState === 'SEM_DONO'
+                  ? 'bg-amber-50/60 dark:bg-amber-950/20 border-amber-400 hover:bg-amber-100/60 dark:hover:bg-amber-950/40'
+                  : isSelected
+                  ? 'bg-white dark:bg-slate-800/70 border-emerald-600 shadow-sm'
+                  : 'hover:bg-slate-200/50 dark:hover:bg-slate-800/40 border-transparent';
               return (
                 <div
                   key={c.id}
                   onClick={() => handleSelectContactMobile(c.id)}
-                  className={`px-3 py-2 transition-colors cursor-pointer relative flex gap-2.5 items-start border-l-4 ${
-                    isUrgent
-                      ? 'bg-rose-50 dark:bg-rose-950/30 border-rose-600 hover:bg-rose-100/70 dark:hover:bg-rose-950/50'
-                      : isSelected
-                      ? 'bg-white dark:bg-slate-800/70 border-emerald-600 shadow-sm'
-                      : c.hasUnseenAssignment
-                      ? 'bg-amber-50/60 dark:bg-amber-950/20 border-amber-400 hover:bg-amber-100/60 dark:hover:bg-amber-950/40'
-                      : 'hover:bg-slate-200/50 dark:hover:bg-slate-800/40 border-transparent'
-                  }`}
+                  className={`px-3 py-2 transition-colors cursor-pointer relative flex gap-2.5 items-start border-l-4 ${rowColorClasses}`}
                   data-od-id={`contact-card-${c.id}`}
                 >
                   <div className="relative shrink-0">
@@ -902,11 +935,9 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                       </span>
                     </div>
 
-                    {isUrgent && (
-                      <p className="text-[10px] font-bold text-rose-700 dark:text-rose-400 mb-0.5 flex items-center gap-1">
-                        <AlertTriangle className="w-2.5 h-2.5" /> Urgência clínica
-                      </p>
-                    )}
+                    <p className={`text-[10px] font-bold mb-0.5 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md ${QUEUE_STATE_BADGE[c.queueState].classes}`}>
+                      {QUEUE_STATE_BADGE[c.queueState].label}
+                    </p>
 
                     {c.hasUnseenAssignment && (
                       <p className="text-[10px] font-bold text-amber-700 dark:text-amber-400 mb-0.5 flex items-center gap-1">
@@ -1099,6 +1130,27 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                   </span>
                 )}
 
+                {onReactivateAi && (selectedContact.queueState === 'HUMANO_ATENDENDO' || selectedContact.queueState === 'AGUARDANDO_PACIENTE') && selectedContact.responsibleAgent !== 'Não Atribuído' && (
+                  <button
+                    onClick={async () => {
+                      setIsReactivatingAi(true);
+                      try {
+                        const result = await onReactivateAi();
+                        if (!result.success) toast.error(result.message || "Não foi possível devolver o atendimento pra IA.");
+                        else toast.success("Atendimento devolvido pra IA.");
+                      } finally {
+                        setIsReactivatingAi(false);
+                      }
+                    }}
+                    disabled={isReactivatingAi}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-violet-700 dark:text-violet-300 bg-violet-50 dark:bg-violet-950/60 hover:bg-violet-100 dark:hover:bg-violet-900 border border-violet-200 dark:border-violet-800 rounded-lg transition-all disabled:opacity-50"
+                    title="Devolver este atendimento pra IA responder"
+                  >
+                    <Bot className="w-3.5 h-3.5" />
+                    <span>{isReactivatingAi ? "Devolvendo..." : "Devolver pra IA"}</span>
+                  </button>
+                )}
+
                 <button
                   onClick={() => setIsScheduleModalOpen(true)}
                   className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-md shadow-xs transition-all active:scale-[0.98]"
@@ -1248,6 +1300,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                       onRetry={onRetryMessage ? () => onRetryMessage(msg.id) : undefined}
                       onEditMessage={onEditMessage}
                       onTranscribeAudio={onTranscribeAudio}
+                      onExtractInvoiceData={onExtractInvoiceData}
                       onRequestResend={
                         msg.mediaDownloadFailed
                           ? () => onSendMessage('Oi! Não conseguimos baixar o arquivo que você enviou por aqui. Pode tentar enviar novamente, por favor?', 'whatsapp')
@@ -1652,6 +1705,73 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                 </div>
               )}
             </div>
+
+            {/* Card 1.5: Histórico de Consultas — dado já buscado por getChatContactHistory
+                (ver chat-crm-app.tsx), só nunca tinha sido renderizado aqui. Separado em
+                "Próximos Agendamentos" e "Histórico" (pedido original: são duas coisas
+                distintas, não uma lista só ordenada por data mais recente). */}
+            {selectedContact.consultationHistory.length > 0 && (() => {
+              const upcoming = selectedContact.consultationHistory.filter((c) => c.isUpcoming);
+              const past = selectedContact.consultationHistory.filter((c) => !c.isUpcoming);
+              const renderConsultationRow = (consultation: (typeof selectedContact.consultationHistory)[number]) => (
+                <div
+                  key={consultation.id}
+                  className="p-2 rounded-lg border border-slate-100 dark:border-slate-700/60 bg-slate-50 dark:bg-slate-900/40 text-xs"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-semibold text-slate-800 dark:text-slate-200 truncate">{consultation.specialty}</span>
+                    <span
+                      className={`shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded-md ${
+                        consultation.status === 'agendada'
+                          ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300'
+                          : consultation.status === 'concluida'
+                          ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300'
+                          : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
+                      }`}
+                    >
+                      {consultation.status === 'agendada' ? 'Agendada' : consultation.status === 'concluida' ? 'Concluída' : 'Cancelada'}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between gap-2 mt-0.5 text-slate-500 dark:text-slate-400">
+                    <span className="truncate">{consultation.date} · {consultation.doctor}</span>
+                    {consultation.price && (
+                      <span className="shrink-0 font-semibold text-slate-700 dark:text-slate-300">{consultation.price}</span>
+                    )}
+                  </div>
+                  {consultation.preparationInstructions && (
+                    <details className="mt-1">
+                      <summary className="cursor-pointer text-[10px] font-semibold text-sky-700 dark:text-sky-400">
+                        Ver preparo do exame
+                      </summary>
+                      <p className="mt-1 text-slate-600 dark:text-slate-300 whitespace-pre-wrap">
+                        {consultation.preparationInstructions}
+                      </p>
+                    </details>
+                  )}
+                </div>
+              );
+
+              return (
+                <div className="bg-white dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-700/80 rounded-xl p-4 shadow-sm space-y-3">
+                  {upcoming.length > 0 && (
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] font-bold uppercase tracking-wide text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
+                        <Calendar className="w-3.5 h-3.5" /> Próximos Agendamentos
+                      </label>
+                      <div className="space-y-1.5">{upcoming.map(renderConsultationRow)}</div>
+                    </div>
+                  )}
+                  {past.length > 0 && (
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                        <Calendar className="w-3.5 h-3.5 text-slate-400" /> Histórico
+                      </label>
+                      <div className="space-y-1.5">{past.map(renderConsultationRow)}</div>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* Card 2: Tags & Observações */}
             <div className="bg-white dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-700/80 rounded-xl p-4 shadow-sm space-y-2">

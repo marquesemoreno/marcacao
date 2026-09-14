@@ -1,15 +1,27 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { getFinancialReport, getAttendantPerformanceReport } from "@/actions/admin";
+import { getFinancialReport, getAttendantPerformanceReport, getConversationQualityReport } from "@/actions/admin";
 import { formatCurrency } from "@/lib/format";
-import { Clock, Trophy, CheckCircle2, XCircle, TrendingUp, Award } from "lucide-react";
+import { Clock, Trophy, CheckCircle2, XCircle, TrendingUp, Award, Sparkles } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
+/** Formata segundos como "3 min"/"1h 20min" pros cards de FRT/TTR — null vira "—"
+ * (nenhuma conversa auditada ainda tem esse dado). */
+function formatDurationLabel(seconds: number | null): string {
+  if (seconds === null) return "—";
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return `${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+  return remainingMinutes > 0 ? `${hours}h ${remainingMinutes}min` : `${hours}h`;
+}
+
 export default async function AdminReportPage() {
-  const [financialReport, attendantReport] = await Promise.all([
+  const [financialReport, attendantReport, qualityReport] = await Promise.all([
     getFinancialReport(),
     getAttendantPerformanceReport(),
+    getConversationQualityReport(),
   ]);
 
   const totals = financialReport.reduce(
@@ -214,6 +226,69 @@ export default async function AdminReportPage() {
             </TableBody>
           </Table>
         </div>
+      </div>
+
+      {/* =========================================================================
+          AUDITORIA DE QUALIDADE COM IA (sentimento, FRT, TTR)
+         ========================================================================= */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-2xs space-y-4">
+        <div>
+          <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
+            <Sparkles className="w-5 h-5 text-violet-600" />
+            Auditoria de Qualidade com IA
+          </h2>
+          <p className="text-xs text-slate-500 font-medium mt-0.5">
+            Gerada automaticamente ao finalizar cada atendimento (FRT, TTR e sentimento) — sem retroativo, só conversas fechadas a partir de agora entram aqui.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="p-4 rounded-xl border border-slate-200 bg-slate-50 space-y-1">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">FRT Médio</span>
+            <p className="text-xl font-extrabold font-mono text-slate-900">{formatDurationLabel(qualityReport.avgFrtSec)}</p>
+          </div>
+          <div className="p-4 rounded-xl border border-slate-200 bg-slate-50 space-y-1">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">TTR Médio</span>
+            <p className="text-xl font-extrabold font-mono text-slate-900">{formatDurationLabel(qualityReport.avgTtrSec)}</p>
+          </div>
+          <div className="p-4 rounded-xl border border-emerald-200 bg-emerald-50 space-y-1">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-700">Sentimento Positivo</span>
+            <p className="text-xl font-extrabold font-mono text-emerald-800">{qualityReport.sentimentPositivePct}%</p>
+          </div>
+          <div className="p-4 rounded-xl border border-rose-200 bg-rose-50 space-y-1">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-rose-700">Sentimento Negativo</span>
+            <p className="text-xl font-extrabold font-mono text-rose-800">{qualityReport.sentimentNegativoPct}%</p>
+          </div>
+        </div>
+
+        {qualityReport.totalAudited === 0 ? (
+          <p className="text-xs text-slate-500 text-center py-4">
+            Nenhuma conversa auditada ainda — aparece aqui conforme forem finalizadas.
+          </p>
+        ) : qualityReport.negativeConversations.length > 0 ? (
+          <div className="overflow-x-auto rounded-xl border border-slate-200">
+            <Table>
+              <TableHeader className="bg-slate-50">
+                <TableRow>
+                  <TableHead className="font-bold text-xs">Clínica</TableHead>
+                  <TableHead className="font-bold text-xs">Data</TableHead>
+                  <TableHead className="font-bold text-xs">Resumo</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {qualityReport.negativeConversations.map((c) => (
+                  <TableRow key={c.conversationId}>
+                    <TableCell className="text-xs text-slate-600">{c.clinicName}</TableCell>
+                    <TableCell className="font-mono text-xs text-slate-500">
+                      {new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(c.date)}
+                    </TableCell>
+                    <TableCell className="text-xs text-slate-700">{c.summary}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        ) : null}
       </div>
     </div>
   );

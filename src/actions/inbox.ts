@@ -13,11 +13,14 @@ import { canEditMessage } from "@/lib/message-edit";
 import { transcribeAudio } from "@/lib/ai-transcription";
 import { generateReplySuggestions } from "@/lib/ai-copilot";
 import { hasHospitalBridgeIntegration, fetchBridgeProcedures, fetchBridgeDoctors, fetchBridgeAgenda, fetchBridgeConvenios, fetchBridgePatients, adaptBridgeProcedureToPlainItem } from "@/lib/hospital-bridge";
-import { formatFileSize } from "@/lib/format";
+import { formatFileSize, formatCurrency } from "@/lib/format";
 import { notifyInboxRealtime } from "@/lib/supabase-server";
-import { APPOINTMENT_CONFIRMED_TEMPLATE } from "@/lib/chat-messages";
+import { APPOINTMENT_CONFIRMED_TEMPLATE, mentionsInvoiceRequest } from "@/lib/chat-messages";
 import { isTeamQueueUser, formatAgentDisplayName } from "@/lib/team-queue";
 import { assignmentSeenAtFor } from "@/lib/conversation-assignment";
+import { getAiAttendantConfig } from "@/lib/ai-attendant";
+import { analyzeConversationQuality } from "@/lib/conversation-quality";
+import { extractInvoiceData, type InvoiceData } from "@/lib/invoice-extraction";
 
 const ALLOWED_MEDIA_MIME_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif", "application/pdf"];
 const MAX_MEDIA_SIZE_BYTES = 15 * 1024 * 1024; // 15 MB — mesma ordem de grandeza do limite de mídia do WhatsApp
@@ -160,7 +163,7 @@ export async function listConversations(filter: ConversationFilter, search?: str
       messages: {
         orderBy: { createdAt: "desc" },
         take: 3,
-        select: { type: true, content: true, mimeType: true, createdAt: true },
+        select: { type: true, content: true, mimeType: true, createdAt: true, direction: true },
       },
     },
     orderBy: { lastMessageAt: "desc" },
@@ -603,6 +606,34 @@ export async function transcribeMessageAudio(messageId: string) {
   return { success: true as const, transcription };
 }
 
+/** Extrai dados de nota fiscal (CPF/endereço/dependentes/valor) de uma mensagem de texto
+ * do paciente, sob demanda — mesmo padrão de cache de transcribeMessageAudio acima. */
+export async function extractMessageInvoiceData(messageId: string) {
+  const { clinicId } = await requireClinicSession();
+
+  const message = await prisma.message.findUnique({
+    where: { id: messageId },
+    include: { conversation: { select: { clinicId: true } } },
+  });
+  if (!message || message.conversation.clinicId !== clinicId) {
+    return { success: false as const, error: "Mensagem não encontrada." };
+  }
+  if (!mentionsInvoiceRequest(message.content)) {
+    return { success: false as const, error: "Esta mensagem não parece ser um pedido de nota fiscal." };
+  }
+  if (message.extractedInvoiceData) {
+    return { success: true as const, data: message.extractedInvoiceData as InvoiceData };
+  }
+
+  const data = await extractInvoiceData(message.content);
+  if (!data) {
+    return { success: false as const, error: "Não foi possível extrair dados dessa mensagem. Tente de novo." };
+  }
+
+  await prisma.message.update({ where: { id: messageId }, data: { extractedInvoiceData: data } });
+  return { success: true as const, data };
+}
+
 /** Sugestões de resposta pro Copilot do atendente (ver ai-copilot.ts) — nunca
  * envia nada sozinho, só devolve rascunhos pro atendente escolher. */
 export async function getReplySuggestions(conversationId: string): Promise<string[]> {
@@ -732,6 +763,46 @@ export async function claimConversation(conversationId: string) {
       content: `🔒 Atendimento assumido por ${userName}.`,
       status: "SENT",
       senderUserId: userId,
+    },
+  });
+
+  revalidatePath("/clinic/inbox");
+  revalidatePath("/clinic/crm");
+  notifyInboxRealtime(clinicId).catch(() => {});
+  return { success: true };
+}
+
+/** "Devolver pra IA" — reativa o atendimento automático numa conversa que um humano
+ * assumiu. Gap real: antes de existir isso, uma vez que `aiEnabled` virava false (humano
+ * respondeu, ou paciente recusou/escalou), não tinha NENHUM jeito de reativar a IA.
+ * Não pula o consentimento LGPD: se o paciente nunca aceitou (aiConsentStatus !==
+ * ACCEPTED), só liga `aiEnabled` — a próxima mensagem dele cai de novo no fluxo normal
+ * de consentimento do webhook (ver route.ts), não duplica essa lógica aqui. */
+export async function reactivateAiForConversation(conversationId: string) {
+  const { clinicId } = await requireClinicSession();
+
+  const conversation = await prisma.conversation.findUnique({ where: { id: conversationId } });
+  if (!conversation || conversation.clinicId !== clinicId) {
+    return { success: false, message: "Conversa não encontrada." };
+  }
+
+  const aiConfig = await getAiAttendantConfig(clinicId);
+  if (!aiConfig) {
+    return { success: false, message: "Esta clínica não tem atendente de IA ativo." };
+  }
+
+  await prisma.conversation.update({
+    where: { id: conversationId },
+    data: { aiEnabled: true },
+  });
+
+  await prisma.message.create({
+    data: {
+      conversationId,
+      direction: "OUTBOUND",
+      type: "INTERNAL_NOTE",
+      content: "🤖 Atendimento devolvido pra IA.",
+      status: "SENT",
     },
   });
 
@@ -889,6 +960,10 @@ export async function resolveConversation(
 
   revalidatePath("/clinic/inbox");
   revalidatePath("/clinic/crm");
+
+  // Fire-and-forget — auditoria de qualidade (FRT/TTR/sentimento) nunca deve atrasar o
+  // atendente fechando o atendimento (ver analyzeConversationQuality).
+  analyzeConversationQuality(conversationId).catch(() => {});
 }
 
 export async function reopenConversation(conversationId: string) {
@@ -1215,15 +1290,26 @@ export async function getChatContactHistory(conversationId: string) {
   });
 
   const statusMap = { PENDING: "agendada", CONFIRMED: "agendada", COMPLETED: "concluida", CANCELLED: "cancelada", NO_SHOW: "cancelada" } as const;
+  // `Appointment.date` é @db.Date, sempre meia-noite UTC (mesmo motivo do `timeZone: "UTC"`
+  // já usado no formatador abaixo) — compara contra meia-noite UTC de hoje, nunca `new Date()`
+  // puro, pra não repetir o bug de fuso já corrigido em outros lugares (ver bridge-reminders.ts).
+  const todayUtc = new Date(new Date().toISOString().slice(0, 10) + "T00:00:00.000Z");
 
-  return appointments.map((appointment) => ({
-    id: appointment.id,
-    specialty: appointment.clinicProcedure.procedure.name,
-    doctor: appointment.timeSlot ? `Horário: ${appointment.timeSlot}` : "Ordem de chegada",
-    date: new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeZone: "UTC" }).format(appointment.date),
-    status: statusMap[appointment.status],
-    price: undefined,
-  }));
+  return appointments.map((appointment) => {
+    const effectivePrice = appointment.clinicProcedure.promotionalPrice ?? appointment.clinicProcedure.price;
+    return {
+      id: appointment.id,
+      specialty: appointment.clinicProcedure.procedure.name,
+      doctor: appointment.timeSlot ? `Horário: ${appointment.timeSlot}` : "Ordem de chegada",
+      date: new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeZone: "UTC" }).format(appointment.date),
+      status: statusMap[appointment.status],
+      // 0 = "valor sob consulta" no catálogo (ver getSpecialtyStartingPrices em search.ts) — não é
+      // um preço de verdade, então não mostra "R$ 0,00" no histórico.
+      price: Number(effectivePrice) > 0 ? formatCurrency(effectivePrice.toString()) : undefined,
+      preparationInstructions: appointment.clinicProcedure.procedure.preparationInstructions ?? undefined,
+      isUpcoming: appointment.date.getTime() >= todayUtc.getTime() && (appointment.status === "PENDING" || appointment.status === "CONFIRMED"),
+    };
+  });
 }
 
 export async function assignConversationToUser(conversationId: string, targetUserId: string) {

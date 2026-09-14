@@ -16,6 +16,7 @@ import {
   refreshContactPhoto,
   assignConversationToUser,
   claimConversation,
+  reactivateAiForConversation,
   transferConversation,
   getAttendantCapacity,
   resolveConversation,
@@ -38,6 +39,7 @@ import {
   markAssignmentSeen,
   editMessage,
   transcribeMessageAudio,
+  extractMessageInvoiceData,
   getReplySuggestions,
 } from "@/actions/inbox";
 import {
@@ -54,6 +56,7 @@ import {
   refreshContactPhotoAdmin,
   assignConversationToUserAdmin,
   claimConversationAdmin,
+  reactivateAiForConversationAdmin,
   transferConversationAdmin,
   getAttendantCapacityAdmin,
   resolveConversationAdmin,
@@ -79,6 +82,7 @@ import {
   getOutboundFromDeviceStatsAdmin,
   editMessageAdmin,
   transcribeMessageAudioAdmin,
+  extractMessageInvoiceDataAdmin,
   getReplySuggestionsAdmin,
   openGlpiTicketAdmin,
   listGlpiEntitiesAdmin,
@@ -129,6 +133,7 @@ const ACTIONS_BY_SCOPE = {
     markAssignmentSeen: (id: string) => markAssignmentSeen(id),
     editMessage: (id: string, text: string) => editMessage(id, text),
     transcribeMessageAudio: (id: string) => transcribeMessageAudio(id),
+    extractMessageInvoiceData: (id: string) => extractMessageInvoiceData(id),
     getReplySuggestions: (id: string) => getReplySuggestions(id),
   },
   admin: {
@@ -158,6 +163,7 @@ const ACTIONS_BY_SCOPE = {
     markAssignmentSeen: (id: string) => markAssignmentSeenAdmin(id),
     editMessage: (id: string, text: string) => editMessageAdmin(id, text),
     transcribeMessageAudio: (id: string) => transcribeMessageAudioAdmin(id),
+    extractMessageInvoiceData: (id: string) => extractMessageInvoiceDataAdmin(id),
     getReplySuggestions: (id: string) => getReplySuggestionsAdmin(id),
   },
 };
@@ -768,6 +774,17 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
     }
   }
 
+  async function handleReactivateAi() {
+    if (!selectedContactId) return { success: false as const, message: "Nenhuma conversa selecionada." };
+    const reactivateFn = scope === "admin" ? reactivateAiForConversationAdmin : reactivateAiForConversation;
+    const result = await reactivateFn(selectedContactId);
+    if (result.success) {
+      await refreshContacts();
+      await refreshMessages();
+    }
+    return result;
+  }
+
   async function handleMarkUnread() {
     if (!selectedContactId) return;
     await actions.markConversationUnread(selectedContactId);
@@ -796,6 +813,10 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
 
   async function handleTranscribeAudio(messageId: string) {
     return actions.transcribeMessageAudio(messageId);
+  }
+
+  async function handleExtractInvoiceData(messageId: string) {
+    return actions.extractMessageInvoiceData(messageId);
   }
 
   async function handleTransferAgent(agentId: string) {
@@ -841,10 +862,12 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
           onUpdatePatient={handleUpdatePatient}
           onUpdateFunnelStage={handleUpdateFunnelStage}
           onClaimConversation={handleClaimConversation}
+          onReactivateAi={handleReactivateAi}
           onMarkUnread={handleMarkUnread}
           onRetryMessage={handleRetryMessage}
           onEditMessage={handleEditMessage}
           onTranscribeAudio={handleTranscribeAudio}
+          onExtractInvoiceData={handleExtractInvoiceData}
           onTransferAgent={handleTransferAgent}
           availableClinics={scope === "admin" ? availableClinics : undefined}
           onReassignClinic={scope === "admin" ? handleReassignClinic : undefined}

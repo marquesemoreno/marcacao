@@ -1,3 +1,5 @@
+import type { InvoiceData } from "@/lib/chat-messages";
+
 export type Department = 'recepcao' | 'agendamento' | 'financeiro';
 
 export type InboxFilter = 'minhas' | 'nao_atribuidas' | 'todas' | 'finalizadas';
@@ -6,6 +8,11 @@ export type Channel = 'whatsapp' | 'instagram' | 'webchat';
 
 export type FunnelStage = 'novos' | 'triagem' | 'orcamento' | 'agendado';
 
+/** Estado único da conversa pra fila do inbox — calculado na hora (ver computeQueueState
+ * em chat-crm-adapters.ts), nunca persistido. Prioridade decrescente na fila: urgência >
+ * sem dono > resto (humano/IA/aguardando paciente mantêm ordem cronológica entre si). */
+export type ConversationQueueState = "URGENCIA_CLINICA" | "SEM_DONO" | "HUMANO_ATENDENDO" | "IA_ATENDENDO" | "AGUARDANDO_PACIENTE";
+
 export interface ConsultationRecord {
   id: string;
   specialty: string;
@@ -13,6 +20,13 @@ export interface ConsultationRecord {
   date: string;
   status: 'concluida' | 'cancelada' | 'agendada';
   price?: string;
+  /** Preparo de exame já cadastrado pra esse procedimento (ver Procedure.preparationInstructions)
+   * — mesmo texto que já é enviado por WhatsApp na confirmação/lembrete. */
+  preparationInstructions?: string;
+  /** true = data igual ou depois de hoje e ainda "agendada" — usado pra separar "Próximos
+   * Agendamentos" de "Histórico" na tela (pedido original: as duas coisas são listas
+   * distintas, não uma única lista ordenada por data mais recente). */
+  isUpcoming?: boolean;
 }
 
 export interface Message {
@@ -44,6 +58,8 @@ export interface Message {
   canEdit?: boolean;
   /** Texto transcrito do áudio (ver botão "Transcrever" em message-bubble.tsx) — undefined até a atendente pedir. */
   transcription?: string;
+  /** Dados de nota fiscal extraídos sob demanda (ver botão "Extrair dados" em message-bubble.tsx) — undefined até a atendente pedir. */
+  extractedInvoiceData?: InvoiceData;
 }
 
 export interface Contact {
@@ -55,6 +71,7 @@ export interface Contact {
   /** Entidade (empresa cliente) do GLPI vinculada a este contato — só relevante pro
    * TIVDC, que usa isso pra abrir chamado na empresa certa (ver Contact.glpiEntityId). */
   glpiEntityId?: number | null;
+  queueState: ConversationQueueState;
   avatar?: string;
   responsibleAgent: string;
   department: Department;
