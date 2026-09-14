@@ -8,6 +8,7 @@ import { notifyInboxRealtime } from "@/lib/supabase-server";
 import { MEDIA_DOWNLOAD_FAILED_PREFIX } from "@/lib/chat-messages";
 import { isBroadcastOptOutReply } from "@/lib/broadcast-csv";
 import { reopenIfResolved } from "@/lib/conversation-reopen";
+import { URGENCY_TAG } from "@/lib/conversation-tags";
 import { resolveStatusFromReply, isRescheduleReply, wasSentConfirmationPrompt } from "@/lib/appointment-reply";
 import { buildBridgeConfirmationFollowUp } from "@/lib/bridge-confirmation";
 import { extractBridgeNumeroFromNotes, confirmBridgeAppointment, verifyBridgeAppointmentPersisted } from "@/lib/hospital-bridge";
@@ -497,6 +498,27 @@ export async function POST(request: Request) {
       where: { id: conversation.id },
       data: { lastMessageAt: new Date(), ...reopenIfResolved(conversation) },
     });
+
+    // =========================================================================
+    // 2.05 TRIAGEM DE URGÊNCIA CLÍNICA: roda em TODA mensagem, de QUALQUER
+    // clínica — antes, matchEscalationTrigger só era checado dentro do fluxo de
+    // IA (2.2 abaixo), então clínica sem IA ativa (Urolaser, Santa Clara, RC)
+    // nunca tinha esse alerta nenhum. Marca a conversa com uma tag de destaque
+    // visual na fila (ver URGENCY_TAG, InboxLayout) e grava histórico em
+    // MessageTriage pra auditoria — nunca bloqueia nem muda o resto do fluxo.
+    // =========================================================================
+    const urgencyReason = matchEscalationTrigger(incoming.text);
+    if (urgencyReason) {
+      await prisma.messageTriage.create({
+        data: { conversationId: conversation.id, messageContent: incoming.text, redFlags: [urgencyReason] },
+      });
+      if (!conversation.tags.includes(URGENCY_TAG)) {
+        await prisma.conversation.update({
+          where: { id: conversation.id },
+          data: { tags: { push: URGENCY_TAG } },
+        });
+      }
+    }
 
     // =========================================================================
     // 2.1 MENSAGEM DE BOAS-VINDAS: dispara só na primeira Conversation de verdade

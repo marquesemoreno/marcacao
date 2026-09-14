@@ -50,7 +50,9 @@ import {
   Smartphone,
   MessageSquarePlus,
   ChevronsUpDown,
+  AlertTriangle,
 } from 'lucide-react';
+import { URGENCY_TAG } from '@/lib/conversation-tags';
 
 const MAX_MEDIA_SIZE_BYTES = 15 * 1024 * 1024; // 15 MB — mesmo limite validado no servidor
 
@@ -828,12 +830,19 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
           ) : (
             filteredContacts.map((c) => {
               const isSelected = c.id === selectedContact?.id;
+              // Maior prioridade visual de todas — mesmo selecionada ou já vista,
+              // uma conversa com red flag clínico continua chamando atenção (ver
+              // matchEscalationTrigger no webhook, que agora roda em toda mensagem,
+              // de qualquer clínica, não só quando a IA está ativa).
+              const isUrgent = c.tags.includes(URGENCY_TAG);
               return (
                 <div
                   key={c.id}
                   onClick={() => handleSelectContactMobile(c.id)}
                   className={`px-3 py-2 transition-colors cursor-pointer relative flex gap-2.5 items-start border-l-4 ${
-                    isSelected
+                    isUrgent
+                      ? 'bg-rose-50 dark:bg-rose-950/30 border-rose-600 hover:bg-rose-100/70 dark:hover:bg-rose-950/50'
+                      : isSelected
                       ? 'bg-white dark:bg-slate-800/70 border-emerald-600 shadow-sm'
                       : c.hasUnseenAssignment
                       ? 'bg-amber-50/60 dark:bg-amber-950/20 border-amber-400 hover:bg-amber-100/60 dark:hover:bg-amber-950/40'
@@ -872,6 +881,12 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                         )}
                       </span>
                     </div>
+
+                    {isUrgent && (
+                      <p className="text-[10px] font-bold text-rose-700 dark:text-rose-400 mb-0.5 flex items-center gap-1">
+                        <AlertTriangle className="w-2.5 h-2.5" /> Urgência clínica
+                      </p>
+                    )}
 
                     {c.hasUnseenAssignment && (
                       <p className="text-[10px] font-bold text-amber-700 dark:text-amber-400 mb-0.5 flex items-center gap-1">

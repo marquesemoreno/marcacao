@@ -440,6 +440,7 @@ model Conversation {
   assignedUser User?              @relation("ConversationAssignee", fields: [assignedUserId], references: [id])
   messages     Message[]
   aiLogs       AiInteractionLog[]
+  triages      MessageTriage[]
 
   @@index([clinicId, status])
   @@index([contactId])
@@ -561,6 +562,25 @@ model AiInteractionLog {
 
   @@index([conversationId])
   @@map("ai_interaction_logs")
+}
+
+/// Auditoria de triagem de urgência clínica (ver matchEscalationTrigger em
+/// ai-attendant.ts, usado como o classificador de red flags aqui) — roda em TODA
+/// mensagem recebida de TODA clínica, independente de a IA estar ativa ou não
+/// (antes só rodava dentro do fluxo de IA, então clínica sem IA ativa — Urolaser,
+/// Santa Clara, RC — nunca tinha esse alerta). Vira tag na conversa (ver
+/// URGENCY_TAG) pra aparecer na fila; esta tabela é só o histórico/auditoria.
+model MessageTriage {
+  id             String   @id @default(cuid())
+  conversationId String   @map("conversation_id")
+  messageContent String   @db.Text @map("message_content")
+  redFlags       String[] @map("red_flags")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  conversation Conversation @relation(fields: [conversationId], references: [id])
+
+  @@index([conversationId])
+  @@map("message_triage")
 }
 
 enum BroadcastCampaignStatus {
