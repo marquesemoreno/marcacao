@@ -341,6 +341,26 @@ export async function createBridgeAppointment(
       time: input.timeSlot || null,
     });
     await sendWhatsAppMessage(input.patientPhone, messageText, "appointment.bridge_confirmation", clinicId);
+
+    // Espelha a mensagem na plataforma — sem isso, o texto real só aparecia no
+    // WhatsApp do paciente, nunca na tela da atendente (mesmo bug já corrigido em
+    // outras mensagens deste arquivo, ver bridge_confirmation_followup/reschedule_ack
+    // logo abaixo — só faltava consertar essa, a primeira do fluxo).
+    const phone = formatToWhatsAppNumber(input.patientPhone);
+    let contact = await prisma.contact.findUnique({ where: { phone } });
+    if (!contact) {
+      contact = await prisma.contact.create({ data: { name: input.patientName, phone } });
+    }
+    let conversation = await prisma.conversation.findFirst({ where: { clinicId, contactId: contact.id } });
+    if (!conversation) {
+      conversation = await prisma.conversation.create({
+        data: { clinicId, contactId: contact.id, status: "OPEN", lastMessageAt: new Date(), tags: ["✅ Agendado"] },
+      });
+    }
+    await prisma.message.create({
+      data: { conversationId: conversation.id, direction: "OUTBOUND", content: messageText, status: "DELIVERED" },
+    });
+    await prisma.conversation.update({ where: { id: conversation.id }, data: { lastMessageAt: new Date() } });
   } catch (error) {
     console.error("Falha ao enviar confirmação do agendamento (bridge):", error);
   }
