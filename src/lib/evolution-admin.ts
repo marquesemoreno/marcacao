@@ -67,12 +67,29 @@ export async function createEvolutionInstance(config: EvolutionInstanceConfig) {
   });
 }
 
+/** Domínio usado só pra registrar o webhook na Evolution API — diferente de getBaseUrl()
+ * (usado em links visíveis a humanos, ex: QR Code/WhatsApp), que aponta de propósito pro
+ * domínio "oficial" sem www. Aqui isso é um problema real: confirmado em produção que
+ * `https://conectasaudevc.com.br` responde com 308 redirecionando pra `www.` — bug real
+ * relatado por mais de uma clínica ("às vezes" a mensagem não chega no inbox), porque não
+ * há garantia de que o disparo de webhook da Evolution API siga esse redirecionamento de
+ * forma confiável a cada envio. Registrar direto no destino final elimina esse risco.
+ */
+function getWebhookBaseUrl(): string {
+  const base = getBaseUrl();
+  return base === "https://conectasaudevc.com.br" ? "https://www.conectasaudevc.com.br" : base;
+}
+
 /** Configura o webhook da instância pra apontar pro endpoint compartilhado do projeto.
  * MESSAGES_SET carrega a sincronização de histórico (Baileys/WhatsApp multi-dispositivo,
  * ver setEvolutionSyncFullHistory) — sem assinar esse evento aqui, o histórico nunca
- * chega no nosso webhook mesmo com syncFullHistory ativado na instância. */
+ * chega no nosso webhook mesmo com syncFullHistory ativado na instância. MESSAGES_DELETE
+ * é o que alimenta handleMessageDelete (route.ts) — precisa estar aqui pra QUALQUER
+ * instância registrada/atualizada por este código; antes só a Santa Clara tinha esse
+ * evento (configurado manualmente fora deste código em algum momento), então recriar o
+ * webhook de outra clínica por aqui apagava silenciosamente o "apagar para todos" dela. */
 export async function setEvolutionWebhook(config: EvolutionInstanceConfig) {
-  const webhookUrl = `${getBaseUrl()}/api/webhooks/whatsapp`;
+  const webhookUrl = `${getWebhookBaseUrl()}/api/webhooks/whatsapp`;
   return evolutionFetch<unknown>(config, `/webhook/set/${config.instanceName}`, {
     method: "POST",
     body: JSON.stringify({
@@ -80,7 +97,7 @@ export async function setEvolutionWebhook(config: EvolutionInstanceConfig) {
         url: webhookUrl,
         enabled: true,
         webhookByEvents: false,
-        events: ["MESSAGES_UPSERT", "MESSAGES_UPDATE", "MESSAGES_SET"],
+        events: ["MESSAGES_UPSERT", "MESSAGES_UPDATE", "MESSAGES_SET", "MESSAGES_DELETE"],
       },
     }),
   });
