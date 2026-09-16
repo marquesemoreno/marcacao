@@ -43,7 +43,7 @@ Por favor, responda com o número da opção desejada:
  * wasSentConfirmationPrompt (ver appointment-reply.ts) junto com o marcador
  * "Digite 1..." das outras clínicas, já que aqui não existe menu numerado nenhum
  * pro paciente responder. */
-export const LARA_CONFIRMATION_MARKER = "responda SIM para confirmar sua presença";
+export const LARA_CONFIRMATION_MARKER = "responda *SIM* para confirmar sua presença";
 
 /** Variante do lembrete D-1 usada só pela Urolaser (pedido do cliente: recriar a
  * persona "Lara", atendente virtual deles, que já existia num sistema anterior —
@@ -72,7 +72,7 @@ export function buildUrolaserLaraReminderMessage(input: BridgeReminderInput): st
 
 Estou passando para te lembrar que você tem ${appointmentLabel} para o dia *${input.dateFormatted}*${timeText}.
 
-Por favor, ${LARA_CONFIRMATION_MARKER}. Se não puder comparecer ou precisar remarcar, responda NÃO!
+Por favor, ${LARA_CONFIRMATION_MARKER}. Se não puder comparecer ou precisar remarcar, responda *NÃO*!
 
 Obrigada! 💙`;
 }

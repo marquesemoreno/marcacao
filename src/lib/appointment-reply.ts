@@ -48,7 +48,8 @@ export function isRescheduleReply(text: string): boolean {
 const CONFIRMATION_PROMPT_MARKERS = [
   "Digite 1 para Confirmar presença",
   "responda esta mensagem para confirmar sua presença", // formato antigo da Lara — mantido pra reconhecer lembretes já enviados antes da mudança pro formato SIM/NÃO (15/09/2026)
-  "responda SIM para confirmar sua presença",
+  "responda SIM para confirmar sua presença", // formato SIM/NÃO sem negrito — mantido pra reconhecer lembretes enviados antes do SIM/NÃO virar negrito (15/09/2026)
+  "responda *SIM* para confirmar sua presença",
 ];
 
 /** Bug real (relatado por atendente, com print do WhatsApp): paciente respondia "Sim"

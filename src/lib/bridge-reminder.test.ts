@@ -83,10 +83,10 @@ describe("buildUrolaserLaraReminderMessage", () => {
     expect(message).not.toContain("uma Consulta");
   });
 
-  it("pede resposta SIM/NÃO em vez de menu numerado ou texto livre", () => {
+  it("pede resposta SIM/NÃO em negrito, em vez de menu numerado ou texto livre", () => {
     const message = buildUrolaserLaraReminderMessage(base);
-    expect(message).toContain("responda SIM para confirmar sua presença");
-    expect(message).toContain("responda NÃO");
+    expect(message).toContain("responda *SIM* para confirmar sua presença");
+    expect(message).toContain("responda *NÃO*");
   });
 
   it("não usa menu numerado nem link/telefone externo", () => {

@@ -70,10 +70,18 @@ describe("wasSentConfirmationPrompt", () => {
     ).toBe(true);
   });
 
-  it("reconhece a versão atual da Lara (Urolaser), que pede SIM/NÃO", () => {
+  it("reconhece a versão SIM/NÃO sem negrito da Lara — lembretes enviados antes do SIM/NÃO virar negrito", () => {
     expect(
       wasSentConfirmationPrompt(
         "Olá *Vivaldo José de Oliveira*! Eu sou a Lara, atendente virtual da Urolaser 😊\n\nEstou passando para te lembrar que você tem uma Consulta com Dr. *João Souza* para o dia *20/02/2026* a partir de *09:30* (atendimento por ordem de chegada).\n\nPor favor, responda SIM para confirmar sua presença. Se não puder comparecer ou precisar remarcar, responda NÃO!\n\nObrigada! 💙"
+      )
+    ).toBe(true);
+  });
+
+  it("reconhece a versão atual da Lara (Urolaser), com SIM/NÃO em negrito", () => {
+    expect(
+      wasSentConfirmationPrompt(
+        "Olá *Vivaldo José de Oliveira*! Eu sou a Lara, atendente virtual da Urolaser 😊\n\nEstou passando para te lembrar que você tem uma Consulta com Dr. *João Souza* para o dia *20/02/2026* a partir de *09:30* (atendimento por ordem de chegada).\n\nPor favor, responda *SIM* para confirmar sua presença. Se não puder comparecer ou precisar remarcar, responda *NÃO*!\n\nObrigada! 💙"
       )
     ).toBe(true);
   });
