@@ -45,7 +45,11 @@ export function isRescheduleReply(text: string): boolean {
  * bridge-confirmation.ts e sendAppointmentConfirmation em whatsapp.ts. A versão "Lara"
  * do lembrete (só Urolaser) não tem menu numerado, por isso tem seu próprio marcador
  * (ver LARA_CONFIRMATION_MARKER em bridge-reminder.ts) somado à lista aqui. */
-const CONFIRMATION_PROMPT_MARKERS = ["Digite 1 para Confirmar presença", "responda esta mensagem para confirmar sua presença"];
+const CONFIRMATION_PROMPT_MARKERS = [
+  "Digite 1 para Confirmar presença",
+  "responda esta mensagem para confirmar sua presença", // formato antigo da Lara — mantido pra reconhecer lembretes já enviados antes da mudança pro formato SIM/NÃO (15/09/2026)
+  "responda SIM para confirmar sua presença",
+];
 
 /** Bug real (relatado por atendente, com print do WhatsApp): paciente respondia "Sim"
  * pra uma pergunta qualquer da atendente no meio de uma conversa manual (ex: "seria

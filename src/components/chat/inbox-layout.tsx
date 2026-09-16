@@ -53,6 +53,7 @@ import {
   MessageSquarePlus,
   ChevronsUpDown,
   Bot,
+  Smile,
 } from 'lucide-react';
 
 const MAX_MEDIA_SIZE_BYTES = 15 * 1024 * 1024; // 15 MB — mesmo limite validado no servidor
@@ -63,6 +64,14 @@ const PRESET_TAGS: { label: string; classes: string }[] = [
   { label: '✅ Confirmado', classes: 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800' },
   { label: 'Urologia', classes: 'bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800' },
   { label: 'Lead B2B', classes: 'bg-sky-50 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 border-sky-200 dark:border-sky-800' },
+];
+
+/** Conjunto curado (não é seletor completo de unicode) — cobre o uso comum de
+ * atendimento clínico por WhatsApp sem precisar de biblioteca externa de emoji. */
+const COMPOSER_EMOJIS = [
+  '😊', '🙂', '😀', '😉', '👍', '🙏', '❤️', '🎉',
+  '😢', '😅', '👋', '✅', '❌', '⏰', '📅', '💊',
+  '🩺', '📍', '📞', '📎', '🤒', '😴', '💉', '🚑',
 ];
 
 function tagClasses(tag: string) {
@@ -202,6 +211,117 @@ interface InboxLayoutProps {
   onUpdateContactGlpiEntity?: (glpiEntityId: number | null) => Promise<{ success: boolean; error?: string }>;
 }
 
+/** Extraído do map da lista pra virar React.memo: sem isso, cada linha era recriada
+ * (e re-renderizada) a cada render de InboxLayout inteiro, inclusive a cada keystroke
+ * no campo de mensagem (inputText é state do próprio InboxLayout) — travava a
+ * digitação em filas com muitas conversas. Memo só recalcula quando o contato, a
+ * seleção ou o callback realmente mudam. */
+const ContactListItem = React.memo(function ContactListItem({
+  contact: c,
+  isSelected,
+  onSelect,
+}: {
+  contact: Contact;
+  isSelected: boolean;
+  onSelect: (id: string) => void;
+}) {
+  // Prioridade visual = mesma prioridade da ordenação da fila (urgência >
+  // sem dono > resto) — "selecionada" só desempata dentro do último grupo,
+  // nunca esconde uma urgência clínica ou uma conversa sem dono nenhum
+  // (ver matchEscalationTrigger no webhook e computeQueueState em
+  // chat-crm-adapters.ts).
+  const rowColorClasses =
+    c.queueState === 'URGENCIA_CLINICA'
+      ? 'bg-rose-50 dark:bg-rose-950/30 border-rose-600 hover:bg-rose-100/70 dark:hover:bg-rose-950/50'
+      : c.queueState === 'SEM_DONO'
+      ? 'bg-amber-50/60 dark:bg-amber-950/20 border-amber-400 hover:bg-amber-100/60 dark:hover:bg-amber-950/40'
+      : isSelected
+      ? 'bg-white dark:bg-slate-800/70 border-emerald-600 shadow-sm'
+      : 'hover:bg-slate-200/50 dark:hover:bg-slate-800/40 border-transparent';
+  return (
+    <div
+      onClick={() => onSelect(c.id)}
+      className={`px-3 py-2 transition-colors cursor-pointer relative flex gap-2.5 items-start border-l-4 ${rowColorClasses}`}
+      data-od-id={`contact-card-${c.id}`}
+    >
+      <div className="relative shrink-0">
+        <AvatarBadge name={c.name} photoUrl={c.avatar} size={34} className="ring-2 ring-white dark:ring-slate-900 shadow-sm" />
+        {c.channel === 'whatsapp' && (
+          <span
+            className="absolute -bottom-1 -right-1 w-3.5 h-3.5 bg-emerald-500 border-2 border-white dark:border-slate-900 rounded-full flex items-center justify-center text-white"
+            title="Canal: WhatsApp"
+          >
+            <MessageSquare className="w-2 h-2 fill-current" />
+          </span>
+        )}
+      </div>
+
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center justify-between mb-0.5 gap-2">
+          <h4 className={`text-xs sm:text-[13px] truncate ${c.unreadCount > 0 ? 'font-bold text-slate-900 dark:text-slate-100' : 'font-semibold text-slate-900 dark:text-slate-100'}`}>
+            {c.name}
+          </h4>
+          <span className="flex items-center gap-1.5 shrink-0">
+            <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">
+              {c.lastMessageTime}
+            </span>
+            {c.unreadCount > 0 && (
+              <span
+                className="min-w-[16px] h-4 px-1 rounded-full bg-emerald-600 text-white text-[9px] font-bold flex items-center justify-center"
+                title={`${c.unreadCount} mensagem(ns) não lida(s)`}
+              >
+                {c.unreadCount > 9 ? '9+' : c.unreadCount}
+              </span>
+            )}
+          </span>
+        </div>
+
+        <p className={`text-[10px] font-bold mb-0.5 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md ${QUEUE_STATE_BADGE[c.queueState].classes}`}>
+          {QUEUE_STATE_BADGE[c.queueState].label}
+        </p>
+
+        {c.hasUnseenAssignment && (
+          <p className="text-[10px] font-bold text-amber-700 dark:text-amber-400 mb-0.5 flex items-center gap-1">
+            <Zap className="w-2.5 h-2.5" /> Transferida pra você
+          </p>
+        )}
+
+        {c.clinicName && (
+          <p className="text-[10px] font-semibold text-sky-700 dark:text-sky-400 mb-0.5 truncate">{c.clinicName}</p>
+        )}
+
+        <p className="text-xs text-slate-500 dark:text-slate-400 truncate mb-1.5 leading-snug">
+          {c.lastMessage}
+        </p>
+
+        <div className="flex items-center justify-between gap-1">
+          <span
+            className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md border ${
+              c.statusTag.variant === 'emerald'
+                ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
+                : c.statusTag.variant === 'amber'
+                ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800'
+                : 'bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800'
+            }`}
+          >
+            {c.statusTag.label}
+          </span>
+
+          {c.responsibleAgent && c.responsibleAgent.toLowerCase() !== 'não atribuído' ? (
+            <span className="inline-flex items-center gap-0.5 text-[10px] font-medium text-slate-500 dark:text-slate-300 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-1.5 py-0.5 rounded-md truncate max-w-[85px]" title={`Atribuído a ${c.responsibleAgent}`}>
+              <User className="w-2.5 h-2.5 shrink-0" /> {c.responsibleAgent.split(' ')[0]}
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-800 px-1.5 py-0.5 rounded-md" title="Aguardando secretária">
+              <Clock className="w-2.5 h-2.5" /> Livre
+            </span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+});
+
 export const InboxLayout: React.FC<InboxLayoutProps> = ({
   contacts,
   agents,
@@ -301,6 +421,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
   const [newContactClinicId, setNewContactClinicId] = useState('');
   const [isSavingContact, setIsSavingContact] = useState(false);
   const [isQuickReplyOpen, setIsQuickReplyOpen] = useState(false);
+  const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
   const quickReplyRef = useClickOutside<HTMLFormElement>(isQuickReplyOpen, () => setIsQuickReplyOpen(false));
   const [isNewQuickReplyModalOpen, setIsNewQuickReplyModalOpen] = useState(false);
   const [newShortcut, setNewShortcut] = useState('');
@@ -400,10 +521,13 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
     selectedContactId ? 'chat' : 'queue'
   );
 
-  const handleSelectContactMobile = (id: string) => {
-    onSelectContact(id);
-    setMobileView('chat');
-  };
+  const handleSelectContactMobile = React.useCallback(
+    (id: string) => {
+      onSelectContact(id);
+      setMobileView('chat');
+    },
+    [onSelectContact]
+  );
 
   // Limpa o rascunho da caixa de digitação ao trocar de conversa — sem isso, um texto
   // gerado (ex: pelo "Melhorar com IA") e nunca enviado ficava ali e podia sair sem
@@ -475,23 +599,30 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
     return [...PRESET_TAGS, ...customTags.map((label) => ({ label, classes: tagClasses(label) }))];
   }, [contacts]);
 
-  const filteredContacts = contacts
-    .filter((contact) => {
-      if (selectedDept !== 'todos' && contact.department !== selectedDept) return false;
-      if (selectedTagFilter && !contact.tags.includes(selectedTagFilter)) return false;
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase();
-        return (
-          contact.name.toLowerCase().includes(q) ||
-          contact.phone.includes(q) ||
-          contact.lastMessage.toLowerCase().includes(q)
-        );
-      }
-      return true;
-    })
-    // Estável: só reordena por prioridade (urgência > sem dono > resto), preserva a
-    // ordem por lastMessageAt que já vem do banco dentro de cada nível.
-    .sort((a, b) => QUEUE_STATE_PRIORITY[a.queueState] - QUEUE_STATE_PRIORITY[b.queueState]);
+  // useMemo é essencial aqui: sem isso, esse filter+sort roda de novo a cada
+  // keystroke no campo de texto (inputText é state deste mesmo componente),
+  // travando a digitação em clínicas com lista grande de conversas.
+  const filteredContacts = useMemo(
+    () =>
+      contacts
+        .filter((contact) => {
+          if (selectedDept !== 'todos' && contact.department !== selectedDept) return false;
+          if (selectedTagFilter && !contact.tags.includes(selectedTagFilter)) return false;
+          if (searchQuery.trim()) {
+            const q = searchQuery.toLowerCase();
+            return (
+              contact.name.toLowerCase().includes(q) ||
+              contact.phone.includes(q) ||
+              contact.lastMessage.toLowerCase().includes(q)
+            );
+          }
+          return true;
+        })
+        // Estável: só reordena por prioridade (urgência > sem dono > resto), preserva a
+        // ordem por lastMessageAt que já vem do banco dentro de cada nível.
+        .sort((a, b) => QUEUE_STATE_PRIORITY[a.queueState] - QUEUE_STATE_PRIORITY[b.queueState]),
+    [contacts, selectedDept, selectedTagFilter, searchQuery]
+  );
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -881,105 +1012,14 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
               <span>Nenhuma conversa encontrada nesta lista.</span>
             </div>
           ) : (
-            filteredContacts.map((c) => {
-              const isSelected = c.id === selectedContact?.id;
-              // Prioridade visual = mesma prioridade da ordenação da fila (urgência >
-              // sem dono > resto) — "selecionada" só desempata dentro do último grupo,
-              // nunca esconde uma urgência clínica ou uma conversa sem dono nenhum
-              // (ver matchEscalationTrigger no webhook e computeQueueState em
-              // chat-crm-adapters.ts).
-              const rowColorClasses =
-                c.queueState === 'URGENCIA_CLINICA'
-                  ? 'bg-rose-50 dark:bg-rose-950/30 border-rose-600 hover:bg-rose-100/70 dark:hover:bg-rose-950/50'
-                  : c.queueState === 'SEM_DONO'
-                  ? 'bg-amber-50/60 dark:bg-amber-950/20 border-amber-400 hover:bg-amber-100/60 dark:hover:bg-amber-950/40'
-                  : isSelected
-                  ? 'bg-white dark:bg-slate-800/70 border-emerald-600 shadow-sm'
-                  : 'hover:bg-slate-200/50 dark:hover:bg-slate-800/40 border-transparent';
-              return (
-                <div
-                  key={c.id}
-                  onClick={() => handleSelectContactMobile(c.id)}
-                  className={`px-3 py-2 transition-colors cursor-pointer relative flex gap-2.5 items-start border-l-4 ${rowColorClasses}`}
-                  data-od-id={`contact-card-${c.id}`}
-                >
-                  <div className="relative shrink-0">
-                    <AvatarBadge name={c.name} photoUrl={c.avatar} size={34} className="ring-2 ring-white dark:ring-slate-900 shadow-sm" />
-                    {c.channel === 'whatsapp' && (
-                      <span
-                        className="absolute -bottom-1 -right-1 w-3.5 h-3.5 bg-emerald-500 border-2 border-white dark:border-slate-900 rounded-full flex items-center justify-center text-white"
-                        title="Canal: WhatsApp"
-                      >
-                        <MessageSquare className="w-2 h-2 fill-current" />
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between mb-0.5 gap-2">
-                      <h4 className={`text-xs sm:text-[13px] truncate ${c.unreadCount > 0 ? 'font-bold text-slate-900 dark:text-slate-100' : 'font-semibold text-slate-900 dark:text-slate-100'}`}>
-                        {c.name}
-                      </h4>
-                      <span className="flex items-center gap-1.5 shrink-0">
-                        <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">
-                          {c.lastMessageTime}
-                        </span>
-                        {c.unreadCount > 0 && (
-                          <span
-                            className="min-w-[16px] h-4 px-1 rounded-full bg-emerald-600 text-white text-[9px] font-bold flex items-center justify-center"
-                            title={`${c.unreadCount} mensagem(ns) não lida(s)`}
-                          >
-                            {c.unreadCount > 9 ? '9+' : c.unreadCount}
-                          </span>
-                        )}
-                      </span>
-                    </div>
-
-                    <p className={`text-[10px] font-bold mb-0.5 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md ${QUEUE_STATE_BADGE[c.queueState].classes}`}>
-                      {QUEUE_STATE_BADGE[c.queueState].label}
-                    </p>
-
-                    {c.hasUnseenAssignment && (
-                      <p className="text-[10px] font-bold text-amber-700 dark:text-amber-400 mb-0.5 flex items-center gap-1">
-                        <Zap className="w-2.5 h-2.5" /> Transferida pra você
-                      </p>
-                    )}
-
-                    {c.clinicName && (
-                      <p className="text-[10px] font-semibold text-sky-700 dark:text-sky-400 mb-0.5 truncate">{c.clinicName}</p>
-                    )}
-
-                    <p className="text-xs text-slate-500 dark:text-slate-400 truncate mb-1.5 leading-snug">
-                      {c.lastMessage}
-                    </p>
-
-                    <div className="flex items-center justify-between gap-1">
-                      <span
-                        className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md border ${
-                          c.statusTag.variant === 'emerald'
-                            ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
-                            : c.statusTag.variant === 'amber'
-                            ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800'
-                            : 'bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800'
-                        }`}
-                      >
-                        {c.statusTag.label}
-                      </span>
-
-                      {c.responsibleAgent && c.responsibleAgent.toLowerCase() !== 'não atribuído' ? (
-                        <span className="inline-flex items-center gap-0.5 text-[10px] font-medium text-slate-500 dark:text-slate-300 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-1.5 py-0.5 rounded-md truncate max-w-[85px]" title={`Atribuído a ${c.responsibleAgent}`}>
-                          <User className="w-2.5 h-2.5 shrink-0" /> {c.responsibleAgent.split(' ')[0]}
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-800 px-1.5 py-0.5 rounded-md" title="Aguardando secretária">
-                          <Clock className="w-2.5 h-2.5" /> Livre
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              );
-            })
+            filteredContacts.map((c) => (
+              <ContactListItem
+                key={c.id}
+                contact={c}
+                isSelected={c.id === selectedContact?.id}
+                onSelect={handleSelectContactMobile}
+              />
+            ))
           )}
         </div>
       </aside>
@@ -1440,6 +1480,38 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                           </button>
                         </>
                       )}
+
+                      <Popover open={isEmojiPickerOpen} onOpenChange={setIsEmojiPickerOpen}>
+                        <PopoverTrigger
+                          render={
+                            <button
+                              type="button"
+                              className="flex items-center justify-center w-9 h-9 text-slate-500 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors"
+                              title="Inserir emoji"
+                              aria-label="Inserir emoji"
+                            />
+                          }
+                        >
+                          <Smile className="w-4 h-4" />
+                        </PopoverTrigger>
+                        <PopoverContent align="start" className="p-2 w-auto">
+                          <div className="grid grid-cols-8 gap-1">
+                            {COMPOSER_EMOJIS.map((emoji) => (
+                              <button
+                                key={emoji}
+                                type="button"
+                                onClick={() => {
+                                  setInputText((prev) => prev + emoji);
+                                  setIsEmojiPickerOpen(false);
+                                }}
+                                className="w-7 h-7 flex items-center justify-center text-base rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                              >
+                                {emoji}
+                              </button>
+                            ))}
+                          </div>
+                        </PopoverContent>
+                      </Popover>
 
                       <button
                         type="button"

@@ -62,10 +62,18 @@ describe("wasSentConfirmationPrompt", () => {
     ).toBe(true);
   });
 
-  it("reconhece também a versão sem menu numerado (Lara, Urolaser)", () => {
+  it("reconhece a versão antiga sem menu numerado (Lara, Urolaser) — lembretes já enviados antes da mudança pro formato SIM/NÃO", () => {
     expect(
       wasSentConfirmationPrompt(
         "Olá Vivaldo! Eu sou a Lara, atendente virtual da Urolaser 😊\n\nEstou passando para te lembrar que você tem um atendimento agendado para o dia 20/02/2026 a partir de 09:30 (horário para fazer a ficha).\n\nPor favor, responda esta mensagem para confirmar sua presença. Se não puder comparecer ou precisar remarcar, é só nos avisar por aqui mesmo!\n\nObrigada! 💙"
+      )
+    ).toBe(true);
+  });
+
+  it("reconhece a versão atual da Lara (Urolaser), que pede SIM/NÃO", () => {
+    expect(
+      wasSentConfirmationPrompt(
+        "Olá *Vivaldo José de Oliveira*! Eu sou a Lara, atendente virtual da Urolaser 😊\n\nEstou passando para te lembrar que você tem uma Consulta com Dr. *João Souza* para o dia *20/02/2026* a partir de *09:30* (atendimento por ordem de chegada).\n\nPor favor, responda SIM para confirmar sua presença. Se não puder comparecer ou precisar remarcar, responda NÃO!\n\nObrigada! 💙"
       )
     ).toBe(true);
   });

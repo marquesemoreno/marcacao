@@ -56,8 +56,37 @@ describe("buildUrolaserLaraReminderMessage", () => {
     expect(message).toContain("Urolaser");
     expect(message).toContain("20/02/2026");
     expect(message).toContain("09:30");
-    expect(message).toContain("horário para fazer a ficha");
+    expect(message).toContain("atendimento por ordem de chegada");
     expect(message).toContain(LARA_CONFIRMATION_MARKER);
+  });
+
+  it("mostra 'Consulta com Dr. X' quando o procedimento é consulta, com nomes em title case", () => {
+    const message = buildUrolaserLaraReminderMessage({
+      ...base,
+      patientName: "DAVI GRALHA PEREIRA",
+      procedureName: "CONSULTA UROLOGIA",
+      doctorName: "ALAN PASCOAL SILVA SANTOS",
+    });
+    expect(message).toContain("*Davi Gralha Pereira*");
+    expect(message).toContain("uma Consulta com Dr. *Alan Pascoal Silva Santos*");
+    expect(message).not.toContain("CONSULTA UROLOGIA");
+    expect(message).not.toContain("ALAN PASCOAL SILVA SANTOS");
+  });
+
+  it("mostra o nome do exame (não 'Consulta') quando não é uma consulta", () => {
+    const message = buildUrolaserLaraReminderMessage({
+      ...base,
+      procedureName: "URODINAMICA COMPLETA",
+      doctorName: "DANILO LEITE ANDRADE",
+    });
+    expect(message).toContain("Urodinamica Completa com Dr. *Danilo Leite Andrade*");
+    expect(message).not.toContain("uma Consulta");
+  });
+
+  it("pede resposta SIM/NÃO em vez de menu numerado ou texto livre", () => {
+    const message = buildUrolaserLaraReminderMessage(base);
+    expect(message).toContain("responda SIM para confirmar sua presença");
+    expect(message).toContain("responda NÃO");
   });
 
   it("não usa menu numerado nem link/telefone externo", () => {
