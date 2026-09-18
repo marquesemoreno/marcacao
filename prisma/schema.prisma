@@ -588,6 +588,46 @@ model AiOutreachState {
   @@map("ai_outreach_state")
 }
 
+enum MspLeadStatus {
+  NEW
+  CONTACTED
+  REPLIED
+  NOT_INTERESTED
+
+  @@map("msp_lead_status")
+}
+
+/// Lead de prospecção do próprio negócio de suporte de TI da TIVDC (MSP) — não confundir
+/// com PartnerLead (clínica candidata a virar parceira do marketplace Conecta Saúde,
+/// domínio totalmente diferente: fechar um MspLead não cria nenhuma Clinic). Fonte
+/// original: TIVDC/MSP (fora deste repo) — ver msp-lead-outreach.ts.
+model MspLead {
+  id        String        @id @default(cuid())
+  name      String
+  segment   String?
+  city      String?       @default("Vitória da Conquista")
+  channel   String?
+  phone     String
+  notes     String?
+  status    MspLeadStatus @default(NEW)
+  createdAt DateTime      @default(now()) @map("created_at")
+  updatedAt DateTime      @updatedAt @map("updated_at")
+
+  @@map("msp_leads")
+}
+
+/// Singleton (1 linha só, id fixo "singleton") — controla o disparo automático de
+/// primeiro contato pros leads de MSP (ver src/lib/msp-lead-outreach.ts). Mesmo padrão
+/// de AiOutreachState; fica desligado até o admin ativar em /admin/leads-msp.
+model MspOutreachState {
+  id        String   @id @default("singleton")
+  enabled   Boolean  @default(false)
+  nextRunAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("msp_outreach_state")
+}
+
 model WebhookLog {
   id           String   @id @default(cuid())
   event        String

@@ -13,6 +13,7 @@ import {
   Share2,
   BarChart3,
   Megaphone,
+  Wrench,
   type LucideIcon,
 } from "lucide-react";
 
@@ -25,6 +26,7 @@ const navItems: { href: string; label: string; icon: LucideIcon; exact?: boolean
   { href: "/admin/crm", label: "CRM", icon: KanbanSquare },
   { href: "/admin/clinicas", label: "Clínicas", icon: Building2 },
   { href: "/admin/leads", label: "Leads B2B", icon: TrendingUp },
+  { href: "/admin/leads-msp", label: "Leads MSP", icon: Wrench },
   { href: "/admin/afiliados", label: "Marcadores", icon: Share2 },
   { href: "/admin/relatorio", label: "Relatórios", icon: BarChart3 },
 ];

@@ -2,6 +2,7 @@ import type {
   AppointmentStatus,
   AppointmentType,
   PartnerLeadStatus,
+  MspLeadStatus,
   ProcedureCategory,
   PixKeyType,
   AffiliateStatus,
@@ -144,6 +145,23 @@ export const partnerLeadStatusVariant: Record<
   CONTACTED: "outline",
   PARTNER: "default",
   REJECTED: "destructive",
+};
+
+export const mspLeadStatusLabels: Record<MspLeadStatus, string> = {
+  NEW: "Novo",
+  CONTACTED: "Contatado",
+  REPLIED: "Respondeu",
+  NOT_INTERESTED: "Sem interesse",
+};
+
+export const mspLeadStatusVariant: Record<
+  MspLeadStatus,
+  "default" | "secondary" | "destructive" | "outline"
+> = {
+  NEW: "secondary",
+  CONTACTED: "outline",
+  REPLIED: "default",
+  NOT_INTERESTED: "destructive",
 };
 
 export const pixKeyTypeLabels: Record<PixKeyType, string> = {
