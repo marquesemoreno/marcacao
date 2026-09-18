@@ -6,13 +6,19 @@ name: Lead outreach dispatch
 # (prospecção MSP da própria TIVDC) a cada 5 minutos; a frequência do disparo de verdade
 # de cada um é controlada dentro do respectivo tick (nextRunAt, jitter de 4-6min), não
 # por esse intervalo.
+#
+# Dois jobs separados (não dois steps do mesmo job): jobs do GitHub Actions rodam em
+# paralelo e são independentes por padrão — assim uma falha/timeout num endpoint (ex:
+# IA de parceiros fora do ar) nunca impede o outro job de rodar, o que aconteceria se
+# fossem steps sequenciais do mesmo job (o primeiro `curl -f` falhando pararia o job
+# antes do segundo step).
 on:
   schedule:
     - cron: "*/5 * * * *"
   workflow_dispatch: {}
 
 jobs:
-  dispatch:
+  partner-leads:
     runs-on: ubuntu-latest
     steps:
       - name: Chamar endpoint de contato automático via IA (leads de parceria)
@@ -21,6 +27,10 @@ jobs:
         run: |
           curl -sf -X GET "https://www.conectasaudevc.com.br/api/cron/lead-outreach" \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
+
+  msp-leads:
+    runs-on: ubuntu-latest
+    steps:
       - name: Chamar endpoint de prospecção MSP (TIVDC)
         run: |
           curl -sf -X GET "https://www.conectasaudevc.com.br/api/cron/msp-lead-outreach" \

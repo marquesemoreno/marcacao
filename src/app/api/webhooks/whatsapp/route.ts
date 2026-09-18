@@ -8,7 +8,9 @@ import { notifyInboxRealtime } from "@/lib/supabase-server";
 import { MEDIA_DOWNLOAD_FAILED_PREFIX } from "@/lib/chat-messages";
 import { isBroadcastOptOutReply } from "@/lib/broadcast-csv";
 import { reopenIfResolved } from "@/lib/conversation-reopen";
-import { URGENCY_TAG } from "@/lib/conversation-tags";
+import { URGENCY_TAG, MSP_LEAD_TAG, PARTNER_LEAD_TAG } from "@/lib/conversation-tags";
+import { isKnownMspLeadPhone } from "@/lib/msp-lead-outreach";
+import { isKnownPartnerLeadPhone } from "@/lib/ai-lead-outreach";
 import { resolveStatusFromReply, isRescheduleReply, wasSentConfirmationPrompt } from "@/lib/appointment-reply";
 import { classifyAppointmentReply } from "@/lib/appointment-reply-ai";
 import { buildBridgeConfirmationFollowUp } from "@/lib/bridge-confirmation";
@@ -558,12 +560,36 @@ export async function POST(request: Request) {
     // Só entra em jogo se a clínica tiver AiAttendantConfig ativo (ver
     // src/lib/ai-attendant.ts). Enquanto isso não acontecer, `aiHandled` fica
     // false e a mensagem cai no fluxo de automação por keyword de sempre.
+    //
+    // Exceção: leads de prospecção MSP (ver msp-lead-outreach.ts) e leads de parceria
+    // do marketplace (ver ai-lead-outreach.ts) respondem por esse MESMO número da
+    // TIVDC, que tem IA de suporte ativa (abre chamado no GLPI pra problema técnico).
+    // Sem essa checagem, o primeiro "sim" de um lead comercial dispararia o disclosure
+    // de consentimento de IA e, se aceito, a IA tentaria tratar a conversa como chamado
+    // de suporte — confuso pra quem só respondeu uma mensagem de prospecção/parceria.
+    // Marca a conversa como comercial (tag) e deixa 100% com o atendente humano, sem
+    // passar pelo fluxo de IA.
     // =========================================================================
     let aiHandled = false;
     const aiConfig = clinic ? await getAiAttendantConfig(conversation.clinicId) : null;
+    const isMspLeadReply = aiConfig ? await isKnownMspLeadPhone(contact.phone) : false;
+    const isPartnerLeadReply = aiConfig && !isMspLeadReply ? await isKnownPartnerLeadPhone(contact.phone) : false;
     const clinicName = clinic?.tradeName ?? "nossa clínica";
 
-    if (aiConfig) {
+    if (isMspLeadReply && !conversation.tags.includes(MSP_LEAD_TAG)) {
+      await prisma.conversation.update({
+        where: { id: conversation.id },
+        data: { tags: { push: MSP_LEAD_TAG } },
+      });
+    }
+    if (isPartnerLeadReply && !conversation.tags.includes(PARTNER_LEAD_TAG)) {
+      await prisma.conversation.update({
+        where: { id: conversation.id },
+        data: { tags: { push: PARTNER_LEAD_TAG } },
+      });
+    }
+
+    if (aiConfig && !isMspLeadReply && !isPartnerLeadReply) {
       if (conversation.aiConsentStatus === "NOT_ASKED") {
         const disclosure = buildAiDisclosureMessage(clinicName, aiConfig.assistantName);
         // `await` — ver nota em "welcome_message.sent" acima: sem isso, um envio que falha

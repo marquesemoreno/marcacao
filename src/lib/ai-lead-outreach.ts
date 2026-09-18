@@ -1,11 +1,22 @@
 import "server-only";
 import OpenAI from "openai";
 import { prisma } from "@/lib/prisma";
-import { sendWhatsAppMessage } from "@/lib/whatsapp";
+import { sendWhatsAppMessage, formatToWhatsAppNumber } from "@/lib/whatsapp";
 import { getTivdcClinicId } from "@/lib/tivdc";
 import type { PartnerLead } from "@prisma/client";
 
 const OUTREACH_STATE_ID = "singleton";
+
+/** Usado pelo webhook (route.ts) pra não deixar o atendente de IA de suporte da TIVDC
+ * (que abre chamado no GLPI) confundir a resposta de um lead de parceria com um
+ * chamado técnico: esse outreach manda pela MESMA instância WhatsApp da TIVDC (ver
+ * getTivdcClinicId acima), então quando o telefone que respondeu é um PartnerLead
+ * conhecido, o webhook pula o fluxo de consentimento/resposta de IA inteiro — mesmo
+ * padrão de isKnownMspLeadPhone em msp-lead-outreach.ts. */
+export async function isKnownPartnerLeadPhone(contactPhone: string): Promise<boolean> {
+  const leads = await prisma.partnerLead.findMany({ select: { phone: true } });
+  return leads.some((lead) => formatToWhatsAppNumber(lead.phone) === contactPhone);
+}
 
 let client: OpenAI | null = null;
 function getOpenAiClient(): OpenAI | null {

@@ -1,12 +1,24 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
-import { sendWhatsAppMessage } from "@/lib/whatsapp";
+import { sendWhatsAppMessage, formatToWhatsAppNumber } from "@/lib/whatsapp";
 import { getTivdcClinicId } from "@/lib/tivdc";
 import { BROADCAST_OPT_OUT_FOOTER } from "@/lib/broadcast-csv";
 import { buildMspOutreachMessage, isWithinOutreachWindow } from "@/lib/msp-lead-message";
 import type { MspLead } from "@prisma/client";
 
 const OUTREACH_STATE_ID = "singleton";
+
+/** Usado pelo webhook (route.ts) pra não deixar o atendente de IA de suporte da TIVDC
+ * (que abre chamado no GLPI) confundir a resposta de um lead comercial com um chamado
+ * técnico: quando o telefone que respondeu é um MspLead conhecido, o webhook pula o
+ * fluxo de consentimento/resposta de IA inteiro e marca a conversa como comercial. A
+ * tabela é pequena (dezenas de linhas), então comparar em memória é mais simples que
+ * tentar expressar a normalização de telefone (formatToWhatsAppNumber) num where do
+ * Prisma. */
+export async function isKnownMspLeadPhone(contactPhone: string): Promise<boolean> {
+  const leads = await prisma.mspLead.findMany({ select: { phone: true } });
+  return leads.some((lead) => formatToWhatsAppNumber(lead.phone) === contactPhone);
+}
 
 /** Próximo intervalo até o disparo seguinte — mesmo espírito de nextJitteredDelayMs
  * em ai-lead-outreach.ts: "por volta de 5 minutos", nunca cravado. */
