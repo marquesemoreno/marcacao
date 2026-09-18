@@ -7,6 +7,28 @@ export type BridgeReminderInput = {
   dateFormatted: string;
 };
 
+/** "Amanhã" no fuso da clínica (Bahia = mesmo horário de Brasília, sem horário de
+ * verão hoje) — rodando num servidor em UTC, "amanhã" calculado ingenuamente pode
+ * dar o dia errado perto da virada. Quando `skipWeekends` é true (clínica fechada
+ * sábado/domingo — ver HospitalIntegration.skipWeekendReminders), pula pro
+ * próximo dia útil em vez de lembrar sobre um dia sem expediente: pedido real da
+ * Urolaser (18/09/2026) depois de uma sexta sem nenhum lembrete pra mandar porque
+ * "amanhã" caía num sábado sem agenda — rodando de segunda em vez de sábado, as
+ * atendentes conseguem responder reagendamento/desistência a tempo. */
+export function nextReminderTargetDate(now: Date, skipWeekends: boolean): { iso: string; formatted: string } {
+  const nowInBahia = new Date(now.toLocaleString("en-US", { timeZone: "America/Bahia" }));
+  const target = new Date(nowInBahia);
+  target.setDate(target.getDate() + 1);
+  if (skipWeekends) {
+    while (target.getDay() === 0 || target.getDay() === 6) {
+      target.setDate(target.getDate() + 1);
+    }
+  }
+  const iso = `${target.getFullYear()}-${String(target.getMonth() + 1).padStart(2, "0")}-${String(target.getDate()).padStart(2, "0")}`;
+  const formatted = target.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
+  return { iso, formatted };
+}
+
 /** Nomes vindos do Firebird chegam em CAIXA ALTA (ex: "ALAN PASCOAL SILVA SANTOS") — deixa
  * mais legível no WhatsApp sem gritar. Preposições continuam minúsculas quando não são a
  * primeira palavra (ex: "Vivaldo José de Oliveira"), como convenção de nome próprio em

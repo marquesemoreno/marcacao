@@ -8,6 +8,7 @@ import {
   getHospitalIntegration,
   saveHospitalIntegrationConfig,
   toggleHospitalIntegrationActive,
+  toggleSkipWeekendReminders,
   testHospitalIntegrationConnection,
 } from "@/actions/admin-hospital-integration";
 
@@ -15,6 +16,7 @@ type IntegrationState = {
   apiUrl: string;
   apiTokenMasked: string;
   active: boolean;
+  skipWeekendReminders: boolean;
   lastCheckedAt: Date | string | null;
   lastCheckOk: boolean | null;
 };
@@ -25,6 +27,7 @@ export function HospitalIntegrationModal({ clinicId, clinicName }: { clinicId: s
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [toggling, setToggling] = useState(false);
+  const [togglingWeekend, setTogglingWeekend] = useState(false);
   const [integration, setIntegration] = useState<IntegrationState | null>(null);
   const [apiUrl, setApiUrl] = useState("");
   const [apiToken, setApiToken] = useState("");
@@ -97,6 +100,24 @@ export function HospitalIntegrationModal({ clinicId, clinicName }: { clinicId: s
       toast.error(error instanceof Error ? error.message : "Erro ao atualizar integração.");
     } finally {
       setToggling(false);
+    }
+  }
+
+  async function handleToggleSkipWeekend() {
+    if (!integration) return;
+    setTogglingWeekend(true);
+    try {
+      await toggleSkipWeekendReminders(clinicId, !integration.skipWeekendReminders);
+      toast.success(
+        !integration.skipWeekendReminders
+          ? "Lembrete de sexta agora pula pra segunda."
+          : "Lembrete de sexta voltou a mirar sábado."
+      );
+      await loadIntegration();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Erro ao atualizar integração.");
+    } finally {
+      setTogglingWeekend(false);
     }
   }
 
@@ -174,6 +195,24 @@ export function HospitalIntegrationModal({ clinicId, clinicName }: { clinicId: s
                   {integration.active ? "Desativar" : "Ativar"}
                 </button>
               </div>
+            )}
+
+            {integration && (
+              <label className="flex items-center justify-between gap-2 rounded-xl border border-slate-200 dark:border-slate-800 p-3 cursor-pointer">
+                <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  Não atende fim de semana
+                  <span className="block text-[11px] font-normal text-slate-500 dark:text-slate-400 mt-0.5">
+                    Lembrete de sexta pula sábado/domingo e mira a segunda-feira.
+                  </span>
+                </span>
+                <input
+                  type="checkbox"
+                  checked={integration.skipWeekendReminders}
+                  disabled={togglingWeekend}
+                  onChange={handleToggleSkipWeekend}
+                  className="w-4 h-4 shrink-0 accent-cyan-600"
+                />
+              </label>
             )}
 
             <div className="space-y-3">

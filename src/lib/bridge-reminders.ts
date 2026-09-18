@@ -2,7 +2,7 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { formatToWhatsAppNumber, sendWhatsAppMessage, sendWhatsAppMedia } from "@/lib/whatsapp";
 import { fetchBridgeDailyAgenda } from "@/lib/hospital-bridge";
-import { buildBridgeReminderMessage, buildUrolaserLaraReminderMessage } from "@/lib/bridge-reminder";
+import { buildBridgeReminderMessage, buildUrolaserLaraReminderMessage, nextReminderTargetDate } from "@/lib/bridge-reminder";
 import { getBaseUrl } from "@/lib/format";
 
 /** Imagem da "Lara" (mascote/atendente virtual da Urolaser, ver buildUrolaserLaraReminderMessage)
@@ -21,18 +21,6 @@ function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-/** "Amanhã" no fuso da clínica (Bahia = mesmo horário de Brasília, sem
- * horário de verão hoje) — rodando num servidor em UTC, "amanhã" calculado
- * ingenuamente pode dar o dia errado perto da virada. */
-function tomorrowInBahia(): { iso: string; formatted: string } {
-  const nowInBahia = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Bahia" }));
-  const tomorrow = new Date(nowInBahia);
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  const iso = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, "0")}-${String(tomorrow.getDate()).padStart(2, "0")}`;
-  const formatted = tomorrow.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
-  return { iso, formatted };
-}
-
 /** "AAAA-MM-DD" -> "DD/MM/AAAA" só com manipulação de string — nunca via
  * `Date`, pra não repetir o mesmo bug de fuso horário já corrigido no bridge
  * (ver EXTRACT em vez de Date no index.js da Urolaser). */
@@ -49,16 +37,19 @@ function formatIsoDateToBr(iso: string): string {
  * clínica+agendamento via BridgeReminderLog — chamar de novo não duplica.
  * `clinicId` restringe a uma única clínica (ex: disparo manual adiantado só
  * pra uma, sem mexer nas outras que têm bridge ativo). `dateIso` sobrescreve
- * a data-alvo (default: amanhã) — usado pra disparo manual antecipado (ex:
- * pedir a confirmação de terça numa sexta, por causa de feriado na véspera). */
+ * a data-alvo (default: amanhã, ou o próximo dia útil se a clínica tiver
+ * `skipWeekendReminders` — ver nextReminderTargetDate) pra TODAS as clínicas
+ * dessa chamada — usado pra disparo manual antecipado (ex: pedir a confirmação
+ * de terça numa sexta, por causa de feriado na véspera), por isso ignora
+ * skipWeekendReminders: é uma escolha explícita de data, não o cálculo padrão. */
 export async function dispatchBridgeReminders(options?: { clinicId?: string; dateIso?: string }) {
-  const { iso: dateIso, formatted: dateFormatted } = options?.dateIso
+  const explicitDate = options?.dateIso
     ? { iso: options.dateIso, formatted: formatIsoDateToBr(options.dateIso) }
-    : tomorrowInBahia();
+    : null;
 
   const clinics = await prisma.clinic.findMany({
     where: { hospitalIntegration: { active: true }, ...(options?.clinicId ? { id: options.clinicId } : {}) },
-    select: { id: true, tradeName: true, name: true },
+    select: { id: true, tradeName: true, name: true, hospitalIntegration: { select: { skipWeekendReminders: true } } },
   });
 
   let sent = 0;
@@ -67,6 +58,8 @@ export async function dispatchBridgeReminders(options?: { clinicId?: string; dat
   let attempted = 0;
 
   for (const clinic of clinics) {
+    const { iso: dateIso, formatted: dateFormatted } =
+      explicitDate ?? nextReminderTargetDate(new Date(), clinic.hospitalIntegration?.skipWeekendReminders ?? false);
     const agendamentos = await fetchBridgeDailyAgenda(clinic.id, dateIso);
 
     for (const item of agendamentos) {

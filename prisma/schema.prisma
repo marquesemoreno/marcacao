@@ -240,6 +240,12 @@ model HospitalIntegration {
   apiUrl        String    @map("api_url")
   apiToken      String    @map("api_token")
   active        Boolean   @default(true)
+  /// Quando true, o lembrete D-1 pula sábado/domingo como dia-alvo e joga pro
+  /// próximo dia útil (ex: sexta manda lembrete de segunda, não de sábado) — pra
+  /// clínicas que não atendem fim de semana. Ver nextReminderTargetDate em
+  /// bridge-reminder.ts. Default false: não muda o comportamento de clínica nenhuma
+  /// só por existir a coluna.
+  skipWeekendReminders Boolean   @default(false) @map("skip_weekend_reminders")
   lastCheckedAt DateTime? @map("last_checked_at")
   lastCheckOk   Boolean?  @map("last_check_ok")
   createdAt     DateTime  @default(now()) @map("created_at")

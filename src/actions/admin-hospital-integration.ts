@@ -18,6 +18,7 @@ export async function getHospitalIntegration(clinicId: string) {
     apiUrl: integration.apiUrl,
     apiTokenMasked: maskApiToken(integration.apiToken),
     active: integration.active,
+    skipWeekendReminders: integration.skipWeekendReminders,
     lastCheckedAt: integration.lastCheckedAt,
     lastCheckOk: integration.lastCheckOk,
   };
@@ -50,6 +51,16 @@ export async function saveHospitalIntegrationConfig(clinicId: string, input: { a
 export async function toggleHospitalIntegrationActive(clinicId: string, active: boolean) {
   await requireAdminSession();
   await prisma.hospitalIntegration.update({ where: { clinicId }, data: { active } });
+  revalidatePath("/admin/clinicas");
+  return { success: true as const };
+}
+
+/** Liga/desliga o pulo de fim de semana no lembrete D-1 (ver nextReminderTargetDate
+ * em bridge-reminder.ts) — pra clínica que não atende sábado/domingo, uma sexta passa
+ * a lembrar sobre segunda em vez de sábado (pedido real da Urolaser, 18/09/2026). */
+export async function toggleSkipWeekendReminders(clinicId: string, skipWeekendReminders: boolean) {
+  await requireAdminSession();
+  await prisma.hospitalIntegration.update({ where: { clinicId }, data: { skipWeekendReminders } });
   revalidatePath("/admin/clinicas");
   return { success: true as const };
 }

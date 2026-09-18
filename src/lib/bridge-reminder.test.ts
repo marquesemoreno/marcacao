@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { buildBridgeReminderMessage, buildUrolaserLaraReminderMessage, LARA_CONFIRMATION_MARKER } from "./bridge-reminder";
+import {
+  buildBridgeReminderMessage,
+  buildUrolaserLaraReminderMessage,
+  LARA_CONFIRMATION_MARKER,
+  nextReminderTargetDate,
+} from "./bridge-reminder";
 
 describe("buildBridgeReminderMessage", () => {
   const base = {
@@ -107,5 +112,38 @@ describe("buildUrolaserLaraReminderMessage", () => {
     expect(message).toContain("20/02/2026");
     expect(message).not.toContain("null");
     expect(message).not.toContain("undefined");
+  });
+});
+
+describe("nextReminderTargetDate", () => {
+  // America/Bahia é UTC-3 o ano todo (sem horário de verão) — hora local `hour` num
+  // dia (Y,M,D) corresponde a `hour + 3` em UTC no mesmo dia.
+  function atBahia(year: number, month: number, day: number, hour = 9): Date {
+    return new Date(Date.UTC(year, month, day, hour + 3, 0, 0));
+  }
+
+  it("sem skipWeekends, sexta manda pra sábado (comportamento de sempre)", () => {
+    // 2026-09-18 é sexta-feira.
+    const result = nextReminderTargetDate(atBahia(2026, 8, 18), false);
+    expect(result.iso).toBe("2026-09-19");
+    expect(result.formatted).toBe("19/09/2026");
+  });
+
+  it("com skipWeekends, sexta pula sábado e domingo e manda pra segunda", () => {
+    const result = nextReminderTargetDate(atBahia(2026, 8, 18), true);
+    expect(result.iso).toBe("2026-09-21");
+    expect(result.formatted).toBe("21/09/2026");
+  });
+
+  it("com skipWeekends, sábado também pula pra segunda (não pra domingo)", () => {
+    // 2026-09-19 é sábado.
+    const result = nextReminderTargetDate(atBahia(2026, 8, 19), true);
+    expect(result.iso).toBe("2026-09-21");
+  });
+
+  it("com skipWeekends, dia de semana normal não muda (terça manda pra quarta)", () => {
+    // 2026-09-15 é terça-feira.
+    const result = nextReminderTargetDate(atBahia(2026, 8, 15), true);
+    expect(result.iso).toBe("2026-09-16");
   });
 });
