@@ -16,36 +16,48 @@ export default async function AdminLayout({
   const session = await getServerSession(authOptions);
 
   return (
-    <div className="flex h-screen w-screen flex-col overflow-hidden bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100">
-      {/* Cabeçalho Slim de Linha Única (56px / h-14) */}
-      <header className="flex h-14 shrink-0 items-center justify-between gap-4 border-b border-slate-200/80 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 px-4">
-        {/* Esquerda: Logo + Badge */}
-        <div className="flex shrink-0 items-center gap-2.5">
-          <Logo variant="full" size="sm" />
-          <span className="inline-flex items-center gap-1 rounded-md bg-sky-50 dark:bg-sky-950/60 border border-sky-200/80 dark:border-sky-800 px-2 py-0.5 text-[10px] font-extrabold text-sky-700 dark:text-sky-300 font-mono">
-            🛡️ Admin
-          </span>
+    <div className="flex h-screen w-screen overflow-hidden bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100">
+      {/* Trilho de navegação — sempre escuro, independente do tema claro/escuro do
+          conteúdo (mesma lógica de identidade fixa usada no dashboard do MSP). */}
+      <aside className="hidden md:flex w-60 shrink-0 flex-col bg-slate-900 border-r border-slate-800">
+        <div className="flex items-center gap-2 px-4 pt-5 pb-4 border-b border-slate-800">
+          <Logo variant="white" size="sm" />
         </div>
+        <span className="mx-4 mt-3 inline-flex w-fit items-center gap-1 rounded-md bg-sky-500/10 border border-sky-500/20 px-2 py-0.5 text-[10px] font-extrabold text-sky-300 font-mono">
+          🛡️ Admin
+        </span>
 
-        {/* Centro: Abas de Navegação */}
-        <div className="flex-1 overflow-x-auto min-w-0 flex items-center justify-center">
+        <div className="flex-1 overflow-y-auto mt-1">
           <AdminNav />
         </div>
 
-        {/* Direita: Alternador de Tema + Nome do Usuário + Sair */}
-        <div className="flex shrink-0 items-center gap-2.5">
-          <ThemeToggle />
+        <div className="border-t border-slate-800 px-3 py-3 space-y-2">
           {session?.user.name && (
-            <span className="hidden text-xs font-bold text-slate-700 dark:text-slate-300 md:inline font-mono">
-              {session.user.name}
-            </span>
+            <p className="truncate px-1 text-xs font-bold text-slate-300 font-mono">{session.user.name}</p>
           )}
+          <div className="flex items-center justify-between gap-2">
+            <ThemeToggle />
+            <SignOutButton />
+          </div>
+        </div>
+      </aside>
+
+      {/* Barra superior compacta — só no mobile, onde o trilho fica escondido. */}
+      <header className="md:hidden flex h-14 shrink-0 items-center justify-between gap-3 border-b border-slate-200/80 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 px-4 fixed top-0 inset-x-0 z-30">
+        <Logo variant="full" size="sm" />
+        <div className="flex items-center gap-2">
+          <ThemeToggle />
           <SignOutButton />
         </div>
       </header>
 
-      {/* Conteúdo Principal em Tela Cheia */}
-      <main className="flex-1 overflow-hidden flex flex-col">{children}</main>
+      <div className="flex-1 min-w-0 flex flex-col overflow-hidden md:pt-0 pt-14">
+        <div className="md:hidden border-b border-slate-800 bg-slate-900">
+          <AdminNav orientation="horizontal" />
+        </div>
+        {/* Conteúdo Principal em Tela Cheia */}
+        <main className="flex-1 overflow-hidden flex flex-col">{children}</main>
+      </div>
     </div>
   );
 }
