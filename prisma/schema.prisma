@@ -535,10 +535,17 @@ model Message {
   /// src/lib/invoice-extraction.ts) — null até a atendente pedir. Mesmo motivo de cache
   /// de `transcription`: não pagar de novo pela mesma extração ao reabrir a conversa.
   extractedInvoiceData Json?       @map("extracted_invoice_data")
+  /// Mensagem que esta responde/cita (botão "Responder" no balão, ou resposta citada
+  /// no WhatsApp de verdade — ver contextInfo.stanzaId no webhook). Null quando a
+  /// mensagem citada nunca existiu no nosso banco (ex: de antes da conversa) — nunca
+  /// bloqueia o recebimento/envio por causa disso.
+  quotedMessageId String?         @map("quoted_message_id")
   createdAt      DateTime         @default(now()) @map("created_at")
 
-  conversation Conversation @relation(fields: [conversationId], references: [id])
-  senderUser   User?        @relation(fields: [senderUserId], references: [id])
+  conversation  Conversation @relation(fields: [conversationId], references: [id])
+  senderUser    User?        @relation(fields: [senderUserId], references: [id])
+  quotedMessage Message?     @relation("MessageQuote", fields: [quotedMessageId], references: [id], onDelete: SetNull)
+  quotedBy      Message[]    @relation("MessageQuote")
 
   @@index([conversationId, createdAt])
   @@map("messages")

@@ -28,7 +28,8 @@ function getOpenAiClient(): OpenAI | null {
 export async function generateReplySuggestions(
   conversationId: string,
   clinicId: string,
-  clinicName: string
+  clinicName: string,
+  quotedMessageContent?: string
 ): Promise<string[]> {
   const openai = getOpenAiClient();
   if (!openai) return [];
@@ -60,7 +61,11 @@ Regras obrigatórias:
 - As sugestões devem ser genuinamente diferentes entre si (tom ou abordagem diferente), não variações triviais da mesma frase.
 
 Instruções específicas desta clínica:
-${instructions}${knowledgeContext ? `\n\nBase de conhecimento da clínica (fonte da verdade — não invente nada fora daqui):\n${knowledgeContext}` : ""}
+${instructions}${knowledgeContext ? `\n\nBase de conhecimento da clínica (fonte da verdade — não invente nada fora daqui):\n${knowledgeContext}` : ""}${
+    quotedMessageContent
+      ? `\n\nO atendente está respondendo especificamente a esta mensagem do paciente: "${quotedMessageContent}". Priorize isso sobre o restante do histórico.`
+      : ""
+  }
 
 Responda em JSON, exatamente neste formato: {"suggestions": ["sugestão 1", "sugestão 2", "sugestão 3"]}`;
 

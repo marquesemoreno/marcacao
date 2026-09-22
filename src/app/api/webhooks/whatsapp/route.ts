@@ -29,7 +29,22 @@ type IncomingMedia =
   | { kind: "image" | "document"; mimeType: string; fileName: string; sizeBytes: number; key: Record<string, unknown> }
   | { kind: "audio"; mimeType: string; seconds: number; key: Record<string, unknown> };
 
-type IncomingMessage = { phone: string; text: string; name?: string; media?: IncomingMedia; keyId?: string };
+type IncomingMessage = {
+  phone: string;
+  text: string;
+  name?: string;
+  media?: IncomingMedia;
+  keyId?: string;
+  quotedWhatsappKeyId?: string;
+};
+
+/** Toda mensagem do Baileys que responde/cita outra carrega seu próprio
+ * `contextInfo.stanzaId` (o key.id da mensagem citada) — mesmo texto, imagem,
+ * documento ou áudio, cada um no seu próprio objeto de mensagem. */
+function extractStanzaId(messagePart: Record<string, unknown> | undefined): string | undefined {
+  const contextInfo = messagePart?.contextInfo as Record<string, unknown> | undefined;
+  return typeof contextInfo?.stanzaId === "string" ? contextInfo.stanzaId : undefined;
+}
 
 /**
  * Extrai a mensagem recebida no webhook da Evolution API v2 (ou payload simplificado).
@@ -70,7 +85,7 @@ function extractIncomingMessage(body: unknown): IncomingMessage | null {
   const extended = message?.extendedTextMessage as Record<string, unknown> | undefined;
   const text = message?.conversation ?? extended?.text;
   if (typeof text === "string") {
-    return { phone, text, name, keyId };
+    return { phone, text, name, keyId, quotedWhatsappKeyId: extractStanzaId(extended) };
   }
 
   const audioMessage = message?.audioMessage as Record<string, unknown> | undefined;
@@ -81,6 +96,7 @@ function extractIncomingMessage(body: unknown): IncomingMessage | null {
       text: "🎤 Áudio recebido",
       name,
       keyId,
+      quotedWhatsappKeyId: extractStanzaId(audioMessage),
       media: { kind: "audio", mimeType: audioMessage.mimetype, seconds, key },
     };
   }
@@ -105,6 +121,7 @@ function extractIncomingMessage(body: unknown): IncomingMessage | null {
       text: caption || (isImage ? "📷 Imagem recebida" : "📄 Documento recebido"),
       name,
       keyId,
+      quotedWhatsappKeyId: extractStanzaId(mediaMessage),
       media: { kind: isImage ? "image" : "document", mimeType: mediaMessage.mimetype, fileName, sizeBytes, key },
     };
   }
@@ -487,6 +504,14 @@ export async function POST(request: Request) {
         : `${MEDIA_DOWNLOAD_FAILED_PREFIX} o anexo recebido (${incoming.media.fileName}).`
       : null;
 
+    // Resposta/citação feita direto no WhatsApp (não pelo nosso botão "Responder") —
+    // `stanzaId` só vira `quotedMessageId` se a mensagem citada já existir no nosso
+    // banco; senão fica null sem quebrar o recebimento (ex: citou algo de antes da
+    // conversa existir aqui, ou de outra instância).
+    const quotedMessage = incoming.quotedWhatsappKeyId
+      ? await prisma.message.findUnique({ where: { whatsappKeyId: incoming.quotedWhatsappKeyId }, select: { id: true } })
+      : null;
+
     await prisma.message.create({
       data: {
         conversationId: conversation.id,
@@ -494,6 +519,7 @@ export async function POST(request: Request) {
         content: failedMediaNotice ?? incoming.text,
         status: "DELIVERED",
         whatsappKeyId: incoming.keyId,
+        quotedMessageId: quotedMessage?.id,
         ...(mediaData ?? {}),
       },
     });

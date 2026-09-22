@@ -60,6 +60,16 @@ export interface Message {
   transcription?: string;
   /** Dados de nota fiscal extraídos sob demanda (ver botão "Extrair dados" em message-bubble.tsx) — undefined até a atendente pedir. */
   extractedInvoiceData?: InvoiceData;
+  /** Mensagem que esta responde/cita (botão "Responder", ou citação feita direto no
+   * WhatsApp) — undefined quando não é uma resposta, ou quando a citada nunca existiu
+   * no nosso banco. */
+  quotedMessage?: {
+    id: string;
+    text?: string;
+    sender: 'contact' | 'agent' | 'system';
+    senderName?: string;
+    deleted?: boolean;
+  };
 }
 
 export interface Contact {

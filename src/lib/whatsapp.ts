@@ -9,6 +9,16 @@ type SendAttemptResult = {
   keyId?: string;
 };
 
+/** Referência à mensagem citada (botão "Responder" no balão) — mesmo formato de
+ * `key` que a Evolution API/Baileys já usa em toda parte (webhook, updateMessage).
+ * `remoteJid` é sempre o telefone do contato (nunca o nosso), independente de quem
+ * mandou a mensagem citada — é assim que o Baileys identifica a conversa. */
+export type QuotedMessageRef = { keyId: string; remoteJid: string; fromMe: boolean };
+
+function buildQuotedPayload(quoted?: QuotedMessageRef) {
+  return quoted ? { quoted: { key: { remoteJid: quoted.remoteJid, fromMe: quoted.fromMe, id: quoted.keyId } } } : {};
+}
+
 /** Extrai o key.id (Baileys) da resposta do sendText/sendMedia — usado depois pra
  * casar os acks de entrega/leitura (webhook "messages.update") com a mensagem. */
 async function extractKeyId(response: Response): Promise<string | undefined> {
@@ -142,7 +152,8 @@ export async function sendWhatsAppMessage(
   to: string,
   text: string,
   event: string = "whatsapp.send",
-  clinicId?: string
+  clinicId?: string,
+  quoted?: QuotedMessageRef
 ): Promise<{ success: boolean; skipped: boolean; responseCode?: number | null; keyId?: string }> {
   const { apiUrl, apiKey, instanceName } = await getEvolutionConfig(clinicId);
   const target = formatToWhatsAppNumber(to);
@@ -177,6 +188,7 @@ export async function sendWhatsAppMessage(
         body: JSON.stringify({
           number: target,
           text,
+          ...buildQuotedPayload(quoted),
         }),
         signal: AbortSignal.timeout(8000),
       });
@@ -206,6 +218,7 @@ export async function sendWhatsAppMessage(
         text,
         attempts,
         error: result.error ?? null,
+        quotedKeyId: quoted?.keyId ?? null,
       },
       status: result.success ? "SUCCESS" : "FAILED",
       responseCode: result.responseCode,
@@ -292,7 +305,8 @@ export async function sendWhatsAppMedia(
   fileName: string,
   caption: string,
   event: string = "whatsapp.send_media",
-  clinicId?: string
+  clinicId?: string,
+  quoted?: QuotedMessageRef
 ): Promise<{ success: boolean; skipped: boolean; responseCode?: number | null; keyId?: string }> {
   const { apiUrl, apiKey, instanceName } = await getEvolutionConfig(clinicId);
   const target = formatToWhatsAppNumber(to);
@@ -326,6 +340,7 @@ export async function sendWhatsAppMedia(
         caption,
         media: mediaUrl,
         fileName,
+        ...buildQuotedPayload(quoted),
       }),
       signal: AbortSignal.timeout(15000),
     });
@@ -487,8 +502,8 @@ Por favor, responda com uma das opções abaixo:
 
 /* Compatibilidade com código legado e Server Actions */
 export const whatsappService = {
-  sendMessage: (phone: string, text: string, event: string, clinicId?: string) =>
-    sendWhatsAppMessage(phone, text, event, clinicId),
+  sendMessage: (phone: string, text: string, event: string, clinicId?: string, quoted?: QuotedMessageRef) =>
+    sendWhatsAppMessage(phone, text, event, clinicId, quoted),
   isConfigured: () => isWhatsAppConfigured(),
 };
 

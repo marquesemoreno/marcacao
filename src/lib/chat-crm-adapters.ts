@@ -132,9 +132,11 @@ function computeQueueState(conversation: ConversationWithRelations): Conversatio
 const REASON_SHORT_LABELS: Record<string, string> = {
   AGENDAMENTO_CONCLUIDO: "🎟️ Agendamento",
   CONFIRMACAO_AGENDA: "📅 Confirmação de Agenda",
+  AGENDAMENTO_REMARCADO: "🔁 Remarcado",
   DUVIDA_ESCLARECIDA: "💡 Dúvida Esclarecida",
   ORCAMENTO_ENVIADO: "💲 Orçamento Enviado",
   SEM_RESPOSTA: "⏳ Sem Resposta",
+  AGENDAMENTO_CANCELADO: "🚫 Agendamento Cancelado",
   CANCELAMENTO: "❌ Cancelado",
   ENCAMINHADO: "🔄 Encaminhado",
 };
@@ -194,8 +196,26 @@ export function toChatContact(conversation: ConversationWithRelations, viewerUse
   };
 }
 
+type QuotedMessageInput = Pick<PrismaMessage, "id" | "content" | "direction" | "type" | "deletedAt"> & {
+  senderUser?: Pick<User, "id" | "name"> | null;
+};
+
+function toChatQuotedMessage(quoted: QuotedMessageInput): Message["quotedMessage"] {
+  return {
+    id: quoted.id,
+    text: quoted.content,
+    sender: quoted.type === "INTERNAL_NOTE" ? "system" : quoted.direction === "INBOUND" ? "contact" : "agent",
+    senderName: quoted.senderUser?.name,
+    deleted: Boolean(quoted.deletedAt),
+  };
+}
+
 export function toChatMessage(
-  message: PrismaMessage & { senderUser?: Pick<User, "id" | "name"> | null; mediaUrl?: string | null }
+  message: PrismaMessage & {
+    senderUser?: Pick<User, "id" | "name"> | null;
+    mediaUrl?: string | null;
+    quotedMessage?: QuotedMessageInput | null;
+  }
 ): Message {
   const typeMap: Record<MessageType, Message["type"]> = {
     TEXT: "text",
@@ -241,5 +261,6 @@ export function toChatMessage(
     canEdit: canEditMessage(message).ok,
     transcription: message.transcription ?? undefined,
     extractedInvoiceData: (message.extractedInvoiceData as InvoiceData | null) ?? undefined,
+    quotedMessage: message.quotedMessage ? toChatQuotedMessage(message.quotedMessage) : undefined,
   };
 }

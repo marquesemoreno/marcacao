@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { ConversationStatus, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireAdminSession } from "@/lib/session";
-import { whatsappService, sendWhatsAppMedia, sendWhatsAppAudio, formatToWhatsAppNumber, isValidWhatsAppNumber, fetchWhatsAppProfilePicture, editWhatsAppMessage } from "@/lib/whatsapp";
+import { whatsappService, sendWhatsAppMedia, sendWhatsAppAudio, formatToWhatsAppNumber, isValidWhatsAppNumber, fetchWhatsAppProfilePicture, editWhatsAppMessage, type QuotedMessageRef } from "@/lib/whatsapp";
 import { canEditMessage } from "@/lib/message-edit";
 import { hasHospitalBridgeIntegration, fetchBridgeProcedures, fetchBridgeDoctors, fetchBridgeAgenda, fetchBridgeConvenios, fetchBridgePatients, adaptBridgeProcedureToPlainItem } from "@/lib/hospital-bridge";
 import { toPlainClinicProcedureItem } from "@/lib/serialize";
@@ -291,7 +291,10 @@ export async function getChatMessagesAdmin(conversationId: string) {
     where: { conversationId },
     orderBy: { createdAt: "desc" },
     take: MESSAGE_PAGE_SIZE,
-    include: { senderUser: { select: { id: true, name: true } } },
+    include: {
+      senderUser: { select: { id: true, name: true } },
+      quotedMessage: { include: { senderUser: { select: { id: true, name: true } } } },
+    },
   });
 
   const withMediaUrls = await attachSignedUrls(latest.reverse());
@@ -311,7 +314,10 @@ export async function getOlderChatMessagesAdmin(conversationId: string, beforeMe
     where: { conversationId, createdAt: { lt: cursor.createdAt } },
     orderBy: { createdAt: "desc" },
     take: MESSAGE_PAGE_SIZE,
-    include: { senderUser: { select: { id: true, name: true } } },
+    include: {
+      senderUser: { select: { id: true, name: true } },
+      quotedMessage: { include: { senderUser: { select: { id: true, name: true } } } },
+    },
   });
 
   const withMediaUrls = await attachSignedUrls(older.reverse());
@@ -351,7 +357,29 @@ export async function getChatContactHistoryAdmin(conversationId: string) {
   });
 }
 
-export async function sendMessageAdmin(conversationId: string, content: string, isInternalNote?: boolean) {
+/** Mesma lógica de resolveQuotedRef em inbox.ts (ver ali o porquê) — duplicada aqui
+ * seguindo o padrão dual clínica/admin já usado no resto do arquivo. */
+async function resolveQuotedRefAdmin(
+  conversationId: string,
+  contactPhone: string,
+  replyToMessageId: string | undefined
+): Promise<QuotedMessageRef | undefined> {
+  if (!replyToMessageId) return undefined;
+  const quoted = await prisma.message.findUnique({ where: { id: replyToMessageId } });
+  if (!quoted || quoted.conversationId !== conversationId || !quoted.whatsappKeyId) return undefined;
+  return {
+    keyId: quoted.whatsappKeyId,
+    remoteJid: `${formatToWhatsAppNumber(contactPhone)}@s.whatsapp.net`,
+    fromMe: quoted.direction === "OUTBOUND",
+  };
+}
+
+export async function sendMessageAdmin(
+  conversationId: string,
+  content: string,
+  isInternalNote?: boolean,
+  replyToMessageId?: string
+) {
   const { userId } = await requireAdminSession();
   const data = sendMessageSchema.parse({ conversationId, content, isInternalNote });
 
@@ -384,6 +412,8 @@ export async function sendMessageAdmin(conversationId: string, content: string, 
     return note;
   }
 
+  const quotedRef = await resolveQuotedRefAdmin(data.conversationId, conversation.contact.phone, replyToMessageId);
+
   const message = await prisma.message.create({
     data: {
       conversationId: data.conversationId,
@@ -391,6 +421,7 @@ export async function sendMessageAdmin(conversationId: string, content: string, 
       content: data.content,
       status: "SENT",
       senderUserId: userId,
+      quotedMessageId: quotedRef ? replyToMessageId : null,
     },
   });
 
@@ -404,7 +435,7 @@ export async function sendMessageAdmin(conversationId: string, content: string, 
   // ser encerrado antes do ".then()" salvar o whatsappKeyId, e sem ele a mensagem
   // nunca fica editável nem casa os acks de entrega/leitura.
   try {
-    const result = await whatsappService.sendMessage(conversation.contact.phone, data.content, "chat.outbound_admin", conversation.clinicId);
+    const result = await whatsappService.sendMessage(conversation.contact.phone, data.content, "chat.outbound_admin", conversation.clinicId, quotedRef);
     if (!result.success && !result.skipped) {
       await prisma.message.update({ where: { id: message.id }, data: { status: "FAILED" } });
     } else if (result.keyId) {
@@ -645,7 +676,7 @@ export async function extractMessageInvoiceDataAdmin(messageId: string) {
 }
 
 /** Espelho de getReplySuggestions (src/actions/inbox.ts) pro escopo admin. */
-export async function getReplySuggestionsAdmin(conversationId: string): Promise<string[]> {
+export async function getReplySuggestionsAdmin(conversationId: string, quotedMessageContent?: string): Promise<string[]> {
   await requireAdminSession();
 
   const conversation = await prisma.conversation.findUnique({
@@ -654,7 +685,12 @@ export async function getReplySuggestionsAdmin(conversationId: string): Promise<
   });
   if (!conversation) return [];
 
-  return generateReplySuggestions(conversationId, conversation.clinicId, conversation.clinic.tradeName || conversation.clinic.name);
+  return generateReplySuggestions(
+    conversationId,
+    conversation.clinicId,
+    conversation.clinic.tradeName || conversation.clinic.name,
+    quotedMessageContent
+  );
 }
 
 /** Abre um chamado no GLPI (help desk interno da TIVDC) a partir da última
@@ -1165,7 +1201,7 @@ export async function listClinicPatientsForAppointmentAdmin(clinicId: string, qu
 
 /** Espelho de suggestIaReply (src/actions/inbox.ts) pro escopo admin — mesma
  * troca do stub de palavra-chave pelo Copilot real. */
-export async function suggestIaReplyAdmin(conversationId: string): Promise<string> {
-  const suggestions = await getReplySuggestionsAdmin(conversationId);
+export async function suggestIaReplyAdmin(conversationId: string, quotedMessageContent?: string): Promise<string> {
+  const suggestions = await getReplySuggestionsAdmin(conversationId, quotedMessageContent);
   return suggestions[0] || "";
 }

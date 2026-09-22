@@ -21,6 +21,7 @@ import {
   CheckCircle2,
   Ban,
   Pencil,
+  CornerUpLeft,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from '@/components/ui/dialog';
@@ -38,7 +39,23 @@ interface MessageBubbleProps {
   onTranscribeAudio?: (messageId: string) => Promise<{ success: boolean; transcription?: string; error?: string }>;
   /** Extrai dados de nota fiscal sob demanda (só relevante quando mentionsInvoiceRequest(message.text)). */
   onExtractInvoiceData?: (messageId: string) => Promise<{ success: boolean; data?: InvoiceData; error?: string }>;
+  /** Fixa esta mensagem como "respondendo a" no composer (botão "Responder" no hover). */
+  onReply?: () => void;
 }
+
+/** Bloco compacto no topo do balão mostrando a mensagem citada — mesmo visual pro
+ * balão recebido/enviado e pra barra de preview do composer (ver ReplyPreviewBar
+ * em inbox-layout.tsx). Clicar não faz scroll-to-message nesta fase. */
+const QuotedMessagePreview: React.FC<{ quoted: NonNullable<Message['quotedMessage']> }> = ({ quoted }) => (
+  <div className="mb-1.5 rounded-lg border-l-[3px] border-emerald-500 bg-black/5 dark:bg-white/5 px-2.5 py-1.5">
+    <p className="text-[11px] font-bold text-emerald-700 dark:text-emerald-400">
+      {quoted.sender === 'agent' ? 'Você' : quoted.senderName || 'Contato'}
+    </p>
+    <p className="truncate text-[11px] text-slate-500 dark:text-slate-400 italic">
+      {quoted.deleted ? 'Mensagem apagada' : quoted.text || '📎 Mídia'}
+    </p>
+  </div>
+);
 
 const INVOICE_FIELD_LABELS: Record<keyof InvoiceData, string> = {
   cpf: 'CPF',
@@ -92,7 +109,7 @@ const MessageStatusTicks: React.FC<{ status?: Message['deliveryStatus'] }> = ({ 
   return <Clock className="w-3 h-3 text-slate-400" aria-label="Enviando..." />;
 };
 
-export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry, onRequestResend, onEditMessage, onTranscribeAudio, onExtractInvoiceData }) => {
+export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry, onRequestResend, onEditMessage, onTranscribeAudio, onExtractInvoiceData, onReply }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   const [playbackSpeed, setPlaybackSpeed] = useState<'1x' | '1.5x' | '2x'>('1x');
@@ -277,9 +294,20 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry, 
 
     return (
       <div
-        className={`flex w-full mb-3 animate-in fade-in slide-in-from-bottom-1 duration-150 ${isAgent ? 'justify-end' : 'justify-start'}`}
+        className={`flex w-full mb-3 group animate-in fade-in slide-in-from-bottom-1 duration-150 ${isAgent ? 'justify-end' : 'justify-start'}`}
         data-od-id={`audio-msg-${message.id}`}
       >
+        {onReply && (
+          <button
+            type="button"
+            onClick={onReply}
+            aria-label="Responder"
+            title="Responder"
+            className={`self-center opacity-0 group-hover:opacity-100 p-1.5 rounded-full transition-opacity hover:bg-slate-200/70 dark:hover:bg-slate-700 text-slate-400 ${isAgent ? 'order-first mr-1' : 'order-last ml-1'}`}
+          >
+            <CornerUpLeft className="w-3.5 h-3.5" />
+          </button>
+        )}
         <div
           className={`max-w-md w-72 sm:w-80 rounded-2xl p-3 sm:p-3.5 shadow-sm transition-all ${
             isAgent
@@ -288,6 +316,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry, 
           }`}
         >
           {message.deleted && <DeletedBadge />}
+          {message.quotedMessage && <QuotedMessagePreview quoted={message.quotedMessage} />}
           {hasRealAudio && (
             <audio
               ref={audioRef}
@@ -391,9 +420,20 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry, 
     return (
       <>
         <div
-          className={`flex w-full mb-3 animate-in fade-in slide-in-from-bottom-1 duration-150 ${isAgent ? 'justify-end' : 'justify-start'}`}
+          className={`flex w-full mb-3 group animate-in fade-in slide-in-from-bottom-1 duration-150 ${isAgent ? 'justify-end' : 'justify-start'}`}
           data-od-id={`attachment-msg-${message.id}`}
         >
+          {onReply && (
+            <button
+              type="button"
+              onClick={onReply}
+              aria-label="Responder"
+              title="Responder"
+              className={`self-center opacity-0 group-hover:opacity-100 p-1.5 rounded-full transition-opacity hover:bg-slate-200/70 dark:hover:bg-slate-700 text-slate-400 ${isAgent ? 'order-first mr-1' : 'order-last ml-1'}`}
+            >
+              <CornerUpLeft className="w-3.5 h-3.5" />
+            </button>
+          )}
           <div
             className={`max-w-md rounded-2xl p-3.5 shadow-sm transition-all ${hasRealFile ? 'cursor-pointer' : 'cursor-not-allowed opacity-80'} ${
               isAgent
@@ -403,6 +443,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry, 
             onClick={() => hasRealFile && setIsLightboxOpen(true)}
           >
             {message.deleted && <DeletedBadge />}
+            {message.quotedMessage && <QuotedMessagePreview quoted={message.quotedMessage} />}
             {isImage && hasRealFile ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
@@ -520,6 +561,17 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry, 
       className={`flex w-full mb-3 group animate-in fade-in slide-in-from-bottom-1 duration-150 ${isAgent ? 'justify-end' : 'justify-start'}`}
       data-od-id={`chat-msg-${message.id}`}
     >
+      {onReply && !isEditing && (
+        <button
+          type="button"
+          onClick={onReply}
+          aria-label="Responder"
+          title="Responder"
+          className={`self-center opacity-0 group-hover:opacity-100 p-1.5 rounded-full transition-opacity hover:bg-slate-200/70 dark:hover:bg-slate-700 text-slate-400 ${isAgent ? 'order-first mr-1' : 'order-last ml-1'}`}
+        >
+          <CornerUpLeft className="w-3.5 h-3.5" />
+        </button>
+      )}
       <div
         className={`relative max-w-[85%] sm:max-w-md md:max-w-lg rounded-2xl p-3.5 shadow-sm text-sm leading-relaxed transition-all ${
           isAgent
@@ -528,6 +580,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry, 
         }`}
       >
         {message.deleted && <DeletedBadge />}
+        {message.quotedMessage && <QuotedMessagePreview quoted={message.quotedMessage} />}
 
         {isEditing ? (
           <div className="space-y-2">

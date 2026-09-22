@@ -155,7 +155,7 @@ interface InboxLayoutProps {
   onSaveQuickReply?: (shortcut: string, content: string) => Promise<void>;
   onUpdateQuickReply?: (id: string, shortcut: string, content: string) => Promise<void>;
   onDeleteQuickReply?: (id: string) => Promise<void>;
-  onSendMessage: (text: string, mode: 'whatsapp' | 'internal_note') => Promise<void> | void;
+  onSendMessage: (text: string, mode: 'whatsapp' | 'internal_note', replyToMessageId?: string) => Promise<void> | void;
   onSendMedia: (file: File) => Promise<void> | void;
   onAddTag: (tag: string) => Promise<void> | void;
   onRemoveTag: (tag: string) => Promise<void> | void;
@@ -194,7 +194,7 @@ interface InboxLayoutProps {
   fetchAgenda?: (medicoId: number, date: string) => Promise<string[]>;
   fetchPatients?: (query: string) => Promise<{ id: number; nome: string; cpf: string | null }[]>;
   onScheduleConfirmed: (data: { appointmentId: string; specialty: string; doctor: string; date: string; time: string; price: string }) => void;
-  onSuggestIaReply?: () => Promise<string>;
+  onSuggestIaReply?: (quotedMessageContent?: string) => Promise<string>;
   /** Copilot: 2-3 rascunhos de resposta pro atendente escolher (nunca envia
    * sozinho) — ver ai-copilot.ts. Diferente de onSuggestIaReply (1 sugestão
    * direto na caixa de texto). */
@@ -377,6 +377,9 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
 }) => {
   const [composerMode, setComposerMode] = useState<'whatsapp' | 'internal_note'>('whatsapp');
   const [inputText, setInputText] = useState('');
+  /** Mensagem fixada pelo botão "Responder" (ver MessageBubble.onReply) — mostra a
+   * barra de preview acima do textarea e anexa o quotedMessageId no envio. */
+  const [replyingTo, setReplyingTo] = useState<Message | null>(null);
   const [copilotSuggestions, setCopilotSuggestions] = useState<string[]>([]);
   const [isLoadingCopilot, setIsLoadingCopilot] = useState(false);
   const [isOpeningGlpiTicket, setIsOpeningGlpiTicket] = useState(false);
@@ -477,7 +480,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
     const requestedContactId = selectedContactId;
     setIsGeneratingIa(true);
     try {
-      const suggestion = await onSuggestIaReply();
+      const suggestion = await onSuggestIaReply(replyingTo?.text);
       if (!suggestion) return;
       if (requestedContactId !== selectedContactId) {
         toast('Sugestão de IA descartada: a conversa foi trocada antes de terminar de gerar.', { icon: '⚠️' });
@@ -545,6 +548,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
     setPendingTransferAgentId(null);
     setPendingFunnelStage(null);
     setCopilotSuggestions([]);
+    setReplyingTo(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedContactId]);
 
@@ -627,8 +631,9 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputText.trim() || !selectedContact) return;
-    await onSendMessage(inputText.trim(), composerMode);
+    await onSendMessage(inputText.trim(), composerMode, replyingTo?.id);
     setInputText('');
+    setReplyingTo(null);
   };
 
   const ACCEPTED_MEDIA_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'application/pdf'];
@@ -1346,6 +1351,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                           ? () => onSendMessage('Oi! Não conseguimos baixar o arquivo que você enviou por aqui. Pode tentar enviar novamente, por favor?', 'whatsapp')
                           : undefined
                       }
+                      onReply={() => setReplyingTo(msg)}
                     />
                   ))}
                 </>
@@ -1436,6 +1442,28 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                       </span>
                     )}
                   </div>
+
+                  {replyingTo && (
+                    <div className="flex items-start gap-2 px-3 py-2 border-b border-slate-200/70 dark:border-slate-800 bg-white/60 dark:bg-slate-900/40">
+                      <div className="flex-1 min-w-0 rounded-lg border-l-[3px] border-emerald-500 bg-black/5 dark:bg-white/5 px-2.5 py-1.5">
+                        <p className="text-[11px] font-bold text-emerald-700 dark:text-emerald-400">
+                          {replyingTo.sender === 'agent' ? 'Você' : replyingTo.senderName || selectedContact?.name || 'Contato'}
+                        </p>
+                        <p className="truncate text-[11px] text-slate-500 dark:text-slate-400 italic">
+                          {replyingTo.deleted ? 'Mensagem apagada' : replyingTo.text || '📎 Mídia'}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setReplyingTo(null)}
+                        aria-label="Cancelar resposta"
+                        title="Cancelar resposta"
+                        className="shrink-0 p-1 rounded text-slate-400 hover:text-slate-700 dark:hover:text-slate-100 hover:bg-slate-200/70 dark:hover:bg-slate-700"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  )}
 
                   <textarea
                     rows={2}
@@ -2337,6 +2365,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                     options: [
                       { id: "AGENDAMENTO_CONCLUIDO", label: "Agendamento Concluído" },
                       { id: "CONFIRMACAO_AGENDA", label: "Confirmação de Agenda" },
+                      { id: "AGENDAMENTO_REMARCADO", label: "Agendamento Remarcado" },
                       { id: "ORCAMENTO_ENVIADO", label: "Orçamento Enviado" },
                       { id: "DUVIDA_ESCLARECIDA", label: "Dúvida Esclarecida" },
                     ],
@@ -2345,6 +2374,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                     group: "Sem conversão",
                     options: [
                       { id: "SEM_RESPOSTA", label: "Paciente Não Respondeu" },
+                      { id: "AGENDAMENTO_CANCELADO", label: "Agendamento Cancelado" },
                       { id: "CANCELAMENTO", label: "Cancelamento / Desistência" },
                       { id: "ENCAMINHADO", label: "Encaminhado a Outro Setor" },
                     ],

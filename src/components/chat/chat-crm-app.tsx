@@ -113,7 +113,8 @@ const ACTIONS_BY_SCOPE = {
     getChatMessages: (id: string) => getChatMessages(id),
     getOlderChatMessages: (id: string, beforeId: string) => getOlderChatMessages(id, beforeId),
     getChatContactHistory: (id: string) => getChatContactHistory(id),
-    sendMessage: (id: string, text: string, note?: boolean) => sendMessage(id, text, note),
+    sendMessage: (id: string, text: string, note?: boolean, replyToMessageId?: string) =>
+      sendMessage(id, text, note, replyToMessageId),
     sendMediaMessage: (id: string, formData: FormData) => sendMediaMessage(id, formData),
     updateConversationTags: (id: string, tags: string[]) => updateConversationTags(id, tags),
     updateConversationFunnelStage: (id: string, stage: FunnelStage) => updateConversationFunnelStage(id, stage),
@@ -126,7 +127,7 @@ const ACTIONS_BY_SCOPE = {
     createCannedResponse: (shortcut: string, content: string) => createCannedResponse(shortcut, content),
     updateCannedResponse: (id: string, shortcut: string, content: string) => updateCannedResponse(id, shortcut, content),
     deleteCannedResponse: (id: string) => deleteCannedResponse(id),
-    suggestIaReply: (id: string) => suggestIaReply(id),
+    suggestIaReply: (id: string, quotedMessageContent?: string) => suggestIaReply(id, quotedMessageContent),
     markConversationUnread: (id: string) => markConversationUnread(id),
     resendMessage: (id: string) => resendMessage(id),
     getUnseenAssignmentNotifications: () => getUnseenAssignmentNotifications(),
@@ -143,7 +144,8 @@ const ACTIONS_BY_SCOPE = {
     getChatMessages: (id: string) => getChatMessagesAdmin(id),
     getOlderChatMessages: (id: string, beforeId: string) => getOlderChatMessagesAdmin(id, beforeId),
     getChatContactHistory: (id: string) => getChatContactHistoryAdmin(id),
-    sendMessage: (id: string, text: string, note?: boolean) => sendMessageAdmin(id, text, note),
+    sendMessage: (id: string, text: string, note?: boolean, replyToMessageId?: string) =>
+      sendMessageAdmin(id, text, note, replyToMessageId),
     sendMediaMessage: (id: string, formData: FormData) => sendMediaMessageAdmin(id, formData),
     updateConversationTags: (id: string, tags: string[]) => updateConversationTagsAdmin(id, tags),
     updateConversationFunnelStage: (id: string, stage: FunnelStage) => updateConversationFunnelStageAdmin(id, stage),
@@ -156,7 +158,7 @@ const ACTIONS_BY_SCOPE = {
     createCannedResponse: (shortcut: string, content: string) => createCannedResponseAdmin(shortcut, content),
     updateCannedResponse: (id: string, shortcut: string, content: string) => updateCannedResponseAdmin(id, shortcut, content),
     deleteCannedResponse: (id: string) => deleteCannedResponseAdmin(id),
-    suggestIaReply: (id: string) => suggestIaReplyAdmin(id),
+    suggestIaReply: (id: string, quotedMessageContent?: string) => suggestIaReplyAdmin(id, quotedMessageContent),
     markConversationUnread: (id: string) => markConversationUnreadAdmin(id),
     resendMessage: (id: string) => resendMessageAdmin(id),
     getUnseenAssignmentNotifications: () => getUnseenAssignmentNotificationsAdmin(),
@@ -559,11 +561,12 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
     }
   }
 
-  async function handleSendMessage(text: string, mode: "whatsapp" | "internal_note") {
+  async function handleSendMessage(text: string, mode: "whatsapp" | "internal_note", replyToMessageId?: string) {
     if (!selectedContactId) return;
 
     const tempId = `temp-${Date.now()}`;
     const nowTime = new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit" }).format(new Date());
+    const quotedMessage = replyToMessageId ? messages.find((m) => m.id === replyToMessageId) : undefined;
 
     const optimisticMsg: Message = {
       id: tempId,
@@ -572,6 +575,9 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
       text,
       timestamp: nowTime,
       type: mode === "internal_note" ? "internal_note" : "text",
+      quotedMessage: quotedMessage
+        ? { id: quotedMessage.id, text: quotedMessage.text, sender: quotedMessage.sender, senderName: quotedMessage.senderName }
+        : undefined,
     };
 
     // 0ms Latência: Renderiza o balão de mensagem e atualiza o card do contato instantaneamente
@@ -583,7 +589,7 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
     );
 
     try {
-      await actions.sendMessage(selectedContactId, text, mode === "internal_note");
+      await actions.sendMessage(selectedContactId, text, mode === "internal_note", replyToMessageId);
       refreshMessages();
       refreshContacts();
     } catch {
@@ -882,9 +888,9 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
           fetchAgenda={fetchAgenda}
           fetchPatients={fetchPatients}
           onScheduleConfirmed={handleScheduleConfirmed}
-          onSuggestIaReply={async () => {
+          onSuggestIaReply={async (quotedMessageContent) => {
             if (!selectedContactId) return "";
-            return actions.suggestIaReply(selectedContactId);
+            return actions.suggestIaReply(selectedContactId, quotedMessageContent);
           }}
           onGenerateCopilotSuggestions={async () => {
             if (!selectedContactId) return [];

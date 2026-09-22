@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { ConversationStatus, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireClinicSession } from "@/lib/session";
-import { whatsappService, formatToWhatsAppNumber, isValidWhatsAppNumber, fetchWhatsAppProfilePicture } from "@/lib/whatsapp";
+import { whatsappService, formatToWhatsAppNumber, isValidWhatsAppNumber, fetchWhatsAppProfilePicture, type QuotedMessageRef } from "@/lib/whatsapp";
 import { toPlainClinicProcedureItem } from "@/lib/serialize";
 import { toChatContact, toChatMessage, departmentToDb, funnelStageToDb } from "@/lib/chat-crm-adapters";
 import { attachSignedUrls, uploadWhatsAppMedia, getSignedMediaUrl, downloadWhatsAppMedia, formatDuration } from "@/lib/whatsapp-media";
@@ -203,7 +203,10 @@ export async function getConversation(conversationId: string) {
       assignedUser: { select: { id: true, name: true } },
       messages: {
         orderBy: { createdAt: "asc" },
-        include: { senderUser: { select: { id: true, name: true } } },
+        include: {
+          senderUser: { select: { id: true, name: true } },
+          quotedMessage: { include: { senderUser: { select: { id: true, name: true } } } },
+        },
       },
     },
   });
@@ -256,7 +259,32 @@ export async function markConversationUnread(conversationId: string) {
   revalidatePath("/clinic/inbox");
 }
 
-export async function sendMessage(conversationId: string, content: string, isInternalNote = false) {
+/** Busca a mensagem citada (botão "Responder") e monta a referência que a Evolution
+ * API espera — só quando ela pertence à MESMA conversa (evita citar uma mensagem de
+ * outro paciente por engano) e já tem `whatsappKeyId` confirmado. Sem isso, ou se a
+ * mensagem nunca confirmou o key.id, retorna `undefined` — a mensagem sai normal,
+ * sem citação, nunca trava o envio por causa disso. */
+async function resolveQuotedRef(
+  conversationId: string,
+  contactPhone: string,
+  replyToMessageId: string | undefined
+): Promise<QuotedMessageRef | undefined> {
+  if (!replyToMessageId) return undefined;
+  const quoted = await prisma.message.findUnique({ where: { id: replyToMessageId } });
+  if (!quoted || quoted.conversationId !== conversationId || !quoted.whatsappKeyId) return undefined;
+  return {
+    keyId: quoted.whatsappKeyId,
+    remoteJid: `${formatToWhatsAppNumber(contactPhone)}@s.whatsapp.net`,
+    fromMe: quoted.direction === "OUTBOUND",
+  };
+}
+
+export async function sendMessage(
+  conversationId: string,
+  content: string,
+  isInternalNote = false,
+  replyToMessageId?: string
+) {
   const { clinicId, userId } = await requireClinicSession();
   const data = sendMessageSchema.parse({ conversationId, content });
 
@@ -288,6 +316,8 @@ export async function sendMessage(conversationId: string, content: string, isInt
     return note;
   }
 
+  const quotedRef = await resolveQuotedRef(data.conversationId, conversation.contact.phone, replyToMessageId);
+
   const message = await prisma.message.create({
     data: {
       conversationId: data.conversationId,
@@ -295,6 +325,7 @@ export async function sendMessage(conversationId: string, content: string, isInt
       content: data.content,
       status: "SENT",
       senderUserId: userId,
+      quotedMessageId: quotedRef ? replyToMessageId : null,
     },
   });
 
@@ -310,7 +341,7 @@ export async function sendMessage(conversationId: string, content: string, isInt
   // acks de entrega/leitura, por faltar o key.id). Não trava a UI de forma perceptível
   // porque o envio já é rápido (~1s) e tem timeout curto (8s) lá dentro.
   try {
-    const result = await whatsappService.sendMessage(conversation.contact.phone, data.content, "chat.outbound", clinicId);
+    const result = await whatsappService.sendMessage(conversation.contact.phone, data.content, "chat.outbound", clinicId, quotedRef);
     if (!result.success && !result.skipped) {
       await prisma.message.update({ where: { id: message.id }, data: { status: "FAILED" } });
     } else if (result.keyId) {
@@ -636,7 +667,7 @@ export async function extractMessageInvoiceData(messageId: string) {
 
 /** Sugestões de resposta pro Copilot do atendente (ver ai-copilot.ts) — nunca
  * envia nada sozinho, só devolve rascunhos pro atendente escolher. */
-export async function getReplySuggestions(conversationId: string): Promise<string[]> {
+export async function getReplySuggestions(conversationId: string, quotedMessageContent?: string): Promise<string[]> {
   const { clinicId } = await requireClinicSession();
 
   const conversation = await prisma.conversation.findUnique({
@@ -645,7 +676,12 @@ export async function getReplySuggestions(conversationId: string): Promise<strin
   });
   if (!conversation || conversation.clinicId !== clinicId) return [];
 
-  return generateReplySuggestions(conversationId, clinicId, conversation.clinic.tradeName || conversation.clinic.name);
+  return generateReplySuggestions(
+    conversationId,
+    clinicId,
+    conversation.clinic.tradeName || conversation.clinic.name,
+    quotedMessageContent
+  );
 }
 
 export async function getAttendantCapacity() {
@@ -899,9 +935,11 @@ export async function assignConversationToMe(conversationId: string) {
 const REASON_LABELS: Record<string, string> = {
   AGENDAMENTO_CONCLUIDO: "🎟️ Agendamento Concluído",
   CONFIRMACAO_AGENDA: "📅 Confirmação de Agenda",
+  AGENDAMENTO_REMARCADO: "🔁 Agendamento Remarcado",
   DUVIDA_ESCLARECIDA: "💡 Dúvida Esclarecida / Informações",
   ORCAMENTO_ENVIADO: "💲 Orçamento Enviado",
   SEM_RESPOSTA: "⏳ Paciente Não Respondeu / Inativo",
+  AGENDAMENTO_CANCELADO: "🚫 Agendamento Cancelado",
   CANCELAMENTO: "❌ Cancelamento / Desistência",
   ENCAMINHADO: "🔄 Encaminhado para Outro Setor",
 };
@@ -1230,7 +1268,10 @@ export async function getChatMessages(conversationId: string) {
     where: { conversationId },
     orderBy: { createdAt: "desc" },
     take: MESSAGE_PAGE_SIZE,
-    include: { senderUser: { select: { id: true, name: true } } },
+    include: {
+      senderUser: { select: { id: true, name: true } },
+      quotedMessage: { include: { senderUser: { select: { id: true, name: true } } } },
+    },
   });
 
   const withMediaUrls = await attachSignedUrls(latest.reverse());
@@ -1253,7 +1294,10 @@ export async function getOlderChatMessages(conversationId: string, beforeMessage
     where: { conversationId, createdAt: { lt: cursor.createdAt } },
     orderBy: { createdAt: "desc" },
     take: MESSAGE_PAGE_SIZE,
-    include: { senderUser: { select: { id: true, name: true } } },
+    include: {
+      senderUser: { select: { id: true, name: true } },
+      quotedMessage: { include: { senderUser: { select: { id: true, name: true } } } },
+    },
   });
 
   const withMediaUrls = await attachSignedUrls(older.reverse());
@@ -1436,7 +1480,7 @@ export async function updateConversationDepartment(conversationId: string, depar
  * Antes era um stub com busca de palavra-chave fixa, nunca chamava IA de
  * verdade; agora reaproveita o Copilot real (ver getReplySuggestions/
  * ai-copilot.ts), só pegando a primeira sugestão. */
-export async function suggestIaReply(conversationId: string): Promise<string> {
-  const suggestions = await getReplySuggestions(conversationId);
+export async function suggestIaReply(conversationId: string, quotedMessageContent?: string): Promise<string> {
+  const suggestions = await getReplySuggestions(conversationId, quotedMessageContent);
   return suggestions[0] || "";
 }
