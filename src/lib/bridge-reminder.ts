@@ -50,10 +50,10 @@ function toTitleCase(text: string): string {
  * horário), então cada um só entra na frase se existir. */
 export function buildBridgeReminderMessage(input: BridgeReminderInput): string {
   const procedureText = input.procedureName ? ` (${input.procedureName})` : "";
-  const doctorText = input.doctorName ? ` com Dr(a). ${input.doctorName}` : "";
+  const doctorText = input.doctorName ? ` com Dr(a). *${toTitleCase(input.doctorName)}*` : "";
   const timeText = input.time ? ` às ${input.time}` : "";
 
-  return `Olá ${input.patientName}! 👋 Lembrando da sua consulta/exame${procedureText}${doctorText} em ${input.dateFormatted}${timeText} na ${input.clinicName}.
+  return `Olá *${toTitleCase(input.patientName)}*! 👋 Lembrando da sua consulta/exame${procedureText}${doctorText} em ${input.dateFormatted}${timeText} na ${input.clinicName}.
 
 Por favor, responda com o número da opção desejada:
 1️⃣ Digite 1 para Confirmar presença

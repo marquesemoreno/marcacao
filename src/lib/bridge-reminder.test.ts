@@ -30,6 +30,18 @@ describe("buildBridgeReminderMessage", () => {
     expect(lines).toContain("3️⃣ Digite 3 para Cancelar");
   });
 
+  it("coloca nome do paciente e do médico em title case e negrito (vêm em CAIXA ALTA do Firebird)", () => {
+    const message = buildBridgeReminderMessage({
+      ...base,
+      patientName: "FLORISVALDO DE OLIVEIRA FREITAS",
+      doctorName: "MAURICIO FAGNER SANTOS LIMA DIAS",
+    });
+    expect(message).toContain("*Florisvaldo de Oliveira Freitas*");
+    expect(message).toContain("*Mauricio Fagner Santos Lima Dias*");
+    expect(message).not.toContain("FLORISVALDO");
+    expect(message).not.toContain("MAURICIO FAGNER");
+  });
+
   it("não quebra quando procedimento, médico ou horário vêm vazios do Firebird", () => {
     const message = buildBridgeReminderMessage({
       ...base,
