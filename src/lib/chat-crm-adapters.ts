@@ -131,6 +131,7 @@ function computeQueueState(conversation: ConversationWithRelations): Conversatio
 
 const REASON_SHORT_LABELS: Record<string, string> = {
   AGENDAMENTO_CONCLUIDO: "🎟️ Agendamento",
+  CONFIRMACAO_AGENDA: "📅 Confirmação de Agenda",
   DUVIDA_ESCLARECIDA: "💡 Dúvida Esclarecida",
   ORCAMENTO_ENVIADO: "💲 Orçamento Enviado",
   SEM_RESPOSTA: "⏳ Sem Resposta",

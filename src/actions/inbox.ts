@@ -898,6 +898,7 @@ export async function assignConversationToMe(conversationId: string) {
 
 const REASON_LABELS: Record<string, string> = {
   AGENDAMENTO_CONCLUIDO: "🎟️ Agendamento Concluído",
+  CONFIRMACAO_AGENDA: "📅 Confirmação de Agenda",
   DUVIDA_ESCLARECIDA: "💡 Dúvida Esclarecida / Informações",
   ORCAMENTO_ENVIADO: "💲 Orçamento Enviado",
   SEM_RESPOSTA: "⏳ Paciente Não Respondeu / Inativo",

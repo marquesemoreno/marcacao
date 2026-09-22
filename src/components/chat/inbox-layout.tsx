@@ -2336,6 +2336,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                     group: "Com retorno positivo",
                     options: [
                       { id: "AGENDAMENTO_CONCLUIDO", label: "Agendamento Concluído" },
+                      { id: "CONFIRMACAO_AGENDA", label: "Confirmação de Agenda" },
                       { id: "ORCAMENTO_ENVIADO", label: "Orçamento Enviado" },
                       { id: "DUVIDA_ESCLARECIDA", label: "Dúvida Esclarecida" },
                     ],
