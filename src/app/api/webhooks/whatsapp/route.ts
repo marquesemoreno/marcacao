@@ -525,7 +525,9 @@ export async function POST(request: Request) {
     });
     await prisma.conversation.update({
       where: { id: conversation.id },
-      data: { lastMessageAt: new Date(), ...reopenIfResolved(conversation) },
+      // archivedAt: null sempre — mensagem de verdade do paciente nunca pode ficar
+      // escondida numa conversa arquivada e esquecida (ver Conversation.archivedAt).
+      data: { lastMessageAt: new Date(), archivedAt: null, ...reopenIfResolved(conversation) },
     });
 
     // =========================================================================

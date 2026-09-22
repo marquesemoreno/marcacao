@@ -106,6 +106,7 @@ const ALL_INBOX_TABS: { id: InboxFilter; label: string }[] = [
   { id: 'minhas', label: 'Minhas' },
   { id: 'nao_atribuidas', label: 'Não Atribuídas' },
   { id: 'finalizadas', label: 'Finalizadas' },
+  { id: 'arquivadas', label: 'Arquivadas' },
 ];
 const INBOX_VISIBLE_TABS_STORAGE_KEY = 'inbox-visible-tabs';
 const DEFAULT_VISIBLE_TAB_IDS: InboxFilter[] = ['todas', 'minhas', 'nao_atribuidas'];
@@ -171,6 +172,11 @@ interface InboxLayoutProps {
    * está com queueState "HUMANO_ATENDENDO". */
   onReactivateAi?: () => Promise<{ success: boolean; message?: string }>;
   onMarkUnread?: () => Promise<void> | void;
+  /** Menu de "mais opções" no card da fila (ver ContactListItem) — recebem o id da
+   * conversa porque agem sobre qualquer card da lista, não só a selecionada. */
+  onTogglePin?: (contactId: string, pinned: boolean) => Promise<void> | void;
+  onMuteConversation?: (contactId: string, until: Date | null) => Promise<void> | void;
+  onArchiveConversation?: (contactId: string, archived: boolean) => Promise<void> | void;
   onRetryMessage?: (messageId: string) => Promise<void> | void;
   onEditMessage?: (messageId: string, newText: string) => Promise<{ success: boolean; error?: string }>;
   /** Transcreve um áudio recebido sob demanda (botão no balão) — ver transcribeMessageAudio em actions/inbox.ts. */
@@ -220,11 +226,26 @@ const ContactListItem = React.memo(function ContactListItem({
   contact: c,
   isSelected,
   onSelect,
+  onTogglePin,
+  onMuteConversation,
+  onArchiveConversation,
 }: {
   contact: Contact;
   isSelected: boolean;
   onSelect: (id: string) => void;
+  onTogglePin?: (contactId: string, pinned: boolean) => Promise<void> | void;
+  onMuteConversation?: (contactId: string, until: Date | null) => Promise<void> | void;
+  onArchiveConversation?: (contactId: string, archived: boolean) => Promise<void> | void;
 }) {
+  const [isCardMenuOpen, setIsCardMenuOpen] = useState(false);
+  const [isMuteSubmenuOpen, setIsMuteSubmenuOpen] = useState(false);
+
+  function muteFor(hours: number | 'sempre') {
+    const until = hours === 'sempre' ? new Date('2999-01-01') : new Date(Date.now() + hours * 60 * 60 * 1000);
+    onMuteConversation?.(c.id, until);
+    setIsMuteSubmenuOpen(false);
+    setIsCardMenuOpen(false);
+  }
   // Prioridade visual = mesma prioridade da ordenação da fila (urgência >
   // sem dono > resto) — "selecionada" só desempata dentro do último grupo,
   // nunca esconde uma urgência clínica ou uma conversa sem dono nenhum
@@ -241,9 +262,55 @@ const ContactListItem = React.memo(function ContactListItem({
   return (
     <div
       onClick={() => onSelect(c.id)}
-      className={`px-3 py-2 transition-colors cursor-pointer relative flex gap-2.5 items-start border-l-4 ${rowColorClasses}`}
+      className={`group px-3 py-2 transition-colors cursor-pointer relative flex gap-2.5 items-start border-l-4 ${rowColorClasses}`}
       data-od-id={`contact-card-${c.id}`}
     >
+      <Popover open={isCardMenuOpen} onOpenChange={(open) => { setIsCardMenuOpen(open); if (!open) setIsMuteSubmenuOpen(false); }}>
+        <PopoverTrigger
+          onClick={(e) => e.stopPropagation()}
+          className={`absolute top-1.5 right-1.5 p-1 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-200/70 dark:hover:bg-slate-700/70 transition-opacity ${
+            isCardMenuOpen ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+          }`}
+          title="Mais opções"
+        >
+          <MoreVertical className="w-3.5 h-3.5" />
+        </PopoverTrigger>
+        <PopoverContent align="end" className="p-1 w-48" onClick={(e) => e.stopPropagation()}>
+          {!isMuteSubmenuOpen ? (
+            <div className="flex flex-col">
+              <button
+                type="button"
+                className="text-left text-xs px-2 py-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800"
+                onClick={() => { onTogglePin?.(c.id, !c.pinned); setIsCardMenuOpen(false); }}
+              >
+                {c.pinned ? 'Desfixar conversa' : 'Fixar conversa'}
+              </button>
+              <button
+                type="button"
+                className="text-left text-xs px-2 py-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800"
+                onClick={() => (c.isMuted ? muteFor(0) : setIsMuteSubmenuOpen(true))}
+              >
+                {c.isMuted ? 'Dessilenciar' : 'Silenciar…'}
+              </button>
+              <button
+                type="button"
+                className="text-left text-xs px-2 py-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800"
+                onClick={() => { onArchiveConversation?.(c.id, !c.isArchived); setIsCardMenuOpen(false); }}
+              >
+                {c.isArchived ? 'Desarquivar conversa' : 'Arquivar conversa'}
+              </button>
+            </div>
+          ) : (
+            <div className="flex flex-col">
+              <button type="button" className="text-left text-xs px-2 py-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800" onClick={() => muteFor(8)}>8 horas</button>
+              <button type="button" className="text-left text-xs px-2 py-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800" onClick={() => muteFor(24 * 7)}>1 semana</button>
+              <button type="button" className="text-left text-xs px-2 py-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800" onClick={() => muteFor('sempre')}>Sempre</button>
+              <button type="button" className="text-left text-xs px-2 py-1.5 rounded-md text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800" onClick={() => setIsMuteSubmenuOpen(false)}>Voltar</button>
+            </div>
+          )}
+        </PopoverContent>
+      </Popover>
+
       <div className="relative shrink-0">
         <AvatarBadge name={c.name} photoUrl={c.avatar} size={34} className="ring-2 ring-white dark:ring-slate-900 shadow-sm" />
         {c.channel === 'whatsapp' && (
@@ -258,8 +325,10 @@ const ContactListItem = React.memo(function ContactListItem({
 
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between mb-0.5 gap-2">
-          <h4 className={`text-xs sm:text-[13px] truncate ${c.unreadCount > 0 ? 'font-bold text-slate-900 dark:text-slate-100' : 'font-semibold text-slate-900 dark:text-slate-100'}`}>
-            {c.name}
+          <h4 className={`text-xs sm:text-[13px] truncate flex items-center gap-1 ${c.unreadCount > 0 ? 'font-bold text-slate-900 dark:text-slate-100' : 'font-semibold text-slate-900 dark:text-slate-100'}`}>
+            {c.pinned && <span title="Fixada">📌</span>}
+            {c.isMuted && <span title="Silenciada">🔕</span>}
+            <span className="truncate">{c.name}</span>
           </h4>
           <span className="flex items-center gap-1.5 shrink-0">
             <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">
@@ -352,6 +421,9 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
   onClaimConversation,
   onReactivateAi,
   onMarkUnread,
+  onTogglePin,
+  onMuteConversation,
+  onArchiveConversation,
   onRetryMessage,
   onEditMessage,
   onTranscribeAudio,
@@ -622,9 +694,14 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
           }
           return true;
         })
-        // Estável: só reordena por prioridade (urgência > sem dono > resto), preserva a
-        // ordem por lastMessageAt que já vem do banco dentro de cada nível.
-        .sort((a, b) => QUEUE_STATE_PRIORITY[a.queueState] - QUEUE_STATE_PRIORITY[b.queueState]),
+        // Estável: reordena por prioridade (urgência > sem dono > resto) e, dentro do
+        // mesmo nível, fixadas primeiro — preserva a ordem por lastMessageAt que já
+        // vem do banco dentro de cada grupo. Fixar nunca passa por cima de urgência/sem dono.
+        .sort((a, b) => {
+          const priorityDiff = QUEUE_STATE_PRIORITY[a.queueState] - QUEUE_STATE_PRIORITY[b.queueState];
+          if (priorityDiff !== 0) return priorityDiff;
+          return Number(b.pinned) - Number(a.pinned);
+        }),
     [contacts, selectedDept, selectedTagFilter, searchQuery]
   );
 
@@ -1023,6 +1100,9 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                 contact={c}
                 isSelected={c.id === selectedContact?.id}
                 onSelect={handleSelectContactMobile}
+                onTogglePin={onTogglePin}
+                onMuteConversation={onMuteConversation}
+                onArchiveConversation={onArchiveConversation}
               />
             ))
           )}

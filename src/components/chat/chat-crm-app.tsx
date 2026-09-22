@@ -34,6 +34,9 @@ import {
   getOldestUnassignedWaitMinutes,
   suggestIaReply,
   markConversationUnread,
+  togglePinConversation,
+  muteConversation,
+  archiveConversation,
   resendMessage,
   getUnseenAssignmentNotifications,
   markAssignmentSeen,
@@ -76,6 +79,9 @@ import {
   listClinicsForReassignment,
   updateConversationClinicAdmin,
   markConversationUnreadAdmin,
+  togglePinConversationAdmin,
+  muteConversationAdmin,
+  archiveConversationAdmin,
   resendMessageAdmin,
   getUnseenAssignmentNotificationsAdmin,
   markAssignmentSeenAdmin,
@@ -129,6 +135,9 @@ const ACTIONS_BY_SCOPE = {
     deleteCannedResponse: (id: string) => deleteCannedResponse(id),
     suggestIaReply: (id: string, quotedMessageContent?: string) => suggestIaReply(id, quotedMessageContent),
     markConversationUnread: (id: string) => markConversationUnread(id),
+    togglePinConversation: (id: string, pinned: boolean) => togglePinConversation(id, pinned),
+    muteConversation: (id: string, until: Date | null) => muteConversation(id, until),
+    archiveConversation: (id: string, archived: boolean) => archiveConversation(id, archived),
     resendMessage: (id: string) => resendMessage(id),
     getUnseenAssignmentNotifications: () => getUnseenAssignmentNotifications(),
     markAssignmentSeen: (id: string) => markAssignmentSeen(id),
@@ -160,6 +169,9 @@ const ACTIONS_BY_SCOPE = {
     deleteCannedResponse: (id: string) => deleteCannedResponseAdmin(id),
     suggestIaReply: (id: string, quotedMessageContent?: string) => suggestIaReplyAdmin(id, quotedMessageContent),
     markConversationUnread: (id: string) => markConversationUnreadAdmin(id),
+    togglePinConversation: (id: string, pinned: boolean) => togglePinConversationAdmin(id, pinned),
+    muteConversation: (id: string, until: Date | null) => muteConversationAdmin(id, until),
+    archiveConversation: (id: string, archived: boolean) => archiveConversationAdmin(id, archived),
     resendMessage: (id: string) => resendMessageAdmin(id),
     getUnseenAssignmentNotifications: () => getUnseenAssignmentNotificationsAdmin(),
     markAssignmentSeen: (id: string) => markAssignmentSeenAdmin(id),
@@ -288,9 +300,13 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
     const totalUnread = result.reduce((sum, item) => sum + item.unreadCount, 0);
     updateTabTitleUnreadCount(totalUnread);
 
-    if (!isFirstLoadRef.current && totalUnread > totalUnreadRef.current) {
+    // Silenciada suprime som/notificação desktop, não o badge de não lida acima
+    // (ver Conversation.mutedUntil) — por isso esse total é separado do totalUnread.
+    const notifiableUnread = result.reduce((sum, item) => (item.isMuted ? sum : sum + item.unreadCount), 0);
+
+    if (!isFirstLoadRef.current && notifiableUnread > totalUnreadRef.current) {
       playNotificationSound();
-      const unreadContact = result.find((c) => c.unreadCount > 0);
+      const unreadContact = result.find((c) => c.unreadCount > 0 && !c.isMuted);
       if (unreadContact) {
         showDesktopNotification(`💬 Nova mensagem de ${unreadContact.name}`, {
           body: unreadContact.lastMessage,
@@ -298,7 +314,7 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
         });
       }
     }
-    totalUnreadRef.current = totalUnread;
+    totalUnreadRef.current = notifiableUnread;
     isFirstLoadRef.current = false;
 
     // Nunca troca sozinho a conversa aberta na tela — antes, qualquer refresh (o polling de
@@ -797,6 +813,22 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
     await refreshContacts();
   }
 
+  async function handleTogglePin(contactId: string, pinned: boolean) {
+    await actions.togglePinConversation(contactId, pinned);
+    await refreshContacts();
+  }
+
+  async function handleMuteConversation(contactId: string, until: Date | null) {
+    await actions.muteConversation(contactId, until);
+    await refreshContacts();
+  }
+
+  async function handleArchiveConversation(contactId: string, archived: boolean) {
+    await actions.archiveConversation(contactId, archived);
+    await refreshContacts();
+    toast.success(archived ? "Conversa arquivada." : "Conversa desarquivada.");
+  }
+
   async function handleRetryMessage(messageId: string) {
     const result = await actions.resendMessage(messageId);
     if (!result.success) {
@@ -870,6 +902,9 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
           onClaimConversation={handleClaimConversation}
           onReactivateAi={handleReactivateAi}
           onMarkUnread={handleMarkUnread}
+          onTogglePin={handleTogglePin}
+          onMuteConversation={handleMuteConversation}
+          onArchiveConversation={handleArchiveConversation}
           onRetryMessage={handleRetryMessage}
           onEditMessage={handleEditMessage}
           onTranscribeAudio={handleTranscribeAudio}

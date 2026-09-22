@@ -124,16 +124,18 @@ export async function listConversations(filter: ConversationFilter, search?: str
 
   // Com busca ativa, ignora o filtro de aba (fila) e procura em todas as
   // conversas da clínica — senão um contato salvo some da busca só por estar
-  // finalizado ou atribuído a outro atendente, fora da aba selecionada.
+  // finalizado, arquivado ou atribuído a outro atendente, fora da aba selecionada.
   const where = search
-    ? { clinicId }
-    : filter === "mine"
-      ? { clinicId, assignedUserId: userId, status: { in: ACTIVE_STATUSES } }
-      : filter === "unassigned"
-        ? { clinicId, assignedUserId: null, status: { in: ACTIVE_STATUSES } }
-        : filter === "resolved"
-          ? { clinicId, status: ConversationStatus.RESOLVED }
-          : { clinicId, status: { in: ACTIVE_STATUSES } };
+    ? { clinicId, archivedAt: filter === "archived" ? { not: null } : null }
+    : filter === "archived"
+      ? { clinicId, archivedAt: { not: null } }
+      : filter === "mine"
+        ? { clinicId, assignedUserId: userId, status: { in: ACTIVE_STATUSES }, archivedAt: null }
+        : filter === "unassigned"
+          ? { clinicId, assignedUserId: null, status: { in: ACTIVE_STATUSES }, archivedAt: null }
+          : filter === "resolved"
+            ? { clinicId, status: ConversationStatus.RESOLVED, archivedAt: null }
+            : { clinicId, status: { in: ACTIVE_STATUSES }, archivedAt: null };
 
   const conversations = await prisma.conversation.findMany({
     where: {
@@ -256,6 +258,38 @@ export async function markConversationUnread(conversationId: string) {
   if (lastInbound) {
     await prisma.message.update({ where: { id: lastInbound.id }, data: { readAt: null } });
   }
+  revalidatePath("/clinic/inbox");
+}
+
+/** Fixa/desfixa no topo da fila (menu do card) — só reordena dentro do mesmo
+ * QUEUE_STATE_PRIORITY (ver inbox-layout.tsx), nunca por cima de urgência
+ * clínica ou "sem dono". */
+export async function togglePinConversation(conversationId: string, pinned: boolean) {
+  const { clinicId } = await requireClinicSession();
+  await assertClinicOwnsConversation(conversationId, clinicId);
+  await prisma.conversation.update({ where: { id: conversationId }, data: { pinned } });
+  revalidatePath("/clinic/inbox");
+}
+
+/** Silencia notificação de mensagem nova (som/desktop) por um tempo — `until: null`
+ * dessilencia. Não esconde o badge de não lida (ver toChatContact/isMuted). */
+export async function muteConversation(conversationId: string, until: Date | null) {
+  const { clinicId } = await requireClinicSession();
+  await assertClinicOwnsConversation(conversationId, clinicId);
+  await prisma.conversation.update({ where: { id: conversationId }, data: { mutedUntil: until } });
+  revalidatePath("/clinic/inbox");
+}
+
+/** Tira da fila ativa sem mudar o status de atendimento — só aparece na aba
+ * "Arquivadas" até desarquivar (manual, ou automático quando chega mensagem
+ * nova do paciente — ver webhook route.ts). */
+export async function archiveConversation(conversationId: string, archived: boolean) {
+  const { clinicId } = await requireClinicSession();
+  await assertClinicOwnsConversation(conversationId, clinicId);
+  await prisma.conversation.update({
+    where: { id: conversationId },
+    data: { archivedAt: archived ? new Date() : null },
+  });
   revalidatePath("/clinic/inbox");
 }
 
@@ -1237,6 +1271,7 @@ const INBOX_FILTER_TO_CONVERSATION_FILTER: Record<InboxFilter, ConversationFilte
   nao_atribuidas: "unassigned",
   todas: "all",
   finalizadas: "resolved",
+  arquivadas: "archived",
 };
 
 /** Camada visual do módulo de atendimento (src/components/chat/) — mesmo dado de

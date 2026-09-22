@@ -485,6 +485,19 @@ model Conversation {
   /// true só depois do consentimento aceito; volta a false automaticamente se o paciente
   /// pedir humano, bater gatilho de escalação, ou um atendente responder manualmente.
   aiEnabled        Boolean                 @default(false) @map("ai_enabled")
+  /// Fixada no topo da fila pelo atendente (menu do card) — só reordena dentro do
+  /// mesmo nível de QUEUE_STATE_PRIORITY (ver inbox-layout.tsx), nunca por cima de
+  /// urgência clínica ou "sem dono".
+  pinned           Boolean                 @default(false)
+  /// Suprime som/notificação desktop de mensagem nova (ver chat-crm-app.tsx) — não
+  /// esconde o badge de não lida. Null = não silenciada. "Sempre" grava uma data bem
+  /// no futuro em vez de precisar de mais um campo boolean.
+  mutedUntil       DateTime?               @map("muted_until")
+  /// Tirada da fila ativa (não aparece em Todas/Minhas/Não Atribuídas/Finalizadas, só
+  /// na aba "Arquivadas") sem depender do status de atendimento. Zerada automaticamente
+  /// quando chega mensagem nova do paciente (ver webhook) — nunca deixa uma mensagem
+  /// de verdade escondida numa conversa arquivada e esquecida.
+  archivedAt       DateTime?               @map("archived_at")
   createdAt        DateTime                @default(now()) @map("created_at")
   updatedAt        DateTime                @updatedAt @map("updated_at")
 

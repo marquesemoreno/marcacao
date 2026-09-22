@@ -2,7 +2,7 @@ import type { InvoiceData } from "@/lib/chat-messages";
 
 export type Department = 'recepcao' | 'agendamento' | 'financeiro';
 
-export type InboxFilter = 'minhas' | 'nao_atribuidas' | 'todas' | 'finalizadas';
+export type InboxFilter = 'minhas' | 'nao_atribuidas' | 'todas' | 'finalizadas' | 'arquivadas';
 
 export type Channel = 'whatsapp' | 'instagram' | 'webchat';
 
@@ -103,6 +103,12 @@ export interface Contact {
   tags: string[];
   consultationHistory: ConsultationRecord[];
   estimatedValue?: string;
+  /** Fixada no topo da fila (menu do card) — ver QUEUE_STATE_PRIORITY em inbox-layout.tsx. */
+  pinned: boolean;
+  /** Notificação de mensagem nova suprimida (som/desktop) — não esconde unreadCount. */
+  isMuted: boolean;
+  /** Fora da fila ativa (aba "Arquivadas" só) — desarquiva sozinha quando chega mensagem nova. */
+  isArchived: boolean;
 }
 
 export interface Agent {

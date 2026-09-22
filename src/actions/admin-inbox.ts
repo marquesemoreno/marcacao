@@ -71,14 +71,16 @@ export async function listChatContactsAdmin(filter: InboxFilter, search?: string
   // Com busca ativa, ignora o filtro de aba e procura em todas as conversas —
   // ver o mesmo comentário em listConversations (inbox.ts).
   const where = search
-    ? {}
-    : filter === "minhas"
-      ? { status: { in: ACTIVE_STATUSES } }
-      : filter === "nao_atribuidas"
-        ? { assignedUserId: null, status: { in: ACTIVE_STATUSES } }
-        : filter === "finalizadas"
-          ? { status: ConversationStatus.RESOLVED }
-          : { status: { in: ACTIVE_STATUSES } };
+    ? { archivedAt: filter === "arquivadas" ? { not: null } : null }
+    : filter === "arquivadas"
+      ? { archivedAt: { not: null } }
+      : filter === "minhas"
+        ? { status: { in: ACTIVE_STATUSES }, archivedAt: null }
+        : filter === "nao_atribuidas"
+          ? { assignedUserId: null, status: { in: ACTIVE_STATUSES }, archivedAt: null }
+          : filter === "finalizadas"
+            ? { status: ConversationStatus.RESOLVED, archivedAt: null }
+            : { status: { in: ACTIVE_STATUSES }, archivedAt: null };
 
   const conversations = await prisma.conversation.findMany({
     where: {
@@ -1100,6 +1102,29 @@ export async function markConversationUnreadAdmin(conversationId: string) {
   if (lastInbound) {
     await prisma.message.update({ where: { id: lastInbound.id }, data: { readAt: null } });
   }
+  revalidatePath("/admin/inbox");
+}
+
+/** Espelho de togglePinConversation/muteConversation/archiveConversation
+ * (inbox.ts) pro escopo admin. */
+export async function togglePinConversationAdmin(conversationId: string, pinned: boolean) {
+  await requireAdminSession();
+  await prisma.conversation.update({ where: { id: conversationId }, data: { pinned } });
+  revalidatePath("/admin/inbox");
+}
+
+export async function muteConversationAdmin(conversationId: string, until: Date | null) {
+  await requireAdminSession();
+  await prisma.conversation.update({ where: { id: conversationId }, data: { mutedUntil: until } });
+  revalidatePath("/admin/inbox");
+}
+
+export async function archiveConversationAdmin(conversationId: string, archived: boolean) {
+  await requireAdminSession();
+  await prisma.conversation.update({
+    where: { id: conversationId },
+    data: { archivedAt: archived ? new Date() : null },
+  });
   revalidatePath("/admin/inbox");
 }
 
