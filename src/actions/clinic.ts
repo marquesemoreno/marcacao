@@ -54,6 +54,107 @@ export async function listClinicAppointments(filters?: { status?: AppointmentSta
   });
 }
 
+/** Relatório de atendimento/chat da clínica (ver /clinic/relatorio) — mesma lógica de
+ * getAttendantPerformanceReport/getConversationQualityReport (admin.ts), só que filtrada
+ * por clinicId em vez da plataforma inteira. Duplicado de propósito (mesmo padrão
+ * clínica/admin usado no resto do projeto) em vez de generalizar as funções do admin. */
+export async function getClinicChatReport(days: number = 30) {
+  const { clinicId } = await requireClinicSession();
+  const since = addUTCDays(startOfUTCDay(new Date()), -days);
+
+  const [conversations, audits, urgencyCount] = await Promise.all([
+    prisma.conversation.findMany({
+      where: { clinicId, createdAt: { gte: since } },
+      select: { id: true, status: true, resolutionReason: true, createdAt: true, resolvedAt: true },
+    }),
+    prisma.conversationQualityAudit.findMany({
+      where: { conversation: { clinicId }, createdAt: { gte: since } },
+      select: { sentiment: true, firstResponseSec: true, resolutionSec: true },
+    }),
+    prisma.messageTriage.count({
+      where: { conversation: { clinicId }, createdAt: { gte: since } },
+    }),
+  ]);
+
+  const totalResolved = conversations.filter((c) => c.status === "RESOLVED").length;
+  const totalAgendados = conversations.filter((c) => c.resolutionReason === "AGENDAMENTO_CONCLUIDO").length;
+  const conversionRate = totalResolved > 0 ? Math.round((totalAgendados / totalResolved) * 1000) / 10 : 0;
+
+  const withFrt = audits.filter((a) => a.firstResponseSec !== null);
+  const withTtr = audits.filter((a) => a.resolutionSec !== null);
+  const avgFrtSec = withFrt.length > 0 ? Math.round(withFrt.reduce((acc, a) => acc + a.firstResponseSec!, 0) / withFrt.length) : null;
+  const avgTtrSec = withTtr.length > 0 ? Math.round(withTtr.reduce((acc, a) => acc + a.resolutionSec!, 0) / withTtr.length) : null;
+
+  const withSentiment = audits.filter((a) => a.sentiment !== null);
+  const sentimentCounts = { POSITIVO: 0, NEUTRO: 0, NEGATIVO: 0 } as Record<string, number>;
+  for (const a of withSentiment) {
+    if (a.sentiment) sentimentCounts[a.sentiment] = (sentimentCounts[a.sentiment] ?? 0) + 1;
+  }
+  const sentimentPct = (key: string) =>
+    withSentiment.length > 0 ? Math.round(((sentimentCounts[key] ?? 0) / withSentiment.length) * 1000) / 10 : 0;
+
+  return {
+    totalConversations: conversations.length,
+    totalResolved,
+    totalAgendados,
+    conversionRate,
+    avgFrtSec,
+    avgTtrSec,
+    sentimentPositivePct: sentimentPct("POSITIVO"),
+    sentimentNeutroPct: sentimentPct("NEUTRO"),
+    sentimentNegativoPct: sentimentPct("NEGATIVO"),
+    urgencyCount,
+  };
+}
+
+/** Relatório de agendamentos da clínica (ver /clinic/relatorio) — mesma fonte de valor
+ * (clinicProcedure.price/promotionalPrice) já usada em getFinancialReport (admin.ts). */
+export async function getClinicAppointmentsReport(days: number = 30) {
+  const { clinicId } = await requireClinicSession();
+  const since = addUTCDays(startOfUTCDay(new Date()), -days);
+
+  const appointments = await prisma.appointment.findMany({
+    where: { clinicProcedure: { clinicId }, createdAt: { gte: since } },
+    include: { clinicProcedure: { include: { procedure: true } } },
+  });
+
+  const countByStatus: Record<AppointmentStatus, number> = {
+    PENDING: 0,
+    CONFIRMED: 0,
+    COMPLETED: 0,
+    CANCELLED: 0,
+    NO_SHOW: 0,
+  };
+  for (const a of appointments) countByStatus[a.status]++;
+
+  const completed = appointments.filter((a) => a.status === "COMPLETED");
+  const revenue = completed.reduce(
+    (sum, a) => sum + Number(a.clinicProcedure.promotionalPrice ?? a.clinicProcedure.price),
+    0
+  );
+
+  const cancelledOrNoShow = countByStatus.CANCELLED + countByStatus.NO_SHOW;
+  const cancellationRate = appointments.length > 0 ? Math.round((cancelledOrNoShow / appointments.length) * 1000) / 10 : 0;
+
+  const procedureCounts = new Map<string, number>();
+  for (const a of appointments) {
+    const name = a.clinicProcedure.procedure.name;
+    procedureCounts.set(name, (procedureCounts.get(name) ?? 0) + 1);
+  }
+  const topProcedures = [...procedureCounts.entries()]
+    .map(([name, count]) => ({ name, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 5);
+
+  return {
+    totalAppointments: appointments.length,
+    countByStatus,
+    cancellationRate,
+    revenue,
+    topProcedures,
+  };
+}
+
 export async function updateAppointmentStatus(appointmentId: string, status: AppointmentStatus) {
   const { clinicId } = await requireClinicSession();
   const { status: validStatus } = updateAppointmentStatusSchema.parse({ status });
