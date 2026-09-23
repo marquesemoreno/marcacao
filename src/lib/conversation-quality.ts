@@ -1,39 +1,10 @@
 import "server-only";
 import OpenAI from "openai";
 import { prisma } from "@/lib/prisma";
-import { isAutoSystemMessage } from "@/lib/chat-messages";
+import { computeResponseTimingsFromMessages, type ResponseTimings } from "@/lib/response-timings";
 
-export type ResponseTimings = {
-  firstResponseSec: number | null;
-  resolutionSec: number | null;
-};
-
-type TimingMessage = { direction: "INBOUND" | "OUTBOUND"; type: string; content: string; createdAt: Date };
-
-/** FRT (tempo até a primeira resposta) e TTR (tempo até resolver) — pura aritmética de
- * timestamp, sem IA. FRT ignora nota interna e mensagem automática (ver
- * isAutoSystemMessage) como "primeira resposta": nenhuma das duas é um humano/IA
- * respondendo de verdade ao paciente. `null` quando não dá pra calcular (ex: conversa
- * sem nenhuma mensagem do paciente, ou ainda sem resposta nenhuma). Função pura
- * (mensagens já em mãos) pra poder testar sem tocar no banco — ver computeResponseTimings. */
-export function computeResponseTimingsFromMessages(messages: TimingMessage[], resolvedAt: Date | null): ResponseTimings {
-  const firstInbound = messages.find((m) => m.direction === "INBOUND");
-  if (!firstInbound) return { firstResponseSec: null, resolutionSec: null };
-
-  const firstRealReply = messages.find(
-    (m) => m.direction === "OUTBOUND" && m.type !== "INTERNAL_NOTE" && !isAutoSystemMessage(m.content)
-  );
-
-  const firstResponseSec = firstRealReply
-    ? Math.round((firstRealReply.createdAt.getTime() - firstInbound.createdAt.getTime()) / 1000)
-    : null;
-
-  const resolutionSec = resolvedAt
-    ? Math.round((resolvedAt.getTime() - firstInbound.createdAt.getTime()) / 1000)
-    : null;
-
-  return { firstResponseSec, resolutionSec };
-}
+export type { ResponseTimings };
+export { computeResponseTimingsFromMessages };
 
 /** Busca as mensagens/resolvedAt da conversa no banco e delega a conta pra
  * computeResponseTimingsFromMessages. */
