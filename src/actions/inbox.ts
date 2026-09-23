@@ -119,6 +119,39 @@ export async function listAllContacts(search?: string) {
   }));
 }
 
+/** Lista conversas-destino pra "Reencaminhar mensagem" — só da mesma clínica da
+ * conversa de origem (nunca entre clínicas), excluindo a própria origem. */
+export async function listForwardTargets(sourceConversationId: string, search?: string) {
+  const { clinicId } = await requireClinicSession();
+  await assertClinicOwnsConversation(sourceConversationId, clinicId);
+
+  const conversations = await prisma.conversation.findMany({
+    where: {
+      clinicId,
+      id: { not: sourceConversationId },
+      ...(search
+        ? {
+            contact: {
+              OR: [
+                { name: { contains: search, mode: "insensitive" } },
+                { phone: { contains: search } },
+              ],
+            },
+          }
+        : {}),
+    },
+    include: { contact: true },
+    orderBy: { contact: { name: "asc" } },
+    take: 30,
+  });
+
+  return conversations.map((conversation) => ({
+    conversationId: conversation.id,
+    name: conversation.contact.name,
+    phone: conversation.contact.phone,
+  }));
+}
+
 export async function listConversations(filter: ConversationFilter, search?: string) {
   const { clinicId, userId } = await requireClinicSession();
 
@@ -646,6 +679,55 @@ export async function toggleStarred(messageId: string) {
   revalidatePath("/clinic/inbox");
   revalidatePath("/admin/inbox");
   return updated;
+}
+
+/** Reencaminha o conteúdo de uma mensagem já existente pra outra conversa — sem o
+ * selo nativo "Encaminhada" do WhatsApp (Evolution API não expõe forward de verdade),
+ * é um reenvio do mesmo conteúdo. Só entre conversas da mesma clínica (ver
+ * listForwardTargets). Reaproveita os mesmos envios do composer por dentro, então
+ * fica registrado como mensagem nova de verdade na conversa de destino. */
+export async function forwardMessage(messageId: string, targetConversationId: string) {
+  const { clinicId } = await requireClinicSession();
+
+  const source = await prisma.message.findUnique({ where: { id: messageId } });
+  if (!source) {
+    throw new Error("Mensagem não encontrada");
+  }
+  await assertClinicOwnsConversation(source.conversationId, clinicId);
+  await assertClinicOwnsConversation(targetConversationId, clinicId);
+
+  if (source.type === "INTERNAL_NOTE") {
+    throw new Error("Nota interna não pode ser encaminhada.");
+  }
+
+  if (source.type === "TEXT") {
+    return sendMessage(targetConversationId, source.content);
+  }
+
+  if (source.type === "CONTACT") {
+    const [name, phone] = source.content.split(" — ");
+    return shareContact(targetConversationId, { name, phone });
+  }
+
+  // ATTACHMENT / AUDIO — baixa o arquivo original do Storage e reenvia como mensagem nova.
+  if (!source.mediaPath || !source.mimeType) {
+    throw new Error("Arquivo original não encontrado para encaminhar.");
+  }
+  const buffer = await downloadWhatsAppMedia(source.mediaPath);
+  if (!buffer) {
+    throw new Error("Não foi possível baixar o arquivo original.");
+  }
+  const fileName = source.attachmentName || `arquivo.${source.mimeType.split("/")[1] || "bin"}`;
+  const file = new File([new Uint8Array(buffer)], fileName, { type: source.mimeType });
+  const formData = new FormData();
+  formData.append("file", file);
+
+  if (source.type === "AUDIO") {
+    const [minutes, seconds] = (source.audioDuration || "0:00").split(":").map(Number);
+    formData.append("duration", String((minutes || 0) * 60 + (seconds || 0)));
+    return sendAudioMessage(targetConversationId, formData);
+  }
+  return sendMediaMessage(targetConversationId, formData);
 }
 
 /** Reenvia uma mensagem OUTBOUND que falhou (texto, anexo ou áudio) — usa o mesmo

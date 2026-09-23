@@ -65,6 +65,44 @@ export async function listAllContactsAdmin(search?: string) {
   }));
 }
 
+/** Mirror admin de listForwardTargets (inbox.ts) — sem clínica própria na sessão,
+ * a restrição "mesma clínica" vem da clínica da CONVERSA DE ORIGEM. */
+export async function listForwardTargetsAdmin(sourceConversationId: string, search?: string) {
+  await requireAdminSession();
+
+  const source = await prisma.conversation.findUnique({
+    where: { id: sourceConversationId },
+    select: { clinicId: true },
+  });
+  if (!source) throw new Error("Conversa não encontrada");
+
+  const conversations = await prisma.conversation.findMany({
+    where: {
+      clinicId: source.clinicId,
+      id: { not: sourceConversationId },
+      ...(search
+        ? {
+            contact: {
+              OR: [
+                { name: { contains: search, mode: "insensitive" } },
+                { phone: { contains: search } },
+              ],
+            },
+          }
+        : {}),
+    },
+    include: { contact: true },
+    orderBy: { contact: { name: "asc" } },
+    take: 30,
+  });
+
+  return conversations.map((conversation) => ({
+    conversationId: conversation.id,
+    name: conversation.contact.name,
+    phone: conversation.contact.phone,
+  }));
+}
+
 export async function listChatContactsAdmin(filter: InboxFilter, search?: string, clinicId?: string) {
   const { userId } = await requireAdminSession();
 
@@ -694,6 +732,56 @@ export async function toggleStarredAdmin(messageId: string) {
 
   revalidatePath("/admin/inbox");
   return updated;
+}
+
+/** Mirror admin de forwardMessage (inbox.ts) — restrição "mesma clínica" vem da
+ * clínica de origem/destino comparadas entre si (sem clínica própria na sessão). */
+export async function forwardMessageAdmin(messageId: string, targetConversationId: string) {
+  await requireAdminSession();
+
+  const source = await prisma.message.findUnique({ where: { id: messageId } });
+  if (!source) {
+    throw new Error("Mensagem não encontrada");
+  }
+  const [sourceConv, targetConv] = await Promise.all([
+    prisma.conversation.findUnique({ where: { id: source.conversationId }, select: { clinicId: true } }),
+    prisma.conversation.findUnique({ where: { id: targetConversationId }, select: { clinicId: true } }),
+  ]);
+  if (!sourceConv || !targetConv || sourceConv.clinicId !== targetConv.clinicId) {
+    throw new Error("Só é possível encaminhar entre conversas da mesma clínica.");
+  }
+
+  if (source.type === "INTERNAL_NOTE") {
+    throw new Error("Nota interna não pode ser encaminhada.");
+  }
+
+  if (source.type === "TEXT") {
+    return sendMessageAdmin(targetConversationId, source.content);
+  }
+
+  if (source.type === "CONTACT") {
+    const [name, phone] = source.content.split(" — ");
+    return shareContactAdmin(targetConversationId, { name, phone });
+  }
+
+  if (!source.mediaPath || !source.mimeType) {
+    throw new Error("Arquivo original não encontrado para encaminhar.");
+  }
+  const buffer = await downloadWhatsAppMedia(source.mediaPath);
+  if (!buffer) {
+    throw new Error("Não foi possível baixar o arquivo original.");
+  }
+  const fileName = source.attachmentName || `arquivo.${source.mimeType.split("/")[1] || "bin"}`;
+  const file = new File([new Uint8Array(buffer)], fileName, { type: source.mimeType });
+  const formData = new FormData();
+  formData.append("file", file);
+
+  if (source.type === "AUDIO") {
+    const [minutes, seconds] = (source.audioDuration || "0:00").split(":").map(Number);
+    formData.append("duration", String((minutes || 0) * 60 + (seconds || 0)));
+    return sendAudioMessageAdmin(targetConversationId, formData);
+  }
+  return sendMediaMessageAdmin(targetConversationId, formData);
 }
 
 /** Reenvia uma mensagem OUTBOUND que falhou (texto, anexo ou áudio) — ver resendMessage (inbox.ts). */

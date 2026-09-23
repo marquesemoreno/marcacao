@@ -25,10 +25,12 @@ import {
   IdCard,
   SmilePlus,
   Star,
+  Forward,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from '@/components/ui/dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from '@/components/ui/command';
 import { mentionsInvoiceRequest, type InvoiceData } from '@/lib/chat-messages';
 
 /** Subconjunto rápido de emojis pra reação — mesmo espírito da barra rápida do
@@ -53,6 +55,10 @@ interface MessageBubbleProps {
   onReact?: (emoji: string) => void;
   /** Marca/desmarca como favorita — só organização interna, nunca sincroniza. */
   onToggleStar?: () => void;
+  /** Reencaminha essa mensagem pra outra conversa da mesma clínica (sem selo nativo). */
+  onForward?: (targetConversationId: string) => void;
+  /** Busca conversas-destino pra encaminhar (mesma clínica, exclui a atual). */
+  onSearchForwardTargets?: (query: string) => Promise<{ conversationId: string; name: string; phone: string }[]>;
 }
 
 /** Bloco compacto no topo do balão mostrando a mensagem citada — mesmo visual pro
@@ -71,16 +77,89 @@ const QuotedMessagePreview: React.FC<{ quoted: NonNullable<Message['quotedMessag
 
 /** Botões de hover do balão (responder/reagir/favoritar) — mesmo grupo em todos os
  * tipos de mensagem (texto/áudio/anexo/contato), por isso extraído uma vez só. */
+/** Botão de encaminhar com o próprio picker de conversa-destino — busca com debounce
+ * simples (mesmo padrão do picker de "Compartilhar contato" em inbox-layout.tsx). */
+const ForwardButton: React.FC<{
+  onForward: (targetConversationId: string) => void;
+  onSearchForwardTargets: (query: string) => Promise<{ conversationId: string; name: string; phone: string }[]>;
+}> = ({ onForward, onSearchForwardTargets }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState<{ conversationId: string; name: string; phone: string }[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+
+  React.useEffect(() => {
+    if (!isOpen) return;
+    const timer = setTimeout(async () => {
+      setIsSearching(true);
+      try {
+        setResults(await onSearchForwardTargets(query));
+      } finally {
+        setIsSearching(false);
+      }
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [isOpen, query, onSearchForwardTargets]);
+
+  return (
+    <Popover open={isOpen} onOpenChange={setIsOpen}>
+      <PopoverTrigger
+        render={
+          <button
+            type="button"
+            aria-label="Encaminhar"
+            title="Encaminhar"
+            className="p-1.5 rounded-full hover:bg-slate-200/70 dark:hover:bg-slate-700 text-slate-400"
+          />
+        }
+      >
+        <Forward className="w-3.5 h-3.5" />
+      </PopoverTrigger>
+      <PopoverContent align="center" className="p-0 w-64">
+        <Command shouldFilter={false}>
+          <CommandInput placeholder="Encaminhar para..." value={query} onValueChange={setQuery} />
+          <CommandList>
+            {isSearching ? (
+              <p className="px-3 py-2 text-[11px] text-slate-500 dark:text-slate-400">Buscando...</p>
+            ) : results.length === 0 ? (
+              <CommandEmpty className="text-xs text-slate-500 dark:text-slate-400">Nenhuma conversa encontrada.</CommandEmpty>
+            ) : (
+              <CommandGroup>
+                {results.map((r) => (
+                  <CommandItem
+                    key={r.conversationId}
+                    value={r.conversationId}
+                    onSelect={() => {
+                      onForward(r.conversationId);
+                      setIsOpen(false);
+                    }}
+                    className="justify-between text-xs"
+                  >
+                    <span className="font-medium truncate">{r.name}</span>
+                    <span className="text-[10px] text-slate-500 dark:text-slate-400 shrink-0">{r.phone}</span>
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            )}
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+};
+
 const HoverActionButtons: React.FC<{
   isAgent: boolean;
   onReply?: () => void;
   onReact?: (emoji: string) => void;
   onToggleStar?: () => void;
+  onForward?: (targetConversationId: string) => void;
+  onSearchForwardTargets?: (query: string) => Promise<{ conversationId: string; name: string; phone: string }[]>;
   starred?: boolean;
   currentReaction?: string;
-}> = ({ isAgent, onReply, onReact, onToggleStar, starred, currentReaction }) => {
+}> = ({ isAgent, onReply, onReact, onToggleStar, onForward, onSearchForwardTargets, starred, currentReaction }) => {
   const [isReactionOpen, setIsReactionOpen] = useState(false);
-  if (!onReply && !onReact && !onToggleStar) return null;
+  if (!onReply && !onReact && !onToggleStar && !onForward) return null;
   return (
     <div
       className={`self-center flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity ${isAgent ? 'order-first mr-1' : 'order-last ml-1'}`}
@@ -130,6 +209,9 @@ const HoverActionButtons: React.FC<{
         >
           <Star className={`w-3.5 h-3.5 ${starred ? 'fill-amber-400 text-amber-400' : ''}`} />
         </button>
+      )}
+      {onForward && onSearchForwardTargets && (
+        <ForwardButton onForward={onForward} onSearchForwardTargets={onSearchForwardTargets} />
       )}
       {onReply && (
         <button
@@ -213,7 +295,7 @@ const MessageStatusTicks: React.FC<{ status?: Message['deliveryStatus'] }> = ({ 
   return <Clock className="w-3 h-3 text-slate-400" aria-label="Enviando..." />;
 };
 
-export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry, onRequestResend, onEditMessage, onTranscribeAudio, onExtractInvoiceData, onReply, onReact, onToggleStar }) => {
+export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry, onRequestResend, onEditMessage, onTranscribeAudio, onExtractInvoiceData, onReply, onReact, onToggleStar, onForward, onSearchForwardTargets }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   const [playbackSpeed, setPlaybackSpeed] = useState<'1x' | '1.5x' | '2x'>('1x');
@@ -406,6 +488,8 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry, 
           onReply={onReply}
           onReact={onReact}
           onToggleStar={onToggleStar}
+          onForward={onForward}
+          onSearchForwardTargets={onSearchForwardTargets}
           starred={message.starred}
           currentReaction={message.agentReaction}
         />
@@ -530,6 +614,8 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry, 
             onReply={onReply}
             onReact={onReact}
             onToggleStar={onToggleStar}
+            onForward={onForward}
+            onSearchForwardTargets={onSearchForwardTargets}
             starred={message.starred}
             currentReaction={message.agentReaction}
           />
@@ -670,6 +756,8 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry, 
           onReply={onReply}
           onReact={onReact}
           onToggleStar={onToggleStar}
+          onForward={onForward}
+          onSearchForwardTargets={onSearchForwardTargets}
           starred={message.starred}
           currentReaction={message.agentReaction}
         />
@@ -715,6 +803,8 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry, 
           onReply={onReply}
           onReact={onReact}
           onToggleStar={onToggleStar}
+          onForward={onForward}
+          onSearchForwardTargets={onSearchForwardTargets}
           starred={message.starred}
           currentReaction={message.agentReaction}
         />

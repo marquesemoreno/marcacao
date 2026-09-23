@@ -42,6 +42,8 @@ import {
   listAllContacts,
   toggleReaction,
   toggleStarred,
+  listForwardTargets,
+  forwardMessage,
   resendMessage,
   getUnseenAssignmentNotifications,
   markAssignmentSeen,
@@ -92,6 +94,8 @@ import {
   listAllContactsAdmin,
   toggleReactionAdmin,
   toggleStarredAdmin,
+  listForwardTargetsAdmin,
+  forwardMessageAdmin,
   resendMessageAdmin,
   getUnseenAssignmentNotificationsAdmin,
   markAssignmentSeenAdmin,
@@ -153,6 +157,8 @@ const ACTIONS_BY_SCOPE = {
     listAllContacts: (search?: string) => listAllContacts(search),
     toggleReaction: (id: string, emoji: string) => toggleReaction(id, emoji),
     toggleStarred: (id: string) => toggleStarred(id),
+    listForwardTargets: (id: string, search?: string) => listForwardTargets(id, search),
+    forwardMessage: (id: string, targetConversationId: string) => forwardMessage(id, targetConversationId),
     resendMessage: (id: string) => resendMessage(id),
     getUnseenAssignmentNotifications: () => getUnseenAssignmentNotifications(),
     markAssignmentSeen: (id: string) => markAssignmentSeen(id),
@@ -192,6 +198,8 @@ const ACTIONS_BY_SCOPE = {
     listAllContacts: (search?: string) => listAllContactsAdmin(search),
     toggleReaction: (id: string, emoji: string) => toggleReactionAdmin(id, emoji),
     toggleStarred: (id: string) => toggleStarredAdmin(id),
+    listForwardTargets: (id: string, search?: string) => listForwardTargetsAdmin(id, search),
+    forwardMessage: (id: string, targetConversationId: string) => forwardMessageAdmin(id, targetConversationId),
     resendMessage: (id: string) => resendMessageAdmin(id),
     getUnseenAssignmentNotifications: () => getUnseenAssignmentNotificationsAdmin(),
     markAssignmentSeen: (id: string) => markAssignmentSeenAdmin(id),
@@ -727,6 +735,20 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
     await refreshMessages();
   }
 
+  async function handleForward(messageId: string, targetConversationId: string) {
+    try {
+      await actions.forwardMessage(messageId, targetConversationId);
+      toast.success("Mensagem encaminhada!");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível encaminhar a mensagem.");
+    }
+  }
+
+  async function handleSearchForwardTargets(query: string) {
+    if (!selectedContactId) return [];
+    return actions.listForwardTargets(selectedContactId, query);
+  }
+
   async function handleAddTag(tag: string) {
     if (!selectedContact) return;
     await actions.updateConversationTags(selectedContact.id, [...selectedContact.tags, tag]);
@@ -968,6 +990,8 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
           onSearchContacts={handleSearchContacts}
           onReact={handleReact}
           onToggleStar={handleToggleStar}
+          onForward={handleForward}
+          onSearchForwardTargets={handleSearchForwardTargets}
           onAddTag={handleAddTag}
           onRemoveTag={handleRemoveTag}
           onUpdatePatient={handleUpdatePatient}

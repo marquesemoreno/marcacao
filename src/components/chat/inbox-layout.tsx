@@ -173,6 +173,10 @@ interface InboxLayoutProps {
   onReact?: (messageId: string, emoji: string) => Promise<void> | void;
   /** Marca/desmarca uma mensagem como favorita — só organização interna do CRM. */
   onToggleStar?: (messageId: string) => Promise<void> | void;
+  /** Reencaminha uma mensagem pra outra conversa da mesma clínica (sem selo nativo). */
+  onForward?: (messageId: string, targetConversationId: string) => Promise<void> | void;
+  /** Busca conversas-destino pra encaminhar — mesma clínica da conversa atual, exclui ela mesma. */
+  onSearchForwardTargets?: (query: string) => Promise<{ conversationId: string; name: string; phone: string }[]>;
   onAddTag: (tag: string) => Promise<void> | void;
   onRemoveTag: (tag: string) => Promise<void> | void;
   onUpdatePatient: (data: {
@@ -434,6 +438,8 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
   onSearchContacts,
   onReact,
   onToggleStar,
+  onForward,
+  onSearchForwardTargets,
   onAddTag,
   onRemoveTag,
   onUpdatePatient,
@@ -1648,6 +1654,8 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                       onReply={() => setReplyingTo(msg)}
                       onReact={onReact ? (emoji) => onReact(msg.id, emoji) : undefined}
                       onToggleStar={onToggleStar ? () => onToggleStar(msg.id) : undefined}
+                      onForward={onForward ? (targetConversationId) => onForward(msg.id, targetConversationId) : undefined}
+                      onSearchForwardTargets={onSearchForwardTargets}
                     />
                   ))}
                 </>
