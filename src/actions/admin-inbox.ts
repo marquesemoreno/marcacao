@@ -5,6 +5,7 @@ import { ConversationStatus, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireAdminSession } from "@/lib/session";
 import { whatsappService, sendWhatsAppMedia, sendWhatsAppAudio, sendWhatsAppContact, sendWhatsAppReaction, formatToWhatsAppNumber, isValidWhatsAppNumber, fetchWhatsAppProfilePicture, editWhatsAppMessage, type QuotedMessageRef } from "@/lib/whatsapp";
+import { BUDGET_SENT_TAG, SCHEDULED_TAG } from "@/lib/conversation-tags";
 import { canEditMessage } from "@/lib/message-edit";
 import { hasHospitalBridgeIntegration, fetchBridgeProcedures, fetchBridgeDoctors, fetchBridgeAgenda, fetchBridgeConvenios, fetchBridgePatients, adaptBridgeProcedureToPlainItem } from "@/lib/hospital-bridge";
 import { toPlainClinicProcedureItem } from "@/lib/serialize";
@@ -1320,9 +1321,18 @@ export async function refreshContactPhotoAdmin(conversationId: string) {
 
 export async function updateConversationFunnelStageAdmin(conversationId: string, stage: FunnelStage) {
   await requireAdminSession();
+
+  // Tag automática ao entrar em Orçamento/Agendado — ver updateConversationFunnelStage (inbox.ts).
+  const conversation = await prisma.conversation.findUnique({ where: { id: conversationId }, select: { tags: true } });
+  const funnelTag = stage === "orcamento" ? BUDGET_SENT_TAG : stage === "agendado" ? SCHEDULED_TAG : null;
+  const shouldTag = funnelTag && conversation && !conversation.tags.includes(funnelTag);
+
   await prisma.conversation.update({
     where: { id: conversationId },
-    data: { funnelStage: funnelStageToDb[stage] },
+    data: {
+      funnelStage: funnelStageToDb[stage],
+      ...(shouldTag ? { tags: { push: funnelTag } } : {}),
+    },
   });
   revalidatePath("/admin/inbox");
   revalidatePath("/admin/crm");

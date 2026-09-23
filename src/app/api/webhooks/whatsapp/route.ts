@@ -8,7 +8,8 @@ import { notifyInboxRealtime } from "@/lib/supabase-server";
 import { MEDIA_DOWNLOAD_FAILED_PREFIX } from "@/lib/chat-messages";
 import { isBroadcastOptOutReply } from "@/lib/broadcast-csv";
 import { reopenIfResolved } from "@/lib/conversation-reopen";
-import { URGENCY_TAG, MSP_LEAD_TAG, PARTNER_LEAD_TAG } from "@/lib/conversation-tags";
+import { URGENCY_TAG, MSP_LEAD_TAG, PARTNER_LEAD_TAG, NO_RESPONSE_TAG } from "@/lib/conversation-tags";
+import { detectProcedureInterestTag, detectSourceTag } from "@/lib/auto-tags";
 import { isKnownMspLeadPhone } from "@/lib/msp-lead-outreach";
 import { isKnownPartnerLeadPhone } from "@/lib/ai-lead-outreach";
 import { resolveStatusFromReply, isRescheduleReply, wasSentConfirmationPrompt } from "@/lib/appointment-reply";
@@ -590,6 +591,34 @@ export async function POST(request: Request) {
           data: { tags: { push: URGENCY_TAG } },
         });
       }
+    }
+
+    // =========================================================================
+    // 2.06 TAGS AUTOMÁTICAS DE GERENCIAMENTO DE LEADS: interesse em procedimento
+    // (por palavra-chave, ver detectProcedureInterestTag), origem do primeiro
+    // contato (melhor esforço, só na primeira mensagem de verdade da conversa) e
+    // remoção de "sem retorno" assim que o paciente responde de novo (a tag só é
+    // aplicada pelo cron de src/app/api/cron/no-response-tagging). Igual à
+    // triagem de urgência acima: nunca bloqueia nem muda o resto do fluxo.
+    // =========================================================================
+    const tagsToPush: string[] = [];
+    const procedureTag = detectProcedureInterestTag(incoming.text);
+    if (procedureTag && !conversation.tags.includes(procedureTag)) tagsToPush.push(procedureTag);
+    if (isNewConversation) {
+      const sourceTag = detectSourceTag(incoming.text);
+      if (sourceTag && !conversation.tags.includes(sourceTag)) tagsToPush.push(sourceTag);
+    }
+    if (tagsToPush.length > 0) {
+      await prisma.conversation.update({
+        where: { id: conversation.id },
+        data: { tags: { push: tagsToPush } },
+      });
+    }
+    if (conversation.tags.includes(NO_RESPONSE_TAG)) {
+      await prisma.conversation.update({
+        where: { id: conversation.id },
+        data: { tags: conversation.tags.filter((t) => t !== NO_RESPONSE_TAG) },
+      });
     }
 
     // =========================================================================

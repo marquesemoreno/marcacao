@@ -9,6 +9,7 @@ import { toPlainClinicProcedureItem } from "@/lib/serialize";
 import { toChatContact, toChatMessage, departmentToDb, funnelStageToDb } from "@/lib/chat-crm-adapters";
 import { attachSignedUrls, uploadWhatsAppMedia, getSignedMediaUrl, downloadWhatsAppMedia, formatDuration } from "@/lib/whatsapp-media";
 import { sendWhatsAppMedia, sendWhatsAppAudio, sendWhatsAppContact, sendWhatsAppReaction, editWhatsAppMessage } from "@/lib/whatsapp";
+import { BUDGET_SENT_TAG, SCHEDULED_TAG } from "@/lib/conversation-tags";
 import { canEditMessage } from "@/lib/message-edit";
 import { transcribeAudio } from "@/lib/ai-transcription";
 import { generateReplySuggestions } from "@/lib/ai-copilot";
@@ -1624,9 +1625,17 @@ export async function updateConversationFunnelStage(conversationId: string, stag
     throw new Error("Conversa não encontrada");
   }
 
+  // Tag automática ao entrar em Orçamento/Agendado (ver conversation-tags.ts) — ajuda
+  // o gerenciamento de leads na fila sem precisar abrir o funil pra ver a etapa.
+  const funnelTag = stage === "orcamento" ? BUDGET_SENT_TAG : stage === "agendado" ? SCHEDULED_TAG : null;
+  const shouldTag = funnelTag && !conversation.tags.includes(funnelTag);
+
   await prisma.conversation.update({
     where: { id: conversationId },
-    data: { funnelStage: funnelStageToDb[stage] },
+    data: {
+      funnelStage: funnelStageToDb[stage],
+      ...(shouldTag ? { tags: { push: funnelTag } } : {}),
+    },
   });
 
   if (stage === "agendado") {
