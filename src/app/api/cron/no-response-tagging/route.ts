@@ -7,8 +7,11 @@ const STALE_HOURS = 24;
 
 /** Marca com "sem retorno" conversas onde já mandamos a última mensagem há mais de
  * STALE_HOURS e o paciente não respondeu — some sozinha assim que ele responde (ver
- * webhook route.ts). Chamado de hora em hora pelo Vercel Cron (ver vercel.json) —
- * mesma autenticação dos outros crons (CRON_SECRET). */
+ * webhook route.ts). Chamado 1x/dia pelo Vercel Cron (ver vercel.json) — mesma
+ * autenticação dos outros crons (CRON_SECRET). Só 1x/dia (não de hora em hora) porque
+ * o projeto está no plano Hobby da Vercel, que ignora schedules mais frequentes que
+ * diário e roda só 1x/dia de qualquer forma — se o plano mudar pra Pro, dá pra trocar
+ * o schedule em vercel.json pra algo tipo "0 * * * *" e ganhar granularidade de verdade. */
 export async function GET(request: Request) {
   const authHeader = request.headers.get("authorization");
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
