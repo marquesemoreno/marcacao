@@ -35,7 +35,7 @@ export interface Message {
   senderName?: string;
   text?: string;
   timestamp: string;
-  type: 'text' | 'audio' | 'internal_note' | 'attachment';
+  type: 'text' | 'audio' | 'internal_note' | 'attachment' | 'contact';
   audioDuration?: string;
   audioWaveform?: number[];
   attachmentName?: string;

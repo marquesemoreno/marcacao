@@ -4,12 +4,12 @@ import { revalidatePath } from "next/cache";
 import { ConversationStatus, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireAdminSession } from "@/lib/session";
-import { whatsappService, sendWhatsAppMedia, sendWhatsAppAudio, formatToWhatsAppNumber, isValidWhatsAppNumber, fetchWhatsAppProfilePicture, editWhatsAppMessage, type QuotedMessageRef } from "@/lib/whatsapp";
+import { whatsappService, sendWhatsAppMedia, sendWhatsAppAudio, sendWhatsAppContact, formatToWhatsAppNumber, isValidWhatsAppNumber, fetchWhatsAppProfilePicture, editWhatsAppMessage, type QuotedMessageRef } from "@/lib/whatsapp";
 import { canEditMessage } from "@/lib/message-edit";
 import { hasHospitalBridgeIntegration, fetchBridgeProcedures, fetchBridgeDoctors, fetchBridgeAgenda, fetchBridgeConvenios, fetchBridgePatients, adaptBridgeProcedureToPlainItem } from "@/lib/hospital-bridge";
 import { toPlainClinicProcedureItem } from "@/lib/serialize";
 import { departmentToDb, funnelStageToDb, toChatContact, toChatMessage } from "@/lib/chat-crm-adapters";
-import { attachSignedUrls, uploadWhatsAppMedia, getSignedMediaUrl, downloadWhatsAppMedia } from "@/lib/whatsapp-media";
+import { attachSignedUrls, uploadWhatsAppMedia, getSignedMediaUrl, downloadWhatsAppMedia, formatDuration } from "@/lib/whatsapp-media";
 import { transcribeAudio } from "@/lib/ai-transcription";
 import { generateReplySuggestions } from "@/lib/ai-copilot";
 import { formatFileSize, formatPhone, formatCurrency } from "@/lib/format";
@@ -512,6 +512,128 @@ export async function sendMediaMessageAdmin(conversationId: string, formData: Fo
     } catch {
       await prisma.message.update({ where: { id: message.id }, data: { status: "FAILED" } }).catch(() => {});
     }
+  }
+
+  revalidatePath("/admin/inbox");
+  notifyInboxRealtime(conversation.clinicId).catch(() => {});
+  return message;
+}
+
+/** Mirror admin de sendAudioMessage (inbox.ts) — sem checagem de clínica, igual aos outros mirrors. */
+export async function sendAudioMessageAdmin(conversationId: string, formData: FormData) {
+  const { userId } = await requireAdminSession();
+
+  const file = formData.get("file");
+  if (!(file instanceof File)) throw new Error("Nenhum áudio enviado");
+  if (!file.type.startsWith("audio/")) {
+    throw new Error("Arquivo inválido. Envie um áudio.");
+  }
+  if (file.size > MAX_MEDIA_SIZE_BYTES) {
+    throw new Error("Áudio muito grande. O limite é 15 MB.");
+  }
+  const durationSeconds = Number(formData.get("duration")) || 0;
+
+  const conversation = await prisma.conversation.findUnique({
+    where: { id: conversationId },
+    include: { contact: true },
+  });
+  if (!conversation) {
+    throw new Error("Conversa não encontrada");
+  }
+
+  const buffer = Buffer.from(await file.arrayBuffer());
+  const uploaded = await uploadWhatsAppMedia(conversationId, buffer, file.type);
+  if (!uploaded) {
+    throw new Error("Não foi possível processar o áudio. Tente novamente.");
+  }
+
+  const message = await prisma.message.create({
+    data: {
+      conversationId,
+      direction: "OUTBOUND",
+      content: "",
+      status: "SENT",
+      type: "AUDIO",
+      mediaPath: uploaded.path,
+      mimeType: file.type,
+      audioDuration: formatDuration(durationSeconds),
+      senderUserId: userId,
+    },
+  });
+
+  await prisma.conversation.update({
+    where: { id: conversationId },
+    data: { lastMessageAt: new Date(), status: "OPEN", aiEnabled: false },
+  });
+
+  const signedUrl = await getSignedMediaUrl(uploaded.path);
+  if (signedUrl) {
+    try {
+      const result = await sendWhatsAppAudio(conversation.contact.phone, signedUrl, "chat.outbound_admin.audio", conversation.clinicId);
+      if (!result.success && !result.skipped) {
+        await prisma.message.update({ where: { id: message.id }, data: { status: "FAILED" } });
+      } else if (result.keyId) {
+        await prisma.message.update({ where: { id: message.id }, data: { whatsappKeyId: result.keyId } });
+      }
+    } catch {
+      await prisma.message.update({ where: { id: message.id }, data: { status: "FAILED" } }).catch(() => {});
+    }
+  }
+
+  revalidatePath("/admin/inbox");
+  notifyInboxRealtime(conversation.clinicId).catch(() => {});
+  return message;
+}
+
+/** Mirror admin de shareContact (inbox.ts) — sem checagem de clínica. */
+export async function shareContactAdmin(conversationId: string, target?: { name: string; phone: string }) {
+  const { userId } = await requireAdminSession();
+
+  const conversation = await prisma.conversation.findUnique({
+    where: { id: conversationId },
+    include: { contact: true, clinic: true },
+  });
+  if (!conversation) {
+    throw new Error("Conversa não encontrada");
+  }
+
+  const contactName = target?.name ?? conversation.clinic.tradeName;
+  const contactPhone = target?.phone ?? (conversation.clinic.phone ?? conversation.clinic.whatsapp);
+  if (!contactPhone) {
+    throw new Error(target ? "Contato sem telefone cadastrado." : "Clínica sem telefone cadastrado.");
+  }
+
+  const message = await prisma.message.create({
+    data: {
+      conversationId,
+      direction: "OUTBOUND",
+      content: `${contactName} — ${contactPhone}`,
+      status: "SENT",
+      type: "CONTACT",
+      senderUserId: userId,
+    },
+  });
+
+  await prisma.conversation.update({
+    where: { id: conversationId },
+    data: { lastMessageAt: new Date(), status: "OPEN", aiEnabled: false },
+  });
+
+  try {
+    const result = await sendWhatsAppContact(
+      conversation.contact.phone,
+      contactName,
+      contactPhone,
+      "chat.outbound_admin.contact",
+      conversation.clinicId
+    );
+    if (!result.success && !result.skipped) {
+      await prisma.message.update({ where: { id: message.id }, data: { status: "FAILED" } });
+    } else if (result.keyId) {
+      await prisma.message.update({ where: { id: message.id }, data: { whatsappKeyId: result.keyId } });
+    }
+  } catch {
+    await prisma.message.update({ where: { id: message.id }, data: { status: "FAILED" } }).catch(() => {});
   }
 
   revalidatePath("/admin/inbox");

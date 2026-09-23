@@ -8,7 +8,7 @@ import { whatsappService, formatToWhatsAppNumber, isValidWhatsAppNumber, fetchWh
 import { toPlainClinicProcedureItem } from "@/lib/serialize";
 import { toChatContact, toChatMessage, departmentToDb, funnelStageToDb } from "@/lib/chat-crm-adapters";
 import { attachSignedUrls, uploadWhatsAppMedia, getSignedMediaUrl, downloadWhatsAppMedia, formatDuration } from "@/lib/whatsapp-media";
-import { sendWhatsAppMedia, sendWhatsAppAudio, editWhatsAppMessage } from "@/lib/whatsapp";
+import { sendWhatsAppMedia, sendWhatsAppAudio, sendWhatsAppContact, editWhatsAppMessage } from "@/lib/whatsapp";
 import { canEditMessage } from "@/lib/message-edit";
 import { transcribeAudio } from "@/lib/ai-transcription";
 import { generateReplySuggestions } from "@/lib/ai-copilot";
@@ -519,6 +519,65 @@ export async function sendAudioMessage(conversationId: string, formData: FormDat
     } catch {
       await prisma.message.update({ where: { id: message.id }, data: { status: "FAILED" } }).catch(() => {});
     }
+  }
+
+  revalidatePath("/clinic/inbox");
+  revalidatePath("/admin/inbox");
+  notifyInboxRealtime(clinicId).catch(() => {});
+  return message;
+}
+
+/** Compartilha um cartão de contato (vCard nativo) com o paciente — sem `target`,
+ * compartilha o contato da própria clínica (nome/telefone da Clinic da conversa);
+ * com `target`, compartilha qualquer contato escolhido na lista (ver listAllContacts). */
+export async function shareContact(conversationId: string, target?: { name: string; phone: string }) {
+  const { clinicId, userId } = await requireClinicSession();
+
+  const conversation = await prisma.conversation.findUnique({
+    where: { id: conversationId },
+    include: { contact: true, clinic: true },
+  });
+  if (!conversation || conversation.clinicId !== clinicId) {
+    throw new Error("Conversa não encontrada");
+  }
+
+  const contactName = target?.name ?? conversation.clinic.tradeName;
+  const contactPhone = target?.phone ?? (conversation.clinic.phone ?? conversation.clinic.whatsapp);
+  if (!contactPhone) {
+    throw new Error(target ? "Contato sem telefone cadastrado." : "Clínica sem telefone cadastrado.");
+  }
+
+  const message = await prisma.message.create({
+    data: {
+      conversationId,
+      direction: "OUTBOUND",
+      content: `${contactName} — ${contactPhone}`,
+      status: "SENT",
+      type: "CONTACT",
+      senderUserId: userId,
+    },
+  });
+
+  await prisma.conversation.update({
+    where: { id: conversationId },
+    data: { lastMessageAt: new Date(), status: "OPEN", aiEnabled: false, ...autoAssignOnReply(conversation, userId) },
+  });
+
+  try {
+    const result = await sendWhatsAppContact(
+      conversation.contact.phone,
+      contactName,
+      contactPhone,
+      "chat.outbound.contact",
+      clinicId
+    );
+    if (!result.success && !result.skipped) {
+      await prisma.message.update({ where: { id: message.id }, data: { status: "FAILED" } });
+    } else if (result.keyId) {
+      await prisma.message.update({ where: { id: message.id }, data: { whatsappKeyId: result.keyId } });
+    }
+  } catch {
+    await prisma.message.update({ where: { id: message.id }, data: { status: "FAILED" } }).catch(() => {});
   }
 
   revalidatePath("/clinic/inbox");

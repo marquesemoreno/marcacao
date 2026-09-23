@@ -431,6 +431,71 @@ export async function sendWhatsAppAudio(
   return { success: result.success, skipped: false, responseCode: result.responseCode, keyId: result.keyId };
 }
 
+/**
+ * Envio de cartão de contato nativo (vCard) via Evolution API v2 — chega como a
+ * bolha real de contato do WhatsApp, não um arquivo .vcf anexado.
+ * POST ${EVOLUTION_API_URL}/message/sendContact/${EVOLUTION_INSTANCE_NAME}
+ */
+export async function sendWhatsAppContact(
+  to: string,
+  contactName: string,
+  contactPhone: string,
+  event: string = "whatsapp.send_contact",
+  clinicId?: string
+): Promise<{ success: boolean; skipped: boolean; responseCode?: number | null; keyId?: string }> {
+  const { apiUrl, apiKey, instanceName } = await getEvolutionConfig(clinicId);
+  const target = formatToWhatsAppNumber(to);
+  const contactWuid = formatToWhatsAppNumber(contactPhone);
+
+  if (!apiUrl || !apiKey || !instanceName) {
+    await prisma.webhookLog.create({
+      data: {
+        event,
+        payload: { phone: target },
+        status: "SKIPPED",
+        responseCode: null,
+      },
+    });
+    return { success: false, skipped: true };
+  }
+
+  const baseUrl = apiUrl.replace(/\/$/, "");
+  const targetUrl = `${baseUrl}/message/sendContact/${instanceName}`;
+
+  let result: SendAttemptResult = { success: false, responseCode: null };
+
+  try {
+    const response = await fetch(targetUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", apikey: apiKey },
+      body: JSON.stringify({
+        number: target,
+        contact: [{ fullName: contactName, wuid: contactWuid, phoneNumber: contactWuid }],
+      }),
+      signal: AbortSignal.timeout(15000),
+    });
+    const keyId = response.ok ? await extractKeyId(response) : undefined;
+    result = { success: response.ok, responseCode: response.status, keyId };
+  } catch (error) {
+    result = {
+      success: false,
+      responseCode: null,
+      error: error instanceof Error ? error.message : "Erro na conexão com Evolution API",
+    };
+  }
+
+  await prisma.webhookLog.create({
+    data: {
+      event,
+      payload: { provider: "evolution_v2", phone: target, contactName, error: result.error ?? null },
+      status: result.success ? "SUCCESS" : "FAILED",
+      responseCode: result.responseCode,
+    },
+  });
+
+  return { success: result.success, skipped: false, responseCode: result.responseCode, keyId: result.keyId };
+}
+
 export type AppointmentWithRelations = Prisma.AppointmentGetPayload<{
   include: { clinicProcedure: { include: { clinic: true; procedure: true } } };
 }>;

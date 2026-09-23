@@ -54,6 +54,8 @@ import {
   ChevronsUpDown,
   Bot,
   Smile,
+  IdCard,
+  Mic,
 } from 'lucide-react';
 
 const MAX_MEDIA_SIZE_BYTES = 15 * 1024 * 1024; // 15 MB — mesmo limite validado no servidor
@@ -158,6 +160,14 @@ interface InboxLayoutProps {
   onDeleteQuickReply?: (id: string) => Promise<void>;
   onSendMessage: (text: string, mode: 'whatsapp' | 'internal_note', replyToMessageId?: string) => Promise<void> | void;
   onSendMedia: (file: File) => Promise<void> | void;
+  /** Grava um áudio no navegador e envia como voice-note nativo do WhatsApp. */
+  onSendAudio?: (file: File, durationSeconds: number) => Promise<void> | void;
+  /** Compartilha um cartão de contato (vCard) com o paciente — sem `target`, compartilha
+   * o contato da própria clínica; com `target`, compartilha o contato escolhido na lista. */
+  onShareContact?: (target?: { name: string; phone: string }) => Promise<void> | void;
+  /** Busca contatos (de qualquer conversa já existente) pra popular o picker de
+   * "Compartilhar contato" — reaproveita a mesma lista da página /contatos. */
+  onSearchContacts?: (query: string) => Promise<{ name: string; phone: string }[]>;
   onAddTag: (tag: string) => Promise<void> | void;
   onRemoveTag: (tag: string) => Promise<void> | void;
   onUpdatePatient: (data: {
@@ -414,6 +424,9 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
   onDeleteQuickReply,
   onSendMessage,
   onSendMedia,
+  onSendAudio,
+  onShareContact,
+  onSearchContacts,
   onAddTag,
   onRemoveTag,
   onUpdatePatient,
@@ -513,6 +526,22 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
   const [isGeneratingIa, setIsGeneratingIa] = useState(false);
   const [isSendingMedia, setIsSendingMedia] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // Arrastar-e-soltar mídia no chat — mesma validação/envio do paste (sendFiles).
+  const [isDraggingFile, setIsDraggingFile] = useState(false);
+  const dragCounterRef = useRef(0);
+  // Compartilhar contato (vCard) — clínica em 1 clique, ou qualquer contato buscado na lista.
+  const [isSharingContact, setIsSharingContact] = useState(false);
+  const [isContactPickerOpen, setIsContactPickerOpen] = useState(false);
+  const [contactSearchQuery, setContactSearchQuery] = useState('');
+  const [contactSearchResults, setContactSearchResults] = useState<{ name: string; phone: string }[]>([]);
+  const [isSearchingContacts, setIsSearchingContacts] = useState(false);
+  // Gravação de áudio direto no navegador (voice-note nativo do WhatsApp).
+  const [isRecordingAudio, setIsRecordingAudio] = useState(false);
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordedChunksRef = useRef<Blob[]>([]);
+  const recordingStreamRef = useRef<MediaStream | null>(null);
+  const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Modal de Motivo Obrigatório de Resolução
   const [isFinishModalOpen, setIsFinishModalOpen] = useState(false);
@@ -621,8 +650,18 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
     setPendingFunnelStage(null);
     setCopilotSuggestions([]);
     setReplyingTo(null);
+    if (isRecordingAudio) handleCancelRecording();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedContactId]);
+
+  // Solta o microfone se o componente desmontar com gravação em andamento
+  // (ex: atendente navega pra outra página no meio da gravação).
+  useEffect(() => {
+    return () => {
+      recordingStreamRef.current?.getTracks().forEach((track) => track.stop());
+      if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+    };
+  }, []);
 
   // Rola pro fim da conversa: ao abrir/trocar de conversa sempre vai pro final (senão
   // ficava parado no topo, no meio das mensagens mais antigas). Em mensagem nova só
@@ -762,6 +801,135 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
     if (files.length === 0) return;
     e.preventDefault();
     await sendFiles(files);
+  };
+
+  // Arrastar-e-soltar mídia na coluna do chat — mesma validação/envio do paste.
+  // Contador de enter/leave em vez de um boolean simples: arrastar sobre elementos
+  // filhos dispara dragLeave do pai a cada troca de alvo, e um boolean piscava o
+  // overlay a cada pixel de movimento.
+  const handleComposerDragEnter = (e: React.DragEvent) => {
+    if (composerMode !== 'whatsapp' || !selectedContact) return;
+    e.preventDefault();
+    dragCounterRef.current += 1;
+    setIsDraggingFile(true);
+  };
+  const handleComposerDragOver = (e: React.DragEvent) => {
+    if (composerMode !== 'whatsapp' || !selectedContact) return;
+    e.preventDefault();
+  };
+  const handleComposerDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    dragCounterRef.current = Math.max(0, dragCounterRef.current - 1);
+    if (dragCounterRef.current === 0) setIsDraggingFile(false);
+  };
+  const handleComposerDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    dragCounterRef.current = 0;
+    setIsDraggingFile(false);
+    if (composerMode !== 'whatsapp' || !selectedContact) return;
+    const files = Array.from(e.dataTransfer?.files ?? []);
+    if (files.length === 0) return;
+    await sendFiles(files);
+  };
+
+  const handleShareContact = async (target?: { name: string; phone: string }) => {
+    if (!onShareContact || !selectedContact || isSharingContact) return;
+    setIsSharingContact(true);
+    setIsContactPickerOpen(false);
+    try {
+      await onShareContact(target);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível compartilhar o contato.");
+    } finally {
+      setIsSharingContact(false);
+    }
+  };
+
+  // Busca com debounce simples ao digitar no picker de "Compartilhar contato" —
+  // evita 1 requisição por tecla numa lista que pode ter muitos contatos.
+  useEffect(() => {
+    if (!isContactPickerOpen || !onSearchContacts) return;
+    const timer = setTimeout(async () => {
+      setIsSearchingContacts(true);
+      try {
+        const results = await onSearchContacts(contactSearchQuery);
+        setContactSearchResults(results);
+      } finally {
+        setIsSearchingContacts(false);
+      }
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [isContactPickerOpen, contactSearchQuery, onSearchContacts]);
+
+  const stopRecordingTimer = () => {
+    if (recordingTimerRef.current) {
+      clearInterval(recordingTimerRef.current);
+      recordingTimerRef.current = null;
+    }
+  };
+
+  const stopRecordingStream = () => {
+    recordingStreamRef.current?.getTracks().forEach((track) => track.stop());
+    recordingStreamRef.current = null;
+  };
+
+  const handleStartRecording = async () => {
+    if (!onSendAudio || isRecordingAudio) return;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      recordingStreamRef.current = stream;
+      const mimeType = MediaRecorder.isTypeSupported('audio/ogg;codecs=opus')
+        ? 'audio/ogg;codecs=opus'
+        : MediaRecorder.isTypeSupported('audio/webm')
+        ? 'audio/webm'
+        : '';
+      const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+      recordedChunksRef.current = [];
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) recordedChunksRef.current.push(e.data);
+      };
+      mediaRecorderRef.current = recorder;
+      recorder.start();
+      setRecordingSeconds(0);
+      setIsRecordingAudio(true);
+      recordingTimerRef.current = setInterval(() => setRecordingSeconds((s) => s + 1), 1000);
+    } catch {
+      toast.error("Permissão de microfone negada.");
+    }
+  };
+
+  const handleCancelRecording = () => {
+    stopRecordingTimer();
+    const recorder = mediaRecorderRef.current;
+    if (recorder && recorder.state !== 'inactive') {
+      recorder.onstop = null;
+      recorder.stop();
+    }
+    stopRecordingStream();
+    mediaRecorderRef.current = null;
+    recordedChunksRef.current = [];
+    setIsRecordingAudio(false);
+    setRecordingSeconds(0);
+  };
+
+  const handleSendRecording = () => {
+    const recorder = mediaRecorderRef.current;
+    if (!recorder || !onSendAudio) return;
+    stopRecordingTimer();
+    const durationSeconds = recordingSeconds;
+    recorder.onstop = async () => {
+      const mimeType = recorder.mimeType || 'audio/webm';
+      const blob = new Blob(recordedChunksRef.current, { type: mimeType });
+      const extension = mimeType.includes('ogg') ? 'ogg' : 'webm';
+      const file = new File([blob], `audio-${Date.now()}.${extension}`, { type: mimeType });
+      stopRecordingStream();
+      mediaRecorderRef.current = null;
+      recordedChunksRef.current = [];
+      await onSendAudio(file, durationSeconds);
+    };
+    if (recorder.state !== 'inactive') recorder.stop();
+    setIsRecordingAudio(false);
+    setRecordingSeconds(0);
   };
 
   const handleAddTag = async () => {
@@ -1117,7 +1285,18 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
           mobileView === 'chat' ? 'flex' : 'hidden md:flex'
         }`}
         data-od-id="inbox-chat-column"
+        onDragEnter={handleComposerDragEnter}
+        onDragOver={handleComposerDragOver}
+        onDragLeave={handleComposerDragLeave}
+        onDrop={handleComposerDrop}
       >
+        {isDraggingFile && (
+          <div className="absolute inset-0 z-50 flex items-center justify-center bg-emerald-600/10 dark:bg-emerald-950/40 border-2 border-dashed border-emerald-500 rounded-2xl m-2 pointer-events-none">
+            <p className="px-4 py-2 rounded-xl bg-white dark:bg-slate-900 shadow-lg text-sm font-bold text-emerald-700 dark:text-emerald-400">
+              Solte para enviar
+            </p>
+          </div>
+        )}
         {!selectedContact ? (
           <div className="flex-1 flex flex-col items-center justify-center p-6 text-center text-slate-500 dark:text-slate-400 gap-4">
             <div className="flex size-16 items-center justify-center rounded-2xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-800">
@@ -1545,6 +1724,37 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                     </div>
                   )}
 
+                  {isRecordingAudio ? (
+                    <div className="flex items-center gap-3 px-3 py-3">
+                      <span className="relative flex h-2.5 w-2.5 shrink-0">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75" />
+                        <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-rose-500" />
+                      </span>
+                      <span className="flex-1 text-xs sm:text-sm font-mono text-slate-600 dark:text-slate-300">
+                        Gravando áudio... {String(Math.floor(recordingSeconds / 60)).padStart(2, '0')}:
+                        {String(recordingSeconds % 60).padStart(2, '0')}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={handleCancelRecording}
+                        aria-label="Cancelar gravação"
+                        title="Cancelar gravação"
+                        className="flex items-center justify-center w-9 h-9 text-slate-500 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleSendRecording}
+                        aria-label="Enviar áudio"
+                        title="Enviar áudio"
+                        className="flex items-center justify-center w-9 h-9 text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors"
+                      >
+                        <Check className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <>
                   <textarea
                     rows={2}
                     value={inputText}
@@ -1586,6 +1796,75 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                           >
                             <Paperclip className={`w-4 h-4 ${isSendingMedia ? 'animate-pulse' : ''}`} />
                           </button>
+                          {onShareContact && (
+                            <Popover open={isContactPickerOpen} onOpenChange={setIsContactPickerOpen}>
+                              <PopoverTrigger
+                                render={
+                                  <button
+                                    type="button"
+                                    disabled={isSharingContact}
+                                    className="flex items-center justify-center w-9 h-9 text-slate-500 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors disabled:opacity-50"
+                                    title="Compartilhar contato"
+                                    aria-label="Compartilhar contato"
+                                  />
+                                }
+                              >
+                                <IdCard className={`w-4 h-4 ${isSharingContact ? 'animate-pulse' : ''}`} />
+                              </PopoverTrigger>
+                              <PopoverContent align="start" className="p-0 w-72">
+                                <Command shouldFilter={false}>
+                                  <CommandInput
+                                    placeholder="Buscar contato..."
+                                    value={contactSearchQuery}
+                                    onValueChange={setContactSearchQuery}
+                                  />
+                                  <CommandList>
+                                    <CommandGroup heading="Rápido">
+                                      <CommandItem
+                                        value="__clinica__"
+                                        onSelect={() => handleShareContact()}
+                                        className="text-xs"
+                                      >
+                                        <span className="font-semibold">Contato da clínica</span>
+                                      </CommandItem>
+                                    </CommandGroup>
+                                    <CommandGroup heading="Contatos">
+                                      {isSearchingContacts ? (
+                                        <p className="px-3 py-2 text-[11px] text-slate-500 dark:text-slate-400">Buscando...</p>
+                                      ) : contactSearchResults.length === 0 ? (
+                                        <CommandEmpty className="text-xs text-slate-500 dark:text-slate-400">
+                                          Nenhum contato encontrado.
+                                        </CommandEmpty>
+                                      ) : (
+                                        contactSearchResults.map((c) => (
+                                          <CommandItem
+                                            key={c.phone}
+                                            value={c.phone}
+                                            onSelect={() => handleShareContact({ name: c.name, phone: c.phone })}
+                                            className="justify-between text-xs"
+                                          >
+                                            <span className="font-medium truncate">{c.name}</span>
+                                            <span className="text-[10px] text-slate-500 dark:text-slate-400 shrink-0">{c.phone}</span>
+                                          </CommandItem>
+                                        ))
+                                      )}
+                                    </CommandGroup>
+                                  </CommandList>
+                                </Command>
+                              </PopoverContent>
+                            </Popover>
+                          )}
+                          {onSendAudio && (
+                            <button
+                              type="button"
+                              onClick={handleStartRecording}
+                              className="flex items-center justify-center w-9 h-9 text-slate-500 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors"
+                              title="Gravar áudio"
+                              aria-label="Gravar áudio"
+                            >
+                              <Mic className="w-4 h-4" />
+                            </button>
+                          )}
                         </>
                       )}
 
@@ -1658,6 +1937,8 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                       <Send className="w-3.5 h-3.5" />
                     </button>
                   </div>
+                  </>
+                  )}
                 </div>
               </form>
             </footer>

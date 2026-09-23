@@ -37,6 +37,9 @@ import {
   togglePinConversation,
   muteConversation,
   archiveConversation,
+  sendAudioMessage,
+  shareContact,
+  listAllContacts,
   resendMessage,
   getUnseenAssignmentNotifications,
   markAssignmentSeen,
@@ -82,6 +85,9 @@ import {
   togglePinConversationAdmin,
   muteConversationAdmin,
   archiveConversationAdmin,
+  sendAudioMessageAdmin,
+  shareContactAdmin,
+  listAllContactsAdmin,
   resendMessageAdmin,
   getUnseenAssignmentNotificationsAdmin,
   markAssignmentSeenAdmin,
@@ -138,6 +144,9 @@ const ACTIONS_BY_SCOPE = {
     togglePinConversation: (id: string, pinned: boolean) => togglePinConversation(id, pinned),
     muteConversation: (id: string, until: Date | null) => muteConversation(id, until),
     archiveConversation: (id: string, archived: boolean) => archiveConversation(id, archived),
+    sendAudioMessage: (id: string, formData: FormData) => sendAudioMessage(id, formData),
+    shareContact: (id: string, target?: { name: string; phone: string }) => shareContact(id, target),
+    listAllContacts: (search?: string) => listAllContacts(search),
     resendMessage: (id: string) => resendMessage(id),
     getUnseenAssignmentNotifications: () => getUnseenAssignmentNotifications(),
     markAssignmentSeen: (id: string) => markAssignmentSeen(id),
@@ -172,6 +181,9 @@ const ACTIONS_BY_SCOPE = {
     togglePinConversation: (id: string, pinned: boolean) => togglePinConversationAdmin(id, pinned),
     muteConversation: (id: string, until: Date | null) => muteConversationAdmin(id, until),
     archiveConversation: (id: string, archived: boolean) => archiveConversationAdmin(id, archived),
+    sendAudioMessage: (id: string, formData: FormData) => sendAudioMessageAdmin(id, formData),
+    shareContact: (id: string, target?: { name: string; phone: string }) => shareContactAdmin(id, target),
+    listAllContacts: (search?: string) => listAllContactsAdmin(search),
     resendMessage: (id: string) => resendMessageAdmin(id),
     getUnseenAssignmentNotifications: () => getUnseenAssignmentNotificationsAdmin(),
     markAssignmentSeen: (id: string) => markAssignmentSeenAdmin(id),
@@ -659,6 +671,40 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
     }
   }
 
+  async function handleSendAudio(file: File, durationSeconds: number) {
+    if (!selectedContactId) return;
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("duration", String(durationSeconds));
+      await actions.sendAudioMessage(selectedContactId, formData);
+      await refreshMessages();
+      refreshContacts();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Erro ao enviar áudio.");
+    }
+  }
+
+  async function handleShareContact(target?: { name: string; phone: string }) {
+    if (!selectedContactId) return;
+    try {
+      await actions.shareContact(selectedContactId, target);
+      await refreshMessages();
+      refreshContacts();
+      toast.success(target ? `Contato de ${target.name} compartilhado!` : "Contato da clínica compartilhado!");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Erro ao compartilhar contato.");
+    }
+  }
+
+  async function handleSearchContacts(query: string) {
+    const results = await actions.listAllContacts(query);
+    // Não sugere compartilhar o contato consigo mesmo (a conversa atual já é ele).
+    return results
+      .filter((c) => c.conversationId !== selectedContactId)
+      .map((c) => ({ name: c.name, phone: c.phone }));
+  }
+
   async function handleAddTag(tag: string) {
     if (!selectedContact) return;
     await actions.updateConversationTags(selectedContact.id, [...selectedContact.tags, tag]);
@@ -895,6 +941,9 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
           onDeleteQuickReply={handleDeleteQuickReply}
           onSendMessage={handleSendMessage}
           onSendMedia={handleSendMedia}
+          onSendAudio={handleSendAudio}
+          onShareContact={handleShareContact}
+          onSearchContacts={handleSearchContacts}
           onAddTag={handleAddTag}
           onRemoveTag={handleRemoveTag}
           onUpdatePatient={handleUpdatePatient}

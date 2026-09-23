@@ -22,6 +22,7 @@ import {
   Ban,
   Pencil,
   CornerUpLeft,
+  IdCard,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from '@/components/ui/dialog';
@@ -552,6 +553,41 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry, 
           </DialogContent>
         </Dialog>
       </>
+    );
+  }
+
+  // 3.5 Balão de Cartão de Contato (vCard nativo) — só informativo, sem player/download.
+  if (message.type === 'contact') {
+    const [contactName, contactPhone] = (message.text ?? '').split(' — ');
+    return (
+      <div
+        className={`flex w-full mb-3 group animate-in fade-in slide-in-from-bottom-1 duration-150 ${isAgent ? 'justify-end' : 'justify-start'}`}
+        data-od-id={`contact-msg-${message.id}`}
+      >
+        <div
+          className={`max-w-md rounded-2xl p-3.5 shadow-sm ${
+            isAgent
+              ? 'bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-100 dark:border-emerald-900 text-slate-900 dark:text-slate-100 rounded-tr-sm'
+              : 'bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-tl-sm'
+          }`}
+        >
+          {message.deleted && <DeletedBadge />}
+          <div className="flex items-center gap-3 p-2.5 rounded-xl bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/10">
+            <div className="p-2 rounded-lg bg-emerald-100 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300">
+              <IdCard className="w-5 h-5" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-semibold truncate">{contactName || 'Contato'}</p>
+              {contactPhone && <p className="text-[10px] opacity-80 font-mono">{contactPhone}</p>}
+            </div>
+          </div>
+          <div className="flex items-center justify-end gap-1 text-[10px] text-slate-400 mt-1.5">
+            <span>{message.timestamp}</span>
+            {isAgent && <MessageStatusTicks status={message.deliveryStatus} />}
+          </div>
+          {isAgent && message.deliveryStatus === 'failed' && <FailedSendNotice onRetry={onRetry} />}
+        </div>
+      </div>
     );
   }
 

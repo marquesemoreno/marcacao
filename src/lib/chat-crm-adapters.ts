@@ -225,6 +225,7 @@ export function toChatMessage(
     AUDIO: "audio",
     INTERNAL_NOTE: "internal_note",
     ATTACHMENT: "attachment",
+    CONTACT: "contact",
   };
 
   const sender: Message["sender"] =

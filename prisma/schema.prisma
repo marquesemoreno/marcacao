@@ -136,6 +136,9 @@ enum MessageType {
   AUDIO
   INTERNAL_NOTE
   ATTACHMENT
+  /// Cartão de contato nativo do WhatsApp (vCard) — hoje só o contato da própria
+  /// clínica, sem mediaPath: o texto formatado (nome + telefone) fica em content.
+  CONTACT
 
   @@map("message_type")
 }
