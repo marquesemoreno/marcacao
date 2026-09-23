@@ -1,8 +1,18 @@
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { PeriodFilter } from "@/components/clinic/period-filter";
+import { HorizontalBarChart, SentimentBar } from "@/components/clinic/report-charts";
 import { getClinicInfo, getClinicChatReport, getClinicAppointmentsReport } from "@/actions/clinic";
 import { formatCurrency, appointmentStatusLabels } from "@/lib/format";
 import { MessageCircle, TrendingUp, Smile, AlertTriangle, CalendarCheck, XCircle, DollarSign } from "lucide-react";
+
+/** Cor por status — mesma semântica já usada em appointmentStatusVariant (format.ts),
+ * cada família de cor distinta (nunca duas cores parecidas pra status diferentes). */
+const STATUS_COLOR_CLASS = {
+  PENDING: "bg-amber-500",
+  CONFIRMED: "bg-sky-500",
+  COMPLETED: "bg-emerald-500",
+  CANCELLED: "bg-rose-500",
+  NO_SHOW: "bg-slate-500",
+} as const;
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -97,18 +107,16 @@ export default async function ClinicReportPage({ searchParams }: RelatorioPagePr
           </div>
         </div>
 
-        {(chatReport.sentimentPositivePct > 0 || chatReport.sentimentNeutroPct > 0 || chatReport.sentimentNegativoPct > 0) && (
-          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 shadow-2xs">
-            <p className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-3">
-              Sentimento das Conversas Auditadas
-            </p>
-            <div className="flex gap-4 text-sm font-semibold">
-              <span className="text-emerald-600">😊 {chatReport.sentimentPositivePct}% positivo</span>
-              <span className="text-slate-500 dark:text-slate-400">😐 {chatReport.sentimentNeutroPct}% neutro</span>
-              <span className="text-rose-600">😞 {chatReport.sentimentNegativoPct}% negativo</span>
-            </div>
-          </div>
-        )}
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 shadow-2xs">
+          <p className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-3">
+            Sentimento das Conversas Auditadas
+          </p>
+          <SentimentBar
+            positivePct={chatReport.sentimentPositivePct}
+            neutroPct={chatReport.sentimentNeutroPct}
+            negativoPct={chatReport.sentimentNegativoPct}
+          />
+        </div>
       </div>
 
       {/* =========================================================================
@@ -156,39 +164,22 @@ export default async function ClinicReportPage({ searchParams }: RelatorioPagePr
             <p className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
               Procedimentos Mais Agendados
             </p>
-            {appointmentsReport.topProcedures.length === 0 ? (
-              <p className="text-xs text-slate-500 dark:text-slate-400">Nenhum agendamento no período.</p>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Procedimento</TableHead>
-                    <TableHead className="text-right">Quantidade</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {appointmentsReport.topProcedures.map((p) => (
-                    <TableRow key={p.name}>
-                      <TableCell>{p.name}</TableCell>
-                      <TableCell className="text-right font-mono">{p.count}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
+            <HorizontalBarChart
+              data={appointmentsReport.topProcedures.map((p) => ({ label: p.name, value: p.count, colorClass: "bg-sky-500" }))}
+            />
           </div>
 
-          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 shadow-2xs">
-            <p className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-3">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 shadow-2xs space-y-3">
+            <p className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
               Agendamentos por Status
             </p>
-            <div className="flex flex-wrap gap-4 text-sm font-semibold">
-              {(Object.keys(appointmentsReport.countByStatus) as (keyof typeof appointmentsReport.countByStatus)[]).map((status) => (
-                <span key={status} className="text-slate-600 dark:text-slate-300">
-                  {appointmentStatusLabels[status]}: {appointmentsReport.countByStatus[status]}
-                </span>
-              ))}
-            </div>
+            <HorizontalBarChart
+              data={(Object.keys(appointmentsReport.countByStatus) as (keyof typeof appointmentsReport.countByStatus)[]).map((status) => ({
+                label: appointmentStatusLabels[status],
+                value: appointmentsReport.countByStatus[status],
+                colorClass: STATUS_COLOR_CLASS[status],
+              }))}
+            />
           </div>
         </div>
       )}
