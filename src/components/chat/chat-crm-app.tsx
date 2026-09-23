@@ -40,6 +40,8 @@ import {
   sendAudioMessage,
   shareContact,
   listAllContacts,
+  toggleReaction,
+  toggleStarred,
   resendMessage,
   getUnseenAssignmentNotifications,
   markAssignmentSeen,
@@ -88,6 +90,8 @@ import {
   sendAudioMessageAdmin,
   shareContactAdmin,
   listAllContactsAdmin,
+  toggleReactionAdmin,
+  toggleStarredAdmin,
   resendMessageAdmin,
   getUnseenAssignmentNotificationsAdmin,
   markAssignmentSeenAdmin,
@@ -147,6 +151,8 @@ const ACTIONS_BY_SCOPE = {
     sendAudioMessage: (id: string, formData: FormData) => sendAudioMessage(id, formData),
     shareContact: (id: string, target?: { name: string; phone: string }) => shareContact(id, target),
     listAllContacts: (search?: string) => listAllContacts(search),
+    toggleReaction: (id: string, emoji: string) => toggleReaction(id, emoji),
+    toggleStarred: (id: string) => toggleStarred(id),
     resendMessage: (id: string) => resendMessage(id),
     getUnseenAssignmentNotifications: () => getUnseenAssignmentNotifications(),
     markAssignmentSeen: (id: string) => markAssignmentSeen(id),
@@ -184,6 +190,8 @@ const ACTIONS_BY_SCOPE = {
     sendAudioMessage: (id: string, formData: FormData) => sendAudioMessageAdmin(id, formData),
     shareContact: (id: string, target?: { name: string; phone: string }) => shareContactAdmin(id, target),
     listAllContacts: (search?: string) => listAllContactsAdmin(search),
+    toggleReaction: (id: string, emoji: string) => toggleReactionAdmin(id, emoji),
+    toggleStarred: (id: string) => toggleStarredAdmin(id),
     resendMessage: (id: string) => resendMessageAdmin(id),
     getUnseenAssignmentNotifications: () => getUnseenAssignmentNotificationsAdmin(),
     markAssignmentSeen: (id: string) => markAssignmentSeenAdmin(id),
@@ -705,6 +713,20 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
       .map((c) => ({ name: c.name, phone: c.phone }));
   }
 
+  async function handleReact(messageId: string, emoji: string) {
+    try {
+      await actions.toggleReaction(messageId, emoji);
+      await refreshMessages();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível enviar a reação.");
+    }
+  }
+
+  async function handleToggleStar(messageId: string) {
+    await actions.toggleStarred(messageId);
+    await refreshMessages();
+  }
+
   async function handleAddTag(tag: string) {
     if (!selectedContact) return;
     await actions.updateConversationTags(selectedContact.id, [...selectedContact.tags, tag]);
@@ -944,6 +966,8 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
           onSendAudio={handleSendAudio}
           onShareContact={handleShareContact}
           onSearchContacts={handleSearchContacts}
+          onReact={handleReact}
+          onToggleStar={handleToggleStar}
           onAddTag={handleAddTag}
           onRemoveTag={handleRemoveTag}
           onUpdatePatient={handleUpdatePatient}

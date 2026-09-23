@@ -266,5 +266,8 @@ export function toChatMessage(
     transcription: message.transcription ?? undefined,
     extractedInvoiceData: (message.extractedInvoiceData as InvoiceData | null) ?? undefined,
     quotedMessage: message.quotedMessage ? toChatQuotedMessage(message.quotedMessage) : undefined,
+    contactReaction: message.contactReaction ?? undefined,
+    agentReaction: message.agentReaction ?? undefined,
+    starred: Boolean(message.starredAt),
   };
 }

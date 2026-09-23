@@ -70,6 +70,12 @@ export interface Message {
     senderName?: string;
     deleted?: boolean;
   };
+  /** Emoji com que o paciente reagiu via WhatsApp — undefined quando não reagiu. */
+  contactReaction?: string;
+  /** Emoji com que o atendente reagiu (sincroniza pro WhatsApp) — undefined quando não reagiu. */
+  agentReaction?: string;
+  /** Marcação pessoal do atendente pra achar mensagens depois — só interno, nunca sincroniza. */
+  starred?: boolean;
 }
 
 export interface Contact {

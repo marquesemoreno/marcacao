@@ -556,6 +556,15 @@ model Message {
   /// mensagem citada nunca existiu no nosso banco (ex: de antes da conversa) — nunca
   /// bloqueia o recebimento/envio por causa disso.
   quotedMessageId String?         @map("quoted_message_id")
+  /// Emoji com que o paciente reagiu via WhatsApp (webhook reactionMessage) — null
+  /// tanto "nunca reagiu" quanto "reagiu e removeu a reação" (mesmo emoji de novo remove).
+  contactReaction String?         @map("contact_reaction")
+  /// Emoji com que o atendente reagiu — sincroniza de verdade pro WhatsApp do paciente
+  /// via sendWhatsAppReaction, não é só uma marcação interna (ver Message.starredAt).
+  agentReaction  String?          @map("agent_reaction")
+  /// Marcação pessoal do atendente pra achar mensagens importantes depois — não existe
+  /// conceito equivalente no WhatsApp, então isso nunca sincroniza com a Evolution API.
+  starredAt      DateTime?        @map("starred_at")
   createdAt      DateTime         @default(now()) @map("created_at")
 
   conversation  Conversation @relation(fields: [conversationId], references: [id])

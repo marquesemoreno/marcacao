@@ -56,6 +56,7 @@ import {
   Smile,
   IdCard,
   Mic,
+  Star,
 } from 'lucide-react';
 
 const MAX_MEDIA_SIZE_BYTES = 15 * 1024 * 1024; // 15 MB — mesmo limite validado no servidor
@@ -168,6 +169,10 @@ interface InboxLayoutProps {
   /** Busca contatos (de qualquer conversa já existente) pra popular o picker de
    * "Compartilhar contato" — reaproveita a mesma lista da página /contatos. */
   onSearchContacts?: (query: string) => Promise<{ name: string; phone: string }[]>;
+  /** Reage (ou remove a reação) numa mensagem — sincroniza de verdade com o WhatsApp. */
+  onReact?: (messageId: string, emoji: string) => Promise<void> | void;
+  /** Marca/desmarca uma mensagem como favorita — só organização interna do CRM. */
+  onToggleStar?: (messageId: string) => Promise<void> | void;
   onAddTag: (tag: string) => Promise<void> | void;
   onRemoveTag: (tag: string) => Promise<void> | void;
   onUpdatePatient: (data: {
@@ -427,6 +432,8 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
   onSendAudio,
   onShareContact,
   onSearchContacts,
+  onReact,
+  onToggleStar,
   onAddTag,
   onRemoveTag,
   onUpdatePatient,
@@ -529,6 +536,13 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
   // Arrastar-e-soltar mídia no chat — mesma validação/envio do paste (sendFiles).
   const [isDraggingFile, setIsDraggingFile] = useState(false);
   const dragCounterRef = useRef(0);
+  // Filtro "Só favoritas" — client-side sobre as mensagens já carregadas (mensagens
+  // mais antigas só entram no filtro depois de "Carregar mensagens anteriores").
+  const [showOnlyStarred, setShowOnlyStarred] = useState(false);
+  const displayedMessages = useMemo(
+    () => (showOnlyStarred ? messages.filter((m) => m.starred) : messages),
+    [messages, showOnlyStarred]
+  );
   // Compartilhar contato (vCard) — clínica em 1 clique, ou qualquer contato buscado na lista.
   const [isSharingContact, setIsSharingContact] = useState(false);
   const [isContactPickerOpen, setIsContactPickerOpen] = useState(false);
@@ -650,6 +664,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
     setPendingFunnelStage(null);
     setCopilotSuggestions([]);
     setReplyingTo(null);
+    setShowOnlyStarred(false);
     if (isRecordingAudio) handleCancelRecording();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedContactId]);
@@ -1567,6 +1582,24 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
               </div>
             </header>
 
+            {(onToggleStar || messages.some((m) => m.starred)) && (
+              <div className="flex justify-end px-3 sm:px-6 pt-2 bg-[#F1F5F9] dark:bg-slate-950/60">
+                <button
+                  type="button"
+                  onClick={() => setShowOnlyStarred((prev) => !prev)}
+                  className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10.5px] font-semibold border transition-colors ${
+                    showOnlyStarred
+                      ? 'bg-amber-100 dark:bg-amber-950/60 border-amber-300 dark:border-amber-800 text-amber-800 dark:text-amber-300'
+                      : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700'
+                  }`}
+                  title="Mostrar só as mensagens favoritas"
+                >
+                  <Star className={`w-3 h-3 ${showOnlyStarred ? 'fill-amber-500 text-amber-500' : ''}`} />
+                  <span>Só favoritas</span>
+                </button>
+              </div>
+            )}
+
             {/* Área de Mensagens */}
             <div
               ref={messagesContainerRef}
@@ -1574,11 +1607,13 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
               className="flex-1 overflow-y-auto p-3 sm:p-6 space-y-3 bg-[#F1F5F9] dark:bg-slate-950/60"
               data-od-id="chat-messages-area"
             >
-              {messages.length === 0 ? (
-                <p className="text-center text-xs text-slate-500 dark:text-slate-400 mt-8">Nenhuma mensagem ainda nesta conversa.</p>
+              {displayedMessages.length === 0 ? (
+                <p className="text-center text-xs text-slate-500 dark:text-slate-400 mt-8">
+                  {showOnlyStarred ? 'Nenhuma mensagem favorita nesta conversa.' : 'Nenhuma mensagem ainda nesta conversa.'}
+                </p>
               ) : (
                 <>
-                  {hasMoreMessages && (
+                  {hasMoreMessages && !showOnlyStarred && (
                     <div className="flex justify-center pb-2">
                       <button
                         type="button"
@@ -1597,7 +1632,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                       </button>
                     </div>
                   )}
-                  {messages.map((msg) => (
+                  {displayedMessages.map((msg) => (
                     <MessageBubble
                       key={msg.id}
                       message={msg}
@@ -1611,6 +1646,8 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                           : undefined
                       }
                       onReply={() => setReplyingTo(msg)}
+                      onReact={onReact ? (emoji) => onReact(msg.id, emoji) : undefined}
+                      onToggleStar={onToggleStar ? () => onToggleStar(msg.id) : undefined}
                     />
                   ))}
                 </>

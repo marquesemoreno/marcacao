@@ -203,6 +203,39 @@ async function handleMessageDelete(data: Record<string, unknown>) {
   await logInbound({ kind: "message_delete", ...data, messageDbId: message.id }, "SUCCESS");
 }
 
+/**
+ * Trata a reação do paciente numa mensagem nossa/dele (Baileys manda como um
+ * `message.reactionMessage` cujo `key.id` aponta pra mensagem original e `text`
+ * é o emoji — `text` vazio significa "removeu a reação"). Nunca cria Message
+ * nova, só muta `contactReaction` numa mensagem já existente.
+ */
+async function handleInboundReaction(reactionMessage: Record<string, unknown>) {
+  const targetKey = reactionMessage.key as Record<string, unknown> | undefined;
+  const keyId = targetKey?.id;
+  const text = reactionMessage.text;
+
+  if (typeof keyId !== "string") {
+    await logInbound({ kind: "reaction", reactionMessage: reactionMessage as Prisma.InputJsonValue }, "IGNORED");
+    return;
+  }
+
+  const message = await prisma.message.findUnique({
+    where: { whatsappKeyId: keyId },
+    select: { id: true, conversation: { select: { clinicId: true } } },
+  });
+  if (!message) {
+    await logInbound({ kind: "reaction", keyId }, "IGNORED");
+    return;
+  }
+
+  await prisma.message.update({
+    where: { id: message.id },
+    data: { contactReaction: typeof text === "string" && text.length > 0 ? text : null },
+  });
+  notifyInboxRealtime(message.conversation.clinicId).catch(() => {});
+  await logInbound({ kind: "reaction", keyId, text: typeof text === "string" ? text : null, messageDbId: message.id }, "SUCCESS");
+}
+
 async function logInbound(payload: Prisma.InputJsonValue, status: string) {
   await prisma.webhookLog.create({
     data: {
@@ -419,6 +452,14 @@ export async function POST(request: Request) {
       "IGNORED"
     );
     return NextResponse.json({ ignored: true, reason: "outbound_message" }, { status: 200 });
+  }
+
+  const reactionMessage = (dataPayload?.message as Record<string, unknown> | undefined)?.reactionMessage as
+    | Record<string, unknown>
+    | undefined;
+  if (reactionMessage) {
+    await handleInboundReaction(reactionMessage);
+    return NextResponse.json({ ok: true, status: "reaction" }, { status: 200 });
   }
 
   const incoming = extractIncomingMessage(body);

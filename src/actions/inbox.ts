@@ -8,7 +8,7 @@ import { whatsappService, formatToWhatsAppNumber, isValidWhatsAppNumber, fetchWh
 import { toPlainClinicProcedureItem } from "@/lib/serialize";
 import { toChatContact, toChatMessage, departmentToDb, funnelStageToDb } from "@/lib/chat-crm-adapters";
 import { attachSignedUrls, uploadWhatsAppMedia, getSignedMediaUrl, downloadWhatsAppMedia, formatDuration } from "@/lib/whatsapp-media";
-import { sendWhatsAppMedia, sendWhatsAppAudio, sendWhatsAppContact, editWhatsAppMessage } from "@/lib/whatsapp";
+import { sendWhatsAppMedia, sendWhatsAppAudio, sendWhatsAppContact, sendWhatsAppReaction, editWhatsAppMessage } from "@/lib/whatsapp";
 import { canEditMessage } from "@/lib/message-edit";
 import { transcribeAudio } from "@/lib/ai-transcription";
 import { generateReplySuggestions } from "@/lib/ai-copilot";
@@ -584,6 +584,68 @@ export async function shareContact(conversationId: string, target?: { name: stri
   revalidatePath("/admin/inbox");
   notifyInboxRealtime(clinicId).catch(() => {});
   return message;
+}
+
+/** Reage (ou remove a reação) numa mensagem — sincroniza de verdade com o WhatsApp
+ * do paciente (ver Message.agentReaction). Clicar de novo no mesmo emoji remove. */
+export async function toggleReaction(messageId: string, emoji: string) {
+  const { clinicId } = await requireClinicSession();
+
+  const message = await prisma.message.findUnique({
+    where: { id: messageId },
+    include: { conversation: { include: { contact: true } } },
+  });
+  if (!message || message.conversation.clinicId !== clinicId) {
+    throw new Error("Mensagem não encontrada");
+  }
+  if (!message.whatsappKeyId) {
+    throw new Error("Essa mensagem nunca chegou a sincronizar com o WhatsApp.");
+  }
+
+  const isRemoving = message.agentReaction === emoji;
+  const target: QuotedMessageRef = {
+    keyId: message.whatsappKeyId,
+    remoteJid: `${formatToWhatsAppNumber(message.conversation.contact.phone)}@s.whatsapp.net`,
+    fromMe: message.direction === "OUTBOUND",
+  };
+
+  const result = await sendWhatsAppReaction(target, isRemoving ? "" : emoji, "chat.outbound.reaction", clinicId);
+  if (!result.success && !result.skipped) {
+    throw new Error("Não foi possível enviar a reação.");
+  }
+
+  const updated = await prisma.message.update({
+    where: { id: messageId },
+    data: { agentReaction: isRemoving ? null : emoji },
+  });
+
+  revalidatePath("/clinic/inbox");
+  revalidatePath("/admin/inbox");
+  notifyInboxRealtime(clinicId).catch(() => {});
+  return updated;
+}
+
+/** Marca/desmarca uma mensagem como favorita — só organização interna do CRM,
+ * nunca sincroniza com o WhatsApp (ver Message.starredAt). */
+export async function toggleStarred(messageId: string) {
+  const { clinicId } = await requireClinicSession();
+
+  const message = await prisma.message.findUnique({
+    where: { id: messageId },
+    include: { conversation: true },
+  });
+  if (!message || message.conversation.clinicId !== clinicId) {
+    throw new Error("Mensagem não encontrada");
+  }
+
+  const updated = await prisma.message.update({
+    where: { id: messageId },
+    data: { starredAt: message.starredAt ? null : new Date() },
+  });
+
+  revalidatePath("/clinic/inbox");
+  revalidatePath("/admin/inbox");
+  return updated;
 }
 
 /** Reenvia uma mensagem OUTBOUND que falhou (texto, anexo ou áudio) — usa o mesmo

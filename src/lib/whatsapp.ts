@@ -496,6 +496,67 @@ export async function sendWhatsAppContact(
   return { success: result.success, skipped: false, responseCode: result.responseCode, keyId: result.keyId };
 }
 
+/**
+ * Reage (ou remove a reação) numa mensagem específica via Evolution API v2 —
+ * chega como a reação nativa do WhatsApp, igual reagir a uma mensagem no app.
+ * `emoji: ""` remove a reação atual. POST ${EVOLUTION_API_URL}/message/sendReaction/${EVOLUTION_INSTANCE_NAME}
+ */
+export async function sendWhatsAppReaction(
+  target: QuotedMessageRef,
+  emoji: string,
+  event: string = "whatsapp.send_reaction",
+  clinicId?: string
+): Promise<{ success: boolean; skipped: boolean; responseCode?: number | null }> {
+  const { apiUrl, apiKey, instanceName } = await getEvolutionConfig(clinicId);
+
+  if (!apiUrl || !apiKey || !instanceName) {
+    await prisma.webhookLog.create({
+      data: {
+        event,
+        payload: { keyId: target.keyId },
+        status: "SKIPPED",
+        responseCode: null,
+      },
+    });
+    return { success: false, skipped: true };
+  }
+
+  const baseUrl = apiUrl.replace(/\/$/, "");
+  const targetUrl = `${baseUrl}/message/sendReaction/${instanceName}`;
+
+  let result: SendAttemptResult = { success: false, responseCode: null };
+
+  try {
+    const response = await fetch(targetUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", apikey: apiKey },
+      body: JSON.stringify({
+        key: { remoteJid: target.remoteJid, fromMe: target.fromMe, id: target.keyId },
+        reaction: emoji,
+      }),
+      signal: AbortSignal.timeout(15000),
+    });
+    result = { success: response.ok, responseCode: response.status };
+  } catch (error) {
+    result = {
+      success: false,
+      responseCode: null,
+      error: error instanceof Error ? error.message : "Erro na conexão com Evolution API",
+    };
+  }
+
+  await prisma.webhookLog.create({
+    data: {
+      event,
+      payload: { provider: "evolution_v2", keyId: target.keyId, emoji, error: result.error ?? null },
+      status: result.success ? "SUCCESS" : "FAILED",
+      responseCode: result.responseCode,
+    },
+  });
+
+  return { success: result.success, skipped: false, responseCode: result.responseCode };
+}
+
 export type AppointmentWithRelations = Prisma.AppointmentGetPayload<{
   include: { clinicProcedure: { include: { clinic: true; procedure: true } } };
 }>;

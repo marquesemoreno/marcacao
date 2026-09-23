@@ -23,10 +23,17 @@ import {
   Pencil,
   CornerUpLeft,
   IdCard,
+  SmilePlus,
+  Star,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from '@/components/ui/dialog';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { mentionsInvoiceRequest, type InvoiceData } from '@/lib/chat-messages';
+
+/** Subconjunto rápido de emojis pra reação — mesmo espírito da barra rápida do
+ * WhatsApp (não é o picker completo do composer, ver COMPOSER_EMOJIS em inbox-layout.tsx). */
+const QUICK_REACTION_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
 
 interface MessageBubbleProps {
   message: Message;
@@ -42,6 +49,10 @@ interface MessageBubbleProps {
   onExtractInvoiceData?: (messageId: string) => Promise<{ success: boolean; data?: InvoiceData; error?: string }>;
   /** Fixa esta mensagem como "respondendo a" no composer (botão "Responder" no hover). */
   onReply?: () => void;
+  /** Reage (ou remove a reação) com um emoji — sincroniza de verdade com o WhatsApp. */
+  onReact?: (emoji: string) => void;
+  /** Marca/desmarca como favorita — só organização interna, nunca sincroniza. */
+  onToggleStar?: () => void;
 }
 
 /** Bloco compacto no topo do balão mostrando a mensagem citada — mesmo visual pro
@@ -57,6 +68,98 @@ const QuotedMessagePreview: React.FC<{ quoted: NonNullable<Message['quotedMessag
     </p>
   </div>
 );
+
+/** Botões de hover do balão (responder/reagir/favoritar) — mesmo grupo em todos os
+ * tipos de mensagem (texto/áudio/anexo/contato), por isso extraído uma vez só. */
+const HoverActionButtons: React.FC<{
+  isAgent: boolean;
+  onReply?: () => void;
+  onReact?: (emoji: string) => void;
+  onToggleStar?: () => void;
+  starred?: boolean;
+  currentReaction?: string;
+}> = ({ isAgent, onReply, onReact, onToggleStar, starred, currentReaction }) => {
+  const [isReactionOpen, setIsReactionOpen] = useState(false);
+  if (!onReply && !onReact && !onToggleStar) return null;
+  return (
+    <div
+      className={`self-center flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity ${isAgent ? 'order-first mr-1' : 'order-last ml-1'}`}
+    >
+      {onReact && (
+        <Popover open={isReactionOpen} onOpenChange={setIsReactionOpen}>
+          <PopoverTrigger
+            render={
+              <button
+                type="button"
+                aria-label="Reagir"
+                title="Reagir"
+                className="p-1.5 rounded-full hover:bg-slate-200/70 dark:hover:bg-slate-700 text-slate-400"
+              />
+            }
+          >
+            <SmilePlus className="w-3.5 h-3.5" />
+          </PopoverTrigger>
+          <PopoverContent align="center" className="p-1.5 w-auto">
+            <div className="flex items-center gap-1">
+              {QUICK_REACTION_EMOJIS.map((emoji) => (
+                <button
+                  key={emoji}
+                  type="button"
+                  onClick={() => {
+                    onReact(emoji);
+                    setIsReactionOpen(false);
+                  }}
+                  className={`w-7 h-7 flex items-center justify-center text-base rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors ${
+                    currentReaction === emoji ? 'bg-emerald-100 dark:bg-emerald-950/60' : ''
+                  }`}
+                >
+                  {emoji}
+                </button>
+              ))}
+            </div>
+          </PopoverContent>
+        </Popover>
+      )}
+      {onToggleStar && (
+        <button
+          type="button"
+          onClick={onToggleStar}
+          aria-label={starred ? 'Desmarcar favorita' : 'Marcar como favorita'}
+          title={starred ? 'Desmarcar favorita' : 'Marcar como favorita'}
+          className="p-1.5 rounded-full hover:bg-slate-200/70 dark:hover:bg-slate-700 text-slate-400"
+        >
+          <Star className={`w-3.5 h-3.5 ${starred ? 'fill-amber-400 text-amber-400' : ''}`} />
+        </button>
+      )}
+      {onReply && (
+        <button
+          type="button"
+          onClick={onReply}
+          aria-label="Responder"
+          title="Responder"
+          className="p-1.5 rounded-full hover:bg-slate-200/70 dark:hover:bg-slate-700 text-slate-400"
+        >
+          <CornerUpLeft className="w-3.5 h-3.5" />
+        </button>
+      )}
+    </div>
+  );
+};
+
+/** Selo com o(s) emoji(s) de reação — paciente e/ou atendente podem ter reagido
+ * ao mesmo tempo (não é grupo, então no máximo 2 reatores por mensagem). */
+const ReactionBadge: React.FC<{ contactReaction?: string; agentReaction?: string }> = ({ contactReaction, agentReaction }) => {
+  if (!contactReaction && !agentReaction) return null;
+  return (
+    <span
+      className="inline-flex items-center gap-0.5 mt-1 px-1.5 py-0.5 rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm text-xs"
+      title={[contactReaction && 'Paciente reagiu', agentReaction && 'Você reagiu'].filter(Boolean).join(' • ')}
+    >
+      {contactReaction}
+      {agentReaction}
+    </span>
+  );
+};
 
 const INVOICE_FIELD_LABELS: Record<keyof InvoiceData, string> = {
   cpf: 'CPF',
@@ -110,7 +213,7 @@ const MessageStatusTicks: React.FC<{ status?: Message['deliveryStatus'] }> = ({ 
   return <Clock className="w-3 h-3 text-slate-400" aria-label="Enviando..." />;
 };
 
-export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry, onRequestResend, onEditMessage, onTranscribeAudio, onExtractInvoiceData, onReply }) => {
+export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry, onRequestResend, onEditMessage, onTranscribeAudio, onExtractInvoiceData, onReply, onReact, onToggleStar }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   const [playbackSpeed, setPlaybackSpeed] = useState<'1x' | '1.5x' | '2x'>('1x');
@@ -298,17 +401,14 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry, 
         className={`flex w-full mb-3 group animate-in fade-in slide-in-from-bottom-1 duration-150 ${isAgent ? 'justify-end' : 'justify-start'}`}
         data-od-id={`audio-msg-${message.id}`}
       >
-        {onReply && (
-          <button
-            type="button"
-            onClick={onReply}
-            aria-label="Responder"
-            title="Responder"
-            className={`self-center opacity-0 group-hover:opacity-100 p-1.5 rounded-full transition-opacity hover:bg-slate-200/70 dark:hover:bg-slate-700 text-slate-400 ${isAgent ? 'order-first mr-1' : 'order-last ml-1'}`}
-          >
-            <CornerUpLeft className="w-3.5 h-3.5" />
-          </button>
-        )}
+        <HoverActionButtons
+          isAgent={isAgent}
+          onReply={onReply}
+          onReact={onReact}
+          onToggleStar={onToggleStar}
+          starred={message.starred}
+          currentReaction={message.agentReaction}
+        />
         <div
           className={`max-w-md w-72 sm:w-80 rounded-2xl p-3 sm:p-3.5 shadow-sm transition-all ${
             isAgent
@@ -382,6 +482,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry, 
                   {isAgent && <MessageStatusTicks status={message.deliveryStatus} />}
                 </span>
               </div>
+              <ReactionBadge contactReaction={message.contactReaction} agentReaction={message.agentReaction} />
             </div>
           </div>
 
@@ -424,17 +525,14 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry, 
           className={`flex w-full mb-3 group animate-in fade-in slide-in-from-bottom-1 duration-150 ${isAgent ? 'justify-end' : 'justify-start'}`}
           data-od-id={`attachment-msg-${message.id}`}
         >
-          {onReply && (
-            <button
-              type="button"
-              onClick={onReply}
-              aria-label="Responder"
-              title="Responder"
-              className={`self-center opacity-0 group-hover:opacity-100 p-1.5 rounded-full transition-opacity hover:bg-slate-200/70 dark:hover:bg-slate-700 text-slate-400 ${isAgent ? 'order-first mr-1' : 'order-last ml-1'}`}
-            >
-              <CornerUpLeft className="w-3.5 h-3.5" />
-            </button>
-          )}
+          <HoverActionButtons
+            isAgent={isAgent}
+            onReply={onReply}
+            onReact={onReact}
+            onToggleStar={onToggleStar}
+            starred={message.starred}
+            currentReaction={message.agentReaction}
+          />
           <div
             className={`max-w-md rounded-2xl p-3.5 shadow-sm transition-all ${hasRealFile ? 'cursor-pointer' : 'cursor-not-allowed opacity-80'} ${
               isAgent
@@ -486,6 +584,9 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry, 
             <div className="flex items-center justify-end gap-1 text-[10px] text-slate-400 mt-1">
               <span>{message.timestamp}</span>
               {isAgent && <MessageStatusTicks status={message.deliveryStatus} />}
+            </div>
+            <div className="flex justify-end">
+              <ReactionBadge contactReaction={message.contactReaction} agentReaction={message.agentReaction} />
             </div>
             {isAgent && message.deliveryStatus === 'failed' && <FailedSendNotice onRetry={onRetry} />}
           </div>
@@ -564,6 +665,14 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry, 
         className={`flex w-full mb-3 group animate-in fade-in slide-in-from-bottom-1 duration-150 ${isAgent ? 'justify-end' : 'justify-start'}`}
         data-od-id={`contact-msg-${message.id}`}
       >
+        <HoverActionButtons
+          isAgent={isAgent}
+          onReply={onReply}
+          onReact={onReact}
+          onToggleStar={onToggleStar}
+          starred={message.starred}
+          currentReaction={message.agentReaction}
+        />
         <div
           className={`max-w-md rounded-2xl p-3.5 shadow-sm ${
             isAgent
@@ -585,6 +694,9 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry, 
             <span>{message.timestamp}</span>
             {isAgent && <MessageStatusTicks status={message.deliveryStatus} />}
           </div>
+          <div className="flex justify-end">
+            <ReactionBadge contactReaction={message.contactReaction} agentReaction={message.agentReaction} />
+          </div>
           {isAgent && message.deliveryStatus === 'failed' && <FailedSendNotice onRetry={onRetry} />}
         </div>
       </div>
@@ -597,16 +709,15 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry, 
       className={`flex w-full mb-3 group animate-in fade-in slide-in-from-bottom-1 duration-150 ${isAgent ? 'justify-end' : 'justify-start'}`}
       data-od-id={`chat-msg-${message.id}`}
     >
-      {onReply && !isEditing && (
-        <button
-          type="button"
-          onClick={onReply}
-          aria-label="Responder"
-          title="Responder"
-          className={`self-center opacity-0 group-hover:opacity-100 p-1.5 rounded-full transition-opacity hover:bg-slate-200/70 dark:hover:bg-slate-700 text-slate-400 ${isAgent ? 'order-first mr-1' : 'order-last ml-1'}`}
-        >
-          <CornerUpLeft className="w-3.5 h-3.5" />
-        </button>
+      {!isEditing && (
+        <HoverActionButtons
+          isAgent={isAgent}
+          onReply={onReply}
+          onReact={onReact}
+          onToggleStar={onToggleStar}
+          starred={message.starred}
+          currentReaction={message.agentReaction}
+        />
       )}
       <div
         className={`relative max-w-[85%] sm:max-w-md md:max-w-lg rounded-2xl p-3.5 shadow-sm text-sm leading-relaxed transition-all ${
@@ -676,6 +787,9 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry, 
               {message.isEdited && <span className="italic opacity-80">editada</span>}
               <span>{message.timestamp}</span>
               {isAgent && <MessageStatusTicks status={message.deliveryStatus} />}
+            </div>
+            <div className="flex justify-end">
+              <ReactionBadge contactReaction={message.contactReaction} agentReaction={message.agentReaction} />
             </div>
             {isAgent && message.deliveryStatus === 'failed' && <FailedSendNotice onRetry={onRetry} />}
 

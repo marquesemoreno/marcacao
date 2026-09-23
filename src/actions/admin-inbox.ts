@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { ConversationStatus, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireAdminSession } from "@/lib/session";
-import { whatsappService, sendWhatsAppMedia, sendWhatsAppAudio, sendWhatsAppContact, formatToWhatsAppNumber, isValidWhatsAppNumber, fetchWhatsAppProfilePicture, editWhatsAppMessage, type QuotedMessageRef } from "@/lib/whatsapp";
+import { whatsappService, sendWhatsAppMedia, sendWhatsAppAudio, sendWhatsAppContact, sendWhatsAppReaction, formatToWhatsAppNumber, isValidWhatsAppNumber, fetchWhatsAppProfilePicture, editWhatsAppMessage, type QuotedMessageRef } from "@/lib/whatsapp";
 import { canEditMessage } from "@/lib/message-edit";
 import { hasHospitalBridgeIntegration, fetchBridgeProcedures, fetchBridgeDoctors, fetchBridgeAgenda, fetchBridgeConvenios, fetchBridgePatients, adaptBridgeProcedureToPlainItem } from "@/lib/hospital-bridge";
 import { toPlainClinicProcedureItem } from "@/lib/serialize";
@@ -639,6 +639,61 @@ export async function shareContactAdmin(conversationId: string, target?: { name:
   revalidatePath("/admin/inbox");
   notifyInboxRealtime(conversation.clinicId).catch(() => {});
   return message;
+}
+
+/** Mirror admin de toggleReaction (inbox.ts) — sem checagem de clínica. */
+export async function toggleReactionAdmin(messageId: string, emoji: string) {
+  await requireAdminSession();
+
+  const message = await prisma.message.findUnique({
+    where: { id: messageId },
+    include: { conversation: { include: { contact: true } } },
+  });
+  if (!message) {
+    throw new Error("Mensagem não encontrada");
+  }
+  if (!message.whatsappKeyId) {
+    throw new Error("Essa mensagem nunca chegou a sincronizar com o WhatsApp.");
+  }
+
+  const isRemoving = message.agentReaction === emoji;
+  const target: QuotedMessageRef = {
+    keyId: message.whatsappKeyId,
+    remoteJid: `${formatToWhatsAppNumber(message.conversation.contact.phone)}@s.whatsapp.net`,
+    fromMe: message.direction === "OUTBOUND",
+  };
+
+  const result = await sendWhatsAppReaction(target, isRemoving ? "" : emoji, "chat.outbound_admin.reaction", message.conversation.clinicId);
+  if (!result.success && !result.skipped) {
+    throw new Error("Não foi possível enviar a reação.");
+  }
+
+  const updated = await prisma.message.update({
+    where: { id: messageId },
+    data: { agentReaction: isRemoving ? null : emoji },
+  });
+
+  revalidatePath("/admin/inbox");
+  notifyInboxRealtime(message.conversation.clinicId).catch(() => {});
+  return updated;
+}
+
+/** Mirror admin de toggleStarred (inbox.ts) — sem checagem de clínica. */
+export async function toggleStarredAdmin(messageId: string) {
+  await requireAdminSession();
+
+  const message = await prisma.message.findUnique({ where: { id: messageId } });
+  if (!message) {
+    throw new Error("Mensagem não encontrada");
+  }
+
+  const updated = await prisma.message.update({
+    where: { id: messageId },
+    data: { starredAt: message.starredAt ? null : new Date() },
+  });
+
+  revalidatePath("/admin/inbox");
+  return updated;
 }
 
 /** Reenvia uma mensagem OUTBOUND que falhou (texto, anexo ou áudio) — ver resendMessage (inbox.ts). */
