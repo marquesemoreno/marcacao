@@ -140,13 +140,13 @@ export function BroadcastManagement() {
     <div className="p-4 sm:p-6 space-y-6 max-w-4xl mx-auto">
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <Megaphone className="w-5 h-5 text-violet-600 dark:text-violet-400" />
-          <h1 className="text-lg font-extrabold text-slate-900 dark:text-slate-100">Disparo de mensagens</h1>
+          <Megaphone className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+          <h1 className="text-xl md:text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Disparo de mensagens</h1>
         </div>
         <button
           type="button"
           onClick={() => setRescheduleModalOpen(true)}
-          className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 hover:bg-amber-100 dark:hover:bg-amber-950/70 rounded-xl transition-all"
+          className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 hover:bg-amber-100 dark:hover:bg-amber-950/70 rounded-lg transition-all"
         >
           <AlertTriangle className="w-3.5 h-3.5" />
           Aviso / Remarcação em Massa
@@ -161,11 +161,11 @@ export function BroadcastManagement() {
         }}
       />
 
-      <div className="rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 space-y-4">
-        <h2 className="text-sm font-extrabold text-slate-900 dark:text-slate-100">Nova campanha</h2>
+      <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 space-y-4">
+        <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-200">Nova campanha</h2>
 
         <div>
-          <label htmlFor="broadcast-name" className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+          <label htmlFor="broadcast-name" className="text-xs font-medium text-slate-600 dark:text-slate-400">
             Nome da campanha
           </label>
           <input
@@ -174,12 +174,12 @@ export function BroadcastManagement() {
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Ex: Aviso de horário especial - Setembro"
-            className="w-full mt-1 px-3 py-2 text-xs font-medium rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500"
+            className="w-full mt-1 px-3 py-2 text-xs font-medium rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
           />
         </div>
 
         <div>
-          <label htmlFor="broadcast-template" className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+          <label htmlFor="broadcast-template" className="text-xs font-medium text-slate-600 dark:text-slate-400">
             Mensagem
           </label>
           <textarea
@@ -188,7 +188,7 @@ export function BroadcastManagement() {
             value={template}
             onChange={(e) => setTemplate(e.target.value)}
             placeholder={"Ex: Olá {{nome}}, sua consulta de {{procedimento}} está confirmada."}
-            className="w-full mt-1 px-3 py-2 text-xs font-medium rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 resize-none"
+            className="w-full mt-1 px-3 py-2 text-xs font-medium rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 resize-none"
           />
           {csvColumns.length > 0 && (
             <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
@@ -201,23 +201,23 @@ export function BroadcastManagement() {
         </div>
 
         <div>
-          <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+          <label className="text-xs font-medium text-slate-600 dark:text-slate-400">
             Imagem (opcional)
           </label>
           {imagePreviewUrl ? (
             <div className="mt-1 flex items-center gap-3">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={imagePreviewUrl} alt="Prévia da imagem da campanha" className="w-16 h-16 rounded-xl object-cover border border-slate-200 dark:border-slate-800" />
+              <img src={imagePreviewUrl} alt="Prévia da imagem da campanha" className="w-16 h-16 rounded-lg object-cover border border-slate-200 dark:border-slate-800" />
               <button
                 type="button"
                 onClick={handleRemoveImage}
-                className="inline-flex items-center gap-1.5 text-[11px] font-bold text-red-600 dark:text-red-400"
+                className="inline-flex items-center gap-1.5 text-[11px] font-medium text-red-600 dark:text-red-400"
               >
                 <X className="w-3.5 h-3.5" /> Remover
               </button>
             </div>
           ) : (
-            <label className="mt-1 inline-flex items-center gap-1.5 text-[11px] font-bold text-violet-700 dark:text-violet-300 cursor-pointer">
+            <label className="mt-1 inline-flex items-center gap-1.5 text-[11px] font-medium text-emerald-700 dark:text-emerald-300 cursor-pointer">
               <ImageIcon className="w-3.5 h-3.5" /> Anexar imagem
               <input
                 type="file"
@@ -231,10 +231,10 @@ export function BroadcastManagement() {
 
         <div>
           <div className="flex items-center justify-between">
-            <label htmlFor="broadcast-csv" className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+            <label htmlFor="broadcast-csv" className="text-xs font-medium text-slate-600 dark:text-slate-400">
               Lista de contatos (CSV — vírgula ou ponto-e-vírgula, cabeçalho opcional)
             </label>
-            <label className="inline-flex items-center gap-1.5 text-[11px] font-bold text-violet-700 dark:text-violet-300 cursor-pointer">
+            <label className="inline-flex items-center gap-1.5 text-[11px] font-medium text-emerald-700 dark:text-emerald-300 cursor-pointer">
               <Upload className="w-3.5 h-3.5" /> Enviar arquivo
               <input
                 type="file"
@@ -250,7 +250,7 @@ export function BroadcastManagement() {
             value={csvText}
             onChange={(e) => handleCsvChange(e.target.value)}
             placeholder={"telefone,nome,procedimento\n77999998888,Maria Silva,Consulta Urológica"}
-            className="w-full mt-1 px-3 py-2 text-xs font-mono rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 resize-none"
+            className="w-full mt-1 px-3 py-2 text-xs font-mono rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 resize-none"
           />
           <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
             Sem cabeçalho, assume a ordem telefone, nome, procedimento, data. Com cabeçalho, qualquer
@@ -268,7 +268,7 @@ export function BroadcastManagement() {
           type="button"
           disabled={creating}
           onClick={handleCreate}
-          className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 text-xs font-bold text-white bg-violet-600 hover:bg-violet-700 disabled:opacity-50 rounded-xl transition-all"
+          className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 rounded-lg transition-all"
         >
           {creating && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
           {creating ? "Criando..." : "Criar campanha (rascunho)"}
@@ -276,7 +276,7 @@ export function BroadcastManagement() {
       </div>
 
       <div className="space-y-3">
-        <h2 className="text-sm font-extrabold text-slate-900 dark:text-slate-100">Campanhas</h2>
+        <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-200">Campanhas</h2>
         {loading ? (
           <div className="p-8 text-center text-xs font-semibold text-slate-400 dark:text-slate-500 flex items-center justify-center gap-2">
             <Loader2 className="w-4 h-4 animate-spin" /> Carregando...
@@ -287,12 +287,12 @@ export function BroadcastManagement() {
           campaigns.map((c) => (
             <div
               key={c.id}
-              className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 flex items-center justify-between gap-3"
+              className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 flex items-center justify-between gap-3"
             >
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-extrabold text-slate-900 dark:text-slate-100 truncate">{c.name}</span>
-                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border ${STATUS_CLASS[c.status]}`}>
+                  <span className="text-sm font-semibold text-slate-900 dark:text-slate-100 truncate">{c.name}</span>
+                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${STATUS_CLASS[c.status]}`}>
                     {STATUS_LABEL[c.status]}
                   </span>
                   {c.hasImage && <ImageIcon className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 shrink-0" />}
@@ -309,7 +309,7 @@ export function BroadcastManagement() {
                   type="button"
                   disabled={togglingId === c.id}
                   onClick={() => handleToggle(c)}
-                  className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-50 transition-all"
+                  className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-medium rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-50 transition-all"
                 >
                   {togglingId === c.id ? (
                     <Loader2 className="w-3.5 h-3.5 animate-spin" />

@@ -23,15 +23,15 @@ export default async function ClinicSettingsPage() {
 
   return (
     <div className="space-y-8">
-      <h1 className="text-2xl font-bold">Preços e Horários</h1>
+      <h1 className="text-xl md:text-2xl font-semibold tracking-tight text-slate-900">Preços e Horários</h1>
 
       <section className="space-y-3">
-        <h2 className="text-lg font-semibold">Horários de atendimento</h2>
+        <h2 className="text-sm font-semibold text-slate-800">Horários de atendimento</h2>
         <BusinessHoursForm businessHours={businessHours} />
       </section>
 
       <section className="space-y-3">
-        <h2 className="text-lg font-semibold">Tabela de preços</h2>
+        <h2 className="text-sm font-semibold text-slate-800">Tabela de preços</h2>
         <div className="space-y-3">
           {clinicProcedures.map((cp) => (
             <ClinicProcedureForm key={cp.id} item={toPlainClinicProcedureItem(cp)} />
@@ -41,7 +41,7 @@ export default async function ClinicSettingsPage() {
 
       {availableProcedures.length > 0 && (
         <section className="space-y-3">
-          <h2 className="text-lg font-semibold">Adicionar procedimento</h2>
+          <h2 className="text-sm font-semibold text-slate-800">Adicionar procedimento</h2>
           <AddProcedureForm availableProcedures={availableProcedures} />
         </section>
       )}

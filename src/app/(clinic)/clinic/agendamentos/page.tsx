@@ -36,7 +36,7 @@ export default async function ClinicAppointmentsPage({ searchParams }: Agendamen
   return (
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold">Agendamentos de Hoje e Consultas</h1>
+        <h1 className="text-xl md:text-2xl font-semibold tracking-tight text-slate-900">Agendamentos de Hoje e Consultas</h1>
         <BatchReminderButton />
       </div>
 

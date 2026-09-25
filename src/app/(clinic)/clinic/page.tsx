@@ -51,7 +51,7 @@ export default async function ClinicDashboardPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-slate-900">Início</h1>
+      <h1 className="text-xl md:text-2xl font-semibold tracking-tight text-slate-900">Início</h1>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         {kpis.map((kpi) => {
@@ -59,16 +59,16 @@ export default async function ClinicDashboardPage() {
           return (
             <div
               key={kpi.label}
-              className="flex items-center gap-4 rounded-3xl border border-slate-200/80 bg-white p-5 shadow-sm"
+              className="flex items-center gap-4 rounded-lg border border-slate-200 bg-white p-5 shadow-xs"
             >
-              <div className={`flex size-12 shrink-0 items-center justify-center rounded-2xl ${kpi.iconBg}`}>
+              <div className={`flex size-12 shrink-0 items-center justify-center rounded-lg ${kpi.iconBg}`}>
                 <Icon className="h-6 w-6" />
               </div>
               <div className="min-w-0">
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <p className="text-xs font-medium text-slate-600">
                   {kpi.label}
                 </p>
-                <p className="text-3xl font-extrabold text-slate-900">{kpi.value}</p>
+                <p className="text-3xl font-semibold text-slate-900">{kpi.value}</p>
               </div>
             </div>
           );
@@ -76,14 +76,14 @@ export default async function ClinicDashboardPage() {
       </div>
 
       <div>
-        <h2 className="mb-3 text-lg font-bold text-slate-900">Agenda de hoje</h2>
-        <div className="overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-sm">
+        <h2 className="mb-3 text-sm font-semibold text-slate-800">Agenda de hoje</h2>
+        <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-xs">
           {todayAppointments.length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-3 px-6 py-16 text-center">
-              <div className="flex size-14 items-center justify-center rounded-2xl bg-slate-50 text-slate-400">
+              <div className="flex size-14 items-center justify-center rounded-lg bg-slate-50 text-slate-400">
                 <CalendarX2 className="h-7 w-7" />
               </div>
-              <p className="text-sm font-medium text-slate-600">
+              <p className="text-sm text-slate-600">
                 Tudo tranquilo por aqui! Nenhum agendamento pendente para hoje.
               </p>
             </div>
@@ -91,7 +91,7 @@ export default async function ClinicDashboardPage() {
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">
                 <thead>
-                  <tr className="bg-slate-50 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                  <tr className="bg-slate-50 text-xs font-medium text-slate-600">
                     <th className="px-5 py-3">Horário</th>
                     <th className="px-5 py-3">Paciente</th>
                     <th className="px-5 py-3">Procedimento</th>
@@ -104,7 +104,7 @@ export default async function ClinicDashboardPage() {
                     const badge = statusBadge[appointment.status];
                     return (
                       <tr key={appointment.id} className="transition-colors hover:bg-slate-50/70">
-                        <td className="whitespace-nowrap px-5 py-3.5 font-mono text-xs text-slate-600">
+                        <td className="whitespace-nowrap px-5 py-3.5 font-mono text-xs text-slate-400">
                           {appointment.timeSlot ?? "—"}
                         </td>
                         <td className="px-5 py-3.5">
@@ -118,7 +118,7 @@ export default async function ClinicDashboardPage() {
                         </td>
                         <td className="px-5 py-3.5">
                           <span
-                            className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold ${badge.className}`}
+                            className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium border border-transparent ${badge.className}`}
                           >
                             {badge.label}
                           </span>
@@ -137,7 +137,7 @@ export default async function ClinicDashboardPage() {
                               target="_blank"
                               rel="noopener noreferrer"
                               title="Chamar no WhatsApp"
-                              className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-xs font-semibold text-emerald-700 transition-colors hover:bg-emerald-100"
+                              className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-xs font-medium text-emerald-700 transition-colors hover:bg-emerald-100"
                             >
                               <WhatsAppIcon className="h-3.5 w-3.5" />
                               WhatsApp
@@ -147,7 +147,7 @@ export default async function ClinicDashboardPage() {
                               target="_blank"
                               rel="noopener noreferrer"
                               title="Ver Guia com QR Code"
-                              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-100"
+                              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-100"
                             >
                               <QrCode className="h-3.5 w-3.5" />
                               Guia

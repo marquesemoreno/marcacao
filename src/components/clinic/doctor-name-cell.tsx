@@ -43,7 +43,7 @@ export function DoctorNameCell({ appointmentId, doctorName }: { appointmentId: s
             }
           }}
           placeholder="Nome do médico"
-          className="w-32 px-2 py-1 text-xs rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+          className="w-32 h-9 px-3 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
         />
         <button
           type="button"
