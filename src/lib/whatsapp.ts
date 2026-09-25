@@ -464,34 +464,56 @@ export async function sendWhatsAppAudio(
 
   const baseUrl = apiUrl.replace(/\/$/, "");
   const targetUrl = `${baseUrl}/message/sendWhatsAppAudio/${instanceName}`;
+  const key = apiKey;
 
-  let result: SendAttemptResult = { success: false, responseCode: null };
+  async function attemptSend(number: string): Promise<SendAttemptResult> {
+    try {
+      const response = await fetch(targetUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", apikey: key },
+        body: JSON.stringify({
+          number,
+          audio: mediaUrl,
+          ptt: true,
+        }),
+        signal: AbortSignal.timeout(15000),
+      });
+      const keyId = response.ok ? await extractKeyId(response) : undefined;
+      return { success: response.ok, responseCode: response.status, keyId };
+    } catch (error) {
+      return {
+        success: false,
+        responseCode: null,
+        error: error instanceof Error ? error.message : "Erro na conexão com Evolution API",
+      };
+    }
+  }
 
-  try {
-    const response = await fetch(targetUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", apikey: apiKey },
-      body: JSON.stringify({
-        number: target,
-        audio: mediaUrl,
-        ptt: true,
-      }),
-      signal: AbortSignal.timeout(15000),
-    });
-    const keyId = response.ok ? await extractKeyId(response) : undefined;
-    result = { success: response.ok, responseCode: response.status, keyId };
-  } catch (error) {
-    result = {
-      success: false,
-      responseCode: null,
-      error: error instanceof Error ? error.message : "Erro na conexão com Evolution API",
-    };
+  let result = await attemptSend(target);
+
+  // Mesmo fallback de sendWhatsAppMessage/sendWhatsAppMedia (ver toggleNinthDigit).
+  let fallbackNumber: string | null = null;
+  if (!result.success && result.responseCode === 400) {
+    fallbackNumber = toggleNinthDigit(target);
+    if (fallbackNumber) {
+      result = await attemptSend(fallbackNumber);
+      if (result.success) {
+        await prisma.contact
+          .updateMany({ where: { phone: target }, data: { phone: fallbackNumber } })
+          .catch((error) => console.error("Falha ao atualizar telefone do contato pro formato que funciona:", error));
+      }
+    }
   }
 
   await prisma.webhookLog.create({
     data: {
       event,
-      payload: { provider: "evolution_v2", phone: target, error: result.error ?? null },
+      payload: {
+        provider: "evolution_v2",
+        phone: fallbackNumber && result.success ? fallbackNumber : target,
+        error: result.error ?? null,
+        ninthDigitFallback: fallbackNumber && result.success ? true : undefined,
+      },
       status: result.success ? "SUCCESS" : "FAILED",
       responseCode: result.responseCode,
     },
