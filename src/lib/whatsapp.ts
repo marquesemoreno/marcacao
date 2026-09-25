@@ -75,6 +75,24 @@ export function formatWhatsAppNumber(phone: string): string {
   return formatToWhatsAppNumber(phone);
 }
 
+/** Alterna a presença do 9º dígito num número já normalizado (DDI 55 + DDD + resto) —
+ * usado como fallback quando o envio no formato "padrão" falha com 400: alguns números
+ * (ex: fixo cadastrado como celular, ou celular antigo cuja conta do WhatsApp nunca foi
+ * migrada) só existem no WhatsApp no formato SEM o 9, mesmo com 9 dígitos sendo o
+ * padrão atual da operadora pra celular. `null` se o número não tiver o formato
+ * DDI+DDD+9-dígitos ou DDI+DDD+8-dígitos esperado (não dá pra alternar com segurança). */
+export function toggleNinthDigit(target: string): string | null {
+  if (!target.startsWith("55")) return null;
+  const rest = target.slice(4); // depois de DDI(2)+DDD(2)
+  if (target.length === 13 && rest.startsWith("9")) {
+    return target.slice(0, 4) + rest.slice(1); // remove o 9 -> 12 dígitos
+  }
+  if (target.length === 12) {
+    return target.slice(0, 4) + "9" + rest; // adiciona o 9 -> 13 dígitos
+  }
+  return null;
+}
+
 /** Um celular brasileiro normalizado é sempre DDI(2) + DDD(2) + 9 dígitos = 13.
  * Números que não se encaixam em nenhuma correção de formatToWhatsAppNumber
  * (ex: dígito a mais/a menos, sem DDI) saem do tamanho errado e por isso não
@@ -173,39 +191,64 @@ export async function sendWhatsAppMessage(
 
   const baseUrl = apiUrl.replace(/\/$/, "");
   const targetUrl = `${baseUrl}/message/sendText/${instanceName}`;
+  const key = apiKey;
 
-  let result: SendAttemptResult = { success: false, responseCode: null };
-  let attempts = 0;
-
-  for (attempts = 1; attempts <= MAX_ATTEMPTS; attempts++) {
+  async function attemptSend(number: string): Promise<SendAttemptResult> {
     try {
       const response = await fetch(targetUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          apikey: apiKey,
+          apikey: key,
         },
         body: JSON.stringify({
-          number: target,
+          number,
           text,
           ...buildQuotedPayload(quoted),
         }),
         signal: AbortSignal.timeout(8000),
       });
-
       const keyId = response.ok ? await extractKeyId(response) : undefined;
-      result = { success: response.ok, responseCode: response.status, keyId };
-      if (response.ok) break;
+      return { success: response.ok, responseCode: response.status, keyId };
     } catch (error) {
-      result = {
+      return {
         success: false,
         responseCode: null,
         error: error instanceof Error ? error.message : "Erro na conexão com Evolution API",
       };
     }
+  }
+
+  let result: SendAttemptResult = { success: false, responseCode: null };
+  let attempts = 0;
+
+  for (attempts = 1; attempts <= MAX_ATTEMPTS; attempts++) {
+    result = await attemptSend(target);
+    if (result.success) break;
 
     if (attempts < MAX_ATTEMPTS) {
       await sleep(RETRY_DELAY_MS * attempts);
+    }
+  }
+
+  // Fallback: alguns números (fixo cadastrado como celular, celular antigo nunca
+  // migrado) só existem no WhatsApp no formato COM/SEM o 9º dígito trocado do que a
+  // gente assume por padrão — 400 é o código que a Evolution API devolve pra "número
+  // não existe no WhatsApp nesse formato" (bug real confirmado: contato da Urolaser
+  // com fixo cadastrado, 8 tentativas falhando até identificar a causa). Só tenta
+  // depois de esgotar as tentativas normais, e só se o toggle fizer sentido pro número.
+  let fallbackNumber: string | null = null;
+  if (!result.success && result.responseCode === 400) {
+    fallbackNumber = toggleNinthDigit(target);
+    if (fallbackNumber) {
+      result = await attemptSend(fallbackNumber);
+      if (result.success) {
+        // Grava o formato que realmente funciona no Contact — sem isso, todo
+        // envio futuro pra esse número repetiria a falha + fallback à toa.
+        await prisma.contact
+          .updateMany({ where: { phone: target }, data: { phone: fallbackNumber } })
+          .catch((error) => console.error("Falha ao atualizar telefone do contato pro formato que funciona:", error));
+      }
     }
   }
 
@@ -214,11 +257,12 @@ export async function sendWhatsAppMessage(
       event,
       payload: {
         provider: "evolution_v2",
-        phone: target,
+        phone: fallbackNumber && result.success ? fallbackNumber : target,
         text,
         attempts,
         error: result.error ?? null,
         quotedKeyId: quoted?.keyId ?? null,
+        ninthDigitFallback: fallbackNumber && result.success ? true : undefined,
       },
       status: result.success ? "SUCCESS" : "FAILED",
       responseCode: result.responseCode,
