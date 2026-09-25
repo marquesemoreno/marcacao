@@ -329,9 +329,15 @@ export async function createBridgeAppointment(
   // agendamento gravava certinho no Firebird, mas a mensagem nunca saía.
   // Em try/catch isolado: o agendamento já é real a essa altura, uma falha só
   // no envio da confirmação não pode derrubar a resposta de sucesso.
+  // Fora do try/catch de baixo (que só cobre o envio da confirmação) porque o
+  // espelho no Postgres, mais abaixo, também precisa desse nome — sem isso o
+  // aviso de remarcação em massa (getDistinctDoctorNames) nunca via nada pra
+  // clínicas que só agendam pelo bridge (bug real: "não tá puxando o médico").
+  let doctorName: string | null = null;
   try {
     const doctors = input.medicoId ? await fetchBridgeDoctors(clinicId) : [];
     const doctor = doctors.find((d) => String(d.id) === String(input.medicoId));
+    doctorName = doctor?.nome ?? null;
     const [year, month, day] = input.date.split("-");
     const messageText = buildBridgeConfirmationMessage({
       patientName: input.patientName,
@@ -433,6 +439,7 @@ export async function createBridgeAppointment(
         date: new Date(`${input.date}T00:00:00Z`),
         timeSlot: input.timeSlot || null,
         status: "CONFIRMED",
+        doctorName,
         notes: input.notes
           ? `Agendado via bridge ${clinic.tradeName} — NUMERO Firebird: ${body?.numero ?? "?"}\n\n${input.notes}`
           : `Agendado via bridge ${clinic.tradeName} — NUMERO Firebird: ${body?.numero ?? "?"}`,
@@ -457,7 +464,7 @@ export async function createBridgeAppointment(
     status: "PENDING",
     paymentMethod: null,
     notes: null,
-    doctorName: null,
+    doctorName,
     affiliateId: null,
     affiliateCommission: null,
     commissionReleased: false,
