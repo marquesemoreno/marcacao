@@ -20,6 +20,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from '@
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from '@/components/ui/command';
 import { useClickOutside } from '@/hooks/use-click-outside';
+import { SCHEDULED_TAG } from '@/lib/conversation-tags';
 import { toast } from "sonner";
 import {
   Search,
@@ -61,10 +62,14 @@ import {
 
 const MAX_MEDIA_SIZE_BYTES = 15 * 1024 * 1024; // 15 MB — mesmo limite validado no servidor
 
+/** O rótulo de cada preset precisa ser IDÊNTICO à string gravada em Conversation.tags
+ * (ver conversation-tags.ts) — o filtro da fila faz comparação exata de string
+ * (`contact.tags.includes(...)`, ver filteredContacts), então qualquer divergência
+ * (ex: "Confirmado" vs a tag real "✅ Agendado") faz o filtro nunca bater com nada. */
 const PRESET_TAGS: { label: string; classes: string }[] = [
   { label: '⚡ Prioritário', classes: 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800' },
   { label: '🔬 Jejum', classes: 'bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800' },
-  { label: '✅ Confirmado', classes: 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800' },
+  { label: SCHEDULED_TAG, classes: 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800' },
   { label: 'Urologia', classes: 'bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800' },
   { label: 'Lead B2B', classes: 'bg-sky-50 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 border-sky-200 dark:border-sky-800' },
 ];
