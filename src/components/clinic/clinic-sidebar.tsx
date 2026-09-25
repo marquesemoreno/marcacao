@@ -29,11 +29,13 @@ export function ClinicSidebar({
   userName: string | null | undefined;
   isExclusive: boolean;
 }) {
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  // Recolhida por padrão (libera espaço pra fila/chat) — só fica expandida se o
+  // usuário já tiver escolhido isso explicitamente antes (localStorage === "0").
+  const [isCollapsed, setIsCollapsed] = useState(true);
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
-    setIsCollapsed(localStorage.getItem(STORAGE_KEY) === "1");
+    setIsCollapsed(localStorage.getItem(STORAGE_KEY) !== "0");
     setHydrated(true);
   }, []);
 
@@ -63,11 +65,8 @@ export function ClinicSidebar({
           <TooltipContent side="right">{tradeName}</TooltipContent>
         </Tooltip>
       ) : (
-        <div className="mx-4 mt-3 flex items-center gap-1.5">
-          <span className="truncate text-xs font-extrabold text-slate-200">{tradeName}</span>
-          <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 text-[10px] font-extrabold text-emerald-300 font-mono">
-            🟢 Clínica
-          </span>
+        <div className="mx-4 mt-3">
+          <span className="truncate block text-xs font-extrabold text-slate-200">{tradeName}</span>
         </div>
       )}
 

@@ -54,25 +54,41 @@ export async function listClinicAppointments(filters?: { status?: AppointmentSta
   });
 }
 
+/** Nomes distintos de tags usadas nas conversas da clínica no período — popula o
+ * filtro "Tags" do relatório (ver /clinic/relatorio). Simples lista pra filtro, não
+ * é gestão de tags (essa feature foi removida — ver memória do projeto). */
+export async function getDistinctConversationTags(days: number = 30) {
+  const { clinicId } = await requireClinicSession();
+  const since = addUTCDays(startOfUTCDay(new Date()), -days);
+  const conversations = await prisma.conversation.findMany({
+    where: { clinicId, createdAt: { gte: since }, tags: { isEmpty: false } },
+    select: { tags: true },
+  });
+  return [...new Set(conversations.flatMap((c) => c.tags))].sort();
+}
+
 /** Relatório de atendimento/chat da clínica (ver /clinic/relatorio) — mesma lógica de
  * getAttendantPerformanceReport/getConversationQualityReport (admin.ts), só que filtrada
  * por clinicId em vez da plataforma inteira. Duplicado de propósito (mesmo padrão
- * clínica/admin usado no resto do projeto) em vez de generalizar as funções do admin. */
-export async function getClinicChatReport(days: number = 30) {
+ * clínica/admin usado no resto do projeto) em vez de generalizar as funções do admin.
+ * `tags`, quando informado, filtra pra conversas que tenham QUALQUER uma delas. */
+export async function getClinicChatReport(days: number = 30, tags?: string[]) {
   const { clinicId } = await requireClinicSession();
   const since = addUTCDays(startOfUTCDay(new Date()), -days);
+  const tagsFilter = tags && tags.length > 0 ? { tags: { hasSome: tags } } : {};
 
-  const [conversations, audits, urgencyCount] = await Promise.all([
+  const [conversations, audits] = await Promise.all([
     prisma.conversation.findMany({
-      where: { clinicId, createdAt: { gte: since } },
+      where: { clinicId, createdAt: { gte: since }, ...tagsFilter },
       select: { id: true, status: true, resolutionReason: true, createdAt: true, resolvedAt: true },
     }),
+    // Filtra pela data da CONVERSA, não do audit — um audit é criado só quando a conversa
+    // é resolvida, então filtrar pela própria data do audit deixava entrar conversas
+    // abertas há semanas e resolvidas só agora, distorcendo a média de resolução pra
+    // muito acima da realidade (bug real: média de 118h só por causa de 1 conversa velha).
     prisma.conversationQualityAudit.findMany({
-      where: { conversation: { clinicId }, createdAt: { gte: since } },
+      where: { conversation: { clinicId, createdAt: { gte: since }, ...tagsFilter } },
       select: { sentiment: true, firstResponseSec: true, resolutionSec: true },
-    }),
-    prisma.messageTriage.count({
-      where: { conversation: { clinicId }, createdAt: { gte: since } },
     }),
   ]);
 
@@ -81,7 +97,11 @@ export async function getClinicChatReport(days: number = 30) {
   const conversionRate = totalResolved > 0 ? Math.round((totalAgendados / totalResolved) * 1000) / 10 : 0;
 
   const withFrt = audits.filter((a) => a.firstResponseSec !== null);
-  const withTtr = audits.filter((a) => a.resolutionSec !== null);
+  // Resolução só entra na média se a conversa teve resposta de verdade (firstResponseSec
+  // não-nulo) — sem esse filtro, uma conversa esquecida por dias (sem ninguém responder)
+  // e resolvida só depois pelo cron de "sem retorno" pesava sozinha a média pra centenas
+  // de horas, mesmo não representando nenhum atendimento de fato.
+  const withTtr = audits.filter((a) => a.resolutionSec !== null && a.firstResponseSec !== null);
   const avgFrtSec = withFrt.length > 0 ? Math.round(withFrt.reduce((acc, a) => acc + a.firstResponseSec!, 0) / withFrt.length) : null;
   const avgTtrSec = withTtr.length > 0 ? Math.round(withTtr.reduce((acc, a) => acc + a.resolutionSec!, 0) / withTtr.length) : null;
 
@@ -104,18 +124,24 @@ export async function getClinicChatReport(days: number = 30) {
     sentimentNeutroPct: sentimentPct("NEUTRO"),
     sentimentNegativoPct: sentimentPct("NEGATIVO"),
     sentimentAuditedCount: withSentiment.length,
-    urgencyCount,
   };
 }
 
 /** Relatório de agendamentos da clínica (ver /clinic/relatorio) — mesma fonte de valor
- * (clinicProcedure.price/promotionalPrice) já usada em getFinancialReport (admin.ts). */
-export async function getClinicAppointmentsReport(days: number = 30) {
+ * (clinicProcedure.price/promotionalPrice) já usada em getFinancialReport (admin.ts).
+ * `doctorName`/`procedureId`, quando informados, filtram os agendamentos — só fazem
+ * sentido aqui (não no relatório de chat): não existe vínculo entre Conversation e
+ * Appointment no banco, então médico/procedimento não dá pra filtrar conversas. */
+export async function getClinicAppointmentsReport(days: number = 30, doctorName?: string, procedureId?: string) {
   const { clinicId } = await requireClinicSession();
   const since = addUTCDays(startOfUTCDay(new Date()), -days);
 
   const appointments = await prisma.appointment.findMany({
-    where: { clinicProcedure: { clinicId }, createdAt: { gte: since } },
+    where: {
+      clinicProcedure: { clinicId, ...(procedureId ? { procedureId } : {}) },
+      createdAt: { gte: since },
+      ...(doctorName ? { doctorName } : {}),
+    },
     include: { clinicProcedure: { include: { procedure: true } } },
   });
 

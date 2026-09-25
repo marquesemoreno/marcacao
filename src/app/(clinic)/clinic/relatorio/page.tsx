@@ -1,9 +1,17 @@
 import { PeriodFilter } from "@/components/clinic/period-filter";
+import { ReportSelectFilter } from "@/components/clinic/report-filters";
 import { HorizontalBarChart, SentimentBar } from "@/components/clinic/report-charts";
 import { ReportExportButton } from "@/components/clinic/report-export-button";
-import { getClinicInfo, getClinicChatReport, getClinicAppointmentsReport } from "@/actions/clinic";
+import {
+  getClinicInfo,
+  getClinicChatReport,
+  getClinicAppointmentsReport,
+  getDistinctConversationTags,
+  getDistinctDoctorNames,
+  listClinicProcedures,
+} from "@/actions/clinic";
 import { formatCurrency, appointmentStatusLabels } from "@/lib/format";
-import { MessageSquare, TrendingUp, AlertTriangle, CalendarCheck, XCircle, DollarSign } from "lucide-react";
+import { MessageSquare, TrendingUp, CalendarCheck, XCircle, DollarSign } from "lucide-react";
 
 /** Cor por status — mesma semântica já usada em appointmentStatusVariant (format.ts),
  * cada família de cor distinta (nunca duas cores parecidas pra status diferentes). */
@@ -29,7 +37,7 @@ function formatDurationLabel(seconds: number | null): string {
 }
 
 type RelatorioPageProps = {
-  searchParams: Promise<{ days?: string }>;
+  searchParams: Promise<{ days?: string; tag?: string; doctor?: string; procedure?: string }>;
 };
 
 export default async function ClinicReportPage({ searchParams }: RelatorioPageProps) {
@@ -38,12 +46,13 @@ export default async function ClinicReportPage({ searchParams }: RelatorioPagePr
 
   const clinic = await getClinicInfo();
   const isExclusive = Boolean(clinic.whatsappInstance);
-  const [chatReport, appointmentsReport] = await Promise.all([
-    getClinicChatReport(days),
-    isExclusive ? Promise.resolve(null) : getClinicAppointmentsReport(days),
+  const [chatReport, appointmentsReport, tagOptions, doctorOptions, procedureOptions] = await Promise.all([
+    getClinicChatReport(days, params.tag ? [params.tag] : undefined),
+    isExclusive ? Promise.resolve(null) : getClinicAppointmentsReport(days, params.doctor, params.procedure),
+    getDistinctConversationTags(days),
+    isExclusive ? Promise.resolve([]) : getDistinctDoctorNames(),
+    isExclusive ? Promise.resolve([]) : listClinicProcedures(),
   ]);
-
-  const hasUrgency = chatReport.urgencyCount > 0;
 
   return (
     <div className="space-y-8 font-sans flex-1 overflow-y-auto text-slate-900 dark:text-slate-100 p-6 md:p-8 max-w-7xl mx-auto w-full">
@@ -54,7 +63,13 @@ export default async function ClinicReportPage({ searchParams }: RelatorioPagePr
             Métricas consolidadas de desempenho e recepção da {clinic.tradeName}.
           </p>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
+          <ReportSelectFilter
+            basePath="/clinic/relatorio"
+            paramKey="tag"
+            placeholder="Tag"
+            options={[{ value: "_all", label: "Todas as tags" }, ...tagOptions.map((t) => ({ value: t, label: t }))]}
+          />
           <PeriodFilter basePath="/clinic/relatorio" />
           <ReportExportButton
             rows={[
@@ -63,7 +78,6 @@ export default async function ClinicReportPage({ searchParams }: RelatorioPagePr
               ["Taxa de conversão em agendamento (%)", chatReport.conversionRate],
               ["Tempo médio de 1ª resposta (s)", chatReport.avgFrtSec ?? "—"],
               ["Tempo médio de resolução (s)", chatReport.avgTtrSec ?? "—"],
-              ["Urgências acionadas", chatReport.urgencyCount],
               ["Sentimento positivo (%)", chatReport.sentimentPositivePct],
               ["Sentimento neutro (%)", chatReport.sentimentNeutroPct],
               ["Sentimento negativo (%)", chatReport.sentimentNegativoPct],
@@ -86,7 +100,7 @@ export default async function ClinicReportPage({ searchParams }: RelatorioPagePr
         <h2 className="text-sm font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
           Atendimento / Chat
         </h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs space-y-1.5">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Total de Conversas</span>
@@ -120,31 +134,6 @@ export default async function ClinicReportPage({ searchParams }: RelatorioPagePr
               <span className="text-sm font-bold text-slate-900 dark:text-slate-100">{formatDurationLabel(chatReport.avgTtrSec)}</span>
             </div>
           </div>
-
-          <div
-            className={`p-5 rounded-xl border shadow-xs space-y-1.5 ${
-              hasUrgency
-                ? "bg-rose-50 dark:bg-rose-950/30 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-900"
-                : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800"
-            }`}
-          >
-            <div className="flex items-center justify-between">
-              <span className={`text-xs font-semibold ${hasUrgency ? "text-rose-700 dark:text-rose-300" : "text-slate-500 dark:text-slate-400"}`}>
-                Alertas / Urgências
-              </span>
-              <AlertTriangle className={`w-4 h-4 ${hasUrgency ? "text-rose-500" : "text-slate-400"}`} />
-            </div>
-            <p className={`text-3xl font-bold ${hasUrgency ? "text-rose-700 dark:text-rose-300" : "text-slate-900 dark:text-slate-100"}`}>
-              {chatReport.urgencyCount}
-            </p>
-            {hasUrgency ? (
-              <span className="inline-flex items-center rounded-md bg-rose-100 dark:bg-rose-900/40 px-2 py-0.5 text-[10px] font-bold text-rose-700 dark:text-rose-300">
-                Requer auditoria
-              </span>
-            ) : (
-              <p className="text-xs text-slate-500 dark:text-slate-400">Nenhum sinal de emergência no período</p>
-            )}
-          </div>
         </div>
 
         <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-5 shadow-xs space-y-3">
@@ -167,9 +156,28 @@ export default async function ClinicReportPage({ searchParams }: RelatorioPagePr
          ========================================================================= */}
       {appointmentsReport && (
         <div className="space-y-4">
-          <h2 className="text-sm font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-            Agendamentos
-          </h2>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <h2 className="text-sm font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+              Agendamentos
+            </h2>
+            <div className="flex flex-wrap items-center gap-2">
+              <ReportSelectFilter
+                basePath="/clinic/relatorio"
+                paramKey="doctor"
+                placeholder="Médico"
+                options={[{ value: "_all", label: "Todos os médicos" }, ...doctorOptions.map((d) => ({ value: d, label: d }))]}
+              />
+              <ReportSelectFilter
+                basePath="/clinic/relatorio"
+                paramKey="procedure"
+                placeholder="Procedimento"
+                options={[
+                  { value: "_all", label: "Todos os procedimentos" },
+                  ...procedureOptions.map((cp) => ({ value: cp.procedureId, label: cp.procedure.name })),
+                ]}
+              />
+            </div>
+          </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <div className="bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs space-y-2">
               <div className="flex items-center justify-between text-slate-500 dark:text-slate-400">

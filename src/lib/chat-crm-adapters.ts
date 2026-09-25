@@ -11,7 +11,7 @@ import type {
 import { formatCurrency } from "@/lib/format";
 import { isMediaDownloadFailedNotice, isAutoSystemMessage, type InvoiceData } from "@/lib/chat-messages";
 import { canEditMessage } from "@/lib/message-edit";
-import { URGENCY_TAG, RESCHEDULE_PENDING_TAG } from "@/lib/conversation-tags";
+import { RESCHEDULE_PENDING_TAG } from "@/lib/conversation-tags";
 import type {
   Channel,
   Contact,
@@ -121,7 +121,12 @@ function hasUnseenAssignmentFor(conversation: ConversationWithRelations, viewerU
  * dessincronizado. Deriva de novo a cada leitura, sempre certo.
  */
 function computeQueueState(conversation: ConversationWithRelations): ConversationQueueState {
-  if (conversation.status === "OPEN" && conversation.tags.includes(URGENCY_TAG)) return "URGENCIA_CLINICA";
+  // Destaque de urgência desligado temporariamente (pedido do usuário, 2026-09-25) —
+  // a regra de detecção (matchEscalationTrigger, ver ai-attendant.ts) continua rodando
+  // e gravando a tag "🚨 Urgência Clínica" (URGENCY_TAG em conversation-tags.ts)
+  // normalmente, só a fila parou de mostrar o badge/prioridade até refinar a regra.
+  // Pra reativar: import { URGENCY_TAG } from "@/lib/conversation-tags" e descomentar:
+  // if (conversation.status === "OPEN" && conversation.tags.includes(URGENCY_TAG)) return "URGENCIA_CLINICA";
   if (conversation.status === "OPEN" && conversation.tags.includes(RESCHEDULE_PENDING_TAG)) return "REMARCACAO_PENDENTE";
   if (conversation.aiEnabled) return "IA_ATENDENDO";
   const lastMessage = conversation.messages[0];

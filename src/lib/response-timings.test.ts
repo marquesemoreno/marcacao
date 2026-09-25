@@ -47,7 +47,7 @@ describe("computeResponseTimingsFromMessages", () => {
     expect(result.firstResponseSec).toBeNull();
   });
 
-  it("ignora nota interna e mensagem automática como resposta", () => {
+  it("ignora nota interna como resposta (não é visível pro paciente)", () => {
     const result = computeResponseTimingsFromMessages(
       [
         msg({ direction: "INBOUND", createdAt: "2026-01-01T10:00:00Z" }),
@@ -57,6 +57,17 @@ describe("computeResponseTimingsFromMessages", () => {
       null
     );
     expect(result.firstResponseSec).toBe(480);
+  });
+
+  it("conta mensagem automática de sistema como primeira resposta (é o que o paciente recebe)", () => {
+    const result = computeResponseTimingsFromMessages(
+      [
+        msg({ direction: "INBOUND", createdAt: "2026-01-01T10:00:00Z" }),
+        msg({ direction: "OUTBOUND", content: "✅ *Agendamento Realizado!* ...", createdAt: "2026-01-01T10:00:30Z" }),
+      ],
+      null
+    );
+    expect(result.firstResponseSec).toBe(30);
   });
 
   it("retorna null quando não há mensagem INBOUND nenhuma", () => {
