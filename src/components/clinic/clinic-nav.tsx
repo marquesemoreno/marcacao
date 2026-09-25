@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { MessageCircle, KanbanSquare, Users, CalendarCheck, Receipt, BarChart3, type LucideIcon } from "lucide-react";
+import { MessageCircle, KanbanSquare, Users, CalendarCheck, Receipt, BarChart3, Megaphone, type LucideIcon } from "lucide-react";
 
 const fullNavItems: { href: string; label: string; icon: LucideIcon; exact?: boolean }[] = [
   { href: "/clinic/inbox", label: "Chat / WhatsApp", icon: MessageCircle },
@@ -10,17 +10,20 @@ const fullNavItems: { href: string; label: string; icon: LucideIcon; exact?: boo
   { href: "/clinic/contatos", label: "Contatos", icon: Users },
   { href: "/clinic/agendamentos", label: "Agendamentos de Hoje", icon: CalendarCheck },
   { href: "/clinic/precos", label: "Tabela de Procedimentos", icon: Receipt },
+  { href: "/clinic/disparos", label: "Disparos", icon: Megaphone },
   { href: "/clinic/relatorio", label: "Relatórios", icon: BarChart3 },
 ];
 
 // Clínicas com instância própria de WhatsApp (atendimento exclusivo, fora dos processos
 // de agendamento do marketplace) não usam agendamento/tabela de preços do Conecta Saúde.
-// Relatórios ainda aparece — a própria página esconde a seção de Agendamentos pra essas
-// clínicas (ver isExclusive em /clinic/relatorio/page.tsx).
+// Relatórios/Disparos continuam aparecendo — nenhum dos dois depende do agendamento
+// pelo marketplace (a página de relatório já esconde a seção de Agendamentos sozinha,
+// ver isExclusive em /clinic/relatorio/page.tsx).
 const exclusiveNavItems: { href: string; label: string; icon: LucideIcon; exact?: boolean }[] = [
   { href: "/clinic/inbox", label: "Chat / WhatsApp", icon: MessageCircle },
   { href: "/clinic/crm", label: "CRM", icon: KanbanSquare },
   { href: "/clinic/contatos", label: "Contatos", icon: Users },
+  { href: "/clinic/disparos", label: "Disparos", icon: Megaphone },
   { href: "/clinic/relatorio", label: "Relatórios", icon: BarChart3 },
 ];
 
