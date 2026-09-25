@@ -45,6 +45,12 @@ describe("buildBridgeConfirmationMessage", () => {
     expect(message).not.toContain("Digite 3");
   });
 
+  it("deixa o nome do médico em title case quando vem em CAIXA ALTA do Firebird (bug real: marcação de teste com nome do médico gritando)", () => {
+    const message = buildBridgeConfirmationMessage({ ...base, doctorName: "LIVIA VASCONCELOS CUNHA OLIVEIRA" });
+    expect(message).toContain("Livia Vasconcelos Cunha Oliveira");
+    expect(message).not.toContain("LIVIA VASCONCELOS");
+  });
+
   it("não quebra sem médico ou horário (nem sempre vêm do bridge)", () => {
     const message = buildBridgeConfirmationMessage({ ...base, doctorName: null, time: null });
     expect(message).toContain("Maria Silva");

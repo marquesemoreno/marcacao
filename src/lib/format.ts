@@ -8,6 +8,23 @@ import type {
   AffiliateStatus,
 } from "@prisma/client";
 
+/** Nomes vindos do Firebird (bridge) chegam em CAIXA ALTA (ex: "ALAN PASCOAL SILVA
+ * SANTOS") — deixa mais legível nas mensagens de WhatsApp sem gritar. Preposições
+ * continuam minúsculas quando não são a primeira palavra (ex: "Vivaldo José de
+ * Oliveira"), como convenção de nome próprio em português. Movido de
+ * bridge-reminder.ts pra ser reaproveitado também em bridge-confirmation.ts (bug
+ * real: nome do médico saía em caixa alta na mensagem de confirmação da marcação,
+ * só o lembrete D-1 já tinha esse tratamento). */
+const NAME_LOWERCASE_WORDS = new Set(["de", "da", "do", "das", "dos", "e"]);
+export function toTitleCaseName(text: string): string {
+  return text
+    .toLowerCase()
+    .split(" ")
+    .filter(Boolean)
+    .map((word, index) => (index > 0 && NAME_LOWERCASE_WORDS.has(word) ? word : word.charAt(0).toUpperCase() + word.slice(1)))
+    .join(" ");
+}
+
 export function formatCurrency(value: number | string) {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(
     Number(value)

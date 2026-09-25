@@ -1,3 +1,5 @@
+import { toTitleCaseName } from "@/lib/format";
+
 export type BridgeConfirmationInput = {
   patientName: string;
   doctorName: string | null;
@@ -31,7 +33,7 @@ export function buildBridgeConfirmationMessage(input: BridgeConfirmationInput): 
     `⏰ Horário: ${input.time || "Por ordem de chegada"}`,
   ];
   if (input.doctorName) {
-    lines.push(`👨‍⚕️ Profissional: Dr(a). ${input.doctorName}`);
+    lines.push(`👨‍⚕️ Profissional: Dr(a). ${toTitleCaseName(input.doctorName)}`);
   }
   if (input.policyNotice) {
     lines.push("");

@@ -1,3 +1,5 @@
+import { toTitleCaseName as toTitleCase } from "@/lib/format";
+
 export type BridgeReminderInput = {
   patientName: string;
   clinicName: string;
@@ -29,19 +31,6 @@ export function nextReminderTargetDate(now: Date, skipWeekends: boolean): { iso:
   return { iso, formatted };
 }
 
-/** Nomes vindos do Firebird chegam em CAIXA ALTA (ex: "ALAN PASCOAL SILVA SANTOS") — deixa
- * mais legível no WhatsApp sem gritar. Preposições continuam minúsculas quando não são a
- * primeira palavra (ex: "Vivaldo José de Oliveira"), como convenção de nome próprio em
- * português. */
-const NAME_LOWERCASE_WORDS = new Set(["de", "da", "do", "das", "dos", "e"]);
-function toTitleCase(text: string): string {
-  return text
-    .toLowerCase()
-    .split(" ")
-    .filter(Boolean)
-    .map((word, index) => (index > 0 && NAME_LOWERCASE_WORDS.has(word) ? word : word.charAt(0).toUpperCase() + word.slice(1)))
-    .join(" ");
-}
 
 /** Texto do lembrete D-1 pra agendamentos vindos da agenda do bridge (Firebird)
  * — mesma ordem de opções de resposta (1 confirmar / 2 remarcar / 3 cancelar)
