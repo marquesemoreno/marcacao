@@ -61,6 +61,19 @@ Por favor, responda com o número da opção desejada:
 3️⃣ Digite 3 para Cancelar`;
 }
 
+/** Médicos que NÃO atendem por ordem de chegada (agenda com horário marcado de
+ * verdade) — a Urolaser pediu pra tirar essa frase só da Dra. Lívia (25/09/2026),
+ * o resto da clínica continua nesse modelo. Comparação sem acento/caixa porque o
+ * nome vem em CAIXA ALTA (às vezes sem acento) do Firebird. */
+const DOCTORS_WITHOUT_ARRIVAL_ORDER = new Set(["livia vasconcelos cunha oliveira"]);
+function normalizeDoctorName(name: string): string {
+  return name
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
 /** Frase fixa presente SÓ na versão "Lara" do lembrete (Urolaser) — reconhecida por
  * wasSentConfirmationPrompt (ver appointment-reply.ts) junto com o marcador
  * "Digite 1..." das outras clínicas, já que aqui não existe menu numerado nenhum
@@ -88,7 +101,10 @@ export function buildUrolaserLaraReminderMessage(input: BridgeReminderInput): st
     ? `${toTitleCase(input.procedureName)}${doctorText}`
     : `um atendimento agendado${doctorText}`;
 
-  const timeText = input.time ? ` a partir de *${input.time}* (atendimento por ordem de chegada)` : "";
+  const attendsByArrivalOrder = !input.doctorName || !DOCTORS_WITHOUT_ARRIVAL_ORDER.has(normalizeDoctorName(input.doctorName));
+  const timeText = input.time
+    ? ` a partir de *${input.time}*${attendsByArrivalOrder ? " (atendimento por ordem de chegada)" : ""}`
+    : "";
 
   return `Olá *${toTitleCase(input.patientName)}*! Eu sou a Lara, atendente virtual da Urolaser 😊
 

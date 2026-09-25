@@ -77,6 +77,23 @@ describe("buildUrolaserLaraReminderMessage", () => {
     expect(message).toContain(LARA_CONFIRMATION_MARKER);
   });
 
+  it("não mostra 'ordem de chegada' pra Dra. Lívia Vasconcelos Cunha Oliveira (agenda com horário marcado de verdade)", () => {
+    const message = buildUrolaserLaraReminderMessage({
+      ...base,
+      doctorName: "LIVIA VASCONCELOS CUNHA OLIVEIRA",
+    });
+    expect(message).toContain("09:30");
+    expect(message).not.toContain("ordem de chegada");
+  });
+
+  it("continua mostrando 'ordem de chegada' pros outros médicos da Urolaser", () => {
+    const message = buildUrolaserLaraReminderMessage({
+      ...base,
+      doctorName: "ALAN PASCOAL SILVA SANTOS",
+    });
+    expect(message).toContain("atendimento por ordem de chegada");
+  });
+
   it("mostra 'Consulta com Dr. X' quando o procedimento é consulta, com nomes em title case", () => {
     const message = buildUrolaserLaraReminderMessage({
       ...base,
