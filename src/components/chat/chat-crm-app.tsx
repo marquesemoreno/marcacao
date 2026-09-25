@@ -33,6 +33,7 @@ import {
   listClinicPatientsForAppointment,
   getOldestUnassignedWaitMinutes,
   suggestIaReply,
+  markConversationRead,
   markConversationUnread,
   togglePinConversation,
   muteConversation,
@@ -85,6 +86,7 @@ import {
   suggestIaReplyAdmin,
   listClinicsForReassignment,
   updateConversationClinicAdmin,
+  markConversationReadAdmin,
   markConversationUnreadAdmin,
   togglePinConversationAdmin,
   muteConversationAdmin,
@@ -148,6 +150,7 @@ const ACTIONS_BY_SCOPE = {
     updateCannedResponse: (id: string, shortcut: string, content: string) => updateCannedResponse(id, shortcut, content),
     deleteCannedResponse: (id: string) => deleteCannedResponse(id),
     suggestIaReply: (id: string, quotedMessageContent?: string) => suggestIaReply(id, quotedMessageContent),
+    markConversationRead: (id: string) => markConversationRead(id),
     markConversationUnread: (id: string) => markConversationUnread(id),
     togglePinConversation: (id: string, pinned: boolean) => togglePinConversation(id, pinned),
     muteConversation: (id: string, until: Date | null) => muteConversation(id, until),
@@ -189,6 +192,7 @@ const ACTIONS_BY_SCOPE = {
     updateCannedResponse: (id: string, shortcut: string, content: string) => updateCannedResponseAdmin(id, shortcut, content),
     deleteCannedResponse: (id: string) => deleteCannedResponseAdmin(id),
     suggestIaReply: (id: string, quotedMessageContent?: string) => suggestIaReplyAdmin(id, quotedMessageContent),
+    markConversationRead: (id: string) => markConversationReadAdmin(id),
     markConversationUnread: (id: string) => markConversationUnreadAdmin(id),
     togglePinConversation: (id: string, pinned: boolean) => togglePinConversationAdmin(id, pinned),
     muteConversation: (id: string, until: Date | null) => muteConversationAdmin(id, until),
@@ -602,6 +606,14 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
       notifiedAssignmentIdsRef.current.delete(id);
       setContacts((prev) => prev.map((c) => (c.id === id ? { ...c, hasUnseenAssignment: false } : c)));
       actions.markAssignmentSeen(id).catch(() => {});
+    }
+
+    // Zera o badge de não lidas na hora (otimista) — sem isso o contador ficava
+    // travado até o próximo refetch, mesmo com as mensagens já marcadas como lidas
+    // no banco (markConversationRead existia mas nunca era chamado, bug real).
+    if (contact && contact.unreadCount > 0) {
+      setContacts((prev) => prev.map((c) => (c.id === id ? { ...c, unreadCount: 0 } : c)));
+      actions.markConversationRead(id).catch(() => {});
     }
   }
 

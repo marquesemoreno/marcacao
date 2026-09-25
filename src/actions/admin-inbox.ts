@@ -1368,6 +1368,16 @@ export async function reopenConversationAdmin(conversationId: string) {
 }
 
 /** Reabre a mensagem mais recente do paciente como não lida — ver markConversationUnread (inbox.ts). */
+/** Espelho de markConversationRead (inbox.ts) pro escopo admin. */
+export async function markConversationReadAdmin(conversationId: string) {
+  await requireAdminSession();
+  await prisma.message.updateMany({
+    where: { conversationId, direction: "INBOUND", readAt: null },
+    data: { readAt: new Date() },
+  });
+  revalidatePath("/admin/inbox");
+}
+
 export async function markConversationUnreadAdmin(conversationId: string) {
   await requireAdminSession();
   const lastInbound = await prisma.message.findFirst({

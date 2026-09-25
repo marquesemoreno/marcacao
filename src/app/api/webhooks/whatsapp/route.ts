@@ -933,6 +933,16 @@ export async function POST(request: Request) {
         await prisma.message.create({
           data: { conversationId: conversation.id, direction: "OUTBOUND", content: ackText, status: "DELIVERED" },
         });
+        // Fecha a conversa quando o fluxo automático de confirmação termina aqui —
+        // sem isso ela ficava OPEN pra sempre e o cron de sem-retorno (24h depois)
+        // marcava "⏳ Sem retorno do paciente" numa conversa que já tinha sido
+        // atendida de ponta a ponta pelo automático (bug real relatado pela clínica).
+        if (newStatus === "CONFIRMED") {
+          await prisma.conversation.update({
+            where: { id: conversation.id },
+            data: { status: "RESOLVED", resolvedAt: new Date(), resolutionReason: "CONFIRMACAO_AGENDA" },
+          });
+        }
       } catch (error) {
         console.error("Falha ao enviar confirmação de resposta ao lembrete (bridge):", error);
       }
@@ -999,6 +1009,13 @@ export async function POST(request: Request) {
         if (conversation) {
           await prisma.message.create({
             data: { conversationId: conversation.id, direction: "OUTBOUND", content: followUp, status: "DELIVERED" },
+          });
+          // Mesmo motivo do outro call-site deste follow-up (ver comentário acima,
+          // no ramo "sem Appointment nosso"): fecha a conversa pra não cair depois
+          // no cron de sem-retorno como se ainda estivesse esperando o paciente.
+          await prisma.conversation.update({
+            where: { id: conversation.id },
+            data: { status: "RESOLVED", resolvedAt: new Date(), resolutionReason: "CONFIRMACAO_AGENDA" },
           });
         }
 
