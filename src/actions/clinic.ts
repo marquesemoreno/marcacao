@@ -103,6 +103,7 @@ export async function getClinicChatReport(days: number = 30) {
     sentimentPositivePct: sentimentPct("POSITIVO"),
     sentimentNeutroPct: sentimentPct("NEUTRO"),
     sentimentNegativoPct: sentimentPct("NEGATIVO"),
+    sentimentAuditedCount: withSentiment.length,
     urgencyCount,
   };
 }

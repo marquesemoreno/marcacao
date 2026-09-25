@@ -1,8 +1,9 @@
 import { PeriodFilter } from "@/components/clinic/period-filter";
 import { HorizontalBarChart, SentimentBar } from "@/components/clinic/report-charts";
+import { ReportExportButton } from "@/components/clinic/report-export-button";
 import { getClinicInfo, getClinicChatReport, getClinicAppointmentsReport } from "@/actions/clinic";
 import { formatCurrency, appointmentStatusLabels } from "@/lib/format";
-import { MessageCircle, TrendingUp, Smile, AlertTriangle, CalendarCheck, XCircle, DollarSign } from "lucide-react";
+import { MessageSquare, TrendingUp, AlertTriangle, CalendarCheck, XCircle, DollarSign } from "lucide-react";
 
 /** Cor por status — mesma semântica já usada em appointmentStatusVariant (format.ts),
  * cada família de cor distinta (nunca duas cores parecidas pra status diferentes). */
@@ -42,16 +43,40 @@ export default async function ClinicReportPage({ searchParams }: RelatorioPagePr
     isExclusive ? Promise.resolve(null) : getClinicAppointmentsReport(days),
   ]);
 
+  const hasUrgency = chatReport.urgencyCount > 0;
+
   return (
-    <div className="space-y-8 font-sans p-4 sm:p-6 flex-1 overflow-y-auto text-slate-900 dark:text-slate-100">
+    <div className="space-y-8 font-sans flex-1 overflow-y-auto text-slate-900 dark:text-slate-100 p-6 md:p-8 max-w-7xl mx-auto w-full">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-extrabold tracking-tight">📊 Relatórios da Clínica</h1>
-          <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-1">
-            Métricas de atendimento{isExclusive ? "" : " e agendamentos"} da {clinic.tradeName}.
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100">Relatórios de Atendimento</h1>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+            Métricas consolidadas de desempenho e recepção da {clinic.tradeName}.
           </p>
         </div>
-        <PeriodFilter basePath="/clinic/relatorio" />
+        <div className="flex items-center gap-2 shrink-0">
+          <PeriodFilter basePath="/clinic/relatorio" />
+          <ReportExportButton
+            rows={[
+              ["Conversas no período", chatReport.totalConversations],
+              ["Conversas resolvidas", chatReport.totalResolved],
+              ["Taxa de conversão em agendamento (%)", chatReport.conversionRate],
+              ["Tempo médio de 1ª resposta (s)", chatReport.avgFrtSec ?? "—"],
+              ["Tempo médio de resolução (s)", chatReport.avgTtrSec ?? "—"],
+              ["Urgências acionadas", chatReport.urgencyCount],
+              ["Sentimento positivo (%)", chatReport.sentimentPositivePct],
+              ["Sentimento neutro (%)", chatReport.sentimentNeutroPct],
+              ["Sentimento negativo (%)", chatReport.sentimentNegativoPct],
+              ...(appointmentsReport
+                ? ([
+                    ["Agendamentos no período", appointmentsReport.totalAppointments],
+                    ["Taxa de cancelamento/falta (%)", appointmentsReport.cancellationRate],
+                    ["Receita do período (R$)", appointmentsReport.revenue],
+                  ] as [string, string | number][])
+                : []),
+            ]}
+          />
+        </div>
       </div>
 
       {/* =========================================================================
@@ -62,53 +87,68 @@ export default async function ClinicReportPage({ searchParams }: RelatorioPagePr
           Atendimento / Chat
         </h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs space-y-2">
-            <div className="flex items-center justify-between text-slate-500 dark:text-slate-400">
-              <span className="text-xs font-bold uppercase tracking-wider">Conversas no Período</span>
-              <MessageCircle className="w-5 h-5 text-sky-600" />
+          <div className="bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Total de Conversas</span>
+              <MessageSquare className="w-4 h-4 text-slate-400" />
             </div>
-            <p className="text-2xl font-extrabold font-mono">{chatReport.totalConversations}</p>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
-              {chatReport.totalResolved} resolvidas
+            <p className="text-3xl font-bold text-slate-900 dark:text-slate-100">{chatReport.totalConversations}</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              {chatReport.totalResolved} resolvidas no período
             </p>
           </div>
 
-          <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs space-y-2">
-            <div className="flex items-center justify-between text-slate-500 dark:text-slate-400">
-              <span className="text-xs font-bold uppercase tracking-wider">Taxa de Conversão</span>
-              <TrendingUp className="w-5 h-5 text-emerald-600" />
+          <div className="bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Conversão em Agendamento</span>
+              <TrendingUp className="w-4 h-4 text-slate-400" />
             </div>
-            <p className="text-2xl font-extrabold font-mono">{chatReport.conversionRate}%</p>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
-              {chatReport.totalAgendados} agendamentos de {chatReport.totalResolved} resolvidos
+            <p className="text-3xl font-bold text-slate-900 dark:text-slate-100">{chatReport.conversionRate}%</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              {chatReport.totalAgendados} de {chatReport.totalResolved} resolvidos
             </p>
           </div>
 
-          <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs space-y-2">
-            <div className="flex items-center justify-between text-slate-500 dark:text-slate-400">
-              <span className="text-xs font-bold uppercase tracking-wider">Tempo de Resposta / Resolução</span>
-              <Smile className="w-5 h-5 text-purple-600" />
+          <div className="bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs space-y-2">
+            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Tempo Médio de Atendimento</span>
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-slate-500 dark:text-slate-400">1ª Resposta</span>
+              <span className="text-sm font-bold text-slate-900 dark:text-slate-100">{formatDurationLabel(chatReport.avgFrtSec)}</span>
             </div>
-            <p className="text-lg font-extrabold font-mono">
-              {formatDurationLabel(chatReport.avgFrtSec)} <span className="text-slate-400 text-xs font-normal">/</span> {formatDurationLabel(chatReport.avgTtrSec)}
-            </p>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">1ª resposta / resolução total</p>
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-slate-500 dark:text-slate-400">Resolução Total</span>
+              <span className="text-sm font-bold text-slate-900 dark:text-slate-100">{formatDurationLabel(chatReport.avgTtrSec)}</span>
+            </div>
           </div>
 
-          <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs space-y-2">
-            <div className="flex items-center justify-between text-slate-500 dark:text-slate-400">
-              <span className="text-xs font-bold uppercase tracking-wider">Urgências Acionadas</span>
-              <AlertTriangle className="w-5 h-5 text-rose-600" />
+          <div
+            className={`p-5 rounded-xl border shadow-xs space-y-1.5 ${
+              hasUrgency
+                ? "bg-rose-50 dark:bg-rose-950/30 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-900"
+                : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800"
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <span className={`text-xs font-semibold ${hasUrgency ? "text-rose-700 dark:text-rose-300" : "text-slate-500 dark:text-slate-400"}`}>
+                Alertas / Urgências
+              </span>
+              <AlertTriangle className={`w-4 h-4 ${hasUrgency ? "text-rose-500" : "text-slate-400"}`} />
             </div>
-            <p className="text-2xl font-extrabold font-mono">{chatReport.urgencyCount}</p>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
-              Sinais de emergência/reclamação grave detectados
+            <p className={`text-3xl font-bold ${hasUrgency ? "text-rose-700 dark:text-rose-300" : "text-slate-900 dark:text-slate-100"}`}>
+              {chatReport.urgencyCount}
             </p>
+            {hasUrgency ? (
+              <span className="inline-flex items-center rounded-md bg-rose-100 dark:bg-rose-900/40 px-2 py-0.5 text-[10px] font-bold text-rose-700 dark:text-rose-300">
+                Requer auditoria
+              </span>
+            ) : (
+              <p className="text-xs text-slate-500 dark:text-slate-400">Nenhum sinal de emergência no período</p>
+            )}
           </div>
         </div>
 
-        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 shadow-2xs">
-          <p className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-3">
+        <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-5 shadow-xs space-y-3">
+          <p className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
             Sentimento das Conversas Auditadas
           </p>
           <SentimentBar
@@ -116,6 +156,9 @@ export default async function ClinicReportPage({ searchParams }: RelatorioPagePr
             neutroPct={chatReport.sentimentNeutroPct}
             negativoPct={chatReport.sentimentNegativoPct}
           />
+          <p className="text-[11px] text-slate-400 dark:text-slate-500">
+            {chatReport.sentimentAuditedCount} conversa(s) auditada(s) por IA / regras automáticas no período.
+          </p>
         </div>
       </div>
 
@@ -128,7 +171,7 @@ export default async function ClinicReportPage({ searchParams }: RelatorioPagePr
             Agendamentos
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs space-y-2">
+            <div className="bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs space-y-2">
               <div className="flex items-center justify-between text-slate-500 dark:text-slate-400">
                 <span className="text-xs font-bold uppercase tracking-wider">Agendamentos no Período</span>
                 <CalendarCheck className="w-5 h-5 text-sky-600" />
@@ -139,7 +182,7 @@ export default async function ClinicReportPage({ searchParams }: RelatorioPagePr
               </p>
             </div>
 
-            <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs space-y-2">
+            <div className="bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs space-y-2">
               <div className="flex items-center justify-between text-slate-500 dark:text-slate-400">
                 <span className="text-xs font-bold uppercase tracking-wider">Cancelamento / Falta</span>
                 <XCircle className="w-5 h-5 text-rose-600" />
@@ -150,7 +193,7 @@ export default async function ClinicReportPage({ searchParams }: RelatorioPagePr
               </p>
             </div>
 
-            <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs space-y-2">
+            <div className="bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs space-y-2">
               <div className="flex items-center justify-between text-slate-500 dark:text-slate-400">
                 <span className="text-xs font-bold uppercase tracking-wider">Receita do Período</span>
                 <DollarSign className="w-5 h-5 text-emerald-600" />

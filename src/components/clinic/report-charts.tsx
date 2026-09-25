@@ -35,8 +35,9 @@ export function HorizontalBarChart({ data, unit }: { data: BarDatum[]; unit?: st
   );
 }
 
-/** Barra única segmentada (soma ~100%) — usada pra sentimento. Gap de 2px (`gap-0.5`)
- * entre segmentos faz as partes lerem como distintas sem precisar de borda. */
+/** Barra única segmentada (soma ~100%) — usada pra sentimento. `rounded-full h-3` fina
+ * demais pra rótulo dentro do segmento, por isso o valor por extenso vive só na legenda
+ * abaixo (ver skill de dataviz: rótulo direto, nunca só cor carregando o dado). */
 export function SentimentBar({
   positivePct,
   neutroPct,
@@ -47,9 +48,9 @@ export function SentimentBar({
   negativoPct: number;
 }) {
   const segments = [
-    { key: "positivo", label: "😊 Positivo", pct: positivePct, colorClass: "bg-emerald-500" },
-    { key: "neutro", label: "😐 Neutro", pct: neutroPct, colorClass: "bg-slate-400" },
-    { key: "negativo", label: "😞 Negativo", pct: negativoPct, colorClass: "bg-rose-500" },
+    { key: "positivo", label: "Positivo", pct: positivePct, colorClass: "bg-emerald-500" },
+    { key: "neutro", label: "Neutro", pct: neutroPct, colorClass: "bg-slate-400" },
+    { key: "negativo", label: "Negativo", pct: negativoPct, colorClass: "bg-rose-400" },
   ];
   const total = positivePct + neutroPct + negativoPct;
 
@@ -59,18 +60,16 @@ export function SentimentBar({
 
   return (
     <div className="space-y-3">
-      <div className="flex h-6 w-full gap-0.5 overflow-hidden rounded-md">
+      <div className="flex h-3 w-full gap-0.5 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
         {segments
           .filter((s) => s.pct > 0)
           .map((s) => (
             <div
               key={s.key}
-              className={`h-full flex items-center justify-center ${s.colorClass}`}
+              className={`h-full ${s.colorClass}`}
               style={{ width: `${s.pct}%` }}
               title={`${s.label}: ${s.pct}%`}
-            >
-              {s.pct >= 12 && <span className="text-[10px] font-bold text-white">{s.pct}%</span>}
-            </div>
+            />
           ))}
       </div>
       <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] font-medium text-slate-600 dark:text-slate-300">

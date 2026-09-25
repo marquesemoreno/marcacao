@@ -1,6 +1,4 @@
-import Link from "next/link";
 import { getServerSession } from "next-auth";
-import { KeyRound } from "lucide-react";
 import { authOptions } from "@/lib/auth";
 import { SignOutButton } from "@/components/sign-out-button";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -21,49 +19,54 @@ export default async function ClinicLayout({
   const isExclusive = Boolean(clinic.whatsappInstance);
 
   return (
-    <div className="flex h-screen w-screen flex-col overflow-hidden bg-slate-50 dark:bg-slate-950">
-      {/* Cabeçalho Slim de Linha Única (56px / h-14) */}
-      <header className="flex h-14 shrink-0 items-center justify-between gap-4 border-b border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 px-4">
-        {/* Esquerda: Logo + Nome da Clínica + Badge */}
-        <div className="flex shrink-0 items-center gap-2.5">
-          <Logo variant={isExclusive ? "icon-only" : "full"} size="sm" />
-          <div className="hidden sm:flex items-center gap-1.5 border-l border-slate-200 dark:border-slate-700 pl-2.5">
-            <span className="font-extrabold text-xs text-slate-900 dark:text-slate-100 truncate max-w-[140px] sm:max-w-[180px]">
-              {clinic.tradeName}
-            </span>
-            <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200/80 dark:border-emerald-800 px-2 py-0.5 text-[10px] font-extrabold text-emerald-700 dark:text-emerald-400 font-mono">
-              🟢 Clínica
-            </span>
-          </div>
+    <div className="flex h-screen w-screen overflow-hidden bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100">
+      {/* Trilho de navegação — mesma identidade fixa (sempre escuro) e mesma estrutura
+          do rail do /admin, pros dois painéis lerem como parte do mesmo produto. */}
+      <aside className="hidden md:flex w-60 shrink-0 flex-col bg-slate-900 border-r border-slate-800">
+        <div className="flex items-center gap-2 px-4 pt-5 pb-4 border-b border-slate-800">
+          <Logo variant="white" size="sm" />
+        </div>
+        <div className="mx-4 mt-3 flex items-center gap-1.5">
+          <span className="truncate text-xs font-extrabold text-slate-200">{clinic.tradeName}</span>
+          <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 text-[10px] font-extrabold text-emerald-300 font-mono">
+            🟢 Clínica
+          </span>
         </div>
 
-        {/* Centro: Abas de Navegação */}
-        <div className="flex-1 overflow-x-auto min-w-0 flex items-center justify-center">
+        <div className="flex-1 overflow-y-auto mt-1">
           <ClinicNav exclusiveWhatsapp={isExclusive} />
         </div>
 
-        {/* Direita: Nome do Usuário + Tema + Sair */}
-        <div className="flex shrink-0 items-center gap-3">
+        <div className="border-t border-slate-800 px-3 py-3 space-y-2">
           {session?.user.name && (
-            <span className="hidden text-xs font-bold text-slate-700 dark:text-slate-300 md:inline font-mono">
-              {session.user.name}
-            </span>
+            <p className="truncate px-1 text-xs font-bold text-slate-300 font-mono">{session.user.name}</p>
           )}
-          <Link
-            href="/clinic/perfil"
-            title="Minha Conta / Trocar senha"
-            aria-label="Minha Conta / Trocar senha"
-            className="flex items-center justify-center w-8 h-8 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-100 transition-colors"
-          >
-            <KeyRound className="w-4 h-4" />
-          </Link>
+          <div className="flex items-center justify-between gap-2">
+            <ThemeToggle />
+            <SignOutButton />
+          </div>
+        </div>
+      </aside>
+
+      {/* Barra superior compacta — só no mobile, onde o trilho fica escondido. */}
+      <header className="md:hidden flex h-14 shrink-0 items-center justify-between gap-3 border-b border-slate-200/80 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 px-4 fixed top-0 inset-x-0 z-30">
+        <div className="flex items-center gap-2 min-w-0">
+          <Logo variant="icon-only" size="sm" />
+          <span className="truncate text-xs font-extrabold text-slate-900 dark:text-slate-100">{clinic.tradeName}</span>
+        </div>
+        <div className="flex items-center gap-2">
           <ThemeToggle />
           <SignOutButton />
         </div>
       </header>
 
-      {/* Conteúdo Principal em Tela Cheia */}
-      <main className="flex-1 overflow-hidden flex flex-col">{children}</main>
+      <div className="flex-1 min-w-0 flex flex-col overflow-hidden md:pt-0 pt-14">
+        <div className="md:hidden border-b border-slate-800 bg-slate-900">
+          <ClinicNav exclusiveWhatsapp={isExclusive} orientation="horizontal" />
+        </div>
+        {/* Conteúdo Principal em Tela Cheia */}
+        <main className="flex-1 overflow-hidden flex flex-col">{children}</main>
+      </div>
 
       <FeedbackWidget />
     </div>
