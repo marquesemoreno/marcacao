@@ -218,6 +218,59 @@ export async function updateAppointmentStatus(appointmentId: string, status: App
   revalidatePath("/clinic");
 }
 
+/** Edição inline na tabela de /clinic/agendamentos — não existe cadastro de médico
+ * no sistema, `doctorName` é texto livre digitado pela recepção (ver comentário no
+ * schema). `null`/string vazia limpa o campo. */
+export async function updateAppointmentDoctor(appointmentId: string, doctorName: string) {
+  const { clinicId } = await requireClinicSession();
+
+  const appointment = await prisma.appointment.findUnique({
+    where: { id: appointmentId },
+    select: { clinicProcedure: { select: { clinicId: true } } },
+  });
+  if (!appointment || appointment.clinicProcedure.clinicId !== clinicId) {
+    throw new Error("Agendamento não encontrado");
+  }
+
+  const trimmed = doctorName.trim();
+  await prisma.appointment.update({
+    where: { id: appointmentId },
+    data: { doctorName: trimmed || null },
+  });
+
+  revalidatePath("/clinic/agendamentos");
+}
+
+/** Nomes distintos já preenchidos em Appointment.doctorName pra essa clínica — popula
+ * o seletor de médico do modal de remarcação em massa (ver reschedule-broadcast-modal). */
+export async function getDistinctDoctorNames() {
+  const { clinicId } = await requireClinicSession();
+  const rows = await prisma.appointment.findMany({
+    where: { clinicProcedure: { clinicId }, doctorName: { not: null } },
+    select: { doctorName: true },
+    distinct: ["doctorName"],
+    orderBy: { doctorName: "asc" },
+  });
+  return rows.map((r) => r.doctorName!).filter(Boolean);
+}
+
+/** Pacientes agendados com um médico numa data específica — prévia do modal de
+ * remarcação em massa antes de disparar o aviso. Só status ativos (PENDING/CONFIRMED),
+ * não faz sentido avisar quem já foi atendido ou já cancelou. */
+export async function getAppointmentsByDoctorAndDate(doctorName: string, date: Date) {
+  const { clinicId } = await requireClinicSession();
+  return prisma.appointment.findMany({
+    where: {
+      clinicProcedure: { clinicId },
+      doctorName,
+      date,
+      status: { in: ["PENDING", "CONFIRMED"] },
+    },
+    select: { id: true, patientName: true, patientPhone: true, timeSlot: true },
+    orderBy: { timeSlot: "asc" },
+  });
+}
+
 export async function listClinicProcedures() {
   const { clinicId } = await requireClinicSession();
   return prisma.clinicProcedure.findMany({

@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { StatusFilter } from "@/components/clinic/status-filter";
 import { AppointmentActions } from "@/components/clinic/appointment-actions";
 import { BatchReminderButton } from "@/components/clinic/batch-reminder-button";
+import { DoctorNameCell } from "@/components/clinic/doctor-name-cell";
 import { listClinicAppointments } from "@/actions/clinic";
 import { appointmentStatusLabels, appointmentStatusVariant, formatDate } from "@/lib/format";
 
@@ -50,6 +51,7 @@ export default async function ClinicAppointmentsPage({ searchParams }: Agendamen
               <TableHead>Paciente</TableHead>
               <TableHead>Telefone</TableHead>
               <TableHead>Procedimento</TableHead>
+              <TableHead>Médico</TableHead>
               <TableHead>Status Consulta</TableHead>
               <TableHead>Lembrete WhatsApp</TableHead>
               <TableHead>Ações</TableHead>
@@ -58,7 +60,7 @@ export default async function ClinicAppointmentsPage({ searchParams }: Agendamen
           <TableBody>
             {appointments.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center text-muted-foreground">
+                <TableCell colSpan={9} className="text-center text-muted-foreground">
                   Nenhum agendamento encontrado.
                 </TableCell>
               </TableRow>
@@ -70,6 +72,9 @@ export default async function ClinicAppointmentsPage({ searchParams }: Agendamen
                   <TableCell>{appointment.patientName}</TableCell>
                   <TableCell>{appointment.patientPhone}</TableCell>
                   <TableCell>{appointment.clinicProcedure.procedure.name}</TableCell>
+                  <TableCell>
+                    <DoctorNameCell appointmentId={appointment.id} doctorName={appointment.doctorName} />
+                  </TableCell>
                   <TableCell>
                     <Badge variant={appointmentStatusVariant[appointment.status]}>
                       {appointmentStatusLabels[appointment.status]}

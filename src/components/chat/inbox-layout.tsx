@@ -91,14 +91,16 @@ function tagClasses(tag: string) {
  * ordem por `lastMessageAt` que já vem do banco (sort é estável). */
 const QUEUE_STATE_PRIORITY: Record<ConversationQueueState, number> = {
   URGENCIA_CLINICA: 0,
-  SEM_DONO: 1,
-  HUMANO_ATENDENDO: 2,
-  IA_ATENDENDO: 2,
-  AGUARDANDO_PACIENTE: 2,
+  REMARCACAO_PENDENTE: 1,
+  SEM_DONO: 2,
+  HUMANO_ATENDENDO: 3,
+  IA_ATENDENDO: 3,
+  AGUARDANDO_PACIENTE: 3,
 };
 
 const QUEUE_STATE_BADGE: Record<ConversationQueueState, { label: string; classes: string }> = {
   URGENCIA_CLINICA: { label: '🚨 Urgência clínica', classes: 'bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300' },
+  REMARCACAO_PENDENTE: { label: '⚠️ Remarcação pendente', classes: 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300' },
   SEM_DONO: { label: '⏳ Sem dono', classes: 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300' },
   HUMANO_ATENDENDO: { label: '🧑 Humano atendendo', classes: 'bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300' },
   IA_ATENDENDO: { label: '🤖 IA atendendo', classes: 'bg-violet-50 dark:bg-violet-950/60 text-violet-700 dark:text-violet-300' },

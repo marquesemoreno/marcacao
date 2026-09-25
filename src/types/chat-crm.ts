@@ -11,7 +11,13 @@ export type FunnelStage = 'novos' | 'triagem' | 'orcamento' | 'agendado';
 /** Estado único da conversa pra fila do inbox — calculado na hora (ver computeQueueState
  * em chat-crm-adapters.ts), nunca persistido. Prioridade decrescente na fila: urgência >
  * sem dono > resto (humano/IA/aguardando paciente mantêm ordem cronológica entre si). */
-export type ConversationQueueState = "URGENCIA_CLINICA" | "SEM_DONO" | "HUMANO_ATENDENDO" | "IA_ATENDENDO" | "AGUARDANDO_PACIENTE";
+export type ConversationQueueState =
+  | "URGENCIA_CLINICA"
+  | "REMARCACAO_PENDENTE"
+  | "SEM_DONO"
+  | "HUMANO_ATENDENDO"
+  | "IA_ATENDENDO"
+  | "AGUARDANDO_PACIENTE";
 
 export interface ConsultationRecord {
   id: string;

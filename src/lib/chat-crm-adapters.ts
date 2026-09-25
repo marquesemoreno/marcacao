@@ -11,7 +11,7 @@ import type {
 import { formatCurrency } from "@/lib/format";
 import { isMediaDownloadFailedNotice, isAutoSystemMessage, type InvoiceData } from "@/lib/chat-messages";
 import { canEditMessage } from "@/lib/message-edit";
-import { URGENCY_TAG } from "@/lib/conversation-tags";
+import { URGENCY_TAG, RESCHEDULE_PENDING_TAG } from "@/lib/conversation-tags";
 import type {
   Channel,
   Contact,
@@ -122,6 +122,7 @@ function hasUnseenAssignmentFor(conversation: ConversationWithRelations, viewerU
  */
 function computeQueueState(conversation: ConversationWithRelations): ConversationQueueState {
   if (conversation.status === "OPEN" && conversation.tags.includes(URGENCY_TAG)) return "URGENCIA_CLINICA";
+  if (conversation.status === "OPEN" && conversation.tags.includes(RESCHEDULE_PENDING_TAG)) return "REMARCACAO_PENDENTE";
   if (conversation.aiEnabled) return "IA_ATENDENDO";
   const lastMessage = conversation.messages[0];
   if (lastMessage?.direction === "OUTBOUND" && conversation.status === "OPEN") return "AGUARDANDO_PACIENTE";

@@ -6,6 +6,8 @@ import { requireClinicSession } from "@/lib/session";
 import { formatToWhatsAppNumber } from "@/lib/whatsapp";
 import { uploadWhatsAppMedia } from "@/lib/whatsapp-media";
 import { type ParsedBroadcastRecipient } from "@/lib/broadcast-csv";
+import { RESCHEDULE_PENDING_TAG } from "@/lib/conversation-tags";
+import { formatDate } from "@/lib/format";
 
 const ALLOWED_IMAGE_MIME_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 const MAX_IMAGE_SIZE_BYTES = 15 * 1024 * 1024; // mesmo limite já usado pra mídia do inbox
@@ -144,4 +146,72 @@ export async function pauseClinicBroadcastCampaign(campaignId: string) {
   await prisma.broadcastCampaign.update({ where: { id: campaignId }, data: { status: "PAUSED" } });
   revalidatePath("/clinic/disparos");
   return { success: true as const };
+}
+
+/** Aviso de remarcação em massa — médico desmarcou a agenda de um dia, avisa todos os
+ * pacientes agendados com ele naquela data de uma vez. Monta os destinatários a partir
+ * dos próprios agendamentos (em vez de CSV manual) e já entra `RUNNING` na hora —
+ * diferente de createClinicBroadcastCampaign, que sempre nasce rascunho — porque o
+ * cenário é urgente por natureza (recepção já decidiu avisar ao abrir o modal).
+ * `tagOnSend` faz o dispatcher (src/lib/broadcast.ts) marcar e reabrir cada conversa
+ * assim que a mensagem sai (ver RESCHEDULE_PENDING_TAG). */
+export async function createRescheduleBroadcast(doctorName: string, date: Date, messageTemplate: string) {
+  const { clinicId, userId } = await requireClinicSession();
+
+  const trimmedTemplate = messageTemplate.trim();
+  if (!trimmedTemplate) {
+    throw new Error("Preencha o texto da mensagem.");
+  }
+
+  const appointments = await prisma.appointment.findMany({
+    where: {
+      clinicProcedure: { clinicId },
+      doctorName,
+      date,
+      status: { in: ["PENDING", "CONFIRMED"] },
+    },
+    select: { patientName: true, patientPhone: true },
+  });
+  if (appointments.length === 0) {
+    throw new Error("Nenhum paciente agendado com esse médico nessa data.");
+  }
+
+  const dateLabel = formatDate(date);
+  const seenPhones = new Set<string>();
+  const normalized = appointments
+    .map((a) => ({ phone: formatToWhatsAppNumber(a.patientPhone), variables: { nome: a.patientName, medico: doctorName, data: dateLabel } }))
+    .filter((r) => {
+      if (!r.phone || seenPhones.has(r.phone)) return false;
+      seenPhones.add(r.phone);
+      return true;
+    });
+
+  const optedOutPhones = new Set(
+    (await prisma.contact.findMany({
+      where: { phone: { in: normalized.map((r) => r.phone) }, optedOutOfBroadcastsAt: { not: null } },
+      select: { phone: true },
+    })).map((c) => c.phone)
+  );
+
+  const campaign = await prisma.broadcastCampaign.create({
+    data: {
+      clinicId,
+      name: `Remarcação — Dr(a). ${doctorName} — ${dateLabel}`,
+      messageTemplate: trimmedTemplate,
+      createdByUserId: userId,
+      status: "RUNNING",
+      tagOnSend: RESCHEDULE_PENDING_TAG,
+      recipients: {
+        create: normalized.map((r) => ({
+          phone: r.phone,
+          variables: r.variables,
+          status: optedOutPhones.has(r.phone) ? "SKIPPED_OPT_OUT" : "PENDING",
+        })),
+      },
+    },
+  });
+
+  revalidatePath("/clinic/disparos");
+  revalidatePath("/clinic/inbox");
+  return { success: true as const, campaignId: campaign.id, recipientCount: normalized.length };
 }

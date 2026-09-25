@@ -457,6 +457,7 @@ export async function createBridgeAppointment(
     status: "PENDING",
     paymentMethod: null,
     notes: null,
+    doctorName: null,
     affiliateId: null,
     affiliateCommission: null,
     commissionReleased: false,

@@ -388,6 +388,11 @@ model Appointment {
   status              AppointmentStatus @default(PENDING)
   paymentMethod       String?           @map("payment_method")
   notes               String?
+  /// Preenchido manualmente pela recepção (edição inline em /clinic/agendamentos) —
+  /// não existe cadastro de médico no sistema, é texto livre. Usado pra montar o
+  /// seletor de médico do aviso de remarcação em massa (ver getDistinctDoctorNames
+  /// e getAppointmentsByDoctorAndDate em src/actions/clinic.ts).
+  doctorName          String?           @map("doctor_name")
   affiliateId         String?           @map("affiliate_id")
   affiliateCommission Decimal?          @map("affiliate_commission") @db.Decimal(10, 2)
   commissionReleased  Boolean           @default(false) @map("commission_released")
@@ -767,6 +772,11 @@ model BroadcastCampaign {
   imagePath       String?                 @map("image_path")
   imageMimeType   String?                 @map("image_mime_type")
   status          BroadcastCampaignStatus @default(DRAFT)
+  /// Quando setada, o dispatcher (src/lib/broadcast.ts) aplica essa tag na Conversation
+  /// do destinatário logo após o envio bem-sucedido, e reabre a conversa (status OPEN)
+  /// pra ela voltar a aparecer na fila — usado pelo aviso de remarcação em massa
+  /// (ver RESCHEDULE_PENDING_TAG em conversation-tags.ts). Null pra campanhas comuns.
+  tagOnSend       String?                 @map("tag_on_send")
   createdByUserId String                  @map("created_by_user_id")
   createdAt       DateTime                @default(now()) @map("created_at")
   updatedAt       DateTime                @updatedAt @map("updated_at")

@@ -35,3 +35,10 @@ export const MARKETPLACE_SOURCE_TAG = "📢 Origem: Marketplace";
 /** Prefixo da tag dinâmica de interesse em procedimento (ver detectProcedureInterestTag
  * em auto-tags.ts) — o resto do texto é a palavra-chave detectada, ex: "🩺 Interesse: Ultrassom". */
 export const PROCEDURE_INTEREST_TAG_PREFIX = "🩺 Interesse: ";
+
+/** Aplicada pelo dispatcher de disparo em massa (src/lib/broadcast.ts) quando a
+ * campanha tem `tagOnSend` setado — usada pelo aviso de remarcação em massa (médico
+ * desmarcou a agenda do dia). Reabre a conversa e prioriza na fila (ver
+ * computeQueueState em chat-crm-adapters.ts); some quando a recepção remove a tag
+ * manualmente depois de confirmar a remarcação — nada remove ela sozinha. */
+export const RESCHEDULE_PENDING_TAG = "⚠️ Remarcação Pendente";

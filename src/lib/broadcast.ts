@@ -74,6 +74,25 @@ export async function dispatchNextBatch(): Promise<{ processed: number }> {
             ? { status: "SENT", sentAt: new Date() }
             : { status: "FAILED", errorMessage: failureReason },
       });
+
+      // Aviso de remarcação em massa (e qualquer futura campanha que precise disso):
+      // marca a conversa do destinatário e reabre ela pra voltar a aparecer na fila
+      // (ver RESCHEDULE_PENDING_TAG em conversation-tags.ts e computeQueueState).
+      if (result.success && campaign.tagOnSend && contact) {
+        const conversation = await prisma.conversation.findFirst({
+          where: { clinicId: campaign.clinicId, contactId: contact.id },
+        });
+        if (conversation) {
+          await prisma.conversation.update({
+            where: { id: conversation.id },
+            data: {
+              status: "OPEN",
+              lastMessageAt: new Date(),
+              ...(conversation.tags.includes(campaign.tagOnSend) ? {} : { tags: { push: campaign.tagOnSend } }),
+            },
+          });
+        }
+      }
     }
 
     const remaining = await prisma.broadcastRecipient.count({

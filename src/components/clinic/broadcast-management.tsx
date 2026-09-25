@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Megaphone, Loader2, Play, Pause, Upload, Image as ImageIcon, X } from "lucide-react";
+import { Megaphone, Loader2, Play, Pause, Upload, Image as ImageIcon, X, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import {
   listClinicBroadcastCampaigns,
@@ -10,6 +10,7 @@ import {
   pauseClinicBroadcastCampaign,
 } from "@/actions/clinic-broadcast";
 import { parseBroadcastCsv, BROADCAST_OPT_OUT_FOOTER, type ParsedBroadcastRecipient } from "@/lib/broadcast-csv";
+import { RescheduleBroadcastModal } from "@/components/clinic/reschedule-broadcast-modal";
 
 type Campaign = Awaited<ReturnType<typeof listClinicBroadcastCampaigns>>[number];
 
@@ -40,6 +41,7 @@ export function BroadcastManagement() {
   const [csvError, setCsvError] = useState<string | null>(null);
   const [image, setImage] = useState<File | null>(null);
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
+  const [rescheduleModalOpen, setRescheduleModalOpen] = useState(false);
 
   async function loadCampaigns() {
     setLoading(true);
@@ -136,10 +138,28 @@ export function BroadcastManagement() {
 
   return (
     <div className="p-4 sm:p-6 space-y-6 max-w-4xl mx-auto">
-      <div className="flex items-center gap-2">
-        <Megaphone className="w-5 h-5 text-violet-600 dark:text-violet-400" />
-        <h1 className="text-lg font-extrabold text-slate-900 dark:text-slate-100">Disparo de mensagens</h1>
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <Megaphone className="w-5 h-5 text-violet-600 dark:text-violet-400" />
+          <h1 className="text-lg font-extrabold text-slate-900 dark:text-slate-100">Disparo de mensagens</h1>
+        </div>
+        <button
+          type="button"
+          onClick={() => setRescheduleModalOpen(true)}
+          className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 hover:bg-amber-100 dark:hover:bg-amber-950/70 rounded-xl transition-all"
+        >
+          <AlertTriangle className="w-3.5 h-3.5" />
+          Aviso / Remarcação em Massa
+        </button>
       </div>
+
+      <RescheduleBroadcastModal
+        open={rescheduleModalOpen}
+        onOpenChange={(next) => {
+          setRescheduleModalOpen(next);
+          if (!next) loadCampaigns();
+        }}
+      />
 
       <div className="rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 space-y-4">
         <h2 className="text-sm font-extrabold text-slate-900 dark:text-slate-100">Nova campanha</h2>
