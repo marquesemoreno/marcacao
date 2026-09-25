@@ -13,6 +13,7 @@ import {
   Settings,
   type LucideIcon,
 } from "lucide-react";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 
 const fullNavItems: { href: string; label: string; icon: LucideIcon; exact?: boolean }[] = [
   { href: "/clinic/inbox", label: "Chat / WhatsApp", icon: MessageCircle },
@@ -46,9 +47,13 @@ const exclusiveNavItems: { href: string; label: string; icon: LucideIcon; exact?
 export function ClinicNav({
   exclusiveWhatsapp = false,
   orientation = "vertical",
+  collapsed = false,
 }: {
   exclusiveWhatsapp?: boolean;
   orientation?: "vertical" | "horizontal";
+  /** Só vale pra orientation="vertical" — ícone sozinho, centralizado, com
+   * tooltip no hover mostrando o nome da rota (ver ClinicSidebar). */
+  collapsed?: boolean;
 }) {
   const pathname = usePathname();
   const navItems = exclusiveWhatsapp ? exclusiveNavItems : fullNavItems;
@@ -66,13 +71,13 @@ export function ClinicNav({
       {navItems.map((item) => {
         const isActive = item.exact ? pathname === item.href : pathname?.startsWith(item.href);
         const Icon = item.icon;
-        return (
+        const link = (
           <Link
             key={item.href}
             href={item.href}
             aria-current={isActive ? "page" : undefined}
             className={`group flex shrink-0 items-center gap-2.5 rounded-lg text-[13px] font-semibold tracking-[-0.01em] transition-colors duration-150 ${
-              isHorizontal ? "px-3 py-2 whitespace-nowrap" : "px-3 py-2.5"
+              collapsed ? "justify-center px-2 py-2.5" : isHorizontal ? "px-3 py-2 whitespace-nowrap" : "px-3 py-2.5"
             } ${
               isActive
                 ? "bg-emerald-600 text-white shadow-sm shadow-emerald-950/40"
@@ -84,8 +89,17 @@ export function ClinicNav({
                 isActive ? "text-white" : "text-slate-500 group-hover:text-slate-200"
               }`}
             />
-            <span className={isHorizontal ? "" : "truncate"}>{item.label}</span>
+            {!collapsed && <span className={isHorizontal ? "" : "truncate"}>{item.label}</span>}
           </Link>
+        );
+
+        if (!collapsed) return link;
+
+        return (
+          <Tooltip key={item.href}>
+            <TooltipTrigger render={link} />
+            <TooltipContent side="right">{item.label}</TooltipContent>
+          </Tooltip>
         );
       })}
     </nav>
