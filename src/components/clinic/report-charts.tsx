@@ -83,3 +83,31 @@ export function SentimentBar({
     </div>
   );
 }
+
+/** Barras verticais — usada pro horário de pico (categoria = hora no eixo X). Mesma
+ * regra das horizontais: valor por extenso acima de cada barra, ponta arredondada só
+ * na extremidade do dado (topo), base quadrada. */
+export function VerticalBarChart({ data }: { data: { label: string; value: number }[] }) {
+  const max = Math.max(1, ...data.map((d) => d.value));
+  if (data.every((d) => d.value === 0)) {
+    return <p className="text-xs text-slate-500 dark:text-slate-400">Nenhum dado no período.</p>;
+  }
+  const peak = Math.max(...data.map((d) => d.value));
+  return (
+    <div className="flex items-end gap-1.5 sm:gap-2 h-44 pt-5">
+      {data.map((d) => (
+        <div key={d.label} className="flex-1 flex flex-col items-center gap-1 h-full min-w-0">
+          <span className="text-[10px] font-mono font-semibold text-slate-700 dark:text-slate-200">{d.value}</span>
+          <div className="flex-1 w-full flex items-end justify-center min-h-0">
+            <div
+              className={`w-full max-w-10 rounded-t-[4px] ${d.value === peak ? "bg-sky-600" : "bg-sky-400/70 dark:bg-sky-500/50"}`}
+              style={{ height: `${Math.max(2, (d.value / max) * 100)}%` }}
+              title={`${d.label}: ${d.value}`}
+            />
+          </div>
+          <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400">{d.label}</span>
+        </div>
+      ))}
+    </div>
+  );
+}

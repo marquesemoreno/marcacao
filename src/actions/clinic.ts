@@ -13,6 +13,13 @@ import {
   type BusinessHours,
 } from "@/lib/schemas/clinic";
 import { notifyAppointmentStatus } from "@/lib/whatsapp";
+import {
+  computeAttendantPerformance,
+  computeConfirmationStats,
+  computeTopDoctors,
+  computeKindDistribution,
+  computeHourlyInbound,
+} from "@/lib/report-metrics";
 
 export async function getClinicInfo() {
   const { clinicId } = await requireClinicSession();
@@ -179,6 +186,74 @@ export async function getClinicAppointmentsReport(days: number = 30, doctorName?
     cancellationRate,
     revenue,
     topProcedures,
+  };
+}
+
+/** Métricas de gestão do /clinic/relatorio (equipe, confirmações, médicos, tipo de
+ * atendimento, horário de pico). Agregação em src/lib/report-metrics.ts. O atendente de
+ * uma conversa é quem a resolveu (resolvedByUserId), senão quem está atribuído. */
+export async function getClinicManagementReport(days: number = 30) {
+  const { clinicId } = await requireClinicSession();
+  const since = addUTCDays(startOfUTCDay(new Date()), -days);
+
+  const [conversations, appointments, inbound] = await Promise.all([
+    prisma.conversation.findMany({
+      where: { clinicId, createdAt: { gte: since } },
+      select: {
+        status: true,
+        resolutionReason: true,
+        resolvedByUserId: true,
+        assignedUserId: true,
+        qualityAudit: { select: { firstResponseSec: true } },
+      },
+    }),
+    prisma.appointment.findMany({
+      where: { clinicProcedure: { clinicId }, createdAt: { gte: since } },
+      select: {
+        doctorName: true,
+        status: true,
+        date: true,
+        reminderSentAt: true,
+        reminderStatus: true,
+        clinicProcedure: { select: { procedure: { select: { name: true, category: true } } } },
+      },
+    }),
+    prisma.message.findMany({
+      where: { direction: "INBOUND", createdAt: { gte: since }, conversation: { clinicId } },
+      select: { createdAt: true },
+    }),
+  ]);
+
+  const userIds = [
+    ...new Set(conversations.map((c) => c.resolvedByUserId ?? c.assignedUserId).filter((id): id is string => !!id)),
+  ];
+  const users = await prisma.user.findMany({ where: { id: { in: userIds } }, select: { id: true, name: true } });
+  const userNames = new Map(users.map((u) => [u.id, u.name]));
+
+  const attendants = computeAttendantPerformance(
+    conversations.map((c) => {
+      const userId = c.resolvedByUserId ?? c.assignedUserId;
+      return {
+        userId,
+        userName: userId ? userNames.get(userId) ?? null : null,
+        status: c.status,
+        resolutionReason: c.resolutionReason,
+        firstResponseSec: c.qualityAudit?.firstResponseSec ?? null,
+      };
+    })
+  );
+
+  return {
+    attendants,
+    confirmations: computeConfirmationStats(appointments),
+    topDoctors: computeTopDoctors(appointments.map((a) => a.doctorName)),
+    kindDistribution: computeKindDistribution(
+      appointments.map((a) => ({
+        procedureName: a.clinicProcedure.procedure.name,
+        category: a.clinicProcedure.procedure.category,
+      }))
+    ),
+    hourlyInbound: computeHourlyInbound(inbound.map((m) => m.createdAt)),
   };
 }
 
