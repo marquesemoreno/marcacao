@@ -227,12 +227,15 @@ export async function getClinicManagementReport(days: number = 30) {
   const userIds = [
     ...new Set(conversations.map((c) => c.resolvedByUserId ?? c.assignedUserId).filter((id): id is string => !!id)),
   ];
-  const users = await prisma.user.findMany({ where: { id: { in: userIds } }, select: { id: true, name: true } });
+  // Só usuários da própria clínica — existe conversa da Santa Clara atribuída a uma
+  // atendente da Urolaser no banco, e ela não pode aparecer no relatório de outra clínica.
+  const users = await prisma.user.findMany({ where: { id: { in: userIds }, clinicId }, select: { id: true, name: true } });
   const userNames = new Map(users.map((u) => [u.id, u.name]));
 
   const attendants = computeAttendantPerformance(
     conversations.map((c) => {
-      const userId = c.resolvedByUserId ?? c.assignedUserId;
+      const rawUserId = c.resolvedByUserId ?? c.assignedUserId;
+      const userId = rawUserId && userNames.has(rawUserId) ? rawUserId : null;
       return {
         userId,
         userName: userId ? userNames.get(userId) ?? null : null,
