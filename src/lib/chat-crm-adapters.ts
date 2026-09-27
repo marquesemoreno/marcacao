@@ -166,7 +166,8 @@ export function toChatContact(conversation: ConversationWithRelations, viewerUse
   return {
     id: conversation.id,
     name: conversation.contact.name,
-    phone: conversation.contact.phone,
+    phone: conversation.contact.phone ?? "",
+    instagramUsername: conversation.contact.instagramUsername ?? undefined,
     cpf: conversation.contact.cpf ?? "",
     neighborhood: "",
     glpiEntityId: conversation.contact.glpiEntityId,
@@ -261,6 +262,7 @@ export function toChatMessage(
     isSystemNotice:
       message.type === "TEXT" && message.direction === "OUTBOUND" && isAutoSystemMessage(message.content),
     timestamp: formatMessageTimestamp(message.createdAt),
+    sentAt: message.createdAt.toISOString(),
     type: typeMap[message.type],
     audioDuration: message.audioDuration ?? undefined,
     attachmentName: message.attachmentName ?? undefined,

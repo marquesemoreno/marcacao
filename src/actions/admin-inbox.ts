@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { ConversationStatus, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireAdminSession } from "@/lib/session";
+import { assertCanSendText, dispatchOutboundText, requireWhatsAppPhone } from "@/lib/outbound-dispatch";
 import { whatsappService, sendWhatsAppMedia, sendWhatsAppAudio, sendWhatsAppContact, sendWhatsAppReaction, formatToWhatsAppNumber, isValidWhatsAppNumber, fetchWhatsAppProfilePicture, editWhatsAppMessage, type QuotedMessageRef } from "@/lib/whatsapp";
 import { BUDGET_SENT_TAG, SCHEDULED_TAG } from "@/lib/conversation-tags";
 import { canEditMessage } from "@/lib/message-edit";
@@ -59,7 +60,7 @@ export async function listAllContactsAdmin(search?: string) {
   return conversations.map((conversation) => ({
     conversationId: conversation.id,
     name: conversation.contact.name,
-    phone: conversation.contact.phone,
+    phone: conversation.contact.phone ?? "",
     cpf: conversation.contact.cpf,
     status: conversation.status,
     clinicName: conversation.clinic.tradeName,
@@ -100,7 +101,7 @@ export async function listForwardTargetsAdmin(sourceConversationId: string, sear
   return conversations.map((conversation) => ({
     conversationId: conversation.id,
     name: conversation.contact.name,
-    phone: conversation.contact.phone,
+    phone: conversation.contact.phone ?? "",
   }));
 }
 
@@ -371,7 +372,7 @@ export async function getChatContactHistoryAdmin(conversationId: string) {
     where: { id: conversationId },
     select: { contact: { select: { phone: true } } },
   });
-  if (!conversation) return [];
+  if (!conversation || !conversation.contact.phone) return [];
 
   const appointments = await prisma.appointment.findMany({
     where: { patientPhone: conversation.contact.phone },
@@ -453,7 +454,11 @@ export async function sendMessageAdmin(
     return note;
   }
 
-  const quotedRef = await resolveQuotedRefAdmin(data.conversationId, conversation.contact.phone, replyToMessageId);
+  await assertCanSendText(conversation);
+  const quotedRef =
+    conversation.channel === "INSTAGRAM" || !conversation.contact.phone
+      ? undefined
+      : await resolveQuotedRefAdmin(data.conversationId, conversation.contact.phone, replyToMessageId);
 
   const message = await prisma.message.create({
     data: {
@@ -476,7 +481,7 @@ export async function sendMessageAdmin(
   // ser encerrado antes do ".then()" salvar o whatsappKeyId, e sem ele a mensagem
   // nunca fica editável nem casa os acks de entrega/leitura.
   try {
-    const result = await whatsappService.sendMessage(conversation.contact.phone, data.content, "chat.outbound_admin", conversation.clinicId, quotedRef);
+    const result = await dispatchOutboundText(conversation, data.content, "chat.outbound_admin", quotedRef);
     if (!result.success && !result.skipped) {
       await prisma.message.update({ where: { id: message.id }, data: { status: "FAILED" } });
     } else if (result.keyId) {
@@ -511,6 +516,7 @@ export async function sendMediaMessageAdmin(conversationId: string, formData: Fo
   if (!conversation) {
     throw new Error("Conversa não encontrada");
   }
+  const waPhone = requireWhatsAppPhone(conversation);
 
   const buffer = Buffer.from(await file.arrayBuffer());
   const uploaded = await uploadWhatsAppMedia(conversationId, buffer, file.type);
@@ -542,7 +548,7 @@ export async function sendMediaMessageAdmin(conversationId: string, formData: Fo
   if (signedUrl) {
     // Await por robustez, não fire-and-forget — ver comentário em sendMessageAdmin.
     try {
-      const result = await sendWhatsAppMedia(conversation.contact.phone, signedUrl, file.type, file.name, "", "chat.outbound_admin.media", conversation.clinicId);
+      const result = await sendWhatsAppMedia(waPhone, signedUrl, file.type, file.name, "", "chat.outbound_admin.media", conversation.clinicId);
       if (!result.success && !result.skipped) {
         await prisma.message.update({ where: { id: message.id }, data: { status: "FAILED" } });
       } else if (result.keyId) {
@@ -579,6 +585,7 @@ export async function sendAudioMessageAdmin(conversationId: string, formData: Fo
   if (!conversation) {
     throw new Error("Conversa não encontrada");
   }
+  const waPhone = requireWhatsAppPhone(conversation);
 
   const buffer = Buffer.from(await file.arrayBuffer());
   const uploaded = await uploadWhatsAppMedia(conversationId, buffer, file.type);
@@ -608,7 +615,7 @@ export async function sendAudioMessageAdmin(conversationId: string, formData: Fo
   const signedUrl = await getSignedMediaUrl(uploaded.path);
   if (signedUrl) {
     try {
-      const result = await sendWhatsAppAudio(conversation.contact.phone, signedUrl, "chat.outbound_admin.audio", conversation.clinicId);
+      const result = await sendWhatsAppAudio(waPhone, signedUrl, "chat.outbound_admin.audio", conversation.clinicId);
       if (!result.success && !result.skipped) {
         await prisma.message.update({ where: { id: message.id }, data: { status: "FAILED" } });
       } else if (result.keyId) {
@@ -635,6 +642,7 @@ export async function shareContactAdmin(conversationId: string, target?: { name:
   if (!conversation) {
     throw new Error("Conversa não encontrada");
   }
+  const waPhone = requireWhatsAppPhone(conversation);
 
   const contactName = target?.name ?? conversation.clinic.tradeName;
   const contactPhone = target?.phone ?? (conversation.clinic.phone ?? conversation.clinic.whatsapp);
@@ -660,7 +668,7 @@ export async function shareContactAdmin(conversationId: string, target?: { name:
 
   try {
     const result = await sendWhatsAppContact(
-      conversation.contact.phone,
+      waPhone,
       contactName,
       contactPhone,
       "chat.outbound_admin.contact",
@@ -691,6 +699,7 @@ export async function toggleReactionAdmin(messageId: string, emoji: string) {
   if (!message) {
     throw new Error("Mensagem não encontrada");
   }
+  const waPhone = requireWhatsAppPhone(message.conversation);
   if (!message.whatsappKeyId) {
     throw new Error("Essa mensagem nunca chegou a sincronizar com o WhatsApp.");
   }
@@ -698,7 +707,7 @@ export async function toggleReactionAdmin(messageId: string, emoji: string) {
   const isRemoving = message.agentReaction === emoji;
   const target: QuotedMessageRef = {
     keyId: message.whatsappKeyId,
-    remoteJid: `${formatToWhatsAppNumber(message.conversation.contact.phone)}@s.whatsapp.net`,
+    remoteJid: `${formatToWhatsAppNumber(waPhone)}@s.whatsapp.net`,
     fromMe: message.direction === "OUTBOUND",
   };
 
@@ -799,12 +808,16 @@ export async function resendMessageAdmin(messageId: string) {
   }
 
   await prisma.message.update({ where: { id: messageId }, data: { status: "SENT" } });
-  const phone = message.conversation.contact.phone;
   const clinicId = message.conversation.clinicId;
 
   if (message.type === "ATTACHMENT" || message.type === "AUDIO") {
     if (!message.mediaPath) {
       return { success: false as const, error: "Arquivo original não encontrado para reenviar." };
+    }
+    const phone = message.conversation.channel === "INSTAGRAM" ? null : message.conversation.contact.phone;
+    if (!phone) {
+      await prisma.message.update({ where: { id: messageId }, data: { status: "FAILED" } });
+      return { success: false as const, error: "Reenvio de arquivo não disponível para este contato." };
     }
     const signedUrl = await getSignedMediaUrl(message.mediaPath);
     if (!signedUrl) {
@@ -832,7 +845,7 @@ export async function resendMessageAdmin(messageId: string) {
       await prisma.message.update({ where: { id: messageId }, data: { whatsappKeyId: result.keyId } });
     }
   } else {
-    const result = await whatsappService.sendMessage(phone, message.content, "chat.retry_admin", clinicId);
+    const result = await dispatchOutboundText(message.conversation, message.content, "chat.retry_admin");
     if (!result.success && !result.skipped) {
       await prisma.message.update({ where: { id: messageId }, data: { status: "FAILED" } });
       return { success: false as const, error: "Falha ao reenviar. Verifique se o número do contato está correto." };
@@ -873,6 +886,9 @@ export async function editMessageAdmin(messageId: string, newText: string) {
     return { success: true as const };
   }
 
+  if (message.conversation.channel === "INSTAGRAM" || !message.conversation.contact.phone) {
+    return { success: false as const, error: "Edição não disponível para este contato." };
+  }
   const result = await editWhatsAppMessage(
     message.conversation.contact.phone,
     message.whatsappKeyId!,
@@ -992,7 +1008,7 @@ export async function openGlpiTicketAdmin(conversationId: string) {
 
   const firstLine = lastInbound.split("\n")[0].trim();
   const name = firstLine.length > 80 ? `${firstLine.slice(0, 77)}...` : firstLine || "Solicitação via WhatsApp";
-  const content = `Chamado aberto a partir de uma conversa do WhatsApp.\nContato: ${conversation.contact.name} (${formatPhone(conversation.contact.phone)})\n\nMensagem do paciente:\n${lastInbound}`;
+  const content = `Chamado aberto a partir de uma conversa do WhatsApp.\nContato: ${conversation.contact.name} (${conversation.contact.phone ? formatPhone(conversation.contact.phone) : "sem telefone"})\n\nMensagem do paciente:\n${lastInbound}`;
 
   const result = await createGlpiTicket(name, content, conversation.contact.glpiEntityId ?? undefined);
 
@@ -1304,8 +1320,10 @@ export async function refreshContactPhotoAdmin(conversationId: string) {
   if (!conversation) {
     throw new Error("Conversa não encontrada");
   }
-
   const { contact } = conversation;
+  // Contato de Instagram não tem telefone — a foto vem do perfil do Instagram
+  // (gravada pelo webhook), não do WhatsApp.
+  if (!contact.phone) return contact.photoUrl;
   const cacheAgeMs = contact.photoUpdatedAt ? Date.now() - contact.photoUpdatedAt.getTime() : Infinity;
   if (cacheAgeMs < CONTACT_PHOTO_CACHE_DAYS * 24 * 60 * 60 * 1000) {
     return contact.photoUrl;

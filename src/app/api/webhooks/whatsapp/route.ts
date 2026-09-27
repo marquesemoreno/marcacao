@@ -713,8 +713,8 @@ export async function POST(request: Request) {
     // =========================================================================
     let aiHandled = false;
     const aiConfig = clinic ? await getAiAttendantConfig(conversation.clinicId) : null;
-    const isMspLeadReply = aiConfig ? await isKnownMspLeadPhone(contact.phone) : false;
-    const isPartnerLeadReply = aiConfig && !isMspLeadReply ? await isKnownPartnerLeadPhone(contact.phone) : false;
+    const isMspLeadReply = aiConfig ? await isKnownMspLeadPhone(contact.phone ?? incoming.phone) : false;
+    const isPartnerLeadReply = aiConfig && !isMspLeadReply ? await isKnownPartnerLeadPhone(contact.phone ?? incoming.phone) : false;
     const clinicName = clinic?.tradeName ?? "nossa clínica";
 
     if (isMspLeadReply && !conversation.tags.includes(MSP_LEAD_TAG)) {

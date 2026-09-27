@@ -6,12 +6,15 @@ import { MARKETPLACE_SOURCE_TEXT } from "./auto-tags";
 
 export const DIRECT_CHANNEL = "Indicação / Direto";
 export const UNKNOWN_CHANNEL = "Não identificado";
+/** Conversa que chegou por DM (webhook do Instagram) — ver api/webhooks/instagram. */
+export const INSTAGRAM_DIRECT_CHANNEL = "Instagram Direct";
 export const ACQUISITION_CHANNELS = [
   "Instagram Ads",
   "Facebook Ads",
   "Google Ads",
   "Google Orgânico",
   "Site Conecta Saúde",
+  INSTAGRAM_DIRECT_CHANNEL,
   DIRECT_CHANNEL,
 ] as const;
 

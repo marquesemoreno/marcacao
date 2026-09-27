@@ -127,6 +127,10 @@ async function runCriarPreAgendamento(
     select: { contact: { select: { name: true, phone: true, cpf: true } } },
   });
   if (!conversation) return { erro: "Conversa não encontrada." };
+  if (!conversation.contact.phone) {
+    return { erro: "Este contato não tem telefone cadastrado — peça o celular com DDD ao paciente e transfira pra recepção concluir o agendamento." };
+  }
+  const patientPhone = conversation.contact.phone;
 
   const clinicProcedureId = await resolveClinicProcedureId(context.clinicId, args.procedimento);
   if (!clinicProcedureId) {
@@ -137,7 +141,7 @@ async function runCriarPreAgendamento(
     const appointment = await createAppointment({
       patientName: conversation.contact.name,
       patientCpf: conversation.contact.cpf ?? undefined,
-      patientPhone: conversation.contact.phone,
+      patientPhone,
       clinicProcedureId,
       date: args.data,
       timeSlot: args.horario,
@@ -169,7 +173,7 @@ async function runAbrirChamadoSuporte(context: ToolContext, args: { resumo?: str
   if (!descricao) return { erro: "Descrição do problema vazia — peça mais detalhes ao cliente antes de tentar de novo." };
 
   const resumo = args.resumo?.trim() || descricao.split("\n")[0].slice(0, 80);
-  const content = `Chamado aberto pela IA a partir de uma conversa do WhatsApp.\nContato: ${conversation.contact.name} (${formatPhone(conversation.contact.phone)})\n\nDescrição do cliente:\n${descricao}`;
+  const content = `Chamado aberto pela IA a partir de uma conversa do WhatsApp.\nContato: ${conversation.contact.name} (${conversation.contact.phone ? formatPhone(conversation.contact.phone) : "sem telefone"})\n\nDescrição do cliente:\n${descricao}`;
 
   const result = await createGlpiTicket(resumo, content, conversation.contact.glpiEntityId ?? undefined);
   if (!result.success) return { erro: result.error };

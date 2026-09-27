@@ -2,6 +2,8 @@
 
 import { ACQUISITION_CHANNELS } from "@/lib/acquisition";
 import { AcquisitionBadge } from "@/components/chat/acquisition-badge";
+import { InstagramGlyph } from "@/components/chat/instagram-glyph";
+import { messagingWindowState } from "@/lib/messaging-window";
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Contact,
@@ -351,6 +353,14 @@ const ContactListItem = React.memo(function ContactListItem({
             <MessageSquare className="w-2 h-2 fill-current" />
           </span>
         )}
+        {c.channel === 'instagram' && (
+          <span
+            className="absolute -bottom-1 -right-1 w-3.5 h-3.5 bg-gradient-to-tr from-amber-500 via-pink-500 to-purple-600 border-2 border-white dark:border-slate-900 rounded-full flex items-center justify-center text-white"
+            title="Canal: Instagram Direct"
+          >
+            <InstagramGlyph className="w-2 h-2" />
+          </span>
+        )}
       </div>
 
       <div className="flex-1 min-w-0">
@@ -486,6 +496,12 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
   onUpdateContactGlpiEntity,
 }) => {
   const [composerMode, setComposerMode] = useState<'whatsapp' | 'internal_note'>('whatsapp');
+  // Janela de mensagens do Instagram (mesma regra do envio, ver outbound-dispatch.ts) —
+  // a partir da última mensagem DO LEAD entre as carregadas.
+  const instagramWindow = useMemo(() => {
+    const lastInbound = [...messages].reverse().find((m) => m.sender === 'contact' && m.sentAt);
+    return messagingWindowState(lastInbound?.sentAt ? new Date(lastInbound.sentAt) : null);
+  }, [messages]);
   const [inputText, setInputText] = useState('');
   /** Mensagem fixada pelo botão "Responder" (ver MessageBubble.onReply) — mostra a
    * barra de preview acima do textarea e anexa o quotedMessageId no envio. */
@@ -1426,7 +1442,16 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                     )}
                   </div>
                   <div className="flex items-center gap-1.5 min-w-0">
-                    <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{selectedContact.phone}</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 truncate flex items-center gap-1">
+                      {selectedContact.channel === 'instagram' ? (
+                        <>
+                          <InstagramGlyph className="w-3 h-3 text-pink-600 dark:text-pink-400" />
+                          {selectedContact.instagramUsername ? `@${selectedContact.instagramUsername}` : 'Instagram Direct'}
+                        </>
+                      ) : (
+                        selectedContact.phone
+                      )}
+                    </p>
                     {selectedContact.acquisitionChannel && (
                       <AcquisitionBadge channel={selectedContact.acquisitionChannel} detail={selectedContact.acquisitionDetail} />
                     )}
@@ -1740,8 +1765,12 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                             : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white'
                         }`}
                       >
-                        <MessageSquare className="w-3.5 h-3.5" />
-                        <span>WhatsApp</span>
+                        {selectedContact?.channel === 'instagram' ? (
+                          <InstagramGlyph className="w-3.5 h-3.5" />
+                        ) : (
+                          <MessageSquare className="w-3.5 h-3.5" />
+                        )}
+                        <span>{selectedContact?.channel === 'instagram' ? 'Instagram' : 'WhatsApp'}</span>
                       </button>
                       <button
                         type="button"
@@ -1763,6 +1792,17 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                       </span>
                     )}
                   </div>
+
+                  {selectedContact?.channel === 'instagram' && composerMode === 'whatsapp' && instagramWindow !== 'OPEN' && (
+                    <div className="flex items-start gap-2 px-3 py-1.5 border-b border-amber-200/70 dark:border-amber-900/60 bg-amber-50/80 dark:bg-amber-950/30 text-[11px] text-amber-800 dark:text-amber-300">
+                      <Clock className="w-3 h-3 mt-0.5 shrink-0" />
+                      <span>
+                        {instagramWindow === 'HUMAN_AGENT'
+                          ? 'Última mensagem do lead há mais de 24h — o Instagram só aceita resposta humana até 7 dias.'
+                          : 'Mais de 7 dias sem mensagem do lead — o Instagram não permite responder até ele escrever de novo.'}
+                      </span>
+                    </div>
+                  )}
 
                   {replyingTo && (
                     <div className="flex items-start gap-2 px-3 py-2 border-b border-slate-200/70 dark:border-slate-800 bg-white/60 dark:bg-slate-900/40">
@@ -1838,7 +1878,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
 
                   <div className="flex items-center justify-between px-3 py-2 border-t border-slate-200/60 dark:border-slate-800">
                     <div className="flex items-center gap-1.5">
-                      {composerMode === 'whatsapp' && (
+                      {composerMode === 'whatsapp' && selectedContact?.channel !== 'instagram' && (
                         <>
                           <input
                             ref={fileInputRef}
@@ -2111,6 +2151,12 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                     <h4 className="font-bold text-slate-900 dark:text-slate-100 text-xs truncate">
                       {selectedContact.name}
                     </h4>
+                    {selectedContact.channel === 'instagram' && !selectedContact.phone ? (
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium flex items-center gap-1 mt-0.5">
+                        <InstagramGlyph className="w-3 h-3" />
+                        {selectedContact.instagramUsername ? `@${selectedContact.instagramUsername}` : 'Instagram Direct'}
+                      </p>
+                    ) : (
                     <div className="flex items-center gap-1 mt-0.5">
                       <a
                         href={`tel:${selectedContact.phone}`}
@@ -2131,6 +2177,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                         <Copy className="w-3 h-3" />
                       </button>
                     </div>
+                    )}
                   </div>
                 </div>
 

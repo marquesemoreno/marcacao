@@ -41,6 +41,8 @@ export interface Message {
   senderName?: string;
   text?: string;
   timestamp: string;
+  /** Data real (ISO) — `timestamp` é só o texto formatado. Usado pro aviso da janela de 24h do Instagram. */
+  sentAt?: string;
   type: 'text' | 'audio' | 'internal_note' | 'attachment' | 'contact';
   audioDuration?: string;
   audioWaveform?: number[];
@@ -117,6 +119,8 @@ export interface Contact {
   estimatedValue?: string;
   /** Canal de aquisição detectado na 1ª mensagem (ver src/lib/acquisition.ts) — ausente
    * em conversa anterior ao rastreamento ou aberta por lembrete/disparo nosso. */
+  /** @username do lead de Instagram Direct — substitui o telefone no cabeçalho. */
+  instagramUsername?: string;
   acquisitionChannel?: string;
   acquisitionDetail?: string;
   /** Fixada no topo da fila (menu do card) — ver QUEUE_STATE_PRIORITY em inbox-layout.tsx. */
