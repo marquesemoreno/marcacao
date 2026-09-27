@@ -22,8 +22,10 @@ import {
   getClinicManagementReport,
   getDistinctConversationTags,
   getDistinctDoctorNames,
+  getDistinctAcquisitionChannels,
   listClinicProcedures,
 } from "@/actions/clinic";
+import Link from "next/link";
 import { formatCurrency, appointmentStatusLabels } from "@/lib/format";
 import {
   MessageSquare,
@@ -34,6 +36,8 @@ import {
   CheckCircle2,
   RotateCcw,
   Clock,
+  ShieldCheck,
+  Wallet,
 } from "lucide-react";
 
 /** Cor por status — mesma semântica já usada em appointmentStatusVariant (format.ts),
@@ -67,6 +71,7 @@ type RelatorioPageProps = {
     tag?: string;
     doctor?: string;
     procedure?: string;
+    channel?: string;
   }>;
 };
 
@@ -85,15 +90,17 @@ export default async function ClinicReportPage({
     doctorOptions,
     procedureOptions,
     management,
+    channelOptions,
   ] = await Promise.all([
-    getClinicChatReport(days, params.tag ? [params.tag] : undefined),
+    getClinicChatReport(days, params.tag ? [params.tag] : undefined, params.channel),
     isExclusive
       ? Promise.resolve(null)
       : getClinicAppointmentsReport(days, params.doctor, params.procedure),
     getDistinctConversationTags(days),
     isExclusive ? Promise.resolve([]) : getDistinctDoctorNames(),
     isExclusive ? Promise.resolve([]) : listClinicProcedures(),
-    getClinicManagementReport(days),
+    getClinicManagementReport(days, params.channel),
+    getDistinctAcquisitionChannels(days),
   ]);
   const topAttendantId = management.attendants.find(
     (a) => a.scheduled > 0,
@@ -125,6 +132,15 @@ export default async function ClinicReportPage({
               ...tagOptions.map((t) => ({ value: t, label: t })),
             ]}
           />
+          <ReportSelectFilter
+            basePath="/clinic/relatorio"
+            paramKey="channel"
+            placeholder="Canal de aquisição"
+            options={[
+              { value: "_all", label: "Todos os canais" },
+              ...channelOptions.map((c) => ({ value: c, label: c })),
+            ]}
+          />
           <PeriodFilter basePath="/clinic/relatorio" />
           <ReportExportButton
             rows={[
@@ -139,6 +155,12 @@ export default async function ClinicReportPage({
               ["Sentimento positivo (%)", chatReport.sentimentPositivePct],
               ["Sentimento neutro (%)", chatReport.sentimentNeutroPct],
               ["Sentimento negativo (%)", chatReport.sentimentNegativoPct],
+              ["Faturamento estimado (R$)", management.estimatedRevenue ?? "—"],
+              ["Receita protegida (R$)", management.protectedRevenue ?? "—"],
+              ...management.channelConversion.map(
+                (c) =>
+                  [`Agendamentos via ${c.channel}`, c.scheduled] as [string, string | number],
+              ),
               ...(appointmentsReport
                 ? ([
                     [
@@ -155,6 +177,48 @@ export default async function ClinicReportPage({
             ]}
           />
         </div>
+      </div>
+
+      {/* =========================================================================
+          ECONOMICS — faturamento estimado e receita protegida
+         ========================================================================= */}
+      <div className="space-y-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="bg-white dark:bg-slate-900 p-5 rounded-lg border border-slate-200 dark:border-slate-800 shadow-xs space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium text-slate-600 dark:text-slate-400">Faturamento Estimado</span>
+              <Wallet className="w-4 h-4 text-emerald-600" />
+            </div>
+            <p className="text-3xl font-bold font-mono text-slate-900 dark:text-slate-100">
+              {management.estimatedRevenue !== null ? formatCurrency(management.estimatedRevenue) : "—"}
+            </p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              {management.scheduledCount} agendamento(s) pelo WhatsApp
+              {management.ticket !== null ? ` × ticket médio de ${formatCurrency(management.ticket)}` : ""}
+            </p>
+          </div>
+          <div className="bg-white dark:bg-slate-900 p-5 rounded-lg border border-slate-200 dark:border-slate-800 shadow-xs space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium text-slate-600 dark:text-slate-400">Receita Protegida (Anti No-Show)</span>
+              <ShieldCheck className="w-4 h-4 text-sky-600" />
+            </div>
+            <p className="text-3xl font-bold font-mono text-slate-900 dark:text-slate-100">
+              {management.protectedRevenue !== null ? formatCurrency(management.protectedRevenue) : "—"}
+            </p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              {management.confirmations.confirmed} consulta(s) confirmada(s) pelos lembretes automáticos
+            </p>
+          </div>
+        </div>
+        {management.ticket === null && (
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            Para estimar valores, informe o ticket médio de consulta em{" "}
+            <Link href="/clinic/precos" className="font-medium text-sky-700 dark:text-sky-400 underline underline-offset-2">
+              Preços e Horários
+            </Link>
+            .
+          </p>
+        )}
       </div>
 
       {/* =========================================================================
@@ -233,6 +297,47 @@ export default async function ClinicReportPage({
             regras automáticas no período.
           </p>
         </div>
+      </div>
+
+      {/* =========================================================================
+          CONVERSÃO POR CANAL DE AQUISIÇÃO
+         ========================================================================= */}
+      <div className="space-y-4">
+        <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-200">Conversão por Canal de Aquisição</h2>
+        <div className="bg-white dark:bg-slate-900 p-5 rounded-lg border border-slate-200 dark:border-slate-800 shadow-xs !p-0 overflow-hidden">
+          {management.channelConversion.length === 0 ? (
+            <p className="p-5 text-xs text-slate-500 dark:text-slate-400">Nenhuma conversa no período.</p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-slate-50 dark:bg-slate-800/50">
+                  <TableHead className="pl-5 text-xs">Canal</TableHead>
+                  <TableHead className="text-right text-xs">Conversas</TableHead>
+                  <TableHead className="text-right text-xs">Agendamentos</TableHead>
+                  <TableHead className="text-right text-xs">Conversão</TableHead>
+                  <TableHead className="pr-5 text-right text-xs">Receita Estimada</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {management.channelConversion.map((c) => (
+                  <TableRow key={c.channel}>
+                    <TableCell className="pl-5 font-medium">{c.channel}</TableCell>
+                    <TableCell className="text-right font-mono">{c.conversations}</TableCell>
+                    <TableCell className="text-right font-mono">{c.scheduled}</TableCell>
+                    <TableCell className="text-right font-mono">{c.conversionRate}%</TableCell>
+                    <TableCell className="pr-5 text-right font-mono font-semibold">
+                      {c.estimatedRevenue !== null ? formatCurrency(c.estimatedRevenue) : "—"}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </div>
+        <p className="text-[11px] text-slate-400 dark:text-slate-500">
+          Canal detectado na 1ª mensagem do paciente (anúncio do Meta, UTM ou texto de campanha). “Não identificado” =
+          conversas anteriores ao rastreamento ou abertas por lembrete/disparo da clínica.
+        </p>
       </div>
 
       {/* =========================================================================
@@ -367,7 +472,7 @@ export default async function ClinicReportPage({
           )}
           <p className="text-[11px] text-slate-400 dark:text-slate-500">
             Base: {management.confirmations.totalSent} lembrete(s) automático(s)
-            enviado(s) para agendamentos criados no período.
+            enviado(s) no período.
           </p>
         </div>
       </div>

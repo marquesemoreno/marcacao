@@ -115,6 +115,10 @@ export interface Contact {
   tags: string[];
   consultationHistory: ConsultationRecord[];
   estimatedValue?: string;
+  /** Canal de aquisição detectado na 1ª mensagem (ver src/lib/acquisition.ts) — ausente
+   * em conversa anterior ao rastreamento ou aberta por lembrete/disparo nosso. */
+  acquisitionChannel?: string;
+  acquisitionDetail?: string;
   /** Fixada no topo da fila (menu do card) — ver QUEUE_STATE_PRIORITY em inbox-layout.tsx. */
   pinned: boolean;
   /** Notificação de mensagem nova suprimida (som/desktop) — não esconde unreadCount. */

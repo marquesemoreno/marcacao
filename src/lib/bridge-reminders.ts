@@ -130,7 +130,7 @@ export async function dispatchBridgeReminders(options?: { clinicId?: string; dat
       });
 
       if (result.success) {
-        await prisma.bridgeReminderLog.create({ data: { clinicId: clinic.id, bridgeNumero: item.numero } });
+        await prisma.bridgeReminderLog.create({ data: { clinicId: clinic.id, bridgeNumero: item.numero, phone } });
         sent++;
       } else {
         failed++;

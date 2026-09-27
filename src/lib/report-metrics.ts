@@ -123,3 +123,67 @@ export function computeHourlyInbound(timestamps: Date[]) {
   }
   return buckets;
 }
+
+export type ConfirmationStats = ReturnType<typeof computeConfirmationStats>;
+export type BridgeConfirmationCounts = { sent: number; confirmed: number; cancelled: number; noReply: number };
+
+/** Lembretes D-1 do bridge (BridgeReminderLog) — o agendamento não existe no nosso banco,
+ * então a resposta fica no próprio log (gravada pelo webhook). "Remarcar" conta como
+ * liberado (o horário vaga). Sem resposta só conta depois de 1 dia (a consulta já passou). */
+export function computeBridgeConfirmationStats(
+  logs: { response: string | null; sentAt: Date }[],
+  now: Date = new Date()
+): BridgeConfirmationCounts {
+  const dayAgo = now.getTime() - 86400000;
+  return {
+    sent: logs.length,
+    confirmed: logs.filter((l) => l.response === "CONFIRMED").length,
+    cancelled: logs.filter((l) => l.response === "CANCELLED" || l.response === "RESCHEDULE").length,
+    noReply: logs.filter((l) => l.response === null && l.sentAt.getTime() < dayAgo).length,
+  };
+}
+
+export function mergeConfirmationStats(a: ConfirmationStats, b: BridgeConfirmationCounts): ConfirmationStats {
+  const totalSent = a.totalSent + b.sent;
+  const confirmed = a.confirmed + b.confirmed;
+  const cancelled = a.cancelled + b.cancelled;
+  const noReply = a.noReply + b.noReply;
+  return {
+    totalSent,
+    confirmed,
+    confirmedPct: pct(confirmed, totalSent),
+    cancelled,
+    cancelledPct: pct(cancelled, totalSent),
+    noReply,
+    noReplyPct: pct(noReply, totalSent),
+  };
+}
+
+export const UNIDENTIFIED_CHANNEL = "Não identificado";
+
+/** Conversão por canal de aquisição — mesma base do card de conversão do chat
+ * (agendamentos / conversas resolvidas). Receita = agendamentos × ticket médio (não há
+ * vínculo Conversation↔Appointment pra saber o procedimento de cada uma). */
+export function computeChannelConversion(
+  conversations: { acquisitionChannel: string | null; status: string; resolutionReason: string | null }[],
+  ticket: number | null
+) {
+  const byChannel = new Map<string, { conversations: number; resolved: number; scheduled: number }>();
+  for (const c of conversations) {
+    const key = c.acquisitionChannel ?? UNIDENTIFIED_CHANNEL;
+    const e = byChannel.get(key) ?? { conversations: 0, resolved: 0, scheduled: 0 };
+    e.conversations++;
+    if (c.status === "RESOLVED") e.resolved++;
+    if (c.resolutionReason === "AGENDAMENTO_CONCLUIDO") e.scheduled++;
+    byChannel.set(key, e);
+  }
+  return [...byChannel.entries()]
+    .map(([channel, e]) => ({
+      channel,
+      conversations: e.conversations,
+      scheduled: e.scheduled,
+      conversionRate: pct(e.scheduled, e.resolved),
+      estimatedRevenue: ticket !== null ? e.scheduled * ticket : null,
+    }))
+    .sort((a, b) => b.scheduled - a.scheduled || b.conversations - a.conversations);
+}

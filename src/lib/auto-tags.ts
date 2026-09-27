@@ -40,8 +40,11 @@ export function detectProcedureInterestTag(text: string): string | null {
  * texto pré-preenchido do link de WhatsApp de /clinicas (único CTA do site hoje com
  * texto distinto o bastante pra reconhecer) — melhor esforço, `null` quando não
  * reconhece nada (nunca bloqueia, nunca "adivinha"). */
+/** Texto de src/app/(public)/clinicas/page.tsx:156 — link de WhatsApp do marketplace de
+ * clínicas. Também usado por detectAcquisition (acquisition.ts). */
+export const MARKETPLACE_SOURCE_TEXT = "no Conecta Saúde";
+
 export function detectSourceTag(text: string): string | null {
-  // Texto de src/app/(public)/clinicas/page.tsx:156 — link de WhatsApp do marketplace de clínicas.
-  if (text.includes("no Conecta Saúde")) return MARKETPLACE_SOURCE_TAG;
+  if (text.includes(MARKETPLACE_SOURCE_TEXT)) return MARKETPLACE_SOURCE_TAG;
   return null;
 }

@@ -189,6 +189,10 @@ model Clinic {
   rating                Float    @default(0)
   reviewCount           Int      @default(0) @map("review_count")
   businessHours         Json?    @map("business_hours")
+  /// Ticket médio de consulta particular — usado no Faturamento Estimado / Receita
+  /// Protegida do /clinic/relatorio quando o procedimento não tem preço (ex: agendamentos
+  /// do Firebird, que caem num procedimento genérico). Null = sem estimativa.
+  defaultTicket         Decimal? @map("default_ticket") @db.Decimal(10, 2)
   createdAt             DateTime @default(now()) @map("created_at")
   updatedAt             DateTime @updatedAt @map("updated_at")
 
@@ -202,6 +206,7 @@ model Clinic {
   broadcastCampaigns  BroadcastCampaign[]
   bridgeReminderLogs  BridgeReminderLog[]
   knowledgeEntries    ClinicKnowledgeEntry[]
+  acquisitionRules    AcquisitionRule[]
 
   @@map("clinics")
 }
@@ -268,10 +273,19 @@ model BridgeReminderLog {
   clinicId     String   @map("clinic_id")
   bridgeNumero Int      @map("bridge_numero")
   sentAt       DateTime @default(now()) @map("sent_at")
+  /// Resposta do paciente ao lembrete ("CONFIRMED" | "CANCELLED" | "RESCHEDULE") —
+  /// gravada pelo webhook. Null = sem resposta. Base da seção de Confirmações e da
+  /// Receita Protegida do /clinic/relatorio.
+  /// Telefone pra casar a resposta do paciente com este lembrete (o agendamento do
+  /// bridge não existe no nosso banco). Null em lembretes antigos.
+  phone        String?
+  response     String?
+  respondedAt  DateTime? @map("responded_at")
 
   clinic Clinic @relation(fields: [clinicId], references: [id])
 
   @@unique([clinicId, bridgeNumero])
+  @@index([clinicId, phone])
   @@map("bridge_reminder_logs")
 }
 
@@ -506,6 +520,15 @@ model Conversation {
   /// quando chega mensagem nova do paciente (ver webhook) — nunca deixa uma mensagem
   /// de verdade escondida numa conversa arquivada e esquecida.
   archivedAt       DateTime?               @map("archived_at")
+  /// Canal de aquisição detectado na 1ª mensagem (ver detectAcquisition em
+  /// src/lib/acquisition.ts) — fica na conversa, não no Contact, porque o contato é
+  /// compartilhado entre clínicas e a origem é por clínica. Null = conversa anterior
+  /// ao rastreamento. Editável manualmente pelo Inbox.
+  acquisitionChannel String?             @map("acquisition_channel")
+  /// Título do anúncio ou texto-chave que casou
+  acquisitionDetail  String?             @map("acquisition_detail")
+  /// ID do anúncio do Meta (externalAdReply.sourceId), pra agrupar por campanha
+  acquisitionAdId    String?             @map("acquisition_ad_id")
   createdAt        DateTime                @default(now()) @map("created_at")
   updatedAt        DateTime                @updatedAt @map("updated_at")
 
@@ -814,4 +837,19 @@ model ChatAutomation {
   updatedAt    DateTime @updatedAt @map("updated_at")
 
   @@map("chat_automations")
+}
+
+/// Texto-chave de campanha (ex: texto pré-preenchido do link do anúncio) → canal de
+/// aquisição. Checado contra a 1ª mensagem da conversa, sem diferenciar caixa/acento.
+model AcquisitionRule {
+  id        String   @id @default(cuid())
+  clinicId  String   @map("clinic_id")
+  keyword   String
+  channel   String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  clinic Clinic @relation(fields: [clinicId], references: [id])
+
+  @@index([clinicId])
+  @@map("acquisition_rules")
 }

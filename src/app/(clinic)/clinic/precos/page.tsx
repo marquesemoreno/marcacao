@@ -2,7 +2,9 @@ import {
   getClinicInfo,
   listClinicProcedures,
   listProceduresNotOffered,
+  listAcquisitionRules,
 } from "@/actions/clinic";
+import { ReportSettingsForm } from "@/components/clinic/report-settings-form";
 import { BusinessHoursForm } from "@/components/clinic/business-hours-form";
 import { ClinicProcedureForm } from "@/components/clinic/clinic-procedure-form";
 import { AddProcedureForm } from "@/components/clinic/add-procedure-form";
@@ -13,10 +15,11 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export default async function ClinicSettingsPage() {
-  const [clinic, clinicProcedures, availableProcedures] = await Promise.all([
+  const [clinic, clinicProcedures, availableProcedures, acquisitionRules] = await Promise.all([
     getClinicInfo(),
     listClinicProcedures(),
     listProceduresNotOffered(),
+    listAcquisitionRules(),
   ]);
 
   const businessHours = (clinic.businessHours as BusinessHours | null) ?? ({} as Partial<BusinessHours>);
@@ -37,6 +40,11 @@ export default async function ClinicSettingsPage() {
             <ClinicProcedureForm key={cp.id} item={toPlainClinicProcedureItem(cp)} />
           ))}
         </div>
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="text-sm font-semibold text-slate-800">Relatórios e origem dos pacientes</h2>
+        <ReportSettingsForm defaultTicket={clinic.defaultTicket?.toString() ?? null} rules={acquisitionRules} />
       </section>
 
       {availableProcedures.length > 0 && (

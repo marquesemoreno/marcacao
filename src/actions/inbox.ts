@@ -305,6 +305,20 @@ export async function togglePinConversation(conversationId: string, pinned: bool
   revalidatePath("/clinic/inbox");
 }
 
+/** Corrige manualmente o canal de aquisição detectado na 1ª mensagem (ver
+ * src/lib/acquisition.ts) — ex: paciente veio de anúncio mas escreveu "bom dia" sem o
+ * texto pré-preenchido. `null` volta pra "não identificado". */
+export async function updateConversationAcquisition(conversationId: string, channel: string | null) {
+  const { clinicId } = await requireClinicSession();
+  await assertClinicOwnsConversation(conversationId, clinicId);
+  const value = channel?.trim().slice(0, 60) || null;
+  await prisma.conversation.update({
+    where: { id: conversationId },
+    data: { acquisitionChannel: value, ...(value ? {} : { acquisitionDetail: null, acquisitionAdId: null }) },
+  });
+  revalidatePath("/clinic/inbox");
+}
+
 /** Silencia notificação de mensagem nova (som/desktop) por um tempo — `until: null`
  * dessilencia. Não esconde o badge de não lida (ver toChatContact/isMuted). */
 export async function muteConversation(conversationId: string, until: Date | null) {

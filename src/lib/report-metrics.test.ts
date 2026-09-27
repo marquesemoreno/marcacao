@@ -6,6 +6,9 @@ import {
   classifyAppointmentKind,
   computeKindDistribution,
   computeHourlyInbound,
+  computeBridgeConfirmationStats,
+  mergeConfirmationStats,
+  computeChannelConversion,
 } from "./report-metrics";
 
 describe("computeAttendantPerformance", () => {
@@ -90,5 +93,54 @@ describe("computeHourlyInbound", () => {
     expect(buckets).toHaveLength(11);
     expect(buckets[0]).toEqual({ hour: 8, count: 2 });
     expect(buckets[10]).toEqual({ hour: 18, count: 1 });
+  });
+});
+
+describe("computeBridgeConfirmationStats", () => {
+  const now = new Date("2026-09-28T12:00:00Z");
+  it("conta respostas dos lembretes do bridge; sem retorno só depois de 1 dia sem resposta", () => {
+    expect(
+      computeBridgeConfirmationStats(
+        [
+          { response: "CONFIRMED", sentAt: new Date("2026-09-27T10:00:00Z") },
+          { response: "CANCELLED", sentAt: new Date("2026-09-27T10:00:00Z") },
+          { response: "RESCHEDULE", sentAt: new Date("2026-09-27T10:00:00Z") },
+          { response: null, sentAt: new Date("2026-09-26T10:00:00Z") },
+          { response: null, sentAt: new Date("2026-09-28T10:00:00Z") },
+        ],
+        now
+      )
+    ).toEqual({ sent: 5, confirmed: 1, cancelled: 2, noReply: 1 });
+  });
+
+  it("mergeConfirmationStats soma as duas fontes e recalcula %", () => {
+    const merged = mergeConfirmationStats(
+      { totalSent: 2, confirmed: 1, confirmedPct: 50, cancelled: 0, cancelledPct: 0, noReply: 1, noReplyPct: 50 },
+      { sent: 2, confirmed: 2, cancelled: 0, noReply: 0 }
+    );
+    expect(merged).toEqual({ totalSent: 4, confirmed: 3, confirmedPct: 75, cancelled: 0, cancelledPct: 0, noReply: 1, noReplyPct: 25 });
+  });
+});
+
+describe("computeChannelConversion", () => {
+  it("agrupa por canal (null = Não identificado), conversão sobre resolvidas, ordena por agendamentos", () => {
+    const rows = computeChannelConversion(
+      [
+        { acquisitionChannel: "Instagram Ads", status: "RESOLVED", resolutionReason: "AGENDAMENTO_CONCLUIDO" },
+        { acquisitionChannel: "Instagram Ads", status: "RESOLVED", resolutionReason: "DUVIDA" },
+        { acquisitionChannel: "Instagram Ads", status: "OPEN", resolutionReason: null },
+        { acquisitionChannel: null, status: "RESOLVED", resolutionReason: "AGENDAMENTO_CONCLUIDO" },
+        { acquisitionChannel: null, status: "RESOLVED", resolutionReason: "AGENDAMENTO_CONCLUIDO" },
+      ],
+      200
+    );
+    expect(rows).toEqual([
+      { channel: "Não identificado", conversations: 2, scheduled: 2, conversionRate: 100, estimatedRevenue: 400 },
+      { channel: "Instagram Ads", conversations: 3, scheduled: 1, conversionRate: 50, estimatedRevenue: 200 },
+    ]);
+  });
+
+  it("sem ticket, receita estimada é null", () => {
+    expect(computeChannelConversion([{ acquisitionChannel: "X", status: "OPEN", resolutionReason: null }], null)[0].estimatedRevenue).toBeNull();
   });
 });

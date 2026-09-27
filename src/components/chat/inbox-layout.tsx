@@ -1,5 +1,7 @@
 "use client";
 
+import { ACQUISITION_CHANNELS } from "@/lib/acquisition";
+import { AcquisitionBadge } from "@/components/chat/acquisition-badge";
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Contact,
@@ -212,6 +214,8 @@ interface InboxLayoutProps {
   onTransferAgent: (agentId: string, agentName: string) => Promise<void> | void;
   availableClinics?: { id: string; tradeName: string }[];
   onReassignClinic?: (clinicId: string) => Promise<void> | void;
+  /** Só na visão da clínica — correção manual do canal de aquisição (Perfil & CRM). */
+  onChangeAcquisition?: (contactId: string, channel: string | null) => Promise<void> | void;
   /** Filtro de clínica da fila (scope admin, que vê todas juntas) — "" = todas.
    * Reaproveita availableClinics, que já lista as clínicas ativas. */
   clinicFilter?: string;
@@ -464,6 +468,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
   onTransferAgent,
   availableClinics,
   onReassignClinic,
+  onChangeAcquisition,
   clinicFilter,
   onClinicFilterChange,
   onCreateContact,
@@ -1420,7 +1425,12 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                       )
                     )}
                   </div>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{selectedContact.phone}</p>
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{selectedContact.phone}</p>
+                    {selectedContact.acquisitionChannel && (
+                      <AcquisitionBadge channel={selectedContact.acquisitionChannel} detail={selectedContact.acquisitionDetail} />
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -2211,6 +2221,24 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                       <span className="text-slate-800 dark:text-slate-200 font-semibold">{selectedContact.cpf}</span>
                     </div>
                   )}
+                  <div className="flex justify-between items-center gap-2">
+                    <span className="text-slate-500 dark:text-slate-400 font-medium">Origem:</span>
+                    {onChangeAcquisition ? (
+                      <select
+                        value={selectedContact.acquisitionChannel ?? ""}
+                        onChange={(e) => onChangeAcquisition(selectedContact.id, e.target.value || null)}
+                        title={selectedContact.acquisitionDetail ? `Detectado: ${selectedContact.acquisitionDetail}` : undefined}
+                        className="max-w-[150px] truncate rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-1.5 py-0.5 text-xs font-semibold text-slate-800 dark:text-slate-200"
+                      >
+                        <option value="">Não identificado</option>
+                        {[...new Set([...ACQUISITION_CHANNELS, ...(selectedContact.acquisitionChannel ? [selectedContact.acquisitionChannel] : [])])].map((ch) => (
+                          <option key={ch} value={ch}>{ch}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <span className="font-semibold text-slate-800 dark:text-slate-200">{selectedContact.acquisitionChannel ?? "Não identificado"}</span>
+                    )}
+                  </div>
                   <div className="flex justify-between">
                     <span className="text-slate-500 dark:text-slate-400 font-medium">Bairro/Região:</span>
                     <span className="font-semibold text-slate-800 dark:text-slate-200">{selectedContact.neighborhood || 'Não informado'}</span>

@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import type { AppointmentStatus, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { sendAppointmentConfirmation, sendWhatsAppMessage, formatToWhatsAppNumber, getEvolutionConfig } from "@/lib/whatsapp";
+import { sendAppointmentConfirmation, sendWhatsAppMessage, formatToWhatsAppNumber, getEvolutionConfig, toggleNinthDigit } from "@/lib/whatsapp";
+import { detectAcquisition } from "@/lib/acquisition";
 import { fetchMediaBase64, uploadWhatsAppMedia, formatDuration } from "@/lib/whatsapp-media";
 import { formatFileSize } from "@/lib/format";
 import { notifyInboxRealtime } from "@/lib/supabase-server";
@@ -254,6 +255,26 @@ async function logInbound(payload: Prisma.InputJsonValue, status: string) {
  * de clínica (ver resolução por `instance` no POST) — nesse caso pula direto o fallback
  * de casar por Appointment/clínica-mais-antiga, que é só pra instância global compartilhada.
  */
+/** Grava a resposta do paciente no lembrete D-1 do bridge (BridgeReminderLog) — base da
+ * seção de Confirmações e da Receita Protegida do /clinic/relatorio. Casa pelo telefone
+ * (com e sem 9º dígito) no lembrete mais recente ainda sem resposta dos últimos 4 dias.
+ * Nunca derruba o fluxo do webhook. */
+async function recordBridgeReminderResponse(clinicId: string, phone: string, response: "CONFIRMED" | "CANCELLED" | "RESCHEDULE") {
+  try {
+    const full = formatToWhatsAppNumber(phone);
+    const variants = [full, toggleNinthDigit(full)].filter((v): v is string => !!v);
+    const log = await prisma.bridgeReminderLog.findFirst({
+      where: { clinicId, phone: { in: variants }, response: null, sentAt: { gte: new Date(Date.now() - 4 * 86400000) } },
+      orderBy: { sentAt: "desc" },
+    });
+    if (log) {
+      await prisma.bridgeReminderLog.update({ where: { id: log.id }, data: { response, respondedAt: new Date() } });
+    }
+  } catch (error) {
+    console.error("Falha ao registrar resposta do lembrete do bridge:", error);
+  }
+}
+
 async function findOrCreateConversation(phone: string, name: string | undefined, resolvedClinicId?: string) {
   const fullPhone = formatToWhatsAppNumber(phone);
   const phoneSuffix = fullPhone.slice(-11);
@@ -608,6 +629,28 @@ export async function POST(request: Request) {
       const sourceTag = detectSourceTag(incoming.text);
       if (sourceTag && !conversation.tags.includes(sourceTag)) tagsToPush.push(sourceTag);
     }
+    // Canal de aquisição (ver src/lib/acquisition.ts) — só na 1ª mensagem da conversa,
+    // que é a que carrega o anúncio/texto pré-preenchido. Falha aqui nunca bloqueia.
+    if (isNewConversation) {
+      try {
+        const rules = await prisma.acquisitionRule.findMany({
+          where: { clinicId: conversation.clinicId },
+          select: { keyword: true, channel: true },
+        });
+        const acquisition = detectAcquisition({ text: incoming.text, data: dataPayload }, rules);
+        await prisma.conversation.update({
+          where: { id: conversation.id },
+          data: {
+            acquisitionChannel: acquisition.channel,
+            acquisitionDetail: acquisition.detail,
+            acquisitionAdId: acquisition.adId,
+          },
+        });
+      } catch (error) {
+        console.error("Falha ao detectar canal de aquisição:", error);
+      }
+    }
+
     if (tagsToPush.length > 0) {
       await prisma.conversation.update({
         where: { id: conversation.id },
@@ -830,6 +873,7 @@ export async function POST(request: Request) {
   // pra alguém assumir e remarcar na mão, e avisa o paciente que entendeu.
   if (rescheduleRequested) {
     if (conversation) {
+      await recordBridgeReminderResponse(conversation.clinicId, incoming.phone, "RESCHEDULE");
       await prisma.message.create({
         data: {
           conversationId: conversation.id,
@@ -904,6 +948,7 @@ export async function POST(request: Request) {
     // a resposta na conversa pra atendente ver e agir manualmente — não dá pra
     // atualizar de volta o Firebird, o bridge hoje só insere, nunca atualiza.
     if (conversation) {
+      await recordBridgeReminderResponse(conversation.clinicId, incoming.phone, newStatus === "CONFIRMED" ? "CONFIRMED" : "CANCELLED");
       const aiSuffix = classifiedByAi ? ` (interpretado pela IA a partir de: "${incoming.text}")` : "";
       const noteText =
         newStatus === "CONFIRMED"

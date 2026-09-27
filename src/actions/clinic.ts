@@ -19,6 +19,10 @@ import {
   computeTopDoctors,
   computeKindDistribution,
   computeHourlyInbound,
+  computeBridgeConfirmationStats,
+  mergeConfirmationStats,
+  computeChannelConversion,
+  UNIDENTIFIED_CHANNEL,
 } from "@/lib/report-metrics";
 
 export async function getClinicInfo() {
@@ -79,10 +83,17 @@ export async function getDistinctConversationTags(days: number = 30) {
  * por clinicId em vez da plataforma inteira. Duplicado de propósito (mesmo padrão
  * clínica/admin usado no resto do projeto) em vez de generalizar as funções do admin.
  * `tags`, quando informado, filtra pra conversas que tenham QUALQUER uma delas. */
-export async function getClinicChatReport(days: number = 30, tags?: string[]) {
+/** Filtro do relatório por Conversation.acquisitionChannel — UNIDENTIFIED_CHANNEL casa
+ * as conversas sem canal (anteriores ao rastreamento ou abertas por lembrete/disparo). */
+function channelWhere(channel?: string) {
+  if (!channel) return {};
+  return { acquisitionChannel: channel === UNIDENTIFIED_CHANNEL ? null : channel };
+}
+
+export async function getClinicChatReport(days: number = 30, tags?: string[], channel?: string) {
   const { clinicId } = await requireClinicSession();
   const since = addUTCDays(startOfUTCDay(new Date()), -days);
-  const tagsFilter = tags && tags.length > 0 ? { tags: { hasSome: tags } } : {};
+  const tagsFilter = { ...(tags && tags.length > 0 ? { tags: { hasSome: tags } } : {}), ...channelWhere(channel) };
 
   const [conversations, audits] = await Promise.all([
     prisma.conversation.findMany({
@@ -192,14 +203,15 @@ export async function getClinicAppointmentsReport(days: number = 30, doctorName?
 /** Métricas de gestão do /clinic/relatorio (equipe, confirmações, médicos, tipo de
  * atendimento, horário de pico). Agregação em src/lib/report-metrics.ts. O atendente de
  * uma conversa é quem a resolveu (resolvedByUserId), senão quem está atribuído. */
-export async function getClinicManagementReport(days: number = 30) {
+export async function getClinicManagementReport(days: number = 30, channel?: string) {
   const { clinicId } = await requireClinicSession();
   const since = addUTCDays(startOfUTCDay(new Date()), -days);
 
-  const [conversations, appointments, inbound] = await Promise.all([
+  const [allConversations, appointments, inbound, bridgeLogs, clinic] = await Promise.all([
     prisma.conversation.findMany({
       where: { clinicId, createdAt: { gte: since } },
       select: {
+        acquisitionChannel: true,
         status: true,
         resolutionReason: true,
         resolvedByUserId: true,
@@ -215,14 +227,27 @@ export async function getClinicManagementReport(days: number = 30) {
         date: true,
         reminderSentAt: true,
         reminderStatus: true,
-        clinicProcedure: { select: { procedure: { select: { name: true, category: true } } } },
+        clinicProcedure: {
+          select: { price: true, promotionalPrice: true, procedure: { select: { name: true, category: true } } },
+        },
       },
     }),
     prisma.message.findMany({
       where: { direction: "INBOUND", createdAt: { gte: since }, conversation: { clinicId } },
       select: { createdAt: true },
     }),
+    prisma.bridgeReminderLog.findMany({
+      where: { clinicId, sentAt: { gte: since } },
+      select: { response: true, sentAt: true },
+    }),
+    prisma.clinic.findUniqueOrThrow({ where: { id: clinicId }, select: { defaultTicket: true } }),
   ]);
+  const ticket = clinic.defaultTicket !== null ? Number(clinic.defaultTicket) : null;
+  // Canal filtra só o que vem de conversa (equipe, faturamento) — agendamentos,
+  // lembretes e mensagens não têm canal próprio. A tabela por canal usa todas.
+  const conversations = channel
+    ? allConversations.filter((c) => (c.acquisitionChannel ?? UNIDENTIFIED_CHANNEL) === channel)
+    : allConversations;
 
   const userIds = [
     ...new Set(conversations.map((c) => c.resolvedByUserId ?? c.assignedUserId).filter((id): id is string => !!id)),
@@ -246,9 +271,28 @@ export async function getClinicManagementReport(days: number = 30) {
     })
   );
 
+  // Faturamento Estimado: conversas finalizadas como agendamento × ticket médio (não há
+  // vínculo Conversation↔Appointment pra saber o procedimento). Receita Protegida:
+  // lembretes confirmados × preço do procedimento (agendamento nosso) ou ticket (bridge).
+  const scheduledCount = conversations.filter((c) => c.resolutionReason === "AGENDAMENTO_CONCLUIDO").length;
+  const bridgeConfirmations = computeBridgeConfirmationStats(bridgeLogs);
+  const ownConfirmedValue = appointments
+    .filter((a) => a.reminderStatus === "CONFIRMED")
+    .reduce((sum, a) => {
+      const price = Number(a.clinicProcedure.promotionalPrice ?? a.clinicProcedure.price);
+      return sum + (price > 0 ? price : ticket ?? 0);
+    }, 0);
+  const protectedRevenue =
+    ticket === null && ownConfirmedValue === 0 ? null : ownConfirmedValue + bridgeConfirmations.confirmed * (ticket ?? 0);
+
   return {
+    ticket,
+    estimatedRevenue: ticket !== null ? scheduledCount * ticket : null,
+    scheduledCount,
+    protectedRevenue,
+    channelConversion: computeChannelConversion(allConversations, ticket),
     attendants,
-    confirmations: computeConfirmationStats(appointments),
+    confirmations: mergeConfirmationStats(computeConfirmationStats(appointments), bridgeConfirmations),
     topDoctors: computeTopDoctors(appointments.map((a) => a.doctorName)),
     kindDistribution: computeKindDistribution(
       appointments.map((a) => ({
@@ -347,6 +391,20 @@ export async function updateAppointmentDoctor(appointmentId: string, doctorName:
 
 /** Nomes distintos já preenchidos em Appointment.doctorName pra essa clínica — popula
  * o seletor de médico do modal de remarcação em massa (ver reschedule-broadcast-modal). */
+/** Canais de aquisição presentes nas conversas do período — opções do filtro do relatório. */
+export async function getDistinctAcquisitionChannels(days: number = 30) {
+  const { clinicId } = await requireClinicSession();
+  const since = addUTCDays(startOfUTCDay(new Date()), -days);
+  const rows = await prisma.conversation.groupBy({
+    by: ["acquisitionChannel"],
+    where: { clinicId, createdAt: { gte: since } },
+    _count: true,
+  });
+  return rows
+    .map((r) => r.acquisitionChannel ?? UNIDENTIFIED_CHANNEL)
+    .sort((a, b) => a.localeCompare(b, "pt-BR"));
+}
+
 export async function getDistinctDoctorNames() {
   const { clinicId } = await requireClinicSession();
   const rows = await prisma.appointment.findMany({
@@ -415,6 +473,48 @@ export async function updateClinicProcedure(clinicProcedureId: string, formData:
     where: { id: clinicProcedureId },
     data,
   });
+  revalidatePath("/clinic/precos");
+}
+
+/** Ticket médio de consulta particular (Clinic.defaultTicket) — usado no Faturamento
+ * Estimado / Receita Protegida do /clinic/relatorio quando o procedimento não tem preço.
+ * Campo vazio = sem estimativa. */
+export async function updateClinicDefaultTicket(formData: FormData) {
+  const { clinicId } = await requireClinicSession();
+  const raw = String(formData.get("defaultTicket") ?? "").replace(",", ".").trim();
+  const value = raw === "" ? null : Number(raw);
+  if (value !== null && (!Number.isFinite(value) || value < 0 || value > 1_000_000)) {
+    throw new Error("Valor inválido");
+  }
+  await prisma.clinic.update({ where: { id: clinicId }, data: { defaultTicket: value } });
+  revalidatePath("/clinic/precos");
+  revalidatePath("/clinic/relatorio");
+}
+
+export async function listAcquisitionRules() {
+  const { clinicId } = await requireClinicSession();
+  return prisma.acquisitionRule.findMany({
+    where: { clinicId },
+    orderBy: { createdAt: "asc" },
+    select: { id: true, keyword: true, channel: true },
+  });
+}
+
+/** Texto-chave de campanha → canal (ver detectAcquisition em src/lib/acquisition.ts). */
+export async function addAcquisitionRule(formData: FormData) {
+  const { clinicId } = await requireClinicSession();
+  const keyword = String(formData.get("keyword") ?? "").trim();
+  const channel = String(formData.get("channel") ?? "").trim();
+  if (keyword.length < 3 || keyword.length > 200 || !channel || channel.length > 60) {
+    throw new Error("Preencha o texto (mín. 3 caracteres) e o canal.");
+  }
+  await prisma.acquisitionRule.create({ data: { clinicId, keyword, channel } });
+  revalidatePath("/clinic/precos");
+}
+
+export async function deleteAcquisitionRule(ruleId: string) {
+  const { clinicId } = await requireClinicSession();
+  await prisma.acquisitionRule.deleteMany({ where: { id: ruleId, clinicId } });
   revalidatePath("/clinic/precos");
 }
 

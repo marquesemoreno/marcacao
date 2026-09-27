@@ -199,6 +199,8 @@ export function toChatContact(conversation: ConversationWithRelations, viewerUse
     queueState: computeQueueState(conversation),
     consultationHistory: [],
     estimatedValue: conversation.estimatedValue ? formatCurrency(conversation.estimatedValue.toString()) : undefined,
+    acquisitionChannel: conversation.acquisitionChannel ?? undefined,
+    acquisitionDetail: conversation.acquisitionDetail ?? undefined,
     pinned: conversation.pinned,
     isMuted: Boolean(conversation.mutedUntil && conversation.mutedUntil.getTime() > Date.now()),
     isArchived: Boolean(conversation.archivedAt),

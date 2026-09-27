@@ -36,6 +36,7 @@ import {
   markConversationRead,
   markConversationUnread,
   togglePinConversation,
+  updateConversationAcquisition,
   muteConversation,
   archiveConversation,
   sendAudioMessage,
@@ -920,6 +921,11 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
     await refreshContacts();
   }
 
+  async function handleChangeAcquisition(contactId: string, channel: string | null) {
+    await updateConversationAcquisition(contactId, channel);
+    await refreshContacts();
+  }
+
   async function handleMuteConversation(contactId: string, until: Date | null) {
     await actions.muteConversation(contactId, until);
     await refreshContacts();
@@ -1021,6 +1027,7 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
           onTransferAgent={handleTransferAgent}
           availableClinics={scope === "admin" ? availableClinics : undefined}
           onReassignClinic={scope === "admin" ? handleReassignClinic : undefined}
+          onChangeAcquisition={scope === "admin" ? undefined : handleChangeAcquisition}
           clinicFilter={scope === "admin" ? clinicFilter : undefined}
           onClinicFilterChange={scope === "admin" ? setClinicFilter : undefined}
           outboundFromDeviceStats={scope === "admin" ? outboundFromDeviceStats : undefined}
