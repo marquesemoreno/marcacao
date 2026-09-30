@@ -23,4 +23,4 @@
 ## 4. Componentes e Formulários
 - Inputs e Selects: `h-9 px-3 rounded-lg border border-slate-200 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500`
 - Modais: Layout sempre em grid de 2 colunas no desktop (`md:grid-cols-2 gap-4`), sem scroll vertical interno desnecessário.
-- Badges / Chips: `text-xs px-2.5 py-0.5 rounded-full font-medium border`
+- Badges / Chips: `text-xs px-2.5 py-0.5 rounded-md font-medium border` — sem pílula (`rounded-full`), mesmo espírito do item 1 (cantos sutis também em badges, não só formulários)

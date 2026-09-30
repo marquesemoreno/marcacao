@@ -24,7 +24,7 @@ export interface ConsultationRecord {
   specialty: string;
   doctor: string;
   date: string;
-  status: 'concluida' | 'cancelada' | 'agendada';
+  status: 'confirmada' | 'concluida' | 'cancelada' | 'no_show' | 'agendada';
   price?: string;
   /** Preparo de exame já cadastrado pra esse procedimento (ver Procedure.preparationInstructions)
    * — mesmo texto que já é enviado por WhatsApp na confirmação/lembrete. */
@@ -91,6 +91,10 @@ export interface Contact {
   name: string;
   phone: string;
   cpf: string;
+  /** Texto livre, sem cadastro/FK — mesmo padrão do doctorName em Appointment.
+   * Editável na aba "Resumo" da ficha do paciente (ver patient-record-sheet.tsx). */
+  convenio?: string;
+  preferredDoctor?: string;
   neighborhood: string;
   /** Entidade (empresa cliente) do GLPI vinculada a este contato — só relevante pro
    * TIVDC, que usa isso pra abrir chamado na empresa certa (ver Contact.glpiEntityId). */
@@ -110,6 +114,11 @@ export interface Contact {
   /** Conversa tem dono e não sou eu — mostra o banner "Esta conversa está com X" +
    * botão "Assumir Conversa" no header do chat (ver inbox-layout.tsx). */
   assignedToOther: boolean;
+  /** Minutos desde a última mensagem do paciente ainda sem resposta — null quando já
+   * foi respondida ou a conversa está finalizada (esconde o badge de SLA no card, ver
+   * inbox-layout.tsx). Calculado a partir da mensagem mais recente já buscada em
+   * listConversations, sem query extra (ver toChatContact). */
+  slaWaitingMinutes: number | null;
   lastMessage: string;
   lastMessageTime: string;
   statusTag: {
