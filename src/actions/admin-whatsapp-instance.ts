@@ -11,6 +11,7 @@ import {
   getEvolutionConnectionState,
   restartEvolutionInstance,
   logoutEvolutionInstance,
+  setEvolutionCallBlocking,
   type EvolutionInstanceConfig,
 } from "@/lib/evolution-admin";
 
@@ -130,5 +131,18 @@ export async function disconnectInstance(clinicId: string) {
   }
   await prisma.whatsappInstance.update({ where: { clinicId }, data: { status: "DISCONNECTED" } });
   revalidatePath("/admin/clinicas");
+  return { success: true as const };
+}
+
+/** Rejeita automaticamente chamadas de voz/vídeo recebidas nessa instância. Quando
+ * `enabled`, `message` é enviado como texto avulso pro chamador (ex: direcionando pra
+ * um telefone fixo) — quando `!enabled`, desativa a rejeição e limpa a mensagem salva. */
+export async function setCallBlocking(clinicId: string, enabled: boolean, message: string) {
+  await requireAdminSession();
+  const config = await getInstanceConfigOrThrow(clinicId);
+  const result = await setEvolutionCallBlocking(config, enabled, message);
+  if (!result.success) {
+    return { success: false as const, error: result.error };
+  }
   return { success: true as const };
 }

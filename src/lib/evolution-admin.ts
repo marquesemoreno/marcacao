@@ -103,22 +103,79 @@ export async function setEvolutionWebhook(config: EvolutionInstanceConfig) {
   });
 }
 
+type EvolutionSettings = {
+  rejectCall?: boolean;
+  msgCall?: string;
+  groupsIgnore?: boolean;
+  alwaysOnline?: boolean;
+  readMessages?: boolean;
+  readStatus?: boolean;
+  syncFullHistory?: boolean;
+};
+
+/** Configuração atual salva na instância (Baileys) — usado pra não sobrescrever campos
+ * que a clínica já customizou quando só queremos mudar UM campo (`/settings/set` da
+ * Evolution API espera o objeto inteiro, não faz merge parcial). */
+export async function getEvolutionSettings(config: EvolutionInstanceConfig) {
+  return evolutionFetch<EvolutionSettings>(config, `/settings/find/${config.instanceName}`, {
+    method: "GET",
+  });
+}
+
+const DEFAULT_SETTINGS: Required<EvolutionSettings> = {
+  rejectCall: false,
+  msgCall: "",
+  groupsIgnore: false,
+  alwaysOnline: false,
+  readMessages: false,
+  readStatus: false,
+  syncFullHistory: false,
+};
+
 /** Liga a sincronização de histórico completo (recurso nativo do WhatsApp
  * multi-dispositivo, via Baileys) — só tem efeito prático na PRÓXIMA vez que o
  * número for pareado (desconectar + escanear o QR Code de novo), não em uma
- * instância já conectada. Mantém os outros campos no default (nenhuma clínica
- * customizou nada além disso até agora) pra não resetar configuração por engano. */
+ * instância já conectada. Busca a configuração atual antes de gravar pra não
+ * resetar por engano campos que a clínica já customizou (ex: rejectCall/msgCall). */
 export async function setEvolutionSyncFullHistory(config: EvolutionInstanceConfig, enabled: boolean) {
+  const current = await getEvolutionSettings(config);
+  const base = current.success ? current.data : {};
+  return evolutionFetch<unknown>(config, `/settings/set/${config.instanceName}`, {
+    method: "POST",
+    body: JSON.stringify({ ...DEFAULT_SETTINGS, ...base, syncFullHistory: enabled }),
+  });
+}
+
+/** Limite real da coluna `msgCall` no banco da Evolution API (`varchar(100)`) — confirmado
+ * batendo direto no Postgres deles: mensagem maior que isso derruba o INSERT com "value too
+ * long for type character varying(100)" e a Evolution devolve um 500 sem indicar a causa
+ * (o corpo do erro deles nem cita a coluna certa), então validamos aqui antes de mandar. */
+const MSG_CALL_MAX_LENGTH = 100;
+
+/** Ativa/desativa a rejeição automática de chamadas de voz/vídeo — Baileys recusa a
+ * ligação na hora e, se `enabled`, manda `message` como texto avulso pro chamador (ex:
+ * direcionando pra um número fixo). Busca a config atual primeiro pelo mesmo motivo de
+ * `setEvolutionSyncFullHistory`: `/settings/set` grava o objeto inteiro, não faz merge. */
+export async function setEvolutionCallBlocking(
+  config: EvolutionInstanceConfig,
+  enabled: boolean,
+  message: string
+) {
+  if (enabled && message.length > MSG_CALL_MAX_LENGTH) {
+    return {
+      success: false as const,
+      error: `Mensagem tem ${message.length} caracteres, o máximo é ${MSG_CALL_MAX_LENGTH}.`,
+    };
+  }
+  const current = await getEvolutionSettings(config);
+  const base = current.success ? current.data : {};
   return evolutionFetch<unknown>(config, `/settings/set/${config.instanceName}`, {
     method: "POST",
     body: JSON.stringify({
-      rejectCall: false,
-      msgCall: "",
-      groupsIgnore: false,
-      alwaysOnline: false,
-      readMessages: false,
-      readStatus: false,
-      syncFullHistory: enabled,
+      ...DEFAULT_SETTINGS,
+      ...base,
+      rejectCall: enabled,
+      msgCall: enabled ? message : "",
     }),
   });
 }
