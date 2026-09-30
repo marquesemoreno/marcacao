@@ -73,15 +73,23 @@ export async function notifyInboxRealtime(clinicId?: string) {
       (name) =>
         new Promise<void>((resolve) => {
           const channel = supabase.channel(name);
+          // `removeChannel` fecha o canal via `unsubscribe()`, o que dispara de novo
+          // o mesmo callback de status com CLOSED (é como o SDK propaga o fechamento,
+          // não é reentrada nossa) — sem essa flag, o branch CLOSED chamaria
+          // `removeChannel` outra vez, que fecharia de novo, disparando CLOSED de novo,
+          // numa recursão síncrona sem fim (RangeError: Maximum call stack size exceeded).
+          let settled = false;
+          const finish = () => {
+            if (settled) return;
+            settled = true;
+            supabase.removeChannel(channel);
+            resolve();
+          };
           channel.subscribe((status) => {
             if (status === "SUBSCRIBED") {
-              channel.send({ type: "broadcast", event: "changed", payload: {} }).finally(() => {
-                supabase.removeChannel(channel);
-                resolve();
-              });
+              channel.send({ type: "broadcast", event: "changed", payload: {} }).finally(finish);
             } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
-              supabase.removeChannel(channel);
-              resolve();
+              finish();
             }
           });
         })
