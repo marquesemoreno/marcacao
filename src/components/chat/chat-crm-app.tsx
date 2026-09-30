@@ -16,6 +16,7 @@ import {
   refreshContactPhoto,
   assignConversationToUser,
   claimConversation,
+  takeOverConversation,
   reactivateAiForConversation,
   transferConversation,
   getAttendantCapacity,
@@ -127,11 +128,17 @@ import type { Agent, Contact, FunnelStage, InboxFilter, Message } from "@/types/
 type Scope = "clinic" | "admin";
 type View = "inbox" | "crm";
 
-type ListChatContactsFn = (filter: InboxFilter, search?: string, clinicId?: string) => Promise<Contact[]>;
+type ListChatContactsFn = (
+  filter: InboxFilter,
+  search?: string,
+  clinicId?: string,
+  assignedUserIdFilter?: string
+) => Promise<Contact[]>;
 
 const ACTIONS_BY_SCOPE = {
   clinic: {
-    listChatContacts: ((filter, search) => listChatContacts(filter, search)) as ListChatContactsFn,
+    listChatContacts: ((filter, search, _clinicId, assignedUserIdFilter) =>
+      listChatContacts(filter, search, assignedUserIdFilter)) as ListChatContactsFn,
     listChatAgents: () => listChatAgents(),
     getChatMessages: (id: string) => getChatMessages(id),
     getOlderChatMessages: (id: string, beforeId: string) => getOlderChatMessages(id, beforeId),
@@ -230,6 +237,10 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
   const actions = ACTIONS_BY_SCOPE[scope];
 
   const [filterTab, setFilterTab] = useState<InboxFilter>("nao_atribuidas");
+  /** Seletor "Filtrar por Atendente" — "" = todos. Só faz sentido em "todas" /
+   * "finalizadas" / "arquivadas" (em "minhas" já sou eu, "não atribuídas" não tem
+   * dono), então zera sozinho ao trocar pra uma dessas abas (ver handleFilterTabChange). */
+  const [agentFilter, setAgentFilter] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [agents, setAgents] = useState<Agent[]>([]);
@@ -327,7 +338,7 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
               actions.listChatContacts("finalizadas", searchQuery || undefined, clinicIdArg),
             ])
           ).flat()
-        : await actions.listChatContacts(filterTab, searchQuery || undefined, clinicIdArg);
+        : await actions.listChatContacts(filterTab, searchQuery || undefined, clinicIdArg, agentFilter || undefined);
     setContacts(result);
 
     const totalUnread = result.reduce((sum, item) => sum + item.unreadCount, 0);
@@ -362,7 +373,7 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
       return result[0]?.id ?? null;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [actions, filterTab, searchQuery, scope, view, clinicFilter]);
+  }, [actions, filterTab, searchQuery, scope, view, clinicFilter, agentFilter]);
 
   useEffect(() => {
     requestNotificationPermission();
@@ -899,6 +910,21 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
     }
   }
 
+  /** "Assumir Conversa" — reatribui à força mesmo se já tiver dono (ver banner "Esta
+   * conversa está com X" no header do chat). Só existe no scope clínica: recepção
+   * ajudando colega, não faz sentido no painel admin. */
+  async function handleTakeOverConversation() {
+    if (!selectedContactId || scope !== "clinic") return;
+    const result = await takeOverConversation(selectedContactId);
+    if (!result.success) {
+      toast.error(result.message || "Não foi possível assumir a conversa.");
+    } else {
+      toast.success("Conversa assumida por você.");
+      await refreshContacts();
+      await refreshMessages();
+    }
+  }
+
   async function handleReactivateAi() {
     if (!selectedContactId) return { success: false as const, message: "Nenhuma conversa selecionada." };
     const reactivateFn = scope === "admin" ? reactivateAiForConversationAdmin : reactivateAiForConversation;
@@ -994,7 +1020,15 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
           selectedContact={selectedContact}
           onSelectContact={selectContact}
           filterTab={filterTab}
-          onFilterTabChange={setFilterTab}
+          onFilterTabChange={(tab) => {
+            setFilterTab(tab);
+            // "Minhas"/"Não Atribuídas" não combinam com o filtro por atendente (já sou
+            // eu / não tem dono nenhum) — zera pra não deixar um filtro escondido e
+            // confuso quando a atendente voltar pra "Todas".
+            if (tab === "minhas" || tab === "nao_atribuidas") setAgentFilter("");
+          }}
+          agentFilter={agentFilter}
+          onAgentFilterChange={scope === "clinic" ? setAgentFilter : undefined}
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
           quickReplies={quickReplies}
@@ -1015,6 +1049,7 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
           onUpdatePatient={handleUpdatePatient}
           onUpdateFunnelStage={handleUpdateFunnelStage}
           onClaimConversation={handleClaimConversation}
+          onTakeOverConversation={scope === "clinic" ? handleTakeOverConversation : undefined}
           onReactivateAi={handleReactivateAi}
           onMarkUnread={handleMarkUnread}
           onTogglePin={handleTogglePin}

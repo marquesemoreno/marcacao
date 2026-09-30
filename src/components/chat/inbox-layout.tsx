@@ -197,6 +197,14 @@ interface InboxLayoutProps {
   }) => Promise<{ success: boolean; error?: string } | void> | { success: boolean; error?: string } | void;
   onUpdateFunnelStage: (stage: FunnelStage) => Promise<void> | void;
   onClaimConversation?: () => Promise<void> | void;
+  /** "Assumir Conversa" — reatribui à força pra mim mesmo se a conversa já tiver dono
+   * (diferente de onClaimConversation, que só funciona em conversa sem dono). Mostrado
+   * no banner "Esta conversa está com X" quando selectedContact.assignedToOther. */
+  onTakeOverConversation?: () => Promise<void> | void;
+  /** Seletor "Filtrar por Atendente" da fila — "" = todos. Só faz sentido nas abas
+   * "todas"/"finalizadas"/"arquivadas" (o componente decide quando mostrar). */
+  agentFilter?: string;
+  onAgentFilterChange?: (agentId: string) => void;
   /** "Devolver pra IA" — reativa aiEnabled numa conversa que um humano assumiu (ver
    * reactivateAiForConversation em actions/inbox.ts). Só mostrado quando a conversa
    * está com queueState "HUMANO_ATENDENDO". */
@@ -466,6 +474,9 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
   onUpdatePatient,
   onUpdateFunnelStage,
   onClaimConversation,
+  onTakeOverConversation,
+  agentFilter,
+  onAgentFilterChange,
   onReactivateAi,
   onMarkUnread,
   onTogglePin,
@@ -1257,6 +1268,28 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
           </div>
           </div>
 
+          {/* Filtro rápido por atendente — só faz sentido em "todas"/"finalizadas"/"arquivadas"
+             (em "minhas" já sou eu, em "não atribuídas" não tem dono nenhum). <select> nativo,
+             não o Select do base-ui: em teste anterior nesta fila, o Select controlado resetava
+             o valor ao reabrir e as ferramentas de browser não clicavam nele de forma confiável. */}
+          {onAgentFilterChange && ['todas', 'finalizadas', 'arquivadas'].includes(filterTab) && (
+            <select
+              value={agentFilter ?? ''}
+              onChange={(e) => onAgentFilterChange(e.target.value)}
+              aria-label="Filtrar por Atendente"
+              className="w-full h-8 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2 text-[11px] font-medium text-slate-600 dark:text-slate-300"
+            >
+              <option value="">Todos os atendentes</option>
+              {agents
+                .filter((agent) => agent.name !== 'Não Atribuídas')
+                .map((agent) => (
+                  <option key={agent.id} value={agent.id}>
+                    {agent.name}
+                  </option>
+                ))}
+            </select>
+          )}
+
           {/* Filtro por Tag: Dropdown Compacto */}
           <div className="relative" ref={tagFilterRef}>
             <button
@@ -1629,6 +1662,25 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                 </div>
               </div>
             </header>
+
+            {/* Trava de intervenção: avisa quando a conversa aberta pertence a outro
+               atendente e deixa assumir com 1 clique (reatribui à força, ver
+               takeOverConversation em actions/inbox.ts — diferente de "Atribuir pra Mim",
+               que só funciona em conversa sem dono). */}
+            {selectedContact.assignedToOther && onTakeOverConversation && (
+              <div className="flex items-center justify-between gap-2 px-3 sm:px-6 py-1.5 bg-amber-50 dark:bg-amber-950/40 border-b border-amber-200 dark:border-amber-900 text-[11px]">
+                <span className="text-amber-800 dark:text-amber-300">
+                  Esta conversa está com <strong>{selectedContact.responsibleAgent}</strong>.
+                </span>
+                <button
+                  type="button"
+                  onClick={() => onTakeOverConversation()}
+                  className="shrink-0 px-2.5 py-1 rounded-md font-semibold text-amber-900 dark:text-amber-100 bg-amber-200 dark:bg-amber-900 hover:bg-amber-300 dark:hover:bg-amber-800 transition-colors"
+                >
+                  Assumir Conversa
+                </button>
+              </div>
+            )}
 
             {(onToggleStar || messages.some((m) => m.starred)) && (
               <div className="flex justify-end px-3 sm:px-6 pt-2 bg-[#F1F5F9] dark:bg-slate-950/60">
