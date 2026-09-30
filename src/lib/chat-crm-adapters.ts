@@ -179,6 +179,9 @@ export function toChatContact(conversation: ConversationWithRelations, viewerUse
     channel: channelFromDb[conversation.channel],
     unreadCount: conversation.unreadCount ?? 0,
     hasUnseenAssignment: hasUnseenAssignmentFor(conversation, viewerUserId),
+    // Banner "Esta conversa está com X" + botão "Assumir Conversa" (ver inbox-layout.tsx)
+    // — só true quando tem dono E não sou eu, pra não aparecer na minha própria conversa.
+    assignedToOther: Boolean(conversation.assignedUser && conversation.assignedUser.id !== viewerUserId),
     lastMessage: previewMessage
       ? previewMessage.type === "INTERNAL_NOTE"
         ? `🔒 Nota: ${previewMessage.content}`

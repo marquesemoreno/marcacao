@@ -1,7 +1,8 @@
 /** Canal de aquisição da conversa — detectado uma vez, na 1ª mensagem (ver webhook do
  * WhatsApp), e gravado em Conversation.acquisitionChannel. Ordem de confiança:
  * anúncio de clique-pro-WhatsApp do Meta (externalAdReply, dado estruturado) > utm no
- * texto pré-preenchido > texto-chave cadastrado pela clínica > link do site > direto. */
+ * texto pré-preenchido > texto-chave cadastrado pela clínica > palavra-chave genérica
+ * (Google/Instagram/Facebook) > link do site > direto. */
 import { MARKETPLACE_SOURCE_TEXT } from "./auto-tags";
 
 export const DIRECT_CHANNEL = "Indicação / Direto";
@@ -13,6 +14,9 @@ export const ACQUISITION_CHANNELS = [
   "Facebook Ads",
   "Google Ads",
   "Google Orgânico",
+  "Google Meu Negócio",
+  "Instagram Orgânico",
+  "Facebook Orgânico",
   "Site Conecta Saúde",
   INSTAGRAM_DIRECT_CHANNEL,
   DIRECT_CHANNEL,
@@ -23,6 +27,26 @@ export type Acquisition = { channel: string; detail: string | null; adId: string
 
 const normalize = (s: string) =>
   s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
+
+/** Sinal orgânico (sem UTM, sem anúncio) que o próprio texto da 1ª mensagem carrega — ex:
+ * cliques no botão "Mensagem" do Google Meu Negócio ou no link da bio do Instagram/Facebook
+ * (ver "Links Rastreados de WhatsApp" em /clinic/precos, que gera mensagens pré-preenchidas
+ * desenhadas pra bater aqui). Palavras genéricas como "google"/"instagram" têm falso positivo
+ * real (ex: "vocês aceitam Google Pay?") — aceito porque foi pedido assim; regra específica da
+ * clínica (nível anterior) sempre vence antes de cair aqui. */
+const KEYWORD_CHANNEL_RULES: { keywords: string[]; channel: string }[] = [
+  { keywords: ["google", "pesquisei no google", "#gmn"], channel: "Google Meu Negócio" },
+  { keywords: ["instagram", "insta", "stories", "#ig"], channel: "Instagram Orgânico" },
+  { keywords: ["facebook", "#fb"], channel: "Facebook Orgânico" },
+];
+
+function channelFromKeyword(text: string): string | null {
+  const normalized = normalize(text);
+  for (const rule of KEYWORD_CHANNEL_RULES) {
+    if (rule.keywords.some((k) => normalized.includes(normalize(k)))) return rule.channel;
+  }
+  return null;
+}
 
 type AdReply = { title?: unknown; sourceUrl?: unknown; sourceId?: unknown };
 
@@ -71,6 +95,9 @@ export function detectAcquisition(
   const text = normalize(input.text);
   const rule = rules.find((r) => r.keyword.trim() && text.includes(normalize(r.keyword)));
   if (rule) return { channel: rule.channel, detail: rule.keyword, adId: null };
+
+  const keywordChannel = channelFromKeyword(input.text);
+  if (keywordChannel) return { channel: keywordChannel, detail: null, adId: null };
 
   if (input.text.includes(MARKETPLACE_SOURCE_TEXT)) return { channel: "Site Conecta Saúde", detail: null, adId: null };
 

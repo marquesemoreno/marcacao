@@ -50,4 +50,33 @@ describe("detectAcquisition", () => {
   it("sem nenhum sinal cai em Indicação / Direto", () => {
     expect(detectAcquisition({ text: "Bom dia" }, [])).toEqual({ channel: DIRECT_CHANNEL, detail: null, adId: null });
   });
+
+  it("palavra-chave genérica do Google Meu Negócio", () => {
+    expect(detectAcquisition({ text: "Olá! Vim pelo Google e quero agendar uma consulta." }, []).channel).toBe(
+      "Google Meu Negócio"
+    );
+    expect(detectAcquisition({ text: "Pesquisei no Google e achei vocês" }, []).channel).toBe("Google Meu Negócio");
+    expect(detectAcquisition({ text: "vi o post #GMN de vocês" }, []).channel).toBe("Google Meu Negócio");
+  });
+
+  it("palavra-chave genérica do Instagram orgânico (distinto de Instagram Ads)", () => {
+    expect(detectAcquisition({ text: "Vim pelo Instagram, quero agendar" }, []).channel).toBe("Instagram Orgânico");
+    expect(detectAcquisition({ text: "vi no insta de vocês" }, []).channel).toBe("Instagram Orgânico");
+    expect(detectAcquisition({ text: "vi nos stories" }, []).channel).toBe("Instagram Orgânico");
+  });
+
+  it("palavra-chave genérica do Facebook orgânico (distinto de Facebook Ads)", () => {
+    expect(detectAcquisition({ text: "Vim pelo Facebook de vocês" }, []).channel).toBe("Facebook Orgânico");
+  });
+
+  it("regra específica da clínica vence a palavra-chave genérica", () => {
+    const rules = [{ keyword: "vim pelo instagram", channel: "Instagram Ads" }];
+    expect(detectAcquisition({ text: "Vim pelo Instagram, quero agendar" }, rules).channel).toBe("Instagram Ads");
+  });
+
+  it("UTM continua tendo prioridade sobre a palavra-chave genérica", () => {
+    expect(detectAcquisition({ text: "Olá utm_source=google&utm_medium=cpc, vim pelo Google" }, []).channel).toBe(
+      "Google Ads"
+    );
+  });
 });

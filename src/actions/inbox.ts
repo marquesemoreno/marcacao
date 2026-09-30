@@ -154,7 +154,7 @@ export async function listForwardTargets(sourceConversationId: string, search?: 
   }));
 }
 
-export async function listConversations(filter: ConversationFilter, search?: string) {
+export async function listConversations(filter: ConversationFilter, search?: string, assignedUserIdFilter?: string) {
   const { clinicId, userId } = await requireClinicSession();
 
   // Com busca ativa, ignora o filtro de aba (fila) e procura em todas as
@@ -175,6 +175,10 @@ export async function listConversations(filter: ConversationFilter, search?: str
   const conversations = await prisma.conversation.findMany({
     where: {
       ...where,
+      // Filtro rápido por atendente (seletor "Filtrar por Atendente" na fila) — só faz
+      // sentido combinado com "todas"/"resolvidas"/"arquivadas" (o client não habilita
+      // o seletor em "minhas"/"não atribuídas", onde já é redundante ou conflitante).
+      ...(assignedUserIdFilter ? { assignedUserId: assignedUserIdFilter } : {}),
       ...(search
         ? {
             contact: {
@@ -1200,6 +1204,18 @@ export async function assignConversationToMe(conversationId: string) {
   }
 }
 
+/** "Assumir Conversa" — reatribui à força pra quem está logado, mesmo que já tenha
+ * dono (diferente de assignConversationToMe/claimConversation, que recusa nesse caso).
+ * Reaproveita transferConversation por inteiro: checa limite de capacidade, grava a
+ * nota de auditoria ("🔒 Conversa transferida para {nome}.") e já notifica em tempo
+ * real — só preenche o destino com o próprio usuário. Mesmo formato de retorno
+ * ({success, message}) de claimConversation/transferConversation, pro client tratar
+ * do mesmo jeito (ver handleTakeOverConversation em chat-crm-app.tsx). */
+export async function takeOverConversation(conversationId: string) {
+  const { userId } = await requireClinicSession();
+  return transferConversation(conversationId, userId);
+}
+
 const REASON_LABELS: Record<string, string> = {
   AGENDAMENTO_CONCLUIDO: "🎟️ Agendamento Concluído",
   CONFIRMACAO_AGENDA: "📅 Confirmação de Agenda",
@@ -1512,9 +1528,9 @@ const INBOX_FILTER_TO_CONVERSATION_FILTER: Record<InboxFilter, ConversationFilte
 
 /** Camada visual do módulo de atendimento (src/components/chat/) — mesmo dado de
  * listConversations, mapeado para o formato Contact usado pelo design novo. */
-export async function listChatContacts(filter: InboxFilter, search?: string) {
+export async function listChatContacts(filter: InboxFilter, search?: string, assignedUserIdFilter?: string) {
   const { userId } = await requireClinicSession();
-  const conversations = await listConversations(INBOX_FILTER_TO_CONVERSATION_FILTER[filter], search);
+  const conversations = await listConversations(INBOX_FILTER_TO_CONVERSATION_FILTER[filter], search, assignedUserIdFilter);
   return conversations.map((c) => toChatContact(c, userId));
 }
 
