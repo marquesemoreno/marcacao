@@ -17,6 +17,8 @@ import {
 import { MessageBubble } from './message-bubble';
 import { ScheduleModal } from './schedule-modal';
 import { AvatarBadge } from './avatar-badge';
+import { PatientRecordSheet } from './patient-record-sheet';
+import { tagClasses, renderConsultationRow, PRESET_TAGS } from './patient-record-shared';
 import { FeedbackWidget } from '@/components/feedback-widget';
 import type { PlainClinicProcedureItem } from '@/lib/serialize';
 import type { InvoiceData } from '@/lib/chat-messages';
@@ -24,7 +26,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from '@
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from '@/components/ui/command';
 import { useClickOutside } from '@/hooks/use-click-outside';
-import { SCHEDULED_TAG } from '@/lib/conversation-tags';
 import { toast } from "sonner";
 import {
   Search,
@@ -66,18 +67,6 @@ import {
 
 const MAX_MEDIA_SIZE_BYTES = 15 * 1024 * 1024; // 15 MB — mesmo limite validado no servidor
 
-/** O rótulo de cada preset precisa ser IDÊNTICO à string gravada em Conversation.tags
- * (ver conversation-tags.ts) — o filtro da fila faz comparação exata de string
- * (`contact.tags.includes(...)`, ver filteredContacts), então qualquer divergência
- * (ex: "Confirmado" vs a tag real "✅ Agendado") faz o filtro nunca bater com nada. */
-const PRESET_TAGS: { label: string; classes: string }[] = [
-  { label: '⚡ Prioritário', classes: 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800' },
-  { label: '🔬 Jejum', classes: 'bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800' },
-  { label: SCHEDULED_TAG, classes: 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800' },
-  { label: 'Urologia', classes: 'bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800' },
-  { label: 'Lead B2B', classes: 'bg-sky-50 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 border-sky-200 dark:border-sky-800' },
-];
-
 /** Conjunto curado (não é seletor completo de unicode) — cobre o uso comum de
  * atendimento clínico por WhatsApp sem precisar de biblioteca externa de emoji. */
 const COMPOSER_EMOJIS = [
@@ -85,10 +74,6 @@ const COMPOSER_EMOJIS = [
   '😢', '😅', '👋', '✅', '❌', '⏰', '📅', '💊',
   '🩺', '📍', '📞', '📎', '🤒', '😴', '💉', '🚑',
 ];
-
-function tagClasses(tag: string) {
-  return PRESET_TAGS.find((preset) => preset.label === tag)?.classes ?? 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700';
-}
 
 /** Prioridade da fila (menor primeiro) — só urgência e "sem dono" furam a ordem
  * cronológica normal; humano/IA/aguardando paciente ficam no mesmo nível, mantendo a
@@ -194,6 +179,8 @@ interface InboxLayoutProps {
     name: string;
     cpf?: string;
     phone?: string;
+    convenio?: string;
+    preferredDoctor?: string;
   }) => Promise<{ success: boolean; error?: string } | void> | { success: boolean; error?: string } | void;
   onUpdateFunnelStage: (stage: FunnelStage) => Promise<void> | void;
   onClaimConversation?: () => Promise<void> | void;
@@ -384,7 +371,7 @@ const ContactListItem = React.memo(function ContactListItem({
             </span>
             {c.unreadCount > 0 && (
               <span
-                className="min-w-[16px] h-4 px-1 rounded-full bg-emerald-600 text-white text-[9px] font-bold flex items-center justify-center"
+                className="min-w-[16px] h-4 px-1 rounded-md bg-emerald-600 text-white text-[9px] font-bold flex items-center justify-center"
                 title={`${c.unreadCount} mensagem(ns) não lida(s)`}
               >
                 {c.unreadCount > 9 ? '9+' : c.unreadCount}
@@ -434,6 +421,26 @@ const ContactListItem = React.memo(function ContactListItem({
             </span>
           )}
         </div>
+
+        {/* Badge de SLA: tempo desde a última mensagem do paciente ainda sem resposta —
+           some sozinho quando ela é respondida ou a conversa é finalizada (ver
+           slaWaitingMinutes em chat-crm-adapters.ts). Classes exatamente como pedido,
+           não seguem o rounded-md do resto do card — é um estado de alerta à parte. */}
+        {c.slaWaitingMinutes !== null && (
+          <div className="mt-1">
+            {c.slaWaitingMinutes < 10 ? (
+              <span className="text-[11px] text-slate-400">Aguardando há {c.slaWaitingMinutes} min</span>
+            ) : c.slaWaitingMinutes <= 20 ? (
+              <span className="bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded text-[11px] font-medium">
+                Aguardando há {c.slaWaitingMinutes} min
+              </span>
+            ) : (
+              <span className="bg-rose-50 text-rose-700 px-1.5 py-0.5 rounded text-[11px] font-medium">
+                Aguardando há {c.slaWaitingMinutes} min
+              </span>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -507,6 +514,10 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
   onUpdateContactGlpiEntity,
 }) => {
   const [composerMode, setComposerMode] = useState<'whatsapp' | 'internal_note'>('whatsapp');
+  /** Sheet amplo com a ficha completa do paciente (Resumo/Histórico/Tags) — aberto ao
+   * clicar no nome do paciente no cabeçalho da conversa. Aditivo ao painel "Perfil &
+   * CRM" fixo, que continua servindo de contexto rápido enquanto atende. */
+  const [isPatientRecordOpen, setIsPatientRecordOpen] = useState(false);
   // Janela de mensagens do Instagram (mesma regra do envio, ver outbound-dispatch.ts) —
   // a partir da última mensagem DO LEAD entre as carregadas.
   const instagramWindow = useMemo(() => {
@@ -1129,7 +1140,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                 <button
                   type="button"
                   onClick={() => setIsNewContactModalOpen(true)}
-                  className="flex items-center justify-center w-8 h-8 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white transition-colors"
+                  className="flex items-center justify-center w-8 h-8 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white transition-colors"
                   title="Cadastrar novo contato e iniciar conversa"
                 >
                   <UserPlus className="w-4 h-4" />
@@ -1137,7 +1148,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
               )}
               {attendantCapacity && (
                 <span
-                  className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
+                  className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md border ${
                     attendantCapacity.activeCount >= attendantCapacity.maxLimit
                       ? "bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800"
                       : attendantCapacity.activeCount >= attendantCapacity.maxLimit - 1
@@ -1150,7 +1161,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                   {attendantCapacity.activeCount}/{attendantCapacity.maxLimit}
                 </span>
               )}
-              <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-300 bg-slate-50 dark:bg-slate-800 px-2 py-0.5 rounded-full border border-slate-200/70 dark:border-slate-700">
+              <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-300 bg-slate-50 dark:bg-slate-800 px-2 py-0.5 rounded-md border border-slate-200/70 dark:border-slate-700">
                 {filteredContacts.length}
               </span>
             </div>
@@ -1326,7 +1337,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                     }}
                     className="w-full px-3 py-1.5 text-left hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center"
                   >
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold border ${preset.classes} ${selectedTagFilter === preset.label ? 'ring-2 ring-emerald-500/30' : ''}`}>
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold border ${preset.classes} ${selectedTagFilter === preset.label ? 'ring-2 ring-emerald-500/30' : ''}`}>
                       {preset.label}
                     </span>
                   </button>
@@ -1426,9 +1437,14 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                 <AvatarBadge name={selectedContact.name} photoUrl={selectedContact.avatar} size={38} className="ring-2 ring-slate-100 dark:ring-slate-800 shadow-sm shrink-0" />
                 <div className="min-w-0">
                   <div className="flex items-center gap-1.5 flex-wrap">
-                    <h3 className="font-semibold text-slate-900 dark:text-slate-100 text-xs sm:text-sm truncate">
+                    <button
+                      type="button"
+                      onClick={() => setIsPatientRecordOpen(true)}
+                      className="font-semibold text-slate-900 dark:text-slate-100 text-xs sm:text-sm truncate hover:underline decoration-slate-400 underline-offset-2"
+                      title="Ver ficha completa do paciente"
+                    >
                       {selectedContact.name}
-                    </h3>
+                    </button>
                     <span
                       className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 text-[10px] font-medium shrink-0"
                       title="WhatsApp Conectado"
@@ -1687,7 +1703,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                 <button
                   type="button"
                   onClick={() => setShowOnlyStarred((prev) => !prev)}
-                  className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10.5px] font-semibold border transition-colors ${
+                  className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10.5px] font-semibold border transition-colors ${
                     showOnlyStarred
                       ? 'bg-amber-100 dark:bg-amber-950/60 border-amber-300 dark:border-amber-800 text-amber-800 dark:text-amber-300'
                       : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700'
@@ -1719,7 +1735,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                         type="button"
                         onClick={onLoadOlderMessages}
                         disabled={isLoadingOlderMessages}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-60 disabled:cursor-not-allowed shadow-sm"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-60 disabled:cursor-not-allowed shadow-sm"
                       >
                         {isLoadingOlderMessages ? (
                           <>
@@ -2353,43 +2369,6 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
             {selectedContact.consultationHistory.length > 0 && (() => {
               const upcoming = selectedContact.consultationHistory.filter((c) => c.isUpcoming);
               const past = selectedContact.consultationHistory.filter((c) => !c.isUpcoming);
-              const renderConsultationRow = (consultation: (typeof selectedContact.consultationHistory)[number]) => (
-                <div
-                  key={consultation.id}
-                  className="p-2 rounded-lg border border-slate-100 dark:border-slate-700/60 bg-slate-50 dark:bg-slate-900/40 text-xs"
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="font-semibold text-slate-800 dark:text-slate-200 truncate">{consultation.specialty}</span>
-                    <span
-                      className={`shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded-md ${
-                        consultation.status === 'agendada'
-                          ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300'
-                          : consultation.status === 'concluida'
-                          ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300'
-                          : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
-                      }`}
-                    >
-                      {consultation.status === 'agendada' ? 'Agendada' : consultation.status === 'concluida' ? 'Concluída' : 'Cancelada'}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between gap-2 mt-0.5 text-slate-500 dark:text-slate-400">
-                    <span className="truncate">{consultation.date} · {consultation.doctor}</span>
-                    {consultation.price && (
-                      <span className="shrink-0 font-semibold text-slate-700 dark:text-slate-300">{consultation.price}</span>
-                    )}
-                  </div>
-                  {consultation.preparationInstructions && (
-                    <details className="mt-1">
-                      <summary className="cursor-pointer text-[10px] font-semibold text-sky-700 dark:text-sky-400">
-                        Ver preparo do exame
-                      </summary>
-                      <p className="mt-1 text-slate-600 dark:text-slate-300 whitespace-pre-wrap">
-                        {consultation.preparationInstructions}
-                      </p>
-                    </details>
-                  )}
-                </div>
-              );
 
               return (
                 <div className="bg-white dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-700/80 rounded-xl p-4 shadow-sm space-y-3">
@@ -2436,7 +2415,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                 {selectedContact.tags.map((tag) => (
                   <span
                     key={tag}
-                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold border ${tagClasses(tag)}`}
+                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-semibold border ${tagClasses(tag)}`}
                   >
                     {tag}
                     <button onClick={() => onRemoveTag(tag)} aria-label={`Remover tag ${tag}`} className="p-1 -m-1 hover:text-slate-900 dark:hover:text-white">
@@ -2870,6 +2849,18 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
           fetchAgenda={fetchAgenda}
           fetchPatients={fetchPatients}
           onConfirmSchedule={onScheduleConfirmed}
+        />
+      )}
+
+      {/* Ficha completa do paciente (drawer) — aberta ao clicar no nome no cabeçalho */}
+      {selectedContact && (
+        <PatientRecordSheet
+          contact={selectedContact}
+          open={isPatientRecordOpen}
+          onOpenChange={setIsPatientRecordOpen}
+          onUpdatePatient={onUpdatePatient}
+          onAddTag={onAddTag}
+          onRemoveTag={onRemoveTag}
         />
       )}
 

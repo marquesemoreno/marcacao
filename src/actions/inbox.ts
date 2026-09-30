@@ -1329,7 +1329,10 @@ export async function updateConversationTags(conversationId: string, tags: strin
 /** Corrige nome/CPF do paciente a partir do painel do chat — o Contact é
  * compartilhado entre clínicas (chave é o telefone), então a checagem de posse
  * é feita pela conversa (clinicId) e não pelo Contact em si. */
-export async function updateContactInfo(conversationId: string, data: { name: string; cpf?: string; phone?: string }) {
+export async function updateContactInfo(
+  conversationId: string,
+  data: { name: string; cpf?: string; phone?: string; convenio?: string; preferredDoctor?: string }
+) {
   const { clinicId } = await requireClinicSession();
 
   const trimmedName = data.name.trim();
@@ -1356,7 +1359,15 @@ export async function updateContactInfo(conversationId: string, data: { name: st
   try {
     await prisma.contact.update({
       where: { id: conversation.contactId },
-      data: { name: trimmedName, cpf: data.cpf?.trim() || null, ...(fullPhone ? { phone: fullPhone } : {}) },
+      data: {
+        name: trimmedName,
+        cpf: data.cpf?.trim() || null,
+        ...(fullPhone ? { phone: fullPhone } : {}),
+        // undefined = campo não veio nesse submit, não mexe (ex: form de nome/CPF/telefone
+        // não manda convenio/preferredDoctor — só o form da ficha do paciente manda).
+        ...(data.convenio !== undefined ? { convenio: data.convenio.trim() || null } : {}),
+        ...(data.preferredDoctor !== undefined ? { preferredDoctor: data.preferredDoctor.trim() || null } : {}),
+      },
     });
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
@@ -1623,7 +1634,9 @@ export async function getChatContactHistory(conversationId: string) {
     take: 10,
   });
 
-  const statusMap = { PENDING: "agendada", CONFIRMED: "agendada", COMPLETED: "concluida", CANCELLED: "cancelada", NO_SHOW: "cancelada" } as const;
+  // CONFIRMED e NO_SHOW ganham status próprios (não colapsam mais em "agendada"/"cancelada")
+  // pra aparecerem distintos no histórico — ver patient-record-sheet.tsx.
+  const statusMap = { PENDING: "agendada", CONFIRMED: "confirmada", COMPLETED: "concluida", CANCELLED: "cancelada", NO_SHOW: "no_show" } as const;
   // `Appointment.date` é @db.Date, sempre meia-noite UTC (mesmo motivo do `timeZone: "UTC"`
   // já usado no formatador abaixo) — compara contra meia-noite UTC de hoje, nunca `new Date()`
   // puro, pra não repetir o bug de fuso já corrigido em outros lugares (ver bridge-reminders.ts).

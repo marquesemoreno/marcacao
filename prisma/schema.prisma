@@ -478,6 +478,11 @@ model Contact {
   externalId     String?   @map("external_id")
   instagramUsername String? @map("instagram_username")
   cpf            String?
+  /// Texto livre, sem cadastro/FK — mesmo padrão de Appointment.doctorName (não existe
+  /// tabela de convênios/médicos por paciente no sistema, de propósito). Editável na
+  /// aba "Resumo" da ficha do paciente (ver patient-record-sheet.tsx).
+  convenio       String?
+  preferredDoctor String?  @map("preferred_doctor")
   photoUrl       String?   @map("photo_url")
   photoUpdatedAt DateTime? @map("photo_updated_at")
   /// Preenchido quando a pessoa responde "sair"/"parar"/"cancelar" (ver route.ts do

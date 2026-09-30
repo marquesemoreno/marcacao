@@ -381,7 +381,9 @@ export async function getChatContactHistoryAdmin(conversationId: string) {
     take: 5,
   });
 
-  const statusMap = { PENDING: "agendada", CONFIRMED: "agendada", COMPLETED: "concluida", CANCELLED: "cancelada", NO_SHOW: "cancelada" } as const;
+  // CONFIRMED e NO_SHOW ganham status próprios (não colapsam mais em "agendada"/"cancelada")
+  // — mesma mudança de getChatContactHistory em inbox.ts, ver patient-record-sheet.tsx.
+  const statusMap = { PENDING: "agendada", CONFIRMED: "confirmada", COMPLETED: "concluida", CANCELLED: "cancelada", NO_SHOW: "no_show" } as const;
   const todayUtc = new Date(new Date().toISOString().slice(0, 10) + "T00:00:00.000Z");
 
   return appointments.map((a) => {
@@ -1271,7 +1273,10 @@ export async function updateConversationTagsAdmin(conversationId: string, tags: 
   revalidatePath("/admin/inbox");
 }
 
-export async function updateContactInfoAdmin(conversationId: string, data: { name: string; cpf?: string; phone?: string }) {
+export async function updateContactInfoAdmin(
+  conversationId: string,
+  data: { name: string; cpf?: string; phone?: string; convenio?: string; preferredDoctor?: string }
+) {
   await requireAdminSession();
 
   const trimmedName = data.name.trim();
@@ -1298,7 +1303,13 @@ export async function updateContactInfoAdmin(conversationId: string, data: { nam
   try {
     await prisma.contact.update({
       where: { id: conversation.contactId },
-      data: { name: trimmedName, cpf: data.cpf?.trim() || null, ...(fullPhone ? { phone: fullPhone } : {}) },
+      data: {
+        name: trimmedName,
+        cpf: data.cpf?.trim() || null,
+        ...(fullPhone ? { phone: fullPhone } : {}),
+        ...(data.convenio !== undefined ? { convenio: data.convenio.trim() || null } : {}),
+        ...(data.preferredDoctor !== undefined ? { preferredDoctor: data.preferredDoctor.trim() || null } : {}),
+      },
     });
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {

@@ -135,6 +135,17 @@ function computeQueueState(conversation: ConversationWithRelations): Conversatio
   return "SEM_DONO";
 }
 
+/** Minutos desde a última mensagem do paciente, só quando ela ainda não foi respondida
+ * (mensagem mais recente é INBOUND) e a conversa não está finalizada — vira o badge de
+ * SLA no card da fila (ver inbox-layout.tsx). Usa `messages[0]`, que já vem no payload
+ * de listConversations (take: 3) — nenhuma query extra. */
+function computeSlaWaitingMinutes(conversation: ConversationWithRelations): number | null {
+  if (conversation.status === "RESOLVED") return null;
+  const lastMessage = conversation.messages[0];
+  if (!lastMessage || lastMessage.direction !== "INBOUND") return null;
+  return Math.floor((Date.now() - lastMessage.createdAt.getTime()) / 60000);
+}
+
 const REASON_SHORT_LABELS: Record<string, string> = {
   AGENDAMENTO_CONCLUIDO: "🎟️ Agendamento",
   CONFIRMACAO_AGENDA: "📅 Confirmação de Agenda",
@@ -169,6 +180,8 @@ export function toChatContact(conversation: ConversationWithRelations, viewerUse
     phone: conversation.contact.phone ?? "",
     instagramUsername: conversation.contact.instagramUsername ?? undefined,
     cpf: conversation.contact.cpf ?? "",
+    convenio: conversation.contact.convenio ?? undefined,
+    preferredDoctor: conversation.contact.preferredDoctor ?? undefined,
     neighborhood: "",
     glpiEntityId: conversation.contact.glpiEntityId,
     avatar: conversation.contact.photoUrl ?? "",
@@ -182,6 +195,7 @@ export function toChatContact(conversation: ConversationWithRelations, viewerUse
     // Banner "Esta conversa está com X" + botão "Assumir Conversa" (ver inbox-layout.tsx)
     // — só true quando tem dono E não sou eu, pra não aparecer na minha própria conversa.
     assignedToOther: Boolean(conversation.assignedUser && conversation.assignedUser.id !== viewerUserId),
+    slaWaitingMinutes: computeSlaWaitingMinutes(conversation),
     lastMessage: previewMessage
       ? previewMessage.type === "INTERNAL_NOTE"
         ? `🔒 Nota: ${previewMessage.content}`
