@@ -96,6 +96,17 @@ export interface Contact {
    * Editável na aba "Resumo" da ficha do paciente (ver patient-record-sheet.tsx). */
   convenio?: string;
   preferredDoctor?: string;
+  /** Todos texto livre, sem validação de formato — cadastro rápido pela recepção.
+   * Editáveis na aba "Resumo Cadastral" da ficha do paciente. */
+  rg?: string;
+  /** ISO date (yyyy-mm-dd) — Contact.birthDate é @db.Date, sem hora/fuso envolvido. */
+  birthDate?: string;
+  address?: string;
+  insuranceCardNumber?: string;
+  /** Observação permanente de texto livre sobre o paciente (ex: "idoso, precisa de
+   * ajuda pra locomoção") — por PACIENTE, atravessa qualquer conversa/clínica.
+   * Diferente de `tags` (rótulos curtos, por atendimento). */
+  notes?: string;
   neighborhood: string;
   /** Entidade (empresa cliente) do GLPI vinculada a este contato — só relevante pro
    * TIVDC, que usa isso pra abrir chamado na empresa certa (ver Contact.glpiEntityId). */
@@ -143,6 +154,45 @@ export interface Contact {
   isMuted: boolean;
   /** Fora da fila ativa (aba "Arquivadas" só) — desarquiva sozinha quando chega mensagem nova. */
   isArchived: boolean;
+}
+
+/** Campos que <PatientRecordSheet> de fato usa — deixa o componente utilizável tanto
+ * pelo Contact "rico" do Inbox (queueState, tags de fila, etc.) quanto por um objeto
+ * mais enxuto montado em /clinic/contatos (ver contacts-app.tsx), sem precisar forjar
+ * os outros 20+ campos do Contact completo que não fazem sentido fora de uma conversa
+ * ativa. Mesma ideia do Pick já usado em ScheduleModalProps.contact. */
+export type PatientRecordData = Pick<
+  Contact,
+  | "id"
+  | "name"
+  | "phone"
+  | "cpf"
+  | "convenio"
+  | "preferredDoctor"
+  | "rg"
+  | "birthDate"
+  | "address"
+  | "insuranceCardNumber"
+  | "notes"
+  | "tags"
+  | "consultationHistory"
+>;
+
+/** Payload de onUpdatePatient/updateContactInfo — mesmos campos editáveis da aba
+ * "Resumo Cadastral" da ficha do paciente. Campo ausente (undefined) = não mexe nesse
+ * campo nesse submit; string vazia = limpa. Um tipo só, reusado nos 3 pontos que
+ * repassam isso (chat-crm-app.tsx, inbox-layout.tsx, patient-record-sheet.tsx). */
+export interface UpdatePatientData {
+  name: string;
+  cpf?: string;
+  phone?: string;
+  convenio?: string;
+  preferredDoctor?: string;
+  rg?: string;
+  birthDate?: string;
+  address?: string;
+  insuranceCardNumber?: string;
+  notes?: string;
 }
 
 export interface Agent {

@@ -103,6 +103,7 @@ export async function listAllContacts(search?: string) {
                 { name: { contains: search, mode: "insensitive" } },
                 { phone: { contains: search } },
                 { cpf: { contains: search } },
+                { convenio: { contains: search, mode: "insensitive" } },
               ],
             },
           }
@@ -112,13 +113,49 @@ export async function listAllContacts(search?: string) {
     orderBy: { contact: { name: "asc" } },
   });
 
-  return conversations.map((conversation) => ({
-    conversationId: conversation.id,
-    name: conversation.contact.name,
-    phone: conversation.contact.phone ?? "",
-    cpf: conversation.contact.cpf,
-    status: conversation.status,
-  }));
+  // "Última Consulta" (data + médico) em 1 query só, pra não virar N+1 (uma consulta
+  // por linha da tabela) — mesmo estilo de batching já usado pro unreadCount em
+  // listConversations. Reduz pra mais recente por telefone em memória (já vem
+  // ordenado por data desc, então o primeiro que aparece por telefone é o mais recente).
+  const phones = conversations.map((c) => c.contact.phone).filter((p): p is string => Boolean(p));
+  const lastAppointmentByPhone = new Map<string, { date: Date; doctorName: string | null }>();
+  if (phones.length > 0) {
+    const appointments = await prisma.appointment.findMany({
+      where: { patientPhone: { in: phones }, clinicProcedure: { clinicId } },
+      select: { patientPhone: true, date: true, doctorName: true },
+      orderBy: { date: "desc" },
+    });
+    for (const a of appointments) {
+      if (!lastAppointmentByPhone.has(a.patientPhone)) {
+        lastAppointmentByPhone.set(a.patientPhone, { date: a.date, doctorName: a.doctorName });
+      }
+    }
+  }
+
+  return conversations.map((conversation) => {
+    const lastAppointment = conversation.contact.phone ? lastAppointmentByPhone.get(conversation.contact.phone) : undefined;
+    return {
+      conversationId: conversation.id,
+      name: conversation.contact.name,
+      phone: conversation.contact.phone ?? "",
+      cpf: conversation.contact.cpf,
+      convenio: conversation.contact.convenio,
+      preferredDoctor: conversation.contact.preferredDoctor,
+      rg: conversation.contact.rg,
+      birthDate: conversation.contact.birthDate ? conversation.contact.birthDate.toISOString().slice(0, 10) : null,
+      address: conversation.contact.address,
+      insuranceCardNumber: conversation.contact.insuranceCardNumber,
+      notes: conversation.contact.notes,
+      tags: conversation.tags,
+      status: conversation.status,
+      lastAppointment: lastAppointment
+        ? {
+            date: new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeZone: "UTC" }).format(lastAppointment.date),
+            doctorName: lastAppointment.doctorName,
+          }
+        : null,
+    };
+  });
 }
 
 /** Lista conversas-destino pra "Reencaminhar mensagem" — só da mesma clínica da
@@ -1373,7 +1410,18 @@ export async function updateConversationTags(conversationId: string, tags: strin
  * é feita pela conversa (clinicId) e não pelo Contact em si. */
 export async function updateContactInfo(
   conversationId: string,
-  data: { name: string; cpf?: string; phone?: string; convenio?: string; preferredDoctor?: string }
+  data: {
+    name: string;
+    cpf?: string;
+    phone?: string;
+    convenio?: string;
+    preferredDoctor?: string;
+    rg?: string;
+    birthDate?: string;
+    address?: string;
+    insuranceCardNumber?: string;
+    notes?: string;
+  }
 ) {
   const { clinicId } = await requireClinicSession();
 
@@ -1409,6 +1457,11 @@ export async function updateContactInfo(
         // não manda convenio/preferredDoctor — só o form da ficha do paciente manda).
         ...(data.convenio !== undefined ? { convenio: data.convenio.trim() || null } : {}),
         ...(data.preferredDoctor !== undefined ? { preferredDoctor: data.preferredDoctor.trim() || null } : {}),
+        ...(data.rg !== undefined ? { rg: data.rg.trim() || null } : {}),
+        ...(data.birthDate !== undefined ? { birthDate: data.birthDate ? new Date(`${data.birthDate}T00:00:00.000Z`) : null } : {}),
+        ...(data.address !== undefined ? { address: data.address.trim() || null } : {}),
+        ...(data.insuranceCardNumber !== undefined ? { insuranceCardNumber: data.insuranceCardNumber.trim() || null } : {}),
+        ...(data.notes !== undefined ? { notes: data.notes.trim() || null } : {}),
       },
     });
   } catch (error) {
@@ -1704,6 +1757,38 @@ export async function getChatContactHistory(conversationId: string) {
       isUpcoming: appointment.date.getTime() >= todayUtc.getTime() && (appointment.status === "PENDING" || appointment.status === "CONFIRMED"),
     };
   });
+}
+
+/** Galeria de "Documentos & Exames" da ficha do paciente (PDFs, fotos de exame,
+ * pedidos médicos trocados por WhatsApp) — Message.type ATTACHMENT/AUDIO daquela
+ * conversa. Uma conversa = um paciente nesta clínica (ver createOrGetConversation),
+ * não precisa varrer outras conversas. attachSignedUrls já existe (mesma função usada
+ * pro histórico de mensagens) — só reaproveita. */
+export async function listContactMedia(conversationId: string) {
+  const { clinicId } = await requireClinicSession();
+  const conversation = await prisma.conversation.findUnique({
+    where: { id: conversationId },
+    select: { clinicId: true },
+  });
+  if (!conversation || conversation.clinicId !== clinicId) {
+    throw new Error("Conversa não encontrada");
+  }
+
+  const messages = await prisma.message.findMany({
+    where: { conversationId, type: { in: ["ATTACHMENT", "AUDIO"] }, deletedAt: null },
+    orderBy: { createdAt: "desc" },
+    select: { id: true, mimeType: true, mediaPath: true, attachmentName: true, attachmentSize: true, createdAt: true },
+  });
+
+  const withUrls = await attachSignedUrls(messages);
+  return withUrls.map((m) => ({
+    id: m.id,
+    mimeType: m.mimeType,
+    url: m.mediaUrl,
+    attachmentName: m.attachmentName,
+    attachmentSize: m.attachmentSize,
+    createdAt: new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeZone: "America/Sao_Paulo" }).format(m.createdAt),
+  }));
 }
 
 export async function assignConversationToUser(conversationId: string, targetUserId: string) {

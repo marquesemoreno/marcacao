@@ -13,11 +13,12 @@ import {
   FunnelStage,
   Agent,
   ConversationQueueState,
+  UpdatePatientData,
 } from '@/types/chat-crm';
 import { MessageBubble } from './message-bubble';
 import { ScheduleModal } from './schedule-modal';
 import { AvatarBadge } from './avatar-badge';
-import { PatientRecordSheet } from './patient-record-sheet';
+import { PatientRecordSheet, type MediaItem } from './patient-record-sheet';
 import { SLABadge } from './sla-badge';
 import { tagClasses, renderConsultationRow, PRESET_TAGS } from './patient-record-shared';
 import { FeedbackWidget } from '@/components/feedback-widget';
@@ -181,19 +182,18 @@ interface InboxLayoutProps {
   onSearchForwardTargets?: (query: string) => Promise<{ conversationId: string; name: string; phone: string }[]>;
   onAddTag: (tag: string) => Promise<void> | void;
   onRemoveTag: (tag: string) => Promise<void> | void;
-  onUpdatePatient: (data: {
-    name: string;
-    cpf?: string;
-    phone?: string;
-    convenio?: string;
-    preferredDoctor?: string;
-  }) => Promise<{ success: boolean; error?: string } | void> | { success: boolean; error?: string } | void;
+  onUpdatePatient: (
+    data: UpdatePatientData
+  ) => Promise<{ success: boolean; error?: string } | void> | { success: boolean; error?: string } | void;
   onUpdateFunnelStage: (stage: FunnelStage) => Promise<void> | void;
   onClaimConversation?: () => Promise<void> | void;
   /** "Assumir Conversa" — reatribui à força pra mim mesmo se a conversa já tiver dono
    * (diferente de onClaimConversation, que só funciona em conversa sem dono). Mostrado
    * no banner "Esta conversa está com X" quando selectedContact.assignedToOther. */
   onTakeOverConversation?: () => Promise<void> | void;
+  /** Galeria de "Documentos & Exames" da ficha do paciente — ver listContactMedia em
+   * actions/inbox.ts. Repassado direto pro <PatientRecordSheet>. */
+  onLoadContactMedia?: (conversationId: string) => Promise<MediaItem[]>;
   /** Seletor "Filtrar por Atendente" da fila — "" = todos. Só faz sentido nas abas
    * "todas"/"finalizadas"/"arquivadas" (o componente decide quando mostrar). */
   agentFilter?: string;
@@ -472,6 +472,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
   onUpdateFunnelStage,
   onClaimConversation,
   onTakeOverConversation,
+  onLoadContactMedia,
   agentFilter,
   onAgentFilterChange,
   onReactivateAi,
@@ -2856,6 +2857,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
           onUpdatePatient={onUpdatePatient}
           onAddTag={onAddTag}
           onRemoveTag={onRemoveTag}
+          onLoadMedia={onLoadContactMedia}
         />
       )}
 

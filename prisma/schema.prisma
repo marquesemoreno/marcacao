@@ -483,6 +483,17 @@ model Contact {
   /// aba "Resumo" da ficha do paciente (ver patient-record-sheet.tsx).
   convenio       String?
   preferredDoctor String?  @map("preferred_doctor")
+  /// Todos texto livre/data simples, sem validação de formato — cadastro rápido pela
+  /// recepção, não um cadastro civil completo. Editáveis na aba "Resumo Cadastral" da
+  /// ficha do paciente (ver patient-record-sheet.tsx).
+  rg                  String?
+  birthDate           DateTime? @map("birth_date") @db.Date
+  address             String?
+  insuranceCardNumber String?   @map("insurance_card_number")
+  /// Observação permanente de texto livre (ex: "paciente idoso, precisa de ajuda pra
+  /// locomoção") — diferente de Conversation.tags (rótulos curtos, por atendimento);
+  /// isso é por PACIENTE, atravessa qualquer conversa/clínica.
+  notes               String?
   photoUrl       String?   @map("photo_url")
   photoUpdatedAt DateTime? @map("photo_updated_at")
   /// Preenchido quando a pessoa responde "sair"/"parar"/"cancelar" (ver route.ts do

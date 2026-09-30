@@ -409,6 +409,25 @@ export async function getChatContactHistoryAdmin(conversationId: string) {
   });
 }
 
+/** Mesma ideia de listContactMedia em inbox.ts — ver lá pro porquê. */
+export async function listContactMediaAdmin(conversationId: string) {
+  await requireAdminSession();
+  const messages = await prisma.message.findMany({
+    where: { conversationId, type: { in: ["ATTACHMENT", "AUDIO"] }, deletedAt: null },
+    orderBy: { createdAt: "desc" },
+    select: { id: true, mimeType: true, mediaPath: true, attachmentName: true, attachmentSize: true, createdAt: true },
+  });
+  const withUrls = await attachSignedUrls(messages);
+  return withUrls.map((m) => ({
+    id: m.id,
+    mimeType: m.mimeType,
+    url: m.mediaUrl,
+    attachmentName: m.attachmentName,
+    attachmentSize: m.attachmentSize,
+    createdAt: new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeZone: "America/Sao_Paulo" }).format(m.createdAt),
+  }));
+}
+
 /** Mesma lógica de resolveQuotedRef em inbox.ts (ver ali o porquê) — duplicada aqui
  * seguindo o padrão dual clínica/admin já usado no resto do arquivo. */
 async function resolveQuotedRefAdmin(
@@ -1302,7 +1321,18 @@ export async function updateConversationTagsAdmin(conversationId: string, tags: 
 
 export async function updateContactInfoAdmin(
   conversationId: string,
-  data: { name: string; cpf?: string; phone?: string; convenio?: string; preferredDoctor?: string }
+  data: {
+    name: string;
+    cpf?: string;
+    phone?: string;
+    convenio?: string;
+    preferredDoctor?: string;
+    rg?: string;
+    birthDate?: string;
+    address?: string;
+    insuranceCardNumber?: string;
+    notes?: string;
+  }
 ) {
   await requireAdminSession();
 
@@ -1336,6 +1366,11 @@ export async function updateContactInfoAdmin(
         ...(fullPhone ? { phone: fullPhone } : {}),
         ...(data.convenio !== undefined ? { convenio: data.convenio.trim() || null } : {}),
         ...(data.preferredDoctor !== undefined ? { preferredDoctor: data.preferredDoctor.trim() || null } : {}),
+        ...(data.rg !== undefined ? { rg: data.rg.trim() || null } : {}),
+        ...(data.birthDate !== undefined ? { birthDate: data.birthDate ? new Date(`${data.birthDate}T00:00:00.000Z`) : null } : {}),
+        ...(data.address !== undefined ? { address: data.address.trim() || null } : {}),
+        ...(data.insuranceCardNumber !== undefined ? { insuranceCardNumber: data.insuranceCardNumber.trim() || null } : {}),
+        ...(data.notes !== undefined ? { notes: data.notes.trim() || null } : {}),
       },
     });
   } catch (error) {
