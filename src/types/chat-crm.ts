@@ -1,8 +1,9 @@
 import type { InvoiceData } from "@/lib/chat-messages";
+import type { SlaInfo } from "@/lib/sla-calculator";
 
 export type Department = 'recepcao' | 'agendamento' | 'financeiro';
 
-export type InboxFilter = 'minhas' | 'nao_atribuidas' | 'todas' | 'finalizadas' | 'arquivadas';
+export type InboxFilter = 'minhas' | 'nao_atribuidas' | 'todas' | 'pendentes' | 'finalizadas' | 'arquivadas';
 
 export type Channel = 'whatsapp' | 'instagram' | 'webchat';
 
@@ -114,11 +115,12 @@ export interface Contact {
   /** Conversa tem dono e não sou eu — mostra o banner "Esta conversa está com X" +
    * botão "Assumir Conversa" no header do chat (ver inbox-layout.tsx). */
   assignedToOther: boolean;
-  /** Minutos desde a última mensagem do paciente ainda sem resposta — null quando já
-   * foi respondida ou a conversa está finalizada (esconde o badge de SLA no card, ver
-   * inbox-layout.tsx). Calculado a partir da mensagem mais recente já buscada em
-   * listConversations, sem query extra (ver toChatContact). */
-  slaWaitingMinutes: number | null;
+  /** Tempo de espera útil (dentro do expediente da clínica) desde a última mensagem do
+   * paciente ainda sem resposta — sla.shouldDisplay é false quando já foi respondida
+   * ou a conversa está finalizada (ver <SLABadge>). Calculado a partir da mensagem
+   * mais recente já buscada em listConversations, sem query extra (ver toChatContact
+   * e src/lib/sla-calculator.ts). */
+  sla: SlaInfo;
   lastMessage: string;
   lastMessageTime: string;
   statusTag: {

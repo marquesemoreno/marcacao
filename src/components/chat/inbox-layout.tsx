@@ -18,6 +18,7 @@ import { MessageBubble } from './message-bubble';
 import { ScheduleModal } from './schedule-modal';
 import { AvatarBadge } from './avatar-badge';
 import { PatientRecordSheet } from './patient-record-sheet';
+import { SLABadge } from './sla-badge';
 import { tagClasses, renderConsultationRow, PRESET_TAGS } from './patient-record-shared';
 import { FeedbackWidget } from '@/components/feedback-widget';
 import type { PlainClinicProcedureItem } from '@/lib/serialize';
@@ -102,13 +103,14 @@ const UNASSIGNED_ALERT_THRESHOLD_MINUTES = 10;
 /** Todas as abas possíveis da fila — o atendente escolhe quais ficam visíveis (persiste no navegador). */
 const ALL_INBOX_TABS: { id: InboxFilter; label: string }[] = [
   { id: 'todas', label: 'Todas' },
+  { id: 'pendentes', label: 'Pendentes' },
   { id: 'minhas', label: 'Minhas' },
   { id: 'nao_atribuidas', label: 'Não Atribuídas' },
   { id: 'finalizadas', label: 'Finalizadas' },
   { id: 'arquivadas', label: 'Arquivadas' },
 ];
 const INBOX_VISIBLE_TABS_STORAGE_KEY = 'inbox-visible-tabs';
-const DEFAULT_VISIBLE_TAB_IDS: InboxFilter[] = ['todas', 'minhas', 'nao_atribuidas'];
+const DEFAULT_VISIBLE_TAB_IDS: InboxFilter[] = ['todas', 'pendentes', 'minhas', 'nao_atribuidas'];
 
 const FUNNEL_STEPS: { id: FunnelStage; label: string }[] = [
   { id: 'novos', label: 'Novo' },
@@ -133,6 +135,10 @@ interface InboxLayoutProps {
   /** Minutos desde a última mensagem da conversa mais antiga em "Não Atribuídas" — pisca a
    * aba quando passa do limiar, mesmo se o atendente estiver vendo outra aba no momento. */
   unassignedWaitMinutes?: number | null;
+  /** Contador ambiente da aba "Pendentes" — conversas ativas com última mensagem do
+   * paciente ainda sem resposta (ver getPendingCount em actions/inbox.ts). Busca
+   * independente da aba selecionada, mesmo padrão de unassignedWaitMinutes. */
+  pendingCount?: number;
   /** Só existe no admin — quantas respostas foram mandadas hoje direto pelo celular
    * conectado (fora do painel), pra flagrar atendente que não está usando o painel. */
   outboundFromDeviceStats?: {
@@ -411,36 +417,19 @@ const ContactListItem = React.memo(function ContactListItem({
             {c.statusTag.label}
           </span>
 
-          {c.responsibleAgent && c.responsibleAgent.toLowerCase() !== 'não atribuído' ? (
-            <span className="inline-flex items-center gap-0.5 text-[10px] font-medium text-slate-500 dark:text-slate-300 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-1.5 py-0.5 rounded-md truncate max-w-[85px]" title={`Atribuído a ${c.responsibleAgent}`}>
-              <User className="w-2.5 h-2.5 shrink-0" /> {c.responsibleAgent.split(' ')[0]}
-            </span>
-          ) : (
-            <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-800 px-1.5 py-0.5 rounded-md" title="Aguardando secretária">
-              <Clock className="w-2.5 h-2.5" /> Livre
-            </span>
-          )}
-        </div>
-
-        {/* Badge de SLA: tempo desde a última mensagem do paciente ainda sem resposta —
-           some sozinho quando ela é respondida ou a conversa é finalizada (ver
-           slaWaitingMinutes em chat-crm-adapters.ts). Classes exatamente como pedido,
-           não seguem o rounded-md do resto do card — é um estado de alerta à parte. */}
-        {c.slaWaitingMinutes !== null && (
-          <div className="mt-1">
-            {c.slaWaitingMinutes < 10 ? (
-              <span className="text-[11px] text-slate-400">Aguardando há {c.slaWaitingMinutes} min</span>
-            ) : c.slaWaitingMinutes <= 20 ? (
-              <span className="bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded text-[11px] font-medium">
-                Aguardando há {c.slaWaitingMinutes} min
+          <span className="inline-flex items-center gap-1 shrink-0">
+            <SLABadge sla={c.sla} />
+            {c.responsibleAgent && c.responsibleAgent.toLowerCase() !== 'não atribuído' ? (
+              <span className="inline-flex items-center gap-0.5 text-[10px] font-medium text-slate-500 dark:text-slate-300 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-1.5 py-0.5 rounded-md truncate max-w-[85px]" title={`Atribuído a ${c.responsibleAgent}`}>
+                <User className="w-2.5 h-2.5 shrink-0" /> {c.responsibleAgent.split(' ')[0]}
               </span>
             ) : (
-              <span className="bg-rose-50 text-rose-700 px-1.5 py-0.5 rounded text-[11px] font-medium">
-                Aguardando há {c.slaWaitingMinutes} min
+              <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-800 px-1.5 py-0.5 rounded-md" title="Aguardando secretária">
+                <Clock className="w-2.5 h-2.5" /> Livre
               </span>
             )}
-          </div>
-        )}
+          </span>
+        </div>
       </div>
     </div>
   );
@@ -455,6 +444,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
   onLoadOlderMessages,
   attendantCapacity,
   unassignedWaitMinutes,
+  pendingCount,
   outboundFromDeviceStats,
   selectedContactId,
   selectedContact,
@@ -1231,7 +1221,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                   key={tab.id}
                   onClick={() => onFilterTabChange(tab.id)}
                   title={shouldAlert ? `Paciente esperando há ${unassignedWaitMinutes} min sem atendente` : undefined}
-                  className={`flex-1 py-1 px-1.5 rounded-md text-[11px] transition-all whitespace-nowrap text-center ${
+                  className={`flex-1 py-1 px-1.5 rounded-md text-[11px] transition-all whitespace-nowrap text-center inline-flex items-center justify-center gap-1 ${
                     shouldAlert
                       ? 'bg-rose-500 text-white font-bold shadow-sm animate-pulse'
                       : filterTab === tab.id
@@ -1240,6 +1230,11 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                   }`}
                 >
                   {tab.label}
+                  {tab.id === 'pendentes' && !!pendingCount && (
+                    <span className="min-w-[16px] px-1 rounded-md bg-rose-500 text-white text-[9px] font-bold leading-4">
+                      {pendingCount > 99 ? '99+' : pendingCount}
+                    </span>
+                  )}
                 </button>
               );
             })}

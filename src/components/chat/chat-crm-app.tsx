@@ -33,6 +33,7 @@ import {
   getClinicDoctorAgenda,
   listClinicPatientsForAppointment,
   getOldestUnassignedWaitMinutes,
+  getPendingCount,
   suggestIaReply,
   markConversationRead,
   markConversationUnread,
@@ -85,6 +86,7 @@ import {
   getClinicDoctorAgendaAdmin,
   listClinicPatientsForAppointmentAdmin,
   getOldestUnassignedWaitMinutesAdmin,
+  getPendingCountAdmin,
   suggestIaReplyAdmin,
   listClinicsForReassignment,
   updateConversationClinicAdmin,
@@ -286,6 +288,7 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
   /** Filtro de clínica da fila — só existe no scope admin, que vê todas juntas. "" = todas. */
   const [clinicFilter, setClinicFilter] = useState("");
   const [unassignedWaitMinutes, setUnassignedWaitMinutes] = useState<number | null>(null);
+  const [pendingCount, setPendingCount] = useState(0);
   const [outboundFromDeviceStats, setOutboundFromDeviceStats] = useState<{
     total: number;
     byClinic: { clinicId: string; clinicName: string; count: number }[];
@@ -307,6 +310,10 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
     // muito tempo em "Não Atribuídas" mesmo quando o atendente está vendo "Minhas".
     const waitFn = scope === "admin" ? getOldestUnassignedWaitMinutesAdmin : getOldestUnassignedWaitMinutes;
     waitFn().then(setUnassignedWaitMinutes).catch(() => {});
+
+    // Idem — badge ambiente da aba "Pendentes" (ver getPendingCount em actions/inbox.ts).
+    const pendingFn = scope === "admin" ? getPendingCountAdmin : getPendingCount;
+    pendingFn().then(setPendingCount).catch(() => {});
 
     // Idem — independente da aba, pra avisar (som + notificação de desktop) assim que
     // alguém transfere/atribui uma conversa a mim, mesmo que eu esteja em "Não
@@ -1018,6 +1025,7 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
           onLoadOlderMessages={handleLoadOlderMessages}
           attendantCapacity={attendantCapacity}
           unassignedWaitMinutes={unassignedWaitMinutes}
+          pendingCount={pendingCount}
           selectedContactId={selectedContactId}
           selectedContact={selectedContact}
           onSelectContact={selectContact}

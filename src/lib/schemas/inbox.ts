@@ -10,4 +10,4 @@ export const updateTagsSchema = z.object({
   tags: z.array(z.string().trim().min(1)).max(10),
 });
 
-export type ConversationFilter = "mine" | "unassigned" | "all" | "resolved" | "archived";
+export type ConversationFilter = "mine" | "unassigned" | "all" | "pending" | "resolved" | "archived";
