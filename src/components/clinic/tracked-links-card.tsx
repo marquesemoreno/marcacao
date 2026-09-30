@@ -48,7 +48,7 @@ export function TrackedLinksCard({ links }: { links: TrackedLink[] }) {
       </CardHeader>
       <CardContent className="space-y-3">
         <p className="text-xs text-muted-foreground">
-          Cole cada link no lugar certo (botão "Mensagem" do Google Meu Negócio, bio do Instagram, botão do
+          Cole cada link no lugar certo (botão &ldquo;Mensagem&rdquo; do Google Meu Negócio, bio do Instagram, botão do
           Facebook) — a mensagem pré-preenchida garante que a conversa entre já com a origem identificada no
           relatório.
         </p>
