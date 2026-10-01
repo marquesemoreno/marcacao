@@ -43,8 +43,8 @@ export function ReportSettingsForm({
             className="flex items-end gap-2"
           >
             <div className="space-y-1 flex-1">
-              <Label className="text-xs">Valor (R$)</Label>
-              <Input type="number" step="0.01" min="0" name="defaultTicket" defaultValue={defaultTicket ?? ""} placeholder="Ex: 250" className="h-9" />
+              <Label htmlFor="default-ticket" className="text-xs">Valor (R$)</Label>
+              <Input id="default-ticket" type="number" step="0.01" min="0" name="defaultTicket" defaultValue={defaultTicket ?? ""} placeholder="Ex: 250" className="h-9" />
             </div>
             <Button type="submit" size="sm" disabled={isPending}>
               Salvar
@@ -96,12 +96,12 @@ export function ReportSettingsForm({
             className="grid grid-cols-[1fr_auto_auto] items-end gap-2"
           >
             <div className="space-y-1">
-              <Label className="text-xs">Texto</Label>
-              <Input name="keyword" placeholder="Ex: promoção de check-up" className="h-9" required minLength={3} />
+              <Label htmlFor="acquisition-rule-keyword" className="text-xs">Texto</Label>
+              <Input id="acquisition-rule-keyword" name="keyword" placeholder="Ex: promoção de check-up" className="h-9" required minLength={3} />
             </div>
             <div className="space-y-1">
-              <Label className="text-xs">Canal</Label>
-              <select name="channel" className="h-9 rounded-lg border border-input bg-transparent px-2 text-sm">
+              <Label htmlFor="acquisition-rule-channel" className="text-xs">Canal</Label>
+              <select id="acquisition-rule-channel" name="channel" className="h-9 rounded-lg border border-input bg-transparent px-2 text-sm">
                 {channels.map((c) => (
                   <option key={c} value={c}>
                     {c}

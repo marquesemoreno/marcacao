@@ -32,7 +32,7 @@ export default async function ClinicSettingsPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-xl md:text-2xl font-semibold tracking-tight text-slate-900">Preços e Horários</h1>
+      <h1 className="text-xl md:text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Preços e Horários</h1>
 
       <PrecosPageTabs
         businessHours={businessHours}

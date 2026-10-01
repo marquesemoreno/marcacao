@@ -31,7 +31,7 @@ export function BusinessHoursForm({ businessHours }: { businessHours: Partial<Bu
 
   return (
     <form onSubmit={handleSubmit}>
-      <Card className="rounded-xl border border-slate-200">
+      <Card className="rounded-xl border border-slate-200 dark:border-slate-800">
         <CardContent className="space-y-3 p-6">
           {weekDays.map(({ key, label }) => {
             const day = businessHours[key] ?? {};
@@ -50,6 +50,7 @@ export function BusinessHoursForm({ businessHours }: { businessHours: Partial<Bu
                 <Input
                   type="time"
                   name={`${key}_open`}
+                  aria-label={`${label} — horário de abertura`}
                   defaultValue={day.open ?? "08:00"}
                   className="h-9 w-28"
                 />
@@ -57,6 +58,7 @@ export function BusinessHoursForm({ businessHours }: { businessHours: Partial<Bu
                 <Input
                   type="time"
                   name={`${key}_close`}
+                  aria-label={`${label} — horário de fechamento`}
                   defaultValue={day.close ?? "18:00"}
                   className="h-9 w-28"
                 />
