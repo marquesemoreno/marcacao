@@ -22,6 +22,8 @@ import { assignmentSeenAtFor } from "@/lib/conversation-assignment";
 import { getAiAttendantConfig } from "@/lib/ai-attendant";
 import { analyzeConversationQuality } from "@/lib/conversation-quality";
 import { extractInvoiceData, type InvoiceData } from "@/lib/invoice-extraction";
+import { processDocumentMessage } from "@/lib/documents/document-processor";
+import { validateExtractedDocument, type DocumentReviewData } from "@/lib/documents/document-validator";
 import { mentionsInvoiceRequest } from "@/lib/chat-messages";
 import type { Department, FunnelStage, InboxFilter } from "@/types/chat-crm";
 import {
@@ -985,6 +987,50 @@ export async function extractMessageInvoiceDataAdmin(messageId: string) {
   }
 
   await prisma.message.update({ where: { id: messageId }, data: { extractedInvoiceData: data } });
+  return { success: true as const, data };
+}
+
+/** Espelho de processMessageDocument (src/actions/inbox.ts) pro escopo admin — sem
+ * clinicId de sessão (admin vê todas), usa o clinicId da própria conversa. */
+export async function processMessageDocumentAdmin(messageId: string) {
+  await requireAdminSession();
+
+  const message = await prisma.message.findUnique({
+    where: { id: messageId },
+    include: { conversation: { select: { clinicId: true, contact: { select: { name: true } } } } },
+  });
+  if (!message) {
+    return { success: false as const, error: "Mensagem não encontrada." };
+  }
+  if (message.type !== "ATTACHMENT" || !message.mediaPath || !message.mimeType?.startsWith("image/")) {
+    return { success: false as const, error: "Esta mensagem não tem uma imagem de documento pra analisar." };
+  }
+
+  const cached = (message.extractedDocumentData as DocumentReviewData | null)?.extracted ?? null;
+  let extracted = cached;
+  let rawOcrTextLength = cached ? cached.proceduresFound.join(" ").length : 0;
+
+  if (!extracted) {
+    const buffer = await downloadWhatsAppMedia(message.mediaPath);
+    if (!buffer) {
+      return { success: false as const, error: "Não foi possível baixar a imagem pra analisar." };
+    }
+    const processed = await processDocumentMessage({
+      buffer,
+      mimeType: message.mimeType,
+      knownPatientNames: [message.conversation.contact.name],
+    });
+    if (!processed) {
+      return { success: false as const, error: "Não foi possível ler o documento. Tente de novo." };
+    }
+    extracted = processed.extracted;
+    rawOcrTextLength = processed.rawOcrText.length;
+  }
+
+  const validation = await validateExtractedDocument(message.conversation.clinicId, extracted, rawOcrTextLength);
+  const data: DocumentReviewData = { extracted, validation };
+
+  await prisma.message.update({ where: { id: messageId }, data: { extractedDocumentData: data } });
   return { success: true as const, data };
 }
 

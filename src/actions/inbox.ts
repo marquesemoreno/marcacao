@@ -23,6 +23,8 @@ import { assignmentSeenAtFor } from "@/lib/conversation-assignment";
 import { getAiAttendantConfig } from "@/lib/ai-attendant";
 import { analyzeConversationQuality } from "@/lib/conversation-quality";
 import { extractInvoiceData, type InvoiceData } from "@/lib/invoice-extraction";
+import { processDocumentMessage } from "@/lib/documents/document-processor";
+import { validateExtractedDocument, type DocumentReviewData } from "@/lib/documents/document-validator";
 
 const ALLOWED_MEDIA_MIME_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif", "application/pdf"];
 const MAX_MEDIA_SIZE_BYTES = 15 * 1024 * 1024; // 15 MB — mesma ordem de grandeza do limite de mídia do WhatsApp
@@ -987,6 +989,58 @@ export async function extractMessageInvoiceData(messageId: string) {
   }
 
   await prisma.message.update({ where: { id: messageId }, data: { extractedInvoiceData: data } });
+  return { success: true as const, data };
+}
+
+/** Lê, mascara (Vault LGPD, ver lgpd-sanitizer.ts), extrai e valida um documento médico
+ * (pedido de exame/receita/carteirinha) enviado por foto pelo paciente — sob demanda,
+ * mesmo padrão de cache de extractMessageInvoiceData acima. A validação (Etapa 3) sempre
+ * roda de novo mesmo em cache hit — é determinística e barata (sem chamada de IA), então
+ * reflete o catálogo/convênios atuais da clínica em vez de ficar presa ao que existia no
+ * dia da extração original. */
+export async function processMessageDocument(messageId: string) {
+  const { clinicId } = await requireClinicSession();
+
+  const message = await prisma.message.findUnique({
+    where: { id: messageId },
+    include: { conversation: { select: { clinicId: true, contact: { select: { name: true } } } } },
+  });
+  if (!message || message.conversation.clinicId !== clinicId) {
+    return { success: false as const, error: "Mensagem não encontrada." };
+  }
+  if (message.type !== "ATTACHMENT" || !message.mediaPath || !message.mimeType?.startsWith("image/")) {
+    return { success: false as const, error: "Esta mensagem não tem uma imagem de documento pra analisar." };
+  }
+
+  const cached = (message.extractedDocumentData as DocumentReviewData | null)?.extracted ?? null;
+  // Aproximação pra legibilidade em cache hit — rawOcrText nunca é persistido de
+  // propósito (ver nota em document-processor.ts), então num re-processamento (ex:
+  // catálogo mudou) usa o tamanho do que foi extraído como proxy do que tinha no
+  // texto bruto original.
+  let extracted = cached;
+  let rawOcrTextLength = cached ? cached.proceduresFound.join(" ").length : 0;
+
+  if (!extracted) {
+    const buffer = await downloadWhatsAppMedia(message.mediaPath);
+    if (!buffer) {
+      return { success: false as const, error: "Não foi possível baixar a imagem pra analisar." };
+    }
+    const processed = await processDocumentMessage({
+      buffer,
+      mimeType: message.mimeType,
+      knownPatientNames: [message.conversation.contact.name],
+    });
+    if (!processed) {
+      return { success: false as const, error: "Não foi possível ler o documento. Tente de novo." };
+    }
+    extracted = processed.extracted;
+    rawOcrTextLength = processed.rawOcrText.length;
+  }
+
+  const validation = await validateExtractedDocument(clinicId, extracted, rawOcrTextLength);
+  const data: DocumentReviewData = { extracted, validation };
+
+  await prisma.message.update({ where: { id: messageId }, data: { extractedDocumentData: data } });
   return { success: true as const, data };
 }
 

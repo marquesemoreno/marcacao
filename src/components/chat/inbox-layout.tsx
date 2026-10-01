@@ -24,6 +24,7 @@ import { tagClasses, renderConsultationRow, PRESET_TAGS } from './patient-record
 import { FeedbackWidget } from '@/components/feedback-widget';
 import type { PlainClinicProcedureItem } from '@/lib/serialize';
 import type { InvoiceData } from '@/lib/chat-messages';
+import type { DocumentReviewData } from '@/lib/documents/document-validator';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from '@/components/ui/dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from '@/components/ui/command';
@@ -214,6 +215,8 @@ interface InboxLayoutProps {
   onTranscribeAudio?: (messageId: string) => Promise<{ success: boolean; transcription?: string; error?: string }>;
   /** Extrai dados de nota fiscal sob demanda (botão no balão) — ver extractMessageInvoiceData em actions/inbox.ts. */
   onExtractInvoiceData?: (messageId: string) => Promise<{ success: boolean; data?: InvoiceData; error?: string }>;
+  /** Analisa um documento médico anexado sob demanda (botão no balão) — ver processMessageDocument em actions/inbox.ts. */
+  onProcessDocument?: (messageId: string) => Promise<{ success: boolean; data?: DocumentReviewData; error?: string }>;
   onTransferAgent: (agentId: string, agentName: string) => Promise<void> | void;
   availableClinics?: { id: string; tradeName: string }[];
   onReassignClinic?: (clinicId: string) => Promise<void> | void;
@@ -484,6 +487,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
   onEditMessage,
   onTranscribeAudio,
   onExtractInvoiceData,
+  onProcessDocument,
   onTransferAgent,
   availableClinics,
   onReassignClinic,
@@ -557,6 +561,13 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
   const moreMenuRef = useClickOutside<HTMLDivElement>(isMoreMenuOpen, () => setIsMoreMenuOpen(false));
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
+  /** Pré-seleção vinda do DocumentReviewCard (ver handleOpenScheduleWithProcedure) —
+   * undefined quando o agendamento é aberto pelo botão normal "Agendar". */
+  const [scheduleModalProcedureId, setScheduleModalProcedureId] = useState<string | undefined>(undefined);
+  function handleOpenScheduleWithProcedure(clinicProcedureId?: string) {
+    setScheduleModalProcedureId(clinicProcedureId);
+    setIsScheduleModalOpen(true);
+  }
   const [isNewContactModalOpen, setIsNewContactModalOpen] = useState(false);
   const [newContactName, setNewContactName] = useState('');
   const [newContactPhone, setNewContactPhone] = useState('');
@@ -1564,7 +1575,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                 )}
 
                 <button
-                  onClick={() => setIsScheduleModalOpen(true)}
+                  onClick={() => handleOpenScheduleWithProcedure(undefined)}
                   className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-md shadow-xs transition-all active:scale-[0.98]"
                   title="Criar novo agendamento de consulta ou exame"
                 >
@@ -1586,7 +1597,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                   {isMoreMenuOpen && (
                     <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-lg py-1.5 z-50 animate-in fade-in zoom-in-95 text-xs font-medium">
                       <button
-                        onClick={() => setIsScheduleModalOpen(true)}
+                        onClick={() => handleOpenScheduleWithProcedure(undefined)}
                         className="sm:hidden w-full px-3 py-2 text-left hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center gap-2 text-slate-700 dark:text-slate-200"
                       >
                         <Calendar className="w-3.5 h-3.5 text-emerald-600" />
@@ -1752,6 +1763,8 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                       onEditMessage={onEditMessage}
                       onTranscribeAudio={onTranscribeAudio}
                       onExtractInvoiceData={onExtractInvoiceData}
+                      onProcessDocument={onProcessDocument}
+                      onOpenScheduleWithProcedure={handleOpenScheduleWithProcedure}
                       onRequestResend={
                         msg.mediaDownloadFailed
                           ? () => onSendMessage('Oi! Não conseguimos baixar o arquivo que você enviou por aqui. Pode tentar enviar novamente, por favor?', 'whatsapp')
@@ -2838,12 +2851,16 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
         <ScheduleModal
           contact={selectedContact}
           isOpen={isScheduleModalOpen}
-          onClose={() => setIsScheduleModalOpen(false)}
+          onClose={() => {
+            setIsScheduleModalOpen(false);
+            setScheduleModalProcedureId(undefined);
+          }}
           fetchProcedures={fetchProcedures}
           fetchDoctors={fetchDoctors}
           fetchConvenios={fetchConvenios}
           fetchAgenda={fetchAgenda}
           fetchPatients={fetchPatients}
+          initialProcedureId={scheduleModalProcedureId}
           onConfirmSchedule={onScheduleConfirmed}
         />
       )}
