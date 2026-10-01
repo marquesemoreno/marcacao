@@ -1049,11 +1049,18 @@ export async function POST(request: Request) {
 
   // Mesma tag de resultado da conversa pros 2 outros fluxos (sem Appointment
   // nosso / pedido de remarcação, ver acima) — cobre CONFIRMED e CANCELLED num
-  // lugar só, antes de ramificar em bridge/marketplace logo abaixo.
+  // lugar só, antes de ramificar em bridge/marketplace logo abaixo. CONFIRMED
+  // também finaliza o atendimento aqui (pedido explícito do usuário, 2026-10-01)
+  // — antes só o ramo "isBridgeAppointment" resolvia (ver abaixo), agendamento
+  // confirmado da plataforma (não-bridge) ficava OPEN pra sempre, igual ao
+  // mesmo bug já corrigido no ramo "sem Appointment nosso" mais acima.
   if (conversation) {
     await prisma.conversation.update({
       where: { id: conversation.id },
-      data: { tags: nextTagsForOutcome(conversation.tags, newStatus === "CONFIRMED" ? CONFIRMED_TAG : CANCELLED_TAG) },
+      data: {
+        tags: nextTagsForOutcome(conversation.tags, newStatus === "CONFIRMED" ? CONFIRMED_TAG : CANCELLED_TAG),
+        ...(newStatus === "CONFIRMED" ? { status: "RESOLVED", resolvedAt: new Date(), resolutionReason: "CONFIRMACAO_AGENDA" } : {}),
+      },
     });
   }
 
@@ -1080,13 +1087,8 @@ export async function POST(request: Request) {
           await prisma.message.create({
             data: { conversationId: conversation.id, direction: "OUTBOUND", content: followUp, status: "DELIVERED" },
           });
-          // Mesmo motivo do outro call-site deste follow-up (ver comentário acima,
-          // no ramo "sem Appointment nosso"): fecha a conversa pra não cair depois
-          // no cron de sem-retorno como se ainda estivesse esperando o paciente.
-          await prisma.conversation.update({
-            where: { id: conversation.id },
-            data: { status: "RESOLVED", resolvedAt: new Date(), resolutionReason: "CONFIRMACAO_AGENDA" },
-          });
+          // Finalização já aconteceu no bloco compartilhado acima (tags/status de
+          // CONFIRMED) — não repete aqui.
         }
 
         // Fecha o ciclo no sistema real da clínica (Firebird) — testado com um
