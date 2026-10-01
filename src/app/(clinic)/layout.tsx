@@ -6,6 +6,7 @@ import { Logo } from "@/components/brand/logo";
 import { ClinicNav } from "@/components/clinic/clinic-nav";
 import { ClinicSidebar } from "@/components/clinic/clinic-sidebar";
 import { FeedbackWidget } from "@/components/feedback-widget";
+import { CopilotLauncher } from "@/components/clinic/copilot/copilot-launcher";
 import { getClinicInfo } from "@/actions/clinic";
 
 export const dynamic = "force-dynamic";
@@ -44,6 +45,7 @@ export default async function ClinicLayout({
       </div>
 
       <FeedbackWidget />
+      <CopilotLauncher />
     </div>
   );
 }
