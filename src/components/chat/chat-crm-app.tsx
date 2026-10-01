@@ -8,6 +8,7 @@ import {
   getChatMessages,
   getOlderChatMessages,
   getChatContactHistory,
+  listContactMedia,
   sendMessage,
   sendMediaMessage,
   updateConversationTags,
@@ -33,6 +34,7 @@ import {
   getClinicDoctorAgenda,
   listClinicPatientsForAppointment,
   getOldestUnassignedWaitMinutes,
+  getPendingCount,
   suggestIaReply,
   markConversationRead,
   markConversationUnread,
@@ -61,6 +63,7 @@ import {
   getChatMessagesAdmin,
   getOlderChatMessagesAdmin,
   getChatContactHistoryAdmin,
+  listContactMediaAdmin,
   sendMessageAdmin,
   sendMediaMessageAdmin,
   updateConversationTagsAdmin,
@@ -85,6 +88,7 @@ import {
   getClinicDoctorAgendaAdmin,
   listClinicPatientsForAppointmentAdmin,
   getOldestUnassignedWaitMinutesAdmin,
+  getPendingCountAdmin,
   suggestIaReplyAdmin,
   listClinicsForReassignment,
   updateConversationClinicAdmin,
@@ -123,7 +127,7 @@ import {
 } from "@/lib/browser-notifications";
 import { InboxLayout } from "./inbox-layout";
 import { CRMKanban } from "./crm-kanban";
-import type { Agent, Contact, FunnelStage, InboxFilter, Message } from "@/types/chat-crm";
+import type { Agent, Contact, FunnelStage, InboxFilter, Message, UpdatePatientData } from "@/types/chat-crm";
 
 type Scope = "clinic" | "admin";
 type View = "inbox" | "crm";
@@ -143,13 +147,13 @@ const ACTIONS_BY_SCOPE = {
     getChatMessages: (id: string) => getChatMessages(id),
     getOlderChatMessages: (id: string, beforeId: string) => getOlderChatMessages(id, beforeId),
     getChatContactHistory: (id: string) => getChatContactHistory(id),
+    listContactMedia: (id: string) => listContactMedia(id),
     sendMessage: (id: string, text: string, note?: boolean, replyToMessageId?: string) =>
       sendMessage(id, text, note, replyToMessageId),
     sendMediaMessage: (id: string, formData: FormData) => sendMediaMessage(id, formData),
     updateConversationTags: (id: string, tags: string[]) => updateConversationTags(id, tags),
     updateConversationFunnelStage: (id: string, stage: FunnelStage) => updateConversationFunnelStage(id, stage),
-    updateContactInfo: (id: string, data: { name: string; cpf?: string; phone?: string; convenio?: string; preferredDoctor?: string }) =>
-      updateContactInfo(id, data),
+    updateContactInfo: (id: string, data: UpdatePatientData) => updateContactInfo(id, data),
     refreshContactPhoto: (id: string) => refreshContactPhoto(id),
     assignConversationToUser: (id: string, userId: string | null) => assignConversationToUser(id, userId ?? ""),
     resolveConversation: (id: string, data?: { reason: string; notes?: string }) => resolveConversation(id, data),
@@ -186,13 +190,13 @@ const ACTIONS_BY_SCOPE = {
     getChatMessages: (id: string) => getChatMessagesAdmin(id),
     getOlderChatMessages: (id: string, beforeId: string) => getOlderChatMessagesAdmin(id, beforeId),
     getChatContactHistory: (id: string) => getChatContactHistoryAdmin(id),
+    listContactMedia: (id: string) => listContactMediaAdmin(id),
     sendMessage: (id: string, text: string, note?: boolean, replyToMessageId?: string) =>
       sendMessageAdmin(id, text, note, replyToMessageId),
     sendMediaMessage: (id: string, formData: FormData) => sendMediaMessageAdmin(id, formData),
     updateConversationTags: (id: string, tags: string[]) => updateConversationTagsAdmin(id, tags),
     updateConversationFunnelStage: (id: string, stage: FunnelStage) => updateConversationFunnelStageAdmin(id, stage),
-    updateContactInfo: (id: string, data: { name: string; cpf?: string; phone?: string; convenio?: string; preferredDoctor?: string }) =>
-      updateContactInfoAdmin(id, data),
+    updateContactInfo: (id: string, data: UpdatePatientData) => updateContactInfoAdmin(id, data),
     refreshContactPhoto: (id: string) => refreshContactPhotoAdmin(id),
     assignConversationToUser: (id: string, userId: string | null) => assignConversationToUserAdmin(id, userId),
     resolveConversation: (id: string, data?: { reason: string; notes?: string }) => resolveConversationAdmin(id, data),
@@ -286,6 +290,7 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
   /** Filtro de clínica da fila — só existe no scope admin, que vê todas juntas. "" = todas. */
   const [clinicFilter, setClinicFilter] = useState("");
   const [unassignedWaitMinutes, setUnassignedWaitMinutes] = useState<number | null>(null);
+  const [pendingCount, setPendingCount] = useState(0);
   const [outboundFromDeviceStats, setOutboundFromDeviceStats] = useState<{
     total: number;
     byClinic: { clinicId: string; clinicName: string; count: number }[];
@@ -307,6 +312,10 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
     // muito tempo em "Não Atribuídas" mesmo quando o atendente está vendo "Minhas".
     const waitFn = scope === "admin" ? getOldestUnassignedWaitMinutesAdmin : getOldestUnassignedWaitMinutes;
     waitFn().then(setUnassignedWaitMinutes).catch(() => {});
+
+    // Idem — badge ambiente da aba "Pendentes" (ver getPendingCount em actions/inbox.ts).
+    const pendingFn = scope === "admin" ? getPendingCountAdmin : getPendingCount;
+    pendingFn().then(setPendingCount).catch(() => {});
 
     // Idem — independente da aba, pra avisar (som + notificação de desktop) assim que
     // alguém transfere/atribui uma conversa a mim, mesmo que eu esteja em "Não
@@ -787,7 +796,7 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
     await refreshContacts();
   }
 
-  async function handleUpdatePatient(data: { name: string; cpf?: string; phone?: string; convenio?: string; preferredDoctor?: string }) {
+  async function handleUpdatePatient(data: UpdatePatientData) {
     if (!selectedContact) return { success: false as const, error: "Nenhuma conversa selecionada." };
     const result = await actions.updateContactInfo(selectedContact.id, data);
     if (result.success) {
@@ -1018,6 +1027,7 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
           onLoadOlderMessages={handleLoadOlderMessages}
           attendantCapacity={attendantCapacity}
           unassignedWaitMinutes={unassignedWaitMinutes}
+          pendingCount={pendingCount}
           selectedContactId={selectedContactId}
           selectedContact={selectedContact}
           onSelectContact={selectContact}
@@ -1052,6 +1062,7 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
           onUpdateFunnelStage={handleUpdateFunnelStage}
           onClaimConversation={handleClaimConversation}
           onTakeOverConversation={scope === "clinic" ? handleTakeOverConversation : undefined}
+          onLoadContactMedia={actions.listContactMedia}
           onReactivateAi={handleReactivateAi}
           onMarkUnread={handleMarkUnread}
           onTogglePin={handleTogglePin}

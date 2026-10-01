@@ -31,8 +31,8 @@ export function BusinessHoursForm({ businessHours }: { businessHours: Partial<Bu
 
   return (
     <form onSubmit={handleSubmit}>
-      <Card>
-        <CardContent className="space-y-3 p-4">
+      <Card className="rounded-xl border border-slate-200">
+        <CardContent className="space-y-3 p-6">
           {weekDays.map(({ key, label }) => {
             const day = businessHours[key] ?? {};
             return (

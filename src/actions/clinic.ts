@@ -416,6 +416,21 @@ export async function getDistinctDoctorNames() {
   return rows.map((r) => r.doctorName!).filter(Boolean);
 }
 
+/** Convênios distintos já cadastrados nos pacientes desta clínica — pro filtro
+ * "Filtrar por Convênio" em /clinic/contatos (ver contacts-app.tsx). Contact não é
+ * scoped por clínica direto (o mesmo paciente pode falar com várias) — filtra pelas
+ * conversas que essa clínica tem com cada um. */
+export async function getDistinctConvenios() {
+  const { clinicId } = await requireClinicSession();
+  const rows = await prisma.contact.findMany({
+    where: { conversations: { some: { clinicId } }, convenio: { not: null } },
+    select: { convenio: true },
+    distinct: ["convenio"],
+    orderBy: { convenio: "asc" },
+  });
+  return rows.map((r) => r.convenio!).filter(Boolean);
+}
+
 /** Pacientes agendados com um médico numa data específica — prévia do modal de
  * remarcação em massa antes de disparar o aviso. Só status ativos (PENDING/CONFIRMED),
  * não faz sentido avisar quem já foi atendido ou já cancelou. */

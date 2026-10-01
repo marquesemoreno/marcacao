@@ -121,6 +121,9 @@ export async function listChatContactsAdmin(filter: InboxFilter, search?: string
           : filter === "finalizadas"
             ? { status: ConversationStatus.RESOLVED, archivedAt: null }
             : { status: { in: ACTIVE_STATUSES }, archivedAt: null };
+  // "pendentes" cai no mesmo `where` de "todas" acima (não tem branch própria) — o
+  // recorte de verdade (só quem está esperando resposta) é o filter em memória depois
+  // do fetch, igual à versão clínica em inbox.ts.
 
   const conversations = await prisma.conversation.findMany({
     where: {
@@ -140,7 +143,7 @@ export async function listChatContactsAdmin(filter: InboxFilter, search?: string
     },
     include: {
       contact: true,
-      clinic: { select: { id: true, tradeName: true } },
+      clinic: { select: { id: true, tradeName: true, businessHours: true } },
       assignedUser: { select: { id: true, name: true } },
       // take: 3 (não 1) — a prévia da lista pula nota interna e mostra a última
       // mensagem de verdade (ver toChatContact em chat-crm-adapters.ts).
@@ -154,13 +157,16 @@ export async function listChatContactsAdmin(filter: InboxFilter, search?: string
         select: { type: true, content: true, mimeType: true, createdAt: true, direction: true },
       },
     },
-    orderBy: { lastMessageAt: "desc" },
+    orderBy: { lastMessageAt: filter === "pendentes" ? "asc" : "desc" },
   });
+
+  const filteredConversations =
+    filter === "pendentes" ? conversations.filter((c) => c.messages[0]?.direction === "INBOUND") : conversations;
 
   // Em lotes de 2000 IDs por vez — o Postgres rejeita a query acima de ~32767
   // parâmetros de bind, e sem o filtro de clínica (ex: "Todas as Clínicas") a
   // lista de conversas pode facilmente passar disso.
-  const conversationIds = conversations.map((c) => c.id);
+  const conversationIds = filteredConversations.map((c) => c.id);
   const unreadByConversation = new Map<string, number>();
   for (let i = 0; i < conversationIds.length; i += 2000) {
     const chunk = conversationIds.slice(i, i + 2000);
@@ -176,7 +182,7 @@ export async function listChatContactsAdmin(filter: InboxFilter, search?: string
     for (const u of unreadCounts) unreadByConversation.set(u.conversationId, u._count.id);
   }
 
-  return conversations.map((c) =>
+  const contacts = filteredConversations.map((c) =>
     toChatContact(
       {
         ...c,
@@ -185,6 +191,8 @@ export async function listChatContactsAdmin(filter: InboxFilter, search?: string
       userId
     )
   );
+  if (filter === "pendentes") contacts.sort((a, b) => b.sla.waitingMinutes - a.sla.waitingMinutes);
+  return contacts;
 }
 
 /** Lista enxuta pro seletor de "trocar clínica da conversa" — ver updateConversationClinicAdmin. */
@@ -399,6 +407,25 @@ export async function getChatContactHistoryAdmin(conversationId: string) {
       isUpcoming: a.date.getTime() >= todayUtc.getTime() && (a.status === "PENDING" || a.status === "CONFIRMED"),
     };
   });
+}
+
+/** Mesma ideia de listContactMedia em inbox.ts — ver lá pro porquê. */
+export async function listContactMediaAdmin(conversationId: string) {
+  await requireAdminSession();
+  const messages = await prisma.message.findMany({
+    where: { conversationId, type: { in: ["ATTACHMENT", "AUDIO"] }, deletedAt: null },
+    orderBy: { createdAt: "desc" },
+    select: { id: true, mimeType: true, mediaPath: true, attachmentName: true, attachmentSize: true, createdAt: true },
+  });
+  const withUrls = await attachSignedUrls(messages);
+  return withUrls.map((m) => ({
+    id: m.id,
+    mimeType: m.mimeType,
+    url: m.mediaUrl,
+    attachmentName: m.attachmentName,
+    attachmentSize: m.attachmentSize,
+    createdAt: new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeZone: "America/Sao_Paulo" }).format(m.createdAt),
+  }));
 }
 
 /** Mesma lógica de resolveQuotedRef em inbox.ts (ver ali o porquê) — duplicada aqui
@@ -1082,6 +1109,25 @@ export async function getOldestUnassignedWaitMinutesAdmin() {
   return Math.floor((Date.now() - oldest.lastMessageAt.getTime()) / 60000);
 }
 
+/** Mesma ideia de getPendingCount (inbox.ts) — ver comentário lá pro porquê do SQL
+ * cru. Sem filtro de clínica aqui: conta em todas (o seletor de clínica do admin filtra
+ * a LISTA, não esse contador ambiente). */
+export async function getPendingCountAdmin() {
+  await requireAdminSession();
+  const result = await prisma.$queryRaw<{ count: bigint }[]>`
+    SELECT COUNT(*)::bigint AS count FROM (
+      SELECT DISTINCT ON (m.conversation_id) m.direction
+      FROM messages m
+      JOIN conversations c ON c.id = m.conversation_id
+      WHERE c.status IN ('OPEN', 'PENDING')
+        AND c.archived_at IS NULL
+      ORDER BY m.conversation_id, m.created_at DESC
+    ) last_messages
+    WHERE direction = 'INBOUND'
+  `;
+  return Number(result[0]?.count ?? 0);
+}
+
 export async function assignConversationToUserAdmin(conversationId: string, targetUserId: string | null) {
   const { userId } = await requireAdminSession();
   const updated = await prisma.conversation.update({
@@ -1275,7 +1321,18 @@ export async function updateConversationTagsAdmin(conversationId: string, tags: 
 
 export async function updateContactInfoAdmin(
   conversationId: string,
-  data: { name: string; cpf?: string; phone?: string; convenio?: string; preferredDoctor?: string }
+  data: {
+    name: string;
+    cpf?: string;
+    phone?: string;
+    convenio?: string;
+    preferredDoctor?: string;
+    rg?: string;
+    birthDate?: string;
+    address?: string;
+    insuranceCardNumber?: string;
+    notes?: string;
+  }
 ) {
   await requireAdminSession();
 
@@ -1309,6 +1366,11 @@ export async function updateContactInfoAdmin(
         ...(fullPhone ? { phone: fullPhone } : {}),
         ...(data.convenio !== undefined ? { convenio: data.convenio.trim() || null } : {}),
         ...(data.preferredDoctor !== undefined ? { preferredDoctor: data.preferredDoctor.trim() || null } : {}),
+        ...(data.rg !== undefined ? { rg: data.rg.trim() || null } : {}),
+        ...(data.birthDate !== undefined ? { birthDate: data.birthDate ? new Date(`${data.birthDate}T00:00:00.000Z`) : null } : {}),
+        ...(data.address !== undefined ? { address: data.address.trim() || null } : {}),
+        ...(data.insuranceCardNumber !== undefined ? { insuranceCardNumber: data.insuranceCardNumber.trim() || null } : {}),
+        ...(data.notes !== undefined ? { notes: data.notes.trim() || null } : {}),
       },
     });
   } catch (error) {

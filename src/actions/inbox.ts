@@ -103,6 +103,7 @@ export async function listAllContacts(search?: string) {
                 { name: { contains: search, mode: "insensitive" } },
                 { phone: { contains: search } },
                 { cpf: { contains: search } },
+                { convenio: { contains: search, mode: "insensitive" } },
               ],
             },
           }
@@ -112,13 +113,49 @@ export async function listAllContacts(search?: string) {
     orderBy: { contact: { name: "asc" } },
   });
 
-  return conversations.map((conversation) => ({
-    conversationId: conversation.id,
-    name: conversation.contact.name,
-    phone: conversation.contact.phone ?? "",
-    cpf: conversation.contact.cpf,
-    status: conversation.status,
-  }));
+  // "Última Consulta" (data + médico) em 1 query só, pra não virar N+1 (uma consulta
+  // por linha da tabela) — mesmo estilo de batching já usado pro unreadCount em
+  // listConversations. Reduz pra mais recente por telefone em memória (já vem
+  // ordenado por data desc, então o primeiro que aparece por telefone é o mais recente).
+  const phones = conversations.map((c) => c.contact.phone).filter((p): p is string => Boolean(p));
+  const lastAppointmentByPhone = new Map<string, { date: Date; doctorName: string | null }>();
+  if (phones.length > 0) {
+    const appointments = await prisma.appointment.findMany({
+      where: { patientPhone: { in: phones }, clinicProcedure: { clinicId } },
+      select: { patientPhone: true, date: true, doctorName: true },
+      orderBy: { date: "desc" },
+    });
+    for (const a of appointments) {
+      if (!lastAppointmentByPhone.has(a.patientPhone)) {
+        lastAppointmentByPhone.set(a.patientPhone, { date: a.date, doctorName: a.doctorName });
+      }
+    }
+  }
+
+  return conversations.map((conversation) => {
+    const lastAppointment = conversation.contact.phone ? lastAppointmentByPhone.get(conversation.contact.phone) : undefined;
+    return {
+      conversationId: conversation.id,
+      name: conversation.contact.name,
+      phone: conversation.contact.phone ?? "",
+      cpf: conversation.contact.cpf,
+      convenio: conversation.contact.convenio,
+      preferredDoctor: conversation.contact.preferredDoctor,
+      rg: conversation.contact.rg,
+      birthDate: conversation.contact.birthDate ? conversation.contact.birthDate.toISOString().slice(0, 10) : null,
+      address: conversation.contact.address,
+      insuranceCardNumber: conversation.contact.insuranceCardNumber,
+      notes: conversation.contact.notes,
+      tags: conversation.tags,
+      status: conversation.status,
+      lastAppointment: lastAppointment
+        ? {
+            date: new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeZone: "UTC" }).format(lastAppointment.date),
+            doctorName: lastAppointment.doctorName,
+          }
+        : null,
+    };
+  });
 }
 
 /** Lista conversas-destino pra "Reencaminhar mensagem" — só da mesma clínica da
@@ -194,6 +231,13 @@ export async function listConversations(filter: ConversationFilter, search?: str
     include: {
       contact: true,
       assignedUser: { select: { id: true, name: true } },
+      // Expediente da clínica — usado pro cálculo de SLA em minutos úteis (ver
+      // sla-calculator.ts); relacionamento de 1 linha, barato (não é o mesmo tipo de
+      // custo do include de messages abaixo). Só businessHours: id/tradeName ficam de
+      // fora de propósito — toChatContact usa esses dois só pra exibir "de qual clínica"
+      // na visão do admin (que mistura várias juntas); aqui, no scope clínica, mostrar
+      // isso em todo card seria redundante (a tela inteira já é só dessa clínica).
+      clinic: { select: { businessHours: true } },
       // take: 3 (não 1) — a prévia da lista pula nota interna e mostra a última
       // mensagem de verdade (ver toChatContact em chat-crm-adapters.ts); raramente
       // há mais de 2 notas internas seguidas antes de uma mensagem real.
@@ -207,12 +251,21 @@ export async function listConversations(filter: ConversationFilter, search?: str
         select: { type: true, content: true, mimeType: true, createdAt: true, direction: true },
       },
     },
-    orderBy: { lastMessageAt: "desc" },
+    // "pending" (aba "Pendentes"): mais antiga primeiro — combinado com o filtro de
+    // direção abaixo e a ordenação por SLA em listChatContacts, prioriza quem está
+    // esperando há mais tempo.
+    orderBy: { lastMessageAt: filter === "pending" ? "asc" : "desc" },
   });
+
+  // Aba "Pendentes": mesma base de "todas" (status ativo), mas só quem realmente está
+  // esperando resposta — última mensagem é do paciente. Filtro em memória, não query
+  // nova: `messages[0]` já veio no include acima.
+  const filteredConversations =
+    filter === "pending" ? conversations.filter((c) => c.messages[0]?.direction === "INBOUND") : conversations;
 
   // Em lotes de 2000 IDs por vez — o Postgres rejeita a query acima de ~32767
   // parâmetros de bind, o que uma clínica com muitas conversas pode ultrapassar.
-  const conversationIds = conversations.map((c) => c.id);
+  const conversationIds = filteredConversations.map((c) => c.id);
   const unreadByConversation = new Map<string, number>();
   for (let i = 0; i < conversationIds.length; i += 2000) {
     const chunk = conversationIds.slice(i, i + 2000);
@@ -228,7 +281,7 @@ export async function listConversations(filter: ConversationFilter, search?: str
     for (const u of unreadCounts) unreadByConversation.set(u.conversationId, u._count.id);
   }
 
-  return conversations.map((conversation) => ({
+  return filteredConversations.map((conversation) => ({
     ...conversation,
     unreadCount: unreadByConversation.get(conversation.id) ?? 0,
   }));
@@ -988,6 +1041,32 @@ export async function getOldestUnassignedWaitMinutes() {
   return Math.floor((Date.now() - oldest.lastMessageAt.getTime()) / 60000);
 }
 
+/** Contador ambiente da aba "Pendentes" (badge visível mesmo em outra aba) — quantas
+ * conversas ativas têm a última mensagem vinda do paciente, ainda sem resposta. SQL
+ * cru (não Prisma comum) de propósito: contar isso com o client normal exigiria
+ * buscar as mensagens de TODA conversa ativa a cada poll, o mesmo tipo de query
+ * pesada em Egress que listConversations evita com take:3 — aqui nem isso, só a
+ * contagem. DISTINCT ON aproveita o índice já existente em
+ * Message(conversationId, createdAt) pra achar a direção da última mensagem de cada
+ * conversa direto no Postgres. Mesmo padrão de $queryRaw/$executeRaw já usado neste
+ * arquivo (ver trava de contato em createOrGetConversation). */
+export async function getPendingCount() {
+  const { clinicId } = await requireClinicSession();
+  const result = await prisma.$queryRaw<{ count: bigint }[]>`
+    SELECT COUNT(*)::bigint AS count FROM (
+      SELECT DISTINCT ON (m.conversation_id) m.direction
+      FROM messages m
+      JOIN conversations c ON c.id = m.conversation_id
+      WHERE c.clinic_id = ${clinicId}
+        AND c.status IN ('OPEN', 'PENDING')
+        AND c.archived_at IS NULL
+      ORDER BY m.conversation_id, m.created_at DESC
+    ) last_messages
+    WHERE direction = 'INBOUND'
+  `;
+  return Number(result[0]?.count ?? 0);
+}
+
 /** Conversas atribuídas a mim (transferência ou atribuição manual do admin) que eu
  * ainda não abri — busca independente da aba selecionada, pra tocar som/notificar
  * mesmo se o atendente estiver em "Não Atribuídas" ou numa conversa diferente
@@ -1331,7 +1410,18 @@ export async function updateConversationTags(conversationId: string, tags: strin
  * é feita pela conversa (clinicId) e não pelo Contact em si. */
 export async function updateContactInfo(
   conversationId: string,
-  data: { name: string; cpf?: string; phone?: string; convenio?: string; preferredDoctor?: string }
+  data: {
+    name: string;
+    cpf?: string;
+    phone?: string;
+    convenio?: string;
+    preferredDoctor?: string;
+    rg?: string;
+    birthDate?: string;
+    address?: string;
+    insuranceCardNumber?: string;
+    notes?: string;
+  }
 ) {
   const { clinicId } = await requireClinicSession();
 
@@ -1367,6 +1457,11 @@ export async function updateContactInfo(
         // não manda convenio/preferredDoctor — só o form da ficha do paciente manda).
         ...(data.convenio !== undefined ? { convenio: data.convenio.trim() || null } : {}),
         ...(data.preferredDoctor !== undefined ? { preferredDoctor: data.preferredDoctor.trim() || null } : {}),
+        ...(data.rg !== undefined ? { rg: data.rg.trim() || null } : {}),
+        ...(data.birthDate !== undefined ? { birthDate: data.birthDate ? new Date(`${data.birthDate}T00:00:00.000Z`) : null } : {}),
+        ...(data.address !== undefined ? { address: data.address.trim() || null } : {}),
+        ...(data.insuranceCardNumber !== undefined ? { insuranceCardNumber: data.insuranceCardNumber.trim() || null } : {}),
+        ...(data.notes !== undefined ? { notes: data.notes.trim() || null } : {}),
       },
     });
   } catch (error) {
@@ -1533,6 +1628,7 @@ const INBOX_FILTER_TO_CONVERSATION_FILTER: Record<InboxFilter, ConversationFilte
   minhas: "mine",
   nao_atribuidas: "unassigned",
   todas: "all",
+  pendentes: "pending",
   finalizadas: "resolved",
   arquivadas: "archived",
 };
@@ -1542,7 +1638,11 @@ const INBOX_FILTER_TO_CONVERSATION_FILTER: Record<InboxFilter, ConversationFilte
 export async function listChatContacts(filter: InboxFilter, search?: string, assignedUserIdFilter?: string) {
   const { userId } = await requireClinicSession();
   const conversations = await listConversations(INBOX_FILTER_TO_CONVERSATION_FILTER[filter], search, assignedUserIdFilter);
-  return conversations.map((c) => toChatContact(c, userId));
+  const contacts = conversations.map((c) => toChatContact(c, userId));
+  // Aba "Pendentes": crítico (maior tempo útil de espera) primeiro — mais preciso que
+  // ordenar só por lastMessageAt cru, já que o SLA pula noite/fim de semana.
+  if (filter === "pendentes") contacts.sort((a, b) => b.sla.waitingMinutes - a.sla.waitingMinutes);
+  return contacts;
 }
 
 async function assertClinicOwnsConversation(conversationId: string, clinicId: string) {
@@ -1657,6 +1757,38 @@ export async function getChatContactHistory(conversationId: string) {
       isUpcoming: appointment.date.getTime() >= todayUtc.getTime() && (appointment.status === "PENDING" || appointment.status === "CONFIRMED"),
     };
   });
+}
+
+/** Galeria de "Documentos & Exames" da ficha do paciente (PDFs, fotos de exame,
+ * pedidos médicos trocados por WhatsApp) — Message.type ATTACHMENT/AUDIO daquela
+ * conversa. Uma conversa = um paciente nesta clínica (ver createOrGetConversation),
+ * não precisa varrer outras conversas. attachSignedUrls já existe (mesma função usada
+ * pro histórico de mensagens) — só reaproveita. */
+export async function listContactMedia(conversationId: string) {
+  const { clinicId } = await requireClinicSession();
+  const conversation = await prisma.conversation.findUnique({
+    where: { id: conversationId },
+    select: { clinicId: true },
+  });
+  if (!conversation || conversation.clinicId !== clinicId) {
+    throw new Error("Conversa não encontrada");
+  }
+
+  const messages = await prisma.message.findMany({
+    where: { conversationId, type: { in: ["ATTACHMENT", "AUDIO"] }, deletedAt: null },
+    orderBy: { createdAt: "desc" },
+    select: { id: true, mimeType: true, mediaPath: true, attachmentName: true, attachmentSize: true, createdAt: true },
+  });
+
+  const withUrls = await attachSignedUrls(messages);
+  return withUrls.map((m) => ({
+    id: m.id,
+    mimeType: m.mimeType,
+    url: m.mediaUrl,
+    attachmentName: m.attachmentName,
+    attachmentSize: m.attachmentSize,
+    createdAt: new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeZone: "America/Sao_Paulo" }).format(m.createdAt),
+  }));
 }
 
 export async function assignConversationToUser(conversationId: string, targetUserId: string) {

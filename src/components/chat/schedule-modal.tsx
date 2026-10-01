@@ -24,7 +24,10 @@ function formatCpfMask(value: string): string {
 }
 
 interface ScheduleModalProps {
-  contact: Contact;
+  // Só usa name/cpf/phone de verdade — tipo estreitado de propósito pra dar pra reusar
+  // este modal em telas que não têm o Contact "rico" do Inbox (ex: /clinic/contatos,
+  // ver contacts-app.tsx), sem precisar montar um objeto fake com 30 campos.
+  contact: Pick<Contact, 'name' | 'cpf' | 'phone'>;
   isOpen: boolean;
   onClose: () => void;
   /** Clínica-scoped usa a clínica da sessão; Admin passa o clinicId da conversa selecionada.

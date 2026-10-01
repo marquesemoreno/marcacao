@@ -12,6 +12,8 @@ import { formatCurrency } from "@/lib/format";
 import { isMediaDownloadFailedNotice, isAutoSystemMessage, type InvoiceData } from "@/lib/chat-messages";
 import { canEditMessage } from "@/lib/message-edit";
 import { RESCHEDULE_PENDING_TAG } from "@/lib/conversation-tags";
+import { getSlaInfo } from "@/lib/sla-calculator";
+import type { BusinessHours } from "@/lib/schemas/clinic";
 import type {
   Channel,
   Contact,
@@ -100,7 +102,10 @@ type ConversationWithRelations = Conversation & {
   assignedUser: Pick<User, "id" | "name"> | null;
   messages: ConversationPreviewMessage[];
   unreadCount?: number;
-  clinic?: { id: string; tradeName: string };
+  // id/tradeName opcionais: o clinic-scope de listConversations (inbox.ts) só seleciona
+  // businessHours (evita mostrar "de qual clínica" redundante numa tela já escopada a
+  // uma só) — só o admin-scope traz os três.
+  clinic?: { id?: string; tradeName?: string; businessHours?: unknown };
 };
 
 /** Quando `viewerUserId` for informado (só faz sentido pra atendente logado, cada um
@@ -135,15 +140,16 @@ function computeQueueState(conversation: ConversationWithRelations): Conversatio
   return "SEM_DONO";
 }
 
-/** Minutos desde a última mensagem do paciente, só quando ela ainda não foi respondida
- * (mensagem mais recente é INBOUND) e a conversa não está finalizada — vira o badge de
- * SLA no card da fila (ver inbox-layout.tsx). Usa `messages[0]`, que já vem no payload
- * de listConversations (take: 3) — nenhuma query extra. */
-function computeSlaWaitingMinutes(conversation: ConversationWithRelations): number | null {
-  if (conversation.status === "RESOLVED") return null;
-  const lastMessage = conversation.messages[0];
-  if (!lastMessage || lastMessage.direction !== "INBOUND") return null;
-  return Math.floor((Date.now() - lastMessage.createdAt.getTime()) / 60000);
+/** Badge de SLA no card da fila (ver <SLABadge>) — usa `messages[0]`, que já vem no
+ * payload de listConversations (take: 3), e o expediente da clínica (Clinic.businessHours,
+ * também já incluído na query) pra contar só minutos úteis (ver sla-calculator.ts). */
+function computeSla(conversation: ConversationWithRelations) {
+  const lastMessage = conversation.messages[0] ?? null;
+  return getSlaInfo({
+    lastMessage: lastMessage ? { direction: lastMessage.direction, createdAt: lastMessage.createdAt } : null,
+    conversationStatus: conversation.status,
+    businessHours: (conversation.clinic?.businessHours as BusinessHours | null) ?? null,
+  });
 }
 
 const REASON_SHORT_LABELS: Record<string, string> = {
@@ -182,6 +188,11 @@ export function toChatContact(conversation: ConversationWithRelations, viewerUse
     cpf: conversation.contact.cpf ?? "",
     convenio: conversation.contact.convenio ?? undefined,
     preferredDoctor: conversation.contact.preferredDoctor ?? undefined,
+    rg: conversation.contact.rg ?? undefined,
+    birthDate: conversation.contact.birthDate ? conversation.contact.birthDate.toISOString().slice(0, 10) : undefined,
+    address: conversation.contact.address ?? undefined,
+    insuranceCardNumber: conversation.contact.insuranceCardNumber ?? undefined,
+    notes: conversation.contact.notes ?? undefined,
     neighborhood: "",
     glpiEntityId: conversation.contact.glpiEntityId,
     avatar: conversation.contact.photoUrl ?? "",
@@ -195,7 +206,7 @@ export function toChatContact(conversation: ConversationWithRelations, viewerUse
     // Banner "Esta conversa está com X" + botão "Assumir Conversa" (ver inbox-layout.tsx)
     // — só true quando tem dono E não sou eu, pra não aparecer na minha própria conversa.
     assignedToOther: Boolean(conversation.assignedUser && conversation.assignedUser.id !== viewerUserId),
-    slaWaitingMinutes: computeSlaWaitingMinutes(conversation),
+    sla: computeSla(conversation),
     lastMessage: previewMessage
       ? previewMessage.type === "INTERNAL_NOTE"
         ? `🔒 Nota: ${previewMessage.content}`

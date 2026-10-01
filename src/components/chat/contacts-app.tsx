@@ -2,9 +2,23 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Search, Users, MessageCircle, UserPlus, Upload, X } from "lucide-react";
+import { Search, Users, MessageCircle, UserPlus, Upload, X, Eye, Calendar } from "lucide-react";
 import { toast } from "sonner";
-import { listAllContacts, createContact } from "@/actions/inbox";
+import {
+  listAllContacts,
+  createContact,
+  getChatContactHistory,
+  updateContactInfo,
+  updateConversationTags,
+  listContactMedia,
+  sendMessage,
+  updateConversationFunnelStage,
+  listClinicProceduresForAppointment,
+  listClinicDoctorsForAppointment,
+  listClinicConveniosForAppointment,
+  getClinicDoctorAgenda,
+  listClinicPatientsForAppointment,
+} from "@/actions/inbox";
 import {
   listAllContactsAdmin,
   createContactAdmin,
@@ -12,8 +26,15 @@ import {
   importContactsAdmin,
   type ImportContactsResult,
 } from "@/actions/admin-inbox";
+import { getDistinctConvenios, getDistinctDoctorNames } from "@/actions/clinic";
 import { parseContactsCsv, type ParsedContactRow } from "@/lib/contacts-csv";
-import { formatPhone } from "@/lib/format";
+import { formatPhone, formatCpf } from "@/lib/format";
+import { Badge } from "@/components/ui/badge";
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
+import { AvatarBadge } from "@/components/chat/avatar-badge";
+import { PatientRecordSheet } from "@/components/chat/patient-record-sheet";
+import { ScheduleModal } from "@/components/chat/schedule-modal";
+import type { PatientRecordData, UpdatePatientData } from "@/types/chat-crm";
 
 type Scope = "clinic" | "admin";
 
@@ -22,13 +43,22 @@ type ContactRow = {
   name: string;
   phone: string;
   cpf: string | null;
+  convenio?: string | null;
+  preferredDoctor?: string | null;
+  rg?: string | null;
+  birthDate?: string | null;
+  address?: string | null;
+  insuranceCardNumber?: string | null;
+  notes?: string | null;
+  tags?: string[];
   status: "OPEN" | "PENDING" | "RESOLVED";
   clinicName?: string;
+  lastAppointment?: { date: string; doctorName: string | null } | null;
 };
 
 const statusLabels: Record<ContactRow["status"], string> = {
   OPEN: "Em atendimento",
-  PENDING: "Pendente",
+  PENDING: "Novo",
   RESOLVED: "Finalizado",
 };
 
@@ -46,11 +76,47 @@ function formatContactPhone(phone: string) {
   return formatPhone(local);
 }
 
+function rowToPatientRecord(row: ContactRow): PatientRecordData {
+  return {
+    id: row.conversationId,
+    name: row.name,
+    phone: row.phone,
+    cpf: row.cpf ?? "",
+    convenio: row.convenio ?? undefined,
+    preferredDoctor: row.preferredDoctor ?? undefined,
+    rg: row.rg ?? undefined,
+    birthDate: row.birthDate ?? undefined,
+    address: row.address ?? undefined,
+    insuranceCardNumber: row.insuranceCardNumber ?? undefined,
+    notes: row.notes ?? undefined,
+    tags: row.tags ?? [],
+    consultationHistory: [],
+  };
+}
+
 export function ContactsApp({ scope, basePath }: { scope: Scope; basePath: string }) {
   const router = useRouter();
   const [search, setSearch] = useState("");
   const [contacts, setContacts] = useState<ContactRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Filtros "Convênio"/"Médico" — só clínica (o pedido é específico de /clinic/contatos;
+  // admin mantém a tabela mais simples de hoje). Filtram em memória a lista já
+  // carregada, sem query nova por filtro (mesma decisão do plano desta mudança).
+  const [convenioFilter, setConvenioFilter] = useState("");
+  const [doctorFilter, setDoctorFilter] = useState("");
+  const [convenios, setConvenios] = useState<string[]>([]);
+  const [doctors, setDoctors] = useState<string[]>([]);
+
+  // Ficha do paciente (Sheet) — monta um PatientRecordData enxuto a partir da linha
+  // (ver rowToPatientRecord) e busca o histórico de agendamentos sob demanda, mesmo
+  // padrão "lazy" já usado no Inbox (getChatContactHistory só ao abrir).
+  const [sheetContact, setSheetContact] = useState<PatientRecordData | null>(null);
+  const [isSheetOpen, setIsSheetOpen] = useState(false);
+
+  // "Agendar" rápido — mesmo ScheduleModal do Inbox, só com o Pick<Contact,...> que ele
+  // realmente usa (ver schedule-modal.tsx).
+  const [scheduleContact, setScheduleContact] = useState<{ conversationId: string; name: string; cpf: string; phone: string } | null>(null);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newName, setNewName] = useState("");
@@ -89,8 +155,66 @@ export function ContactsApp({ scope, basePath }: { scope: Scope; basePath: strin
   useEffect(() => {
     if (scope === "admin") {
       listClinicsForReassignment().then(setAvailableClinics).catch(() => {});
+    } else {
+      getDistinctConvenios().then(setConvenios).catch(() => {});
+      getDistinctDoctorNames().then(setDoctors).catch(() => {});
     }
   }, [scope]);
+
+  const filteredContacts = contacts.filter((c) => {
+    if (convenioFilter && c.convenio !== convenioFilter) return false;
+    if (doctorFilter && c.lastAppointment?.doctorName !== doctorFilter) return false;
+    return true;
+  });
+
+  async function handleOpenSheet(row: ContactRow) {
+    setSheetContact(rowToPatientRecord(row));
+    setIsSheetOpen(true);
+    const history = await getChatContactHistory(row.conversationId).catch(() => []);
+    setSheetContact((prev) => (prev && prev.id === row.conversationId ? { ...prev, consultationHistory: history } : prev));
+  }
+
+  async function handleUpdatePatient(data: UpdatePatientData) {
+    if (!sheetContact) return { success: false as const, error: "Nenhum paciente selecionado." };
+    const result = await updateContactInfo(sheetContact.id, data);
+    if (result.success) {
+      setSheetContact((prev) => (prev ? { ...prev, ...data } : prev));
+      await fetchContacts();
+    }
+    return result;
+  }
+
+  async function handleAddTag(tag: string) {
+    if (!sheetContact) return;
+    const nextTags = [...sheetContact.tags, tag];
+    await updateConversationTags(sheetContact.id, nextTags);
+    setSheetContact((prev) => (prev ? { ...prev, tags: nextTags } : prev));
+    await fetchContacts();
+  }
+
+  async function handleRemoveTag(tag: string) {
+    if (!sheetContact) return;
+    const nextTags = sheetContact.tags.filter((t) => t !== tag);
+    await updateConversationTags(sheetContact.id, nextTags);
+    setSheetContact((prev) => (prev ? { ...prev, tags: nextTags } : prev));
+    await fetchContacts();
+  }
+
+  async function handleScheduleConfirmed(data: { appointmentId: string; specialty: string; doctor: string; date: string; time: string; price: string }) {
+    if (!scheduleContact) return;
+    const isBridgeAppointment = data.appointmentId.startsWith("bridge:");
+    const guideLine = isBridgeAppointment
+      ? ""
+      : `\n\n📎 Guia com QR Code enviada ao paciente pelo WhatsApp: ${window.location.origin}/comprovante/${data.appointmentId}`;
+    await sendMessage(
+      scheduleContact.conversationId,
+      `✅ Consulta confirmada!\n${data.specialty} — ${data.doctor}\nData: ${data.date} às ${data.time}\nValor: ${data.price}${guideLine}`,
+      true
+    );
+    await updateConversationFunnelStage(scheduleContact.conversationId, "agendado");
+    toast.success("Agendamento confirmado!");
+    await fetchContacts();
+  }
 
   async function handleSaveNewContact(event: React.FormEvent) {
     event.preventDefault();
@@ -173,7 +297,7 @@ export function ContactsApp({ scope, basePath }: { scope: Scope; basePath: strin
             <Users className="size-6 text-slate-500" /> Contatos
           </h1>
           <p className="text-sm text-slate-500 dark:text-slate-400">
-            Busque por nome, telefone ou CPF para encontrar um contato já cadastrado e abrir a conversa dele.
+            Central de fichas dos pacientes — busque por nome, telefone, CPF ou convênio.
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
@@ -194,80 +318,176 @@ export function ContactsApp({ scope, basePath }: { scope: Scope; basePath: strin
         </div>
       </div>
 
-      <div className="relative max-w-md">
-        <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
-        <input
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-          placeholder="Buscar por nome, telefone ou CPF..."
-          className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 py-2.5 pl-9 pr-3 text-sm outline-none transition-all focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:focus:ring-slate-700"
-        />
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative max-w-md flex-1 min-w-[220px]">
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+          <input
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Buscar por nome, telefone, CPF ou convênio..."
+            className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 py-2.5 pl-9 pr-3 text-sm outline-none transition-all focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:focus:ring-slate-700"
+          />
+        </div>
+        {scope === "clinic" && (
+          <>
+            <select
+              value={convenioFilter}
+              onChange={(e) => setConvenioFilter(e.target.value)}
+              className="h-9 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2.5 text-xs text-slate-700 dark:text-slate-300"
+            >
+              <option value="">Todos os convênios</option>
+              {convenios.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+            <select
+              value={doctorFilter}
+              onChange={(e) => setDoctorFilter(e.target.value)}
+              className="h-9 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2.5 text-xs text-slate-700 dark:text-slate-300"
+            >
+              <option value="">Todos os médicos</option>
+              {doctors.map((d) => (
+                <option key={d} value={d}>{d}</option>
+              ))}
+            </select>
+          </>
+        )}
       </div>
 
       <div className="overflow-hidden rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/40">
-              <th className="px-4 py-2.5 text-left font-medium text-slate-600 dark:text-slate-400">Nome</th>
-              <th className="px-4 py-2.5 text-left font-medium text-slate-600 dark:text-slate-400">Telefone</th>
-              <th className="px-4 py-2.5 text-left font-medium text-slate-600 dark:text-slate-400">CPF</th>
-              {scope === "admin" && (
-                <th className="px-4 py-2.5 text-left font-medium text-slate-600 dark:text-slate-400">Clínica</th>
-              )}
-              <th className="px-4 py-2.5 text-left font-medium text-slate-600 dark:text-slate-400">Status</th>
-              <th className="px-4 py-2.5 text-right font-medium text-slate-600 dark:text-slate-400">Ação</th>
-            </tr>
-          </thead>
-          <tbody>
+        <Table>
+          <TableHeader>
+            <TableRow className="bg-slate-50/70 dark:bg-slate-800/40">
+              <TableHead>Paciente</TableHead>
+              <TableHead>Telefone</TableHead>
+              <TableHead>CPF / Convênio</TableHead>
+              <TableHead>Última Consulta</TableHead>
+              {scope === "admin" && <TableHead>Clínica</TableHead>}
+              <TableHead>Status</TableHead>
+              <TableHead className="text-right">Ações</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {isLoading ? (
-              <tr>
-                <td colSpan={scope === "admin" ? 6 : 5} className="px-4 py-8 text-center text-sm text-slate-400">
+              <TableRow>
+                <TableCell colSpan={scope === "admin" ? 7 : 6} className="py-8 text-center text-sm text-slate-400 whitespace-normal">
                   Carregando contatos...
-                </td>
-              </tr>
-            ) : contacts.length === 0 ? (
-              <tr>
-                <td colSpan={scope === "admin" ? 6 : 5} className="px-4 py-8 text-center text-sm text-slate-400 italic">
-                  {search ? "Nenhum contato encontrado para essa busca." : "Nenhum contato cadastrado ainda."}
-                </td>
-              </tr>
+                </TableCell>
+              </TableRow>
+            ) : filteredContacts.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={scope === "admin" ? 7 : 6} className="py-8 text-center text-sm text-slate-400 italic whitespace-normal">
+                  {search || convenioFilter || doctorFilter ? "Nenhum contato encontrado para esse filtro." : "Nenhum contato cadastrado ainda."}
+                </TableCell>
+              </TableRow>
             ) : (
-              contacts.map((contact) => (
-                <tr
-                  key={contact.conversationId}
-                  className="border-b border-slate-100 dark:border-slate-800/60 last:border-0 hover:bg-slate-50/60 dark:hover:bg-slate-800/40"
-                >
-                  <td className="px-4 py-2.5 font-semibold text-slate-900 dark:text-slate-100">{contact.name}</td>
-                  <td className="px-4 py-2.5 font-mono text-xs text-slate-600 dark:text-slate-400">
-                    {formatContactPhone(contact.phone)}
-                  </td>
-                  <td className="px-4 py-2.5 font-mono text-xs text-slate-600 dark:text-slate-400">
-                    {contact.cpf || "—"}
-                  </td>
-                  {scope === "admin" && (
-                    <td className="px-4 py-2.5 text-slate-600 dark:text-slate-400">{contact.clinicName}</td>
-                  )}
-                  <td className="px-4 py-2.5">
-                    <span
-                      className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold ${statusClasses[contact.status]}`}
-                    >
-                      {statusLabels[contact.status]}
-                    </span>
-                  </td>
-                  <td className="px-4 py-2.5 text-right">
+              filteredContacts.map((contact) => (
+                <TableRow key={contact.conversationId} className="border-slate-100 dark:border-slate-800/60">
+                  <TableCell>
                     <button
-                      onClick={() => router.push(`${basePath}/inbox?c=${contact.conversationId}`)}
-                      className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 dark:bg-emerald-600 px-2.5 py-1.5 text-xs font-medium text-white transition-all hover:bg-slate-800 dark:hover:bg-emerald-500"
+                      type="button"
+                      onClick={() => handleOpenSheet(contact)}
+                      className="flex items-center gap-2.5 text-left hover:underline decoration-slate-400 underline-offset-2"
                     >
-                      <MessageCircle className="size-3.5" /> Abrir Conversa
+                      <AvatarBadge name={contact.name} size={32} />
+                      <div className="min-w-0">
+                        <p className="font-semibold text-slate-900 dark:text-slate-100 truncate max-w-[180px]">{contact.name}</p>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 font-mono">{formatContactPhone(contact.phone)}</p>
+                      </div>
                     </button>
-                  </td>
-                </tr>
+                  </TableCell>
+                  <TableCell className="font-mono text-xs text-slate-600 dark:text-slate-400">
+                    {formatContactPhone(contact.phone)}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex flex-col gap-1">
+                      <span className="font-mono text-xs text-slate-600 dark:text-slate-400">{contact.cpf ? formatCpf(contact.cpf) : "—"}</span>
+                      {contact.convenio && (
+                        <Badge variant="outline" className="rounded-md w-fit text-[10px] px-1.5 py-0 h-4.5">
+                          {contact.convenio}
+                        </Badge>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-xs text-slate-600 dark:text-slate-400">
+                    {contact.lastAppointment ? (
+                      <div>
+                        <p>{contact.lastAppointment.date}</p>
+                        {contact.lastAppointment.doctorName && (
+                          <p className="text-slate-400 dark:text-slate-500">{contact.lastAppointment.doctorName}</p>
+                        )}
+                      </div>
+                    ) : (
+                      "—"
+                    )}
+                  </TableCell>
+                  {scope === "admin" && (
+                    <TableCell className="text-slate-600 dark:text-slate-400">{contact.clinicName}</TableCell>
+                  )}
+                  <TableCell>
+                    <Badge variant="outline" className={`rounded-md ${statusClasses[contact.status]}`}>
+                      {statusLabels[contact.status]}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex items-center justify-end gap-1">
+                      <button
+                        onClick={() => handleOpenSheet(contact)}
+                        title="Ver Ficha"
+                        className="p-1.5 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-800 dark:hover:text-slate-200"
+                      >
+                        <Eye className="size-3.5" />
+                      </button>
+                      {scope === "clinic" && (
+                        <button
+                          onClick={() => setScheduleContact({ conversationId: contact.conversationId, name: contact.name, cpf: contact.cpf ?? "", phone: contact.phone })}
+                          title="Agendar"
+                          className="p-1.5 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-800 dark:hover:text-slate-200"
+                        >
+                          <Calendar className="size-3.5" />
+                        </button>
+                      )}
+                      <button
+                        onClick={() => router.push(`${basePath}/inbox?c=${contact.conversationId}`)}
+                        title="Abrir Conversa"
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 dark:bg-emerald-600 px-2.5 py-1.5 text-xs font-medium text-white transition-all hover:bg-slate-800 dark:hover:bg-emerald-500"
+                      >
+                        <MessageCircle className="size-3.5" />
+                      </button>
+                    </div>
+                  </TableCell>
+                </TableRow>
               ))
             )}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       </div>
+
+      {sheetContact && (
+        <PatientRecordSheet
+          contact={sheetContact}
+          open={isSheetOpen}
+          onOpenChange={setIsSheetOpen}
+          onUpdatePatient={handleUpdatePatient}
+          onAddTag={handleAddTag}
+          onRemoveTag={handleRemoveTag}
+          onLoadMedia={scope === "clinic" ? listContactMedia : undefined}
+        />
+      )}
+
+      {scheduleContact && (
+        <ScheduleModal
+          contact={scheduleContact}
+          isOpen={Boolean(scheduleContact)}
+          onClose={() => setScheduleContact(null)}
+          fetchProcedures={listClinicProceduresForAppointment}
+          fetchDoctors={listClinicDoctorsForAppointment}
+          fetchConvenios={listClinicConveniosForAppointment}
+          fetchAgenda={getClinicDoctorAgenda}
+          fetchPatients={listClinicPatientsForAppointment}
+          onConfirmSchedule={handleScheduleConfirmed}
+        />
+      )}
 
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 backdrop-blur-xs p-4">
