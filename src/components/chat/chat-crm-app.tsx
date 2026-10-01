@@ -55,6 +55,7 @@ import {
   editMessage,
   transcribeMessageAudio,
   extractMessageInvoiceData,
+  processMessageDocument,
   getReplySuggestions,
 } from "@/actions/inbox";
 import {
@@ -111,6 +112,7 @@ import {
   editMessageAdmin,
   transcribeMessageAudioAdmin,
   extractMessageInvoiceDataAdmin,
+  processMessageDocumentAdmin,
   getReplySuggestionsAdmin,
   openGlpiTicketAdmin,
   listGlpiEntitiesAdmin,
@@ -181,6 +183,7 @@ const ACTIONS_BY_SCOPE = {
     editMessage: (id: string, text: string) => editMessage(id, text),
     transcribeMessageAudio: (id: string) => transcribeMessageAudio(id),
     extractMessageInvoiceData: (id: string) => extractMessageInvoiceData(id),
+    processMessageDocument: (id: string) => processMessageDocument(id),
     getReplySuggestions: (id: string) => getReplySuggestions(id),
   },
   admin: {
@@ -224,6 +227,7 @@ const ACTIONS_BY_SCOPE = {
     editMessage: (id: string, text: string) => editMessageAdmin(id, text),
     transcribeMessageAudio: (id: string) => transcribeMessageAudioAdmin(id),
     extractMessageInvoiceData: (id: string) => extractMessageInvoiceDataAdmin(id),
+    processMessageDocument: (id: string) => processMessageDocumentAdmin(id),
     getReplySuggestions: (id: string) => getReplySuggestionsAdmin(id),
   },
 };
@@ -1002,6 +1006,10 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
     return actions.extractMessageInvoiceData(messageId);
   }
 
+  async function handleProcessDocument(messageId: string) {
+    return actions.processMessageDocument(messageId);
+  }
+
   async function handleTransferAgent(agentId: string) {
     if (!selectedContactId) return;
     const transferFn = scope === "admin" ? transferConversationAdmin : transferConversation;
@@ -1072,6 +1080,7 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
           onEditMessage={handleEditMessage}
           onTranscribeAudio={handleTranscribeAudio}
           onExtractInvoiceData={handleExtractInvoiceData}
+          onProcessDocument={handleProcessDocument}
           onTransferAgent={handleTransferAgent}
           availableClinics={scope === "admin" ? availableClinics : undefined}
           onReassignClinic={scope === "admin" ? handleReassignClinic : undefined}

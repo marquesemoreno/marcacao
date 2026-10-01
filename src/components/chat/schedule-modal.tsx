@@ -41,6 +41,10 @@ interface ScheduleModalProps {
   fetchAgenda?: (medicoId: number, date: string) => Promise<string[]>;
   /** Idem — busca paciente já cadastrado no sistema hospitalar por nome. */
   fetchPatients?: (query: string) => Promise<BridgePatient[]>;
+  /** Pré-seleciona um procedimento ao abrir (ex: vindo do DocumentReviewCard, ver
+   * handleOpenScheduleWithProcedure em inbox-layout.tsx) — só tem efeito se o id
+   * estiver na lista retornada por fetchProcedures(); undefined abre vazio normalmente. */
+  initialProcedureId?: string;
   onConfirmSchedule: (scheduleData: {
     appointmentId: string;
     specialty: string;
@@ -60,6 +64,7 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
   fetchConvenios,
   fetchAgenda,
   fetchPatients,
+  initialProcedureId,
   onConfirmSchedule,
 }) => {
   const [procedures, setProcedures] = useState<PlainClinicProcedureItem[]>([]);
@@ -114,10 +119,15 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
     fetchProcedures()
       .then((items) => {
         setProcedures(items);
-        // Só 1 procedimento cadastrado (comum nas clínicas com integração hospitalar,
+        // Prioridade: pré-seleção explícita (ex: vinda do DocumentReviewCard), senão
+        // só 1 procedimento cadastrado (comum nas clínicas com integração hospitalar,
         // que hoje só oferecem "Consulta") — pré-seleciona pra não obrigar o
         // atendente a escolher algo que não tem outra opção.
-        if (items.length === 1) setProcedureId(items[0].id);
+        if (initialProcedureId && items.some((item) => item.id === initialProcedureId)) {
+          setProcedureId(initialProcedureId);
+        } else if (items.length === 1) {
+          setProcedureId(items[0].id);
+        }
       })
       .finally(() => setLoadingProcedures(false));
     fetchDoctors?.().then(setDoctors).catch(() => setDoctors([]));

@@ -10,6 +10,7 @@ import type {
 } from "@prisma/client";
 import { formatCurrency } from "@/lib/format";
 import { isMediaDownloadFailedNotice, isAutoSystemMessage, type InvoiceData } from "@/lib/chat-messages";
+import type { DocumentReviewData } from "@/lib/documents/document-validator";
 import { canEditMessage } from "@/lib/message-edit";
 import { RESCHEDULE_PENDING_TAG } from "@/lib/conversation-tags";
 import { getSlaInfo } from "@/lib/sla-calculator";
@@ -303,6 +304,7 @@ export function toChatMessage(
     canEdit: canEditMessage(message).ok,
     transcription: message.transcription ?? undefined,
     extractedInvoiceData: (message.extractedInvoiceData as InvoiceData | null) ?? undefined,
+    extractedDocumentData: (message.extractedDocumentData as DocumentReviewData | null) ?? undefined,
     quotedMessage: message.quotedMessage ? toChatQuotedMessage(message.quotedMessage) : undefined,
     contactReaction: message.contactReaction ?? undefined,
     agentReaction: message.agentReaction ?? undefined,

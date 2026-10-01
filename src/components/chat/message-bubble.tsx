@@ -32,6 +32,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from '@
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from '@/components/ui/command';
 import { mentionsInvoiceRequest, type InvoiceData } from '@/lib/chat-messages';
+import type { DocumentReviewData } from '@/lib/documents/document-validator';
+import { DocumentReviewCard } from '@/components/chat/document-review-card';
 
 /** Subconjunto rápido de emojis pra reação — mesmo espírito da barra rápida do
  * WhatsApp (não é o picker completo do composer, ver COMPOSER_EMOJIS em inbox-layout.tsx). */
@@ -49,6 +51,10 @@ interface MessageBubbleProps {
   onTranscribeAudio?: (messageId: string) => Promise<{ success: boolean; transcription?: string; error?: string }>;
   /** Extrai dados de nota fiscal sob demanda (só relevante quando mentionsInvoiceRequest(message.text)). */
   onExtractInvoiceData?: (messageId: string) => Promise<{ success: boolean; data?: InvoiceData; error?: string }>;
+  /** Analisa um documento médico anexado (foto) sob demanda — só relevante em anexo de imagem do paciente. */
+  onProcessDocument?: (messageId: string) => Promise<{ success: boolean; data?: DocumentReviewData; error?: string }>;
+  /** Abre o modal de agendamento, opcionalmente pré-selecionando um procedimento (vindo do DocumentReviewCard). */
+  onOpenScheduleWithProcedure?: (clinicProcedureId?: string) => void;
   /** Fixa esta mensagem como "respondendo a" no composer (botão "Responder" no hover). */
   onReply?: () => void;
   /** Reage (ou remove a reação) com um emoji — sincroniza de verdade com o WhatsApp. */
@@ -295,7 +301,7 @@ const MessageStatusTicks: React.FC<{ status?: Message['deliveryStatus'] }> = ({ 
   return <Clock className="w-3 h-3 text-slate-400" aria-label="Enviando..." />;
 };
 
-export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry, onRequestResend, onEditMessage, onTranscribeAudio, onExtractInvoiceData, onReply, onReact, onToggleStar, onForward, onSearchForwardTargets }) => {
+export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry, onRequestResend, onEditMessage, onTranscribeAudio, onExtractInvoiceData, onProcessDocument, onOpenScheduleWithProcedure, onReply, onReact, onToggleStar, onForward, onSearchForwardTargets }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   const [playbackSpeed, setPlaybackSpeed] = useState<'1x' | '1.5x' | '2x'>('1x');
@@ -308,7 +314,24 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry, 
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [invoiceData, setInvoiceData] = useState<InvoiceData | undefined>(message.extractedInvoiceData);
   const [isExtractingInvoiceData, setIsExtractingInvoiceData] = useState(false);
+  const [documentData, setDocumentData] = useState<DocumentReviewData | undefined>(message.extractedDocumentData);
+  const [isProcessingDocument, setIsProcessingDocument] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
+
+  async function handleProcessDocument() {
+    if (!onProcessDocument || isProcessingDocument) return;
+    setIsProcessingDocument(true);
+    try {
+      const result = await onProcessDocument(message.id);
+      if (result.success && result.data) {
+        setDocumentData(result.data);
+      } else {
+        toast.error(result.error || 'Não foi possível analisar esse documento.');
+      }
+    } finally {
+      setIsProcessingDocument(false);
+    }
+  }
 
   async function handleExtractInvoiceData() {
     if (!onExtractInvoiceData || isExtractingInvoiceData) return;
@@ -667,6 +690,35 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry, 
               </div>
             )}
             {message.text && <p className="text-xs sm:text-sm mb-1 leading-relaxed">{message.text}</p>}
+
+            {/* Análise de documento médico — sob demanda, só em foto enviada pelo
+                paciente. Mesmo padrão de custo das outras análises de IA no balão
+                (transcrever áudio, extrair nota fiscal): nunca roda automático. */}
+            {!isAgent && !message.deleted && isImage && hasRealFile && (onProcessDocument || documentData) && (
+              <div onClick={(e) => e.stopPropagation()}>
+                {documentData ? (
+                  <DocumentReviewCard
+                    data={documentData}
+                    onOpenSchedule={(clinicProcedureId) => onOpenScheduleWithProcedure?.(clinicProcedureId)}
+                  />
+                ) : (
+                  onProcessDocument && (
+                    <div className="mt-2.5 pt-2.5 border-t border-black/5 dark:border-white/10">
+                      <button
+                        type="button"
+                        onClick={handleProcessDocument}
+                        disabled={isProcessingDocument}
+                        className="w-full text-left text-[10.5px] font-semibold text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-300 disabled:opacity-60 flex items-center gap-1"
+                      >
+                        <FileText className="w-3 h-3" />
+                        {isProcessingDocument ? 'Analisando...' : 'Analisar Documento (IA)'}
+                      </button>
+                    </div>
+                  )
+                )}
+              </div>
+            )}
+
             <div className="flex items-center justify-end gap-1 text-[10px] text-slate-400 mt-1">
               <span>{message.timestamp}</span>
               {isAgent && <MessageStatusTicks status={message.deliveryStatus} />}

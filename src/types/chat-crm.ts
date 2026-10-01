@@ -1,5 +1,6 @@
 import type { InvoiceData } from "@/lib/chat-messages";
 import type { SlaInfo } from "@/lib/sla-calculator";
+import type { DocumentReviewData } from "@/lib/documents/document-validator";
 
 export type Department = 'recepcao' | 'agendamento' | 'financeiro';
 
@@ -69,6 +70,8 @@ export interface Message {
   transcription?: string;
   /** Dados de nota fiscal extraídos sob demanda (ver botão "Extrair dados" em message-bubble.tsx) — undefined até a atendente pedir. */
   extractedInvoiceData?: InvoiceData;
+  /** Documento médico extraído e validado sob demanda (ver botão "Analisar Documento" em message-bubble.tsx) — undefined até a atendente pedir. */
+  extractedDocumentData?: DocumentReviewData;
   /** Mensagem que esta responde/cita (botão "Responder", ou citação feita direto no
    * WhatsApp) — undefined quando não é uma resposta, ou quando a citada nunca existiu
    * no nosso banco. */
