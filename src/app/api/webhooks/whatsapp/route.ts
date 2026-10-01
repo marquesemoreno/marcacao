@@ -9,6 +9,7 @@ import { notifyInboxRealtime } from "@/lib/supabase-server";
 import { MEDIA_DOWNLOAD_FAILED_PREFIX } from "@/lib/chat-messages";
 import { isBroadcastOptOutReply } from "@/lib/broadcast-csv";
 import { reopenIfResolved } from "@/lib/conversation-reopen";
+import { autoAssignNewConversation } from "@/lib/conversation-auto-assign";
 import { URGENCY_TAG, MSP_LEAD_TAG, PARTNER_LEAD_TAG, NO_RESPONSE_TAG } from "@/lib/conversation-tags";
 import { detectProcedureInterestTag, detectSourceTag } from "@/lib/auto-tags";
 import { isKnownMspLeadPhone } from "@/lib/msp-lead-outreach";
@@ -340,6 +341,7 @@ async function findOrCreateConversation(phone: string, name: string | undefined,
         contactId: contact.id,
         status: "OPEN",
         lastMessageAt: new Date(),
+        ...(await autoAssignNewConversation(tx, clinicId)),
       },
     });
     return { contact, conversation, isNewConversation: true };
