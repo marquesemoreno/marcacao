@@ -1359,6 +1359,7 @@ const REASON_LABELS: Record<string, string> = {
   AGENDAMENTO_CANCELADO: "🚫 Agendamento Cancelado",
   CANCELAMENTO: "❌ Cancelamento / Desistência",
   ENCAMINHADO: "🔄 Encaminhado para Outro Setor",
+  ATENDIDO_NO_CELULAR: "📱 Atendido pelo Celular (fora da plataforma)",
 };
 
 export async function resolveConversation(
