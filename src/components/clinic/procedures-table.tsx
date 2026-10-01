@@ -22,9 +22,9 @@ const CATEGORY_FILTERS: { value: ProcedureCategory | "ALL"; label: string }[] = 
 ];
 
 const CATEGORY_BADGE_CLASSES: Record<ProcedureCategory, string> = {
-  CONSULTATION: "bg-sky-50 text-sky-700 border-sky-200",
-  EXAM: "bg-violet-50 text-violet-700 border-violet-200",
-  SURGERY: "bg-rose-50 text-rose-700 border-rose-200",
+  CONSULTATION: "bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950/40 dark:text-sky-300 dark:border-sky-900",
+  EXAM: "bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-950/40 dark:text-violet-300 dark:border-violet-900",
+  SURGERY: "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-900",
 };
 
 function ProcedureRow({ item }: { item: PlainClinicProcedureItem }) {
@@ -55,7 +55,7 @@ function ProcedureRow({ item }: { item: PlainClinicProcedureItem }) {
 
   return (
     <TableRow>
-      <TableCell className="font-medium text-slate-800 max-w-[260px] truncate" title={displayName}>
+      <TableCell className="font-medium text-slate-800 dark:text-slate-100 max-w-[260px] truncate" title={displayName}>
         {displayName}
       </TableCell>
       <TableCell>
@@ -90,7 +90,7 @@ function ProcedureRow({ item }: { item: PlainClinicProcedureItem }) {
               </option>
             ))}
           </select>
-          <label className="flex items-center gap-1.5 text-[11px] text-slate-500">
+          <label className="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400">
             <input
               type="checkbox"
               checked={requiresAppointment}
@@ -141,7 +141,7 @@ export function ProceduresTable({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative w-64">
-            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
             <Input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -149,14 +149,16 @@ export function ProceduresTable({
               className="h-9 pl-9"
             />
           </div>
-          <div className="flex items-center gap-0.5 p-0.5 bg-slate-100 rounded-lg text-xs font-medium">
+          <div className="flex items-center gap-0.5 p-0.5 bg-slate-100 dark:bg-slate-800 rounded-lg text-xs font-medium">
             {CATEGORY_FILTERS.map((f) => (
               <button
                 key={f.value}
                 type="button"
                 onClick={() => setCategoryFilter(f.value)}
                 className={`px-2.5 py-1 rounded-md transition-all ${
-                  categoryFilter === f.value ? "bg-white text-slate-900 font-semibold shadow-xs" : "text-slate-500 hover:text-slate-800"
+                  categoryFilter === f.value
+                    ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 font-semibold shadow-xs"
+                    : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
                 }`}
               >
                 {f.label}
@@ -167,22 +169,22 @@ export function ProceduresTable({
         <AddProcedureDialog availableProcedures={availableProcedures} />
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs">
+      <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs">
         <Table>
           <TableHeader>
-            <TableRow className="bg-slate-50/70">
-              <TableHead>Procedimento</TableHead>
-              <TableHead>Categoria</TableHead>
-              <TableHead>Preço Base (R$)</TableHead>
-              <TableHead>Preço Promo (R$)</TableHead>
-              <TableHead>Tipo de Vaga</TableHead>
-              <TableHead className="text-right">Ações</TableHead>
+            <TableRow className="bg-slate-50/70 dark:bg-slate-800/70">
+              <TableHead scope="col" className="text-slate-600 dark:text-slate-300">Procedimento</TableHead>
+              <TableHead scope="col" className="text-slate-600 dark:text-slate-300">Categoria</TableHead>
+              <TableHead scope="col" className="text-slate-600 dark:text-slate-300">Preço Base (R$)</TableHead>
+              <TableHead scope="col" className="text-slate-600 dark:text-slate-300">Preço Promo (R$)</TableHead>
+              <TableHead scope="col" className="text-slate-600 dark:text-slate-300">Tipo de Vaga</TableHead>
+              <TableHead scope="col" className="text-right text-slate-600 dark:text-slate-300">Ações</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="py-8 text-center text-sm text-slate-400 whitespace-normal">
+                <TableCell colSpan={6} className="py-8 text-center text-sm text-slate-500 dark:text-slate-400 whitespace-normal">
                   {search || categoryFilter !== "ALL" ? "Nenhum procedimento encontrado para esse filtro." : "Nenhum procedimento cadastrado ainda."}
                 </TableCell>
               </TableRow>

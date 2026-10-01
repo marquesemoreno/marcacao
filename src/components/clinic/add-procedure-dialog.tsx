@@ -45,19 +45,20 @@ export function AddProcedureDialog({ availableProcedures }: { availableProcedure
           <DialogClose
             aria-label="Fechar"
             render={
-              <button className="absolute top-3 right-3 size-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors" />
+              <button className="absolute top-3 right-3 size-8 flex items-center justify-center rounded-lg text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors" />
             }
           >
             <X className="w-4 h-4" />
           </DialogClose>
           <DialogHeader>
-            <DialogTitle className="text-sm font-bold text-slate-900">Adicionar Procedimento</DialogTitle>
+            <DialogTitle className="text-sm font-bold text-slate-900 dark:text-slate-100">Adicionar Procedimento</DialogTitle>
           </DialogHeader>
 
           <form ref={formRef} onSubmit={handleSubmit} className="grid grid-cols-2 gap-3 pt-2">
             <div className="col-span-2 space-y-1">
-              <Label className="text-xs">Procedimento</Label>
+              <Label htmlFor="add-procedure-id" className="text-xs">Procedimento</Label>
               <select
+                id="add-procedure-id"
                 name="procedureId"
                 className="h-9 w-full rounded-lg border border-input bg-transparent px-2 text-sm"
                 defaultValue=""
@@ -74,16 +75,17 @@ export function AddProcedureDialog({ availableProcedures }: { availableProcedure
               </select>
             </div>
             <div className="space-y-1">
-              <Label className="text-xs">Preço</Label>
-              <Input type="number" step="0.01" min="0" name="price" className="h-9" required />
+              <Label htmlFor="add-procedure-price" className="text-xs">Preço</Label>
+              <Input id="add-procedure-price" type="number" step="0.01" min="0" name="price" className="h-9" required />
             </div>
             <div className="space-y-1">
-              <Label className="text-xs">Preço promocional</Label>
-              <Input type="number" step="0.01" min="0" name="promotionalPrice" className="h-9" />
+              <Label htmlFor="add-procedure-promo-price" className="text-xs">Preço promocional</Label>
+              <Input id="add-procedure-promo-price" type="number" step="0.01" min="0" name="promotionalPrice" className="h-9" />
             </div>
             <div className="space-y-1">
-              <Label className="text-xs">Atendimento</Label>
+              <Label htmlFor="add-procedure-appointment-type" className="text-xs">Atendimento</Label>
               <select
+                id="add-procedure-appointment-type"
                 name="appointmentType"
                 defaultValue="SCHEDULED"
                 className="h-9 w-full rounded-lg border border-input bg-transparent px-2 text-sm"
