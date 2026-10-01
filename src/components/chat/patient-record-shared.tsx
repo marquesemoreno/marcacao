@@ -1,7 +1,7 @@
 /** Compartilhado entre inbox-layout.tsx (painel "Perfil & CRM" fixo) e
  * patient-record-sheet.tsx (drawer amplo aberto ao clicar no nome do paciente) — evita
  * tanto duplicar JSX quanto um import circular entre os dois componentes. */
-import { SCHEDULED_TAG } from "@/lib/conversation-tags";
+import { SCHEDULED_TAG, CONFIRMED_TAG, CANCELLED_TAG, RESCHEDULED_TAG } from "@/lib/conversation-tags";
 import type { ConsultationRecord } from "@/types/chat-crm";
 
 /** O rótulo de cada preset precisa ser IDÊNTICO à string gravada em Conversation.tags
@@ -13,6 +13,9 @@ export const PRESET_TAGS: { label: string; classes: string }[] = [
   { label: "⚡ Prioritário", classes: "bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800" },
   { label: "🔬 Jejum", classes: "bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800" },
   { label: SCHEDULED_TAG, classes: "bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800" },
+  { label: CONFIRMED_TAG, classes: "bg-green-50 dark:bg-green-950/60 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800" },
+  { label: CANCELLED_TAG, classes: "bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800" },
+  { label: RESCHEDULED_TAG, classes: "bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800" },
   { label: "Urologia", classes: "bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800" },
   { label: "Lead B2B", classes: "bg-sky-50 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 border-sky-200 dark:border-sky-800" },
 ];
