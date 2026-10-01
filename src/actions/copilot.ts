@@ -38,6 +38,11 @@ function getOpenAiClient(): OpenAI | null {
   return client;
 }
 
+/** Igual a generateAiReply (ai-attendant.ts): nunca deixa uma falha da OpenAI (rate
+ * limit, modelo indisponível, chave inválida) ou de uma tool virar erro 500 pro
+ * client — o Next redige exceções não tratadas em produção (só um digest sem
+ * detalhe nenhum, confirmado testando no preview deste PR), a recepcionista só via
+ * "algo deu errado" sem explicação nenhuma. Captura e devolve mensagem amigável. */
 export async function runCopilotCommand(history: CopilotChatMessage[]): Promise<CopilotTurnResult> {
   const { clinicId } = await requireClinicSession();
   const openai = getOpenAiClient();
@@ -45,54 +50,59 @@ export async function runCopilotCommand(history: CopilotChatMessage[]): Promise<
     return { message: "O assistente de IA não está configurado neste ambiente (falta OPENAI_API_KEY)." };
   }
 
-  const conversationMessages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
-    { role: "system", content: SYSTEM_PROMPT },
-    ...history.slice(-20).map((m) => ({ role: m.role, content: m.content })),
-  ];
+  try {
+    const conversationMessages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
+      { role: "system", content: SYSTEM_PROMPT },
+      ...history.slice(-20).map((m) => ({ role: m.role, content: m.content })),
+    ];
 
-  const first = await openai.chat.completions.create({
-    model: process.env.OPENAI_MODEL || "gpt-4o-mini",
-    messages: conversationMessages,
-    tools: ASSISTANT_TOOL_DEFINITIONS,
-    max_tokens: 500,
-    temperature: 0.2,
-  });
-  const firstMessage = first.choices[0]?.message;
-  const toolCalls = firstMessage?.tool_calls?.filter(
-    (call): call is OpenAI.Chat.Completions.ChatCompletionMessageFunctionToolCall => call.type === "function"
-  );
+    const first = await openai.chat.completions.create({
+      model: process.env.OPENAI_MODEL || "gpt-4o-mini",
+      messages: conversationMessages,
+      tools: ASSISTANT_TOOL_DEFINITIONS,
+      max_tokens: 500,
+      temperature: 0.2,
+    });
+    const firstMessage = first.choices[0]?.message;
+    const toolCalls = firstMessage?.tool_calls?.filter(
+      (call): call is OpenAI.Chat.Completions.ChatCompletionMessageFunctionToolCall => call.type === "function"
+    );
 
-  if (!toolCalls || toolCalls.length === 0) {
-    return { message: firstMessage?.content?.trim() || "Não entendi o pedido — pode reformular?" };
+    if (!toolCalls || toolCalls.length === 0) {
+      return { message: firstMessage?.content?.trim() || "Não entendi o pedido — pode reformular?" };
+    }
+
+    const executed = await Promise.all(
+      toolCalls.map(async (call) => ({
+        call,
+        result: await executeAssistantTool(call.function.name, call.function.arguments, { clinicId }),
+      }))
+    );
+    const pendingAction = executed.find((e) => e.result.pendingAction)?.result.pendingAction;
+
+    const second = await openai.chat.completions.create({
+      model: process.env.OPENAI_MODEL || "gpt-4o-mini",
+      messages: [
+        ...conversationMessages,
+        firstMessage!,
+        ...executed.map(({ call, result }) => ({
+          role: "tool" as const,
+          tool_call_id: call.id,
+          content: JSON.stringify(result.forModel),
+        })),
+      ],
+      max_tokens: 500,
+      temperature: 0.2,
+    });
+
+    return {
+      message: second.choices[0]?.message?.content?.trim() || "Ação localizada — confira os dados abaixo.",
+      pendingAction,
+    };
+  } catch (error) {
+    console.error("Falha ao processar comando do Copiloto da Recepção:", error);
+    return { message: "Não consegui processar esse comando agora — tente de novo em instantes." };
   }
-
-  const executed = await Promise.all(
-    toolCalls.map(async (call) => ({
-      call,
-      result: await executeAssistantTool(call.function.name, call.function.arguments, { clinicId }),
-    }))
-  );
-  const pendingAction = executed.find((e) => e.result.pendingAction)?.result.pendingAction;
-
-  const second = await openai.chat.completions.create({
-    model: process.env.OPENAI_MODEL || "gpt-4o-mini",
-    messages: [
-      ...conversationMessages,
-      firstMessage!,
-      ...executed.map(({ call, result }) => ({
-        role: "tool" as const,
-        tool_call_id: call.id,
-        content: JSON.stringify(result.forModel),
-      })),
-    ],
-    max_tokens: 500,
-    temperature: 0.2,
-  });
-
-  return {
-    message: second.choices[0]?.message?.content?.trim() || "Ação localizada — confira os dados abaixo.",
-    pendingAction,
-  };
 }
 
 /** `updateAppointmentStatus` (actions/clinic.ts) já faz requireClinicSession() e

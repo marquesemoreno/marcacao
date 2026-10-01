@@ -58,8 +58,8 @@ export function CopilotChat({ open, onOpenChange }: { open: boolean; onOpenChang
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-full sm:max-w-md flex flex-col p-0">
-        <SheetHeader className="border-b border-slate-200">
-          <SheetTitle className="flex items-center gap-2 text-slate-900">
+        <SheetHeader className="border-b border-slate-200 dark:border-slate-800">
+          <SheetTitle className="flex items-center gap-2 text-slate-900 dark:text-slate-100">
             <Sparkles className="w-4 h-4 text-emerald-600" /> Copiloto da Recepção
           </SheetTitle>
         </SheetHeader>
@@ -73,7 +73,7 @@ export function CopilotChat({ open, onOpenChange }: { open: boolean; onOpenChang
                   className={
                     m.role === "user"
                       ? "rounded-lg bg-emerald-600 text-white px-3 py-2 text-sm"
-                      : "rounded-lg bg-slate-100 text-slate-800 px-3 py-2 text-sm whitespace-pre-wrap"
+                      : "rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-100 px-3 py-2 text-sm whitespace-pre-wrap"
                   }
                 >
                   {m.content}
@@ -89,7 +89,7 @@ export function CopilotChat({ open, onOpenChange }: { open: boolean; onOpenChang
           )}
         </div>
 
-        <SheetFooter className="border-t border-slate-200 flex-row gap-2">
+        <SheetFooter className="border-t border-slate-200 dark:border-slate-800 flex-row gap-2">
           <Input
             value={input}
             onChange={(e) => setInput(e.target.value)}
