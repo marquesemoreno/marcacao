@@ -10,7 +10,16 @@ import { MEDIA_DOWNLOAD_FAILED_PREFIX } from "@/lib/chat-messages";
 import { isBroadcastOptOutReply } from "@/lib/broadcast-csv";
 import { reopenIfResolved } from "@/lib/conversation-reopen";
 import { autoAssignNewConversation } from "@/lib/conversation-auto-assign";
-import { URGENCY_TAG, MSP_LEAD_TAG, PARTNER_LEAD_TAG, NO_RESPONSE_TAG } from "@/lib/conversation-tags";
+import {
+  URGENCY_TAG,
+  MSP_LEAD_TAG,
+  PARTNER_LEAD_TAG,
+  NO_RESPONSE_TAG,
+  CONFIRMED_TAG,
+  CANCELLED_TAG,
+  RESCHEDULED_TAG,
+  nextTagsForOutcome,
+} from "@/lib/conversation-tags";
 import { detectProcedureInterestTag, detectSourceTag } from "@/lib/auto-tags";
 import { isKnownMspLeadPhone } from "@/lib/msp-lead-outreach";
 import { isKnownPartnerLeadPhone } from "@/lib/ai-lead-outreach";
@@ -889,7 +898,7 @@ export async function POST(request: Request) {
       });
       await prisma.conversation.update({
         where: { id: conversation.id },
-        data: { assignedUserId: null, status: "OPEN" },
+        data: { assignedUserId: null, status: "OPEN", tags: nextTagsForOutcome(conversation.tags, RESCHEDULED_TAG) },
       });
       const ackText = "Entendido! Nossa equipe vai entrar em contato em breve pra reagendar sua consulta. 😊";
       try {
@@ -951,6 +960,10 @@ export async function POST(request: Request) {
     // atualizar de volta o Firebird, o bridge hoje só insere, nunca atualiza.
     if (conversation) {
       await recordBridgeReminderResponse(conversation.clinicId, incoming.phone, newStatus === "CONFIRMED" ? "CONFIRMED" : "CANCELLED");
+      await prisma.conversation.update({
+        where: { id: conversation.id },
+        data: { tags: nextTagsForOutcome(conversation.tags, newStatus === "CONFIRMED" ? CONFIRMED_TAG : CANCELLED_TAG) },
+      });
       const aiSuffix = classifiedByAi ? ` (interpretado pela IA a partir de: "${incoming.text}")` : "";
       const noteText =
         newStatus === "CONFIRMED"
@@ -1031,6 +1044,16 @@ export async function POST(request: Request) {
         } e atualizou o agendamento automaticamente.`,
         status: "SENT",
       },
+    });
+  }
+
+  // Mesma tag de resultado da conversa pros 2 outros fluxos (sem Appointment
+  // nosso / pedido de remarcação, ver acima) — cobre CONFIRMED e CANCELLED num
+  // lugar só, antes de ramificar em bridge/marketplace logo abaixo.
+  if (conversation) {
+    await prisma.conversation.update({
+      where: { id: conversation.id },
+      data: { tags: nextTagsForOutcome(conversation.tags, newStatus === "CONFIRMED" ? CONFIRMED_TAG : CANCELLED_TAG) },
     });
   }
 

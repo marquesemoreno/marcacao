@@ -42,3 +42,25 @@ export const PROCEDURE_INTEREST_TAG_PREFIX = "🩺 Interesse: ";
  * computeQueueState em chat-crm-adapters.ts); some quando a recepção remove a tag
  * manualmente depois de confirmar a remarcação — nada remove ela sozinha. */
 export const RESCHEDULE_PENDING_TAG = "⚠️ Remarcação Pendente";
+
+/** Resposta do paciente ao lembrete D-1 (ou a qualquer confirmação de agendamento,
+ * ver webhook route.ts) — aplicada em todos os 3 fluxos onde isso é detectado
+ * (agendamento nosso, agendamento só do bridge/recepção, e pedido de remarcação).
+ * Mutuamente exclusivas entre si (ver outcomeTags/nextTagsForOutcome abaixo): se o
+ * paciente responder de novo com um resultado diferente, a tag antiga é trocada,
+ * não acumulada — pra filtro por tag não misturar "Confirmado" com "Cancelado" na
+ * mesma conversa. Usadas pelo filtro "Filtrar por Tag" da fila, nenhum significado
+ * especial na UI além disso (ao contrário de URGENCY_TAG etc acima). */
+export const CONFIRMED_TAG = "✅ Confirmado";
+export const CANCELLED_TAG = "❌ Cancelado";
+export const RESCHEDULED_TAG = "🔁 Remarcado";
+
+const OUTCOME_TAGS = [CONFIRMED_TAG, CANCELLED_TAG, RESCHEDULED_TAG];
+
+/** Troca a tag de resultado (Confirmado/Cancelado/Remarcado) sem acumular as
+ * outras duas nem duplicar a mesma — preserva qualquer outra tag (urgência, lead,
+ * interesse em procedimento etc) intacta. */
+export function nextTagsForOutcome(currentTags: string[], outcomeTag: string): string[] {
+  const withoutOtherOutcomes = currentTags.filter((t) => !OUTCOME_TAGS.includes(t) || t === outcomeTag);
+  return withoutOtherOutcomes.includes(outcomeTag) ? withoutOtherOutcomes : [...withoutOtherOutcomes, outcomeTag];
+}
