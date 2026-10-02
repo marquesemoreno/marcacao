@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import type { PatientRecordData, UpdatePatientData } from "@/types/chat-crm";
 import { tagClasses, renderConsultationRow } from "./patient-record-shared";
+import { displayName } from "@/lib/contact-display";
 
 export interface MediaItem {
   id: string;
@@ -139,21 +140,27 @@ export function PatientRecordSheet({ contact, open, onOpenChange, onUpdatePatien
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="sm:max-w-xl w-full p-0">
+      {/* data-[side=right]: precisa do mesmo prefixo do SheetContent base, senão o
+          sm:max-w-sm dele vence e a ficha abre com ~384px (F1). */}
+      <SheetContent side="right" className="w-full p-0 gap-0 data-[side=right]:sm:max-w-xl">
         <SheetHeader className="border-b border-slate-200 dark:border-slate-800 p-4">
-          <SheetTitle className="text-base">{contact.name}</SheetTitle>
+          <SheetTitle className="text-base">{displayName(contact)}</SheetTitle>
           <SheetDescription>Ficha completa do paciente</SheetDescription>
         </SheetHeader>
 
-        <Tabs defaultValue="resumo" className="flex-1 overflow-y-auto p-4 gap-4" onValueChange={(v) => v === "documentos" && handleOpenDocumentosTab()}>
-          <TabsList className="w-full">
+        {/* Abas: barra com rolagem horizontal própria e altura automática; só o conteúdo
+            rola na vertical (antes o TabsList esticava e cobria os campos). */}
+        <Tabs defaultValue="resumo" className="flex-1 min-h-0 gap-0" onValueChange={(v) => v === "documentos" && handleOpenDocumentosTab()}>
+          <div className="shrink-0 overflow-x-auto border-b border-slate-200 dark:border-slate-800 px-4 py-2">
+          <TabsList className="h-auto w-max flex-none [&>*]:shrink-0 [&>*]:whitespace-nowrap">
             <TabsTrigger value="resumo">Resumo Cadastral</TabsTrigger>
             <TabsTrigger value="historico">Histórico de Agendamentos</TabsTrigger>
             <TabsTrigger value="documentos">Documentos & Exames</TabsTrigger>
             <TabsTrigger value="observacoes">Observações & Timeline</TabsTrigger>
           </TabsList>
+          </div>
 
-          <TabsContent value="resumo" className="space-y-3">
+          <TabsContent value="resumo" className="min-h-0 flex-1 overflow-y-auto space-y-3 p-4">
             <div className="bg-white dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/80 rounded-xl p-4 space-y-3 shadow-sm">
               <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
                 <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
@@ -223,7 +230,7 @@ export function PatientRecordSheet({ contact, open, onOpenChange, onUpdatePatien
             </div>
           </TabsContent>
 
-          <TabsContent value="historico" className="space-y-3">
+          <TabsContent value="historico" className="min-h-0 flex-1 overflow-y-auto space-y-3 p-4">
             {contact.consultationHistory.length === 0 ? (
               <p className="text-xs text-slate-500 dark:text-slate-400">Nenhum agendamento encontrado pra esse paciente.</p>
             ) : (
@@ -248,7 +255,7 @@ export function PatientRecordSheet({ contact, open, onOpenChange, onUpdatePatien
             )}
           </TabsContent>
 
-          <TabsContent value="documentos" className="space-y-3">
+          <TabsContent value="documentos" className="min-h-0 flex-1 overflow-y-auto space-y-3 p-4">
             {!onLoadMedia ? (
               <p className="text-xs text-slate-500 dark:text-slate-400">Indisponível aqui.</p>
             ) : isLoadingMedia ? (
@@ -287,7 +294,7 @@ export function PatientRecordSheet({ contact, open, onOpenChange, onUpdatePatien
             )}
           </TabsContent>
 
-          <TabsContent value="observacoes" className="space-y-3">
+          <TabsContent value="observacoes" className="min-h-0 flex-1 overflow-y-auto space-y-3 p-4">
             <div className="bg-white dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/80 rounded-xl p-4 shadow-sm space-y-2">
               <Label className="text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                 Observação Interna Permanente
