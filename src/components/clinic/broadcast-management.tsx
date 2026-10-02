@@ -12,6 +12,7 @@ import {
   clinicHasBridgeAudience,
 } from "@/actions/clinic-broadcast";
 import { BridgeAudiencePicker } from "@/components/clinic/bridge-audience-picker";
+import { SELECTION_BROADCAST_KEY } from "@/components/clinic/patient-list-table";
 import { parseBroadcastCsv, BROADCAST_OPT_OUT_FOOTER, type ParsedBroadcastRecipient } from "@/lib/broadcast-csv";
 import { RescheduleBroadcastModal } from "@/components/clinic/reschedule-broadcast-modal";
 
@@ -46,7 +47,7 @@ export function BroadcastManagement() {
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
   const [rescheduleModalOpen, setRescheduleModalOpen] = useState(false);
   const [hasBridge, setHasBridge] = useState(false);
-  const [audienceSource, setAudienceSource] = useState<"csv" | "bridge">("csv");
+  const [audienceSource, setAudienceSource] = useState<"csv" | "bridge" | "selecao">("csv");
 
   async function loadCampaigns() {
     setLoading(true);
@@ -62,9 +63,24 @@ export function BroadcastManagement() {
   useEffect(() => {
     loadCampaigns();
     clinicHasBridgeAudience().then(setHasBridge).catch(() => {});
+    // N4: "Enviar disparo" da lista de pacientes chega com ?selecao=1 e a seleção no
+    // sessionStorage — vira o público desta campanha (lido uma vez e apagado).
+    if (new URLSearchParams(window.location.search).get("selecao") === "1") {
+      const raw = sessionStorage.getItem(SELECTION_BROADCAST_KEY);
+      sessionStorage.removeItem(SELECTION_BROADCAST_KEY);
+      try {
+        const parsed = raw ? (JSON.parse(raw) as ParsedBroadcastRecipient[]) : [];
+        if (parsed.length > 0) {
+          setAudienceSource("selecao");
+          setRecipients(parsed);
+        }
+      } catch {
+        // seleção inválida: segue com o formulário normal
+      }
+    }
   }, []);
 
-  function switchSource(next: "csv" | "bridge") {
+  function switchSource(next: "csv" | "bridge" | "selecao") {
     setAudienceSource(next);
     setRecipients([]);
     setCsvText("");
@@ -273,7 +289,16 @@ export function BroadcastManagement() {
           </div>
         )}
 
-        {audienceSource === "bridge" ? (
+        {audienceSource === "selecao" ? (
+          <div className="rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 p-3 text-sm flex items-center justify-between gap-2">
+            <span className="text-emerald-900 dark:text-emerald-200">
+              Público: <strong>{recipients.length} paciente(s) selecionado(s)</strong> na lista de pacientes. Use {"{{saudacao}}"} ou {"{{nome}}"} na mensagem.
+            </span>
+            <button type="button" onClick={() => switchSource("csv")} className="text-sm font-medium underline underline-offset-2 text-emerald-900 dark:text-emerald-200">
+              Trocar público
+            </button>
+          </div>
+        ) : audienceSource === "bridge" ? (
           <BridgeAudiencePicker onRecipients={setRecipients} />
         ) : (
         <div>

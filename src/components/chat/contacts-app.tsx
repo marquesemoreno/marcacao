@@ -3,7 +3,7 @@
 import { PageHeader } from "@/components/clinic/page-header";
 import { useCallback, useEffect, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Search, MessageCircle, UserPlus, Upload, X, Eye, Calendar } from "lucide-react";
+import { Search, MessageCircle, UserPlus, Upload, X, Eye } from "lucide-react";
 import { toast } from "sonner";
 import {
   listContactsPage,
@@ -13,13 +13,6 @@ import {
   updateContactInfo,
   updateConversationTags,
   listContactMedia,
-  sendMessage,
-  updateConversationFunnelStage,
-  listClinicProceduresForAppointment,
-  listClinicDoctorsForAppointment,
-  listClinicConveniosForAppointment,
-  getClinicDoctorAgenda,
-  listClinicPatientsForAppointment,
 } from "@/actions/inbox";
 import {
   listAllContactsAdmin,
@@ -39,7 +32,7 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@
 import { AvatarBadge } from "@/components/chat/avatar-badge";
 import { PatientRecordSheet } from "@/components/chat/patient-record-sheet";
 import { NewContactDialog } from "@/components/chat/new-contact-dialog";
-import { ScheduleModal } from "@/components/chat/schedule-modal";
+import { PatientListTable } from "@/components/clinic/patient-list-table";
 import type { PatientRecordData, UpdatePatientData } from "@/types/chat-crm";
 
 type Scope = "clinic" | "admin";
@@ -62,6 +55,12 @@ type ContactRow = {
   status: "OPEN" | "PENDING" | "RESOLVED";
   clinicName?: string;
   lastAppointment?: { date: string; doctorName: string | null } | null;
+  // N4 (só na lista paginada da clínica)
+  funnelStage?: string;
+  acquisitionChannel?: string | null;
+  lastInteractionAt?: string;
+  attendant?: string | null;
+  instagramUsername?: string | null;
 };
 
 const statusLabels: Record<ContactRow["status"], string> = {
@@ -126,7 +125,6 @@ export function ContactsApp({ scope, basePath }: { scope: Scope; basePath: strin
 
   // "Agendar" rápido — mesmo ScheduleModal do Inbox, só com o Pick<Contact,...> que ele
   // realmente usa (ver schedule-modal.tsx).
-  const [scheduleContact, setScheduleContact] = useState<{ conversationId: string; name: string; cpf: string; phone: string } | null>(null);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [availableClinics, setAvailableClinics] = useState<{ id: string; tradeName: string }[]>([]);
@@ -236,21 +234,6 @@ export function ContactsApp({ scope, basePath }: { scope: Scope; basePath: strin
     await fetchContacts();
   }
 
-  async function handleScheduleConfirmed(data: { appointmentId: string; specialty: string; doctor: string; date: string; time: string; price: string }) {
-    if (!scheduleContact) return;
-    const isBridgeAppointment = data.appointmentId.startsWith("bridge:");
-    const guideLine = isBridgeAppointment
-      ? ""
-      : `\n\n📎 Guia com QR Code enviada ao paciente pelo WhatsApp: ${window.location.origin}/comprovante/${data.appointmentId}`;
-    await sendMessage(
-      scheduleContact.conversationId,
-      `✅ Consulta confirmada!\n${data.specialty} — ${data.doctor}\nData: ${data.date} às ${data.time}\nValor: ${data.price}${guideLine}`,
-      true
-    );
-    await updateConversationFunnelStage(scheduleContact.conversationId, "agendado");
-    toast.success("Agendamento confirmado!");
-    await fetchContacts();
-  }
 
   const handleCheckContactPhone = useCallback(
     (phone: string, clinicId?: string) =>
@@ -383,6 +366,14 @@ export function ContactsApp({ scope, basePath }: { scope: Scope; basePath: strin
         )}
       </div>
 
+      {scope === "clinic" ? (
+        <PatientListTable
+          rows={filteredContacts}
+          isLoading={isLoading}
+          emptyMessage={urlQ || convenioFilter || doctorFilter ? "Nenhum paciente encontrado para esse filtro." : "Nenhum paciente cadastrado ainda."}
+          onChanged={fetchContacts}
+        />
+      ) : (
       <div className="overflow-hidden rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs">
         <Table>
           <TableHeader>
@@ -467,17 +458,6 @@ export function ContactsApp({ scope, basePath }: { scope: Scope; basePath: strin
                       >
                         <Eye className="size-3.5" />
                       </button>
-                      {scope === "clinic" && (
-                        <button
-                          onClick={() => setScheduleContact({ conversationId: contact.conversationId, name: contact.name, cpf: contact.cpf ?? "", phone: contact.phone })}
-                          type="button"
-                          title="Agendar"
-                          aria-label={`Agendar para ${displayName(contact)}`}
-                          className="p-1.5 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-800 dark:hover:text-slate-200"
-                        >
-                          <Calendar className="size-3.5" />
-                        </button>
-                      )}
                       <button
                         onClick={() => router.push(`${basePath}/inbox?c=${contact.conversationId}`)}
                         type="button"
@@ -495,6 +475,7 @@ export function ContactsApp({ scope, basePath }: { scope: Scope; basePath: strin
           </TableBody>
         </Table>
       </div>
+      )}
 
       {total > 0 && (
         <nav aria-label="Paginação de contatos" className="flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600 dark:text-slate-300">
@@ -535,19 +516,6 @@ export function ContactsApp({ scope, basePath }: { scope: Scope; basePath: strin
         />
       )}
 
-      {scheduleContact && (
-        <ScheduleModal
-          contact={scheduleContact}
-          isOpen={Boolean(scheduleContact)}
-          onClose={() => setScheduleContact(null)}
-          fetchProcedures={listClinicProceduresForAppointment}
-          fetchDoctors={listClinicDoctorsForAppointment}
-          fetchConvenios={listClinicConveniosForAppointment}
-          fetchAgenda={getClinicDoctorAgenda}
-          fetchPatients={listClinicPatientsForAppointment}
-          onConfirmSchedule={handleScheduleConfirmed}
-        />
-      )}
 
       <NewContactDialog
         open={isModalOpen}

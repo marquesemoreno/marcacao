@@ -228,13 +228,26 @@ export async function listContactsPage(params: { q?: string; page?: number; conv
     prisma.conversation.count({ where }),
     prisma.conversation.findMany({
       where,
-      include: { contact: true },
+      include: { contact: true, assignedUser: { select: { name: true } } },
       orderBy: { contact: { name: "asc" } },
       skip: (page - 1) * CONTACTS_PAGE_SIZE,
       take: CONTACTS_PAGE_SIZE,
     }),
   ]);
-  return { rows: await buildContactRows(conversations, clinicId), total, page, pageSize: CONTACTS_PAGE_SIZE };
+  // N4: colunas da lista de pacientes (etapa, interesse/origem, última interação, atendente).
+  const base = await buildContactRows(conversations, clinicId);
+  const rows = base.map((row, i) => {
+    const c = conversations[i];
+    return {
+      ...row,
+      funnelStage: c.funnelStage,
+      acquisitionChannel: c.acquisitionChannel,
+      lastInteractionAt: (c.lastMessageAt ?? c.createdAt).toISOString(),
+      attendant: c.assignedUser?.name ?? null,
+      instagramUsername: c.contact.instagramUsername,
+    };
+  });
+  return { rows, total, page, pageSize: CONTACTS_PAGE_SIZE };
 }
 
 /** Lista conversas-destino pra "Reencaminhar mensagem" — só da mesma clínica da
