@@ -77,11 +77,6 @@ const statusClasses: Record<ContactRow["status"], string> = {
 
 /** Remove o DDI 55 (armazenado junto no telefone do Contact) antes de formatar
  * como (DD) 9XXXX-XXXX — sem isso o formatPhone padrão desalinha os dígitos. */
-function formatContactPhone(phone: string) {
-  const digits = phone.replace(/\D/g, "");
-  const local = digits.length > 11 && digits.startsWith("55") ? digits.slice(2) : digits;
-  return formatPhone(local);
-}
 
 function rowToPatientRecord(row: ContactRow): PatientRecordData {
   return {
@@ -427,7 +422,7 @@ export function ContactsApp({ scope, basePath }: { scope: Scope; basePath: strin
                     </button>
                   </TableCell>
                   <TableCell className="font-mono text-xs text-slate-600 dark:text-slate-400">
-                    {formatContactPhone(contact.phone)}
+                    {formatPhone(contact.phone)}
                   </TableCell>
                   <TableCell>
                     <div className="flex flex-col gap-1">

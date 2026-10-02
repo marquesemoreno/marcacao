@@ -1,5 +1,7 @@
 "use client";
 
+import { formatPhone } from "@/lib/format";
+import { displayName } from "@/lib/contact-display";
 import React, { useState } from 'react';
 import { Agent, Contact, FunnelStage } from '@/types/chat-crm';
 import { AvatarBadge } from './avatar-badge';
@@ -233,13 +235,13 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
                         >
                           <div className="flex items-start justify-between gap-2">
                             <div className="flex items-center gap-2.5 min-w-0">
-                              <AvatarBadge name={contact.name} photoUrl={contact.avatar} size={36} className="ring-2 ring-slate-100 dark:ring-slate-800 shrink-0" />
+                              <AvatarBadge name={displayName(contact)} photoUrl={contact.avatar} size={36} className="ring-2 ring-slate-100 dark:ring-slate-800 shrink-0" />
                               <div className="min-w-0">
                                 <h4 className="font-semibold text-xs text-slate-900 dark:text-slate-100 truncate">
-                                  {contact.name}
+                                  {displayName(contact)}
                                 </h4>
                                 <p className="text-xs text-slate-500 dark:text-slate-400 font-mono flex items-center gap-1 mt-0.5">
-                                  <Phone className="w-3 h-3 text-emerald-600 dark:text-emerald-400" /> {contact.phone}
+                                  <Phone className="w-3 h-3 text-emerald-600 dark:text-emerald-400" /> {formatPhone(contact.phone)}
                                 </p>
                               </div>
                             </div>

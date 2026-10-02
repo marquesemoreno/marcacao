@@ -1,5 +1,6 @@
 "use client";
 
+import { formatPhone } from "@/lib/format";
 import { useState } from "react";
 import { Plus, X, Phone, IdCard, Stethoscope, ShieldCheck, Calendar, MapPin, CreditCard, FileText, Download, File as FileIcon } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
@@ -165,7 +166,7 @@ export function PatientRecordSheet({ contact, open, onOpenChange, onUpdatePatien
               <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
                 <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                 <span className="font-medium">WhatsApp:</span>
-                <span>{contact.phone || "Não informado"}</span>
+                <span>{contact.phone ? formatPhone(contact.phone) : "Não informado"}</span>
               </div>
 
               <div className="grid grid-cols-2 gap-3">

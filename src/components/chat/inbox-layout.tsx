@@ -1,5 +1,6 @@
 "use client";
 
+import { formatPhone } from "@/lib/format";
 import { ACQUISITION_CHANNELS } from "@/lib/acquisition";
 import { AcquisitionBadge } from "@/components/chat/acquisition-badge";
 import { InstagramGlyph } from "@/components/chat/instagram-glyph";
@@ -1450,7 +1451,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                   <ChevronLeft className="w-5 h-5" />
                 </button>
 
-                <AvatarBadge name={selectedContact.name} photoUrl={selectedContact.avatar} size={38} className="ring-2 ring-slate-100 dark:ring-slate-800 shadow-sm shrink-0" />
+                <AvatarBadge name={displayName(selectedContact)} photoUrl={selectedContact.avatar} size={38} className="ring-2 ring-slate-100 dark:ring-slate-800 shadow-sm shrink-0" />
                 <div className="min-w-0">
                   <div className="flex items-center gap-1.5 flex-wrap">
                     <button
@@ -1459,7 +1460,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                       className="font-semibold text-slate-900 dark:text-slate-100 text-base truncate hover:underline decoration-slate-400 underline-offset-2"
                       title="Ver ficha completa do paciente"
                     >
-                      {selectedContact.name}
+                      {displayName(selectedContact)}
                     </button>
                     <span
                       className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 text-xs font-medium shrink-0"
@@ -1514,7 +1515,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                           {selectedContact.instagramUsername ? `@${selectedContact.instagramUsername}` : 'Instagram Direct'}
                         </>
                       ) : (
-                        selectedContact.phone
+                        formatPhone(selectedContact.phone)
                       )}
                     </p>
                     {selectedContact.acquisitionChannel && (
@@ -2252,10 +2253,10 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
             <div className="bg-white dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-700/80 rounded-xl p-4 space-y-3 shadow-sm">
               <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-700/60 pb-3">
                 <div className="flex items-center gap-3 min-w-0">
-                  <AvatarBadge name={selectedContact.name} photoUrl={selectedContact.avatar} size={44} className="ring-2 ring-white dark:ring-slate-900 shadow-sm shrink-0" />
+                  <AvatarBadge name={displayName(selectedContact)} photoUrl={selectedContact.avatar} size={44} className="ring-2 ring-white dark:ring-slate-900 shadow-sm shrink-0" />
                   <div className="min-w-0">
                     <h4 className="font-bold text-slate-900 dark:text-slate-100 text-xs truncate">
-                      {selectedContact.name}
+                      {displayName(selectedContact)}
                     </h4>
                     {selectedContact.channel === 'instagram' && !selectedContact.phone ? (
                       <p className="text-xs text-slate-500 dark:text-slate-400 font-medium flex items-center gap-1 mt-0.5">
@@ -2269,7 +2270,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                         className="text-xs text-slate-500 dark:text-slate-400 font-medium flex items-center gap-1 hover:text-emerald-700 dark:hover:text-emerald-400"
                         title="Ligar para o paciente"
                       >
-                        <Phone className="w-3 h-3" /> {selectedContact.phone}
+                        <Phone className="w-3 h-3" /> {formatPhone(selectedContact.phone)}
                       </a>
                       <button
                         type="button"
@@ -2870,7 +2871,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
               Finalizar Atendimento do Paciente
             </DialogTitle>
             <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-              Selecione o desfecho obrigatório deste atendimento para {selectedContact.name}.
+              Selecione o desfecho obrigatório deste atendimento para {displayName(selectedContact)}.
             </p>
           </DialogHeader>
 
