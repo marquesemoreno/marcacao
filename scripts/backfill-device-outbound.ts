@@ -40,7 +40,9 @@ const variants = (p: string) =>
 
 (async () => {
   console.log(APPLY ? "=== GRAVANDO ===" : `=== SÓ CONTAGEM (últimos ${DAYS} dias) ===`);
+  // A Evolution só aplica o filtro de data com gte E lte juntos — só gte devolve tudo.
   const from = new Date(Date.now() - DAYS * 86400000).toISOString();
+  const to = new Date().toISOString();
   const instances = await prisma.whatsappInstance.findMany({ include: { clinic: { select: { id: true, tradeName: true } } } });
 
   for (const inst of instances) {
@@ -49,7 +51,7 @@ const variants = (p: string) =>
       const res = await fetch(`${inst.apiUrl.replace(/\/$/, "")}/chat/findMessages/${encodeURIComponent(inst.instanceName)}`, {
         method: "POST",
         headers: { apikey: inst.apiKey, "Content-Type": "application/json" },
-        body: JSON.stringify({ where: { key: { fromMe: true }, messageTimestamp: { gte: from } }, page, offset: 200 }),
+        body: JSON.stringify({ where: { key: { fromMe: true }, messageTimestamp: { gte: from, lte: to } }, page, offset: 200 }),
         signal: AbortSignal.timeout(60000),
       });
       const j: any = await res.json().catch(() => null);
@@ -57,36 +59,70 @@ const variants = (p: string) =>
       if (page >= (j?.messages?.pages ?? 0)) break;
     }
 
+    // A paginação da Evolution repete registros (mesmo key.id em páginas diferentes).
+    const seen = new Set<string>();
+    for (let i = recs.length - 1; i >= 0; i--) {
+      if (seen.has(recs[i].key.id)) recs.splice(i, 1);
+      else seen.add(recs[i].key.id);
+    }
     const stats = { total: recs.length, alreadyByKey: 0, panelTwin: 0, noTarget: 0, noConversation: 0, notText: 0, toInsert: 0 };
-    const convCache = new Map<string, string | null>();
-    for (const r of recs.sort((a, b) => Number(a.messageTimestamp) - Number(b.messageTimestamp))) {
+
+    // Lote: quais key.id já existem no banco.
+    const existingKeys = new Set<string>();
+    const ids = recs.map((r) => r.key.id);
+    for (let i = 0; i < ids.length; i += 500) {
+      const found = await prisma.message.findMany({ where: { whatsappKeyId: { in: ids.slice(i, i + 500) } }, select: { whatsappKeyId: true } });
+      found.forEach((f) => f.whatsappKeyId && existingKeys.add(f.whatsappKeyId));
+    }
+
+    // Lote: telefone -> conversa (uma consulta por bloco de telefones, não por mensagem).
+    const candidates: { r: Rec; text: string; phone: string }[] = [];
+    for (const r of recs) {
       const text = textOf(r);
       if (!text) { stats.notText++; continue; }
       const phone = deviceOutboundTargetPhone(r.key);
       if (!phone) { stats.noTarget++; continue; }
-      if (await prisma.message.findUnique({ where: { whatsappKeyId: r.key.id }, select: { id: true } })) { stats.alreadyByKey++; continue; }
-
-      if (!convCache.has(phone)) {
-        const contact = await prisma.contact.findFirst({ where: { phone: { in: variants(phone) } }, select: { id: true } });
-        const conv = contact
-          ? await prisma.conversation.findFirst({ where: { contactId: contact.id, clinicId: inst.clinicId, channel: "WHATSAPP" }, orderBy: { createdAt: "desc" }, select: { id: true } })
-          : null;
-        convCache.set(phone, conv?.id ?? null);
-      }
-      const conversationId = convCache.get(phone);
-      if (!conversationId) { stats.noConversation++; continue; }
-
-      const at = new Date(Number(r.messageTimestamp) * 1000);
-      const near = await prisma.message.findMany({
-        where: { conversationId, direction: "OUTBOUND", createdAt: { gte: new Date(at.getTime() - 120000), lte: new Date(at.getTime() + 120000) } },
-        select: { id: true, content: true, whatsappKeyId: true, createdAt: true },
+      if (existingKeys.has(r.key.id)) { stats.alreadyByKey++; continue; }
+      candidates.push({ r, text, phone });
+    }
+    const allPhones = [...new Set(candidates.flatMap((c) => variants(c.phone)))];
+    const convByPhone = new Map<string, string>();
+    for (let i = 0; i < allPhones.length; i += 500) {
+      const contacts = await prisma.contact.findMany({
+        where: { phone: { in: allPhones.slice(i, i + 500) } },
+        select: { phone: true, conversations: { where: { clinicId: inst.clinicId, channel: "WHATSAPP" }, orderBy: { createdAt: "desc" }, take: 1, select: { id: true } } },
       });
-      if (findPanelTwin(near.map((n) => ({ ...n, whatsappKeyId: null })), { content: text, at })) { stats.panelTwin++; continue; }
+      for (const c of contacts) if (c.phone && c.conversations[0]) convByPhone.set(c.phone, c.conversations[0].id);
+    }
+    const convOf = (phone: string) => variants(phone).map((v) => convByPhone.get(v)).find(Boolean) ?? null;
 
+    // Lote: mensagens OUTBOUND já gravadas nessas conversas na janela (pra achar a gêmea do painel).
+    const convIds = [...new Set(candidates.map((c) => convOf(c.phone)).filter((x): x is string => !!x))];
+    const outboundByConv = new Map<string, { id: string; content: string; whatsappKeyId: string | null; createdAt: Date }[]>();
+    for (let i = 0; i < convIds.length; i += 200) {
+      const rows = await prisma.message.findMany({
+        where: { conversationId: { in: convIds.slice(i, i + 200) }, direction: "OUTBOUND", createdAt: { gte: new Date(from), lte: new Date(to) } },
+        select: { id: true, conversationId: true, content: true, createdAt: true },
+      });
+      for (const m of rows) {
+        const list = outboundByConv.get(m.conversationId) ?? [];
+        list.push({ id: m.id, content: m.content, whatsappKeyId: null, createdAt: m.createdAt });
+        outboundByConv.set(m.conversationId, list);
+      }
+    }
+
+    for (const { r, text, phone } of candidates.sort((a, b) => Number(a.r.messageTimestamp) - Number(b.r.messageTimestamp))) {
+      const conversationId = convOf(phone);
+      if (!conversationId) { stats.noConversation++; continue; }
+      const at = new Date(Number(r.messageTimestamp) * 1000);
+      if (findPanelTwin(outboundByConv.get(conversationId) ?? [], { content: text, at })) { stats.panelTwin++; continue; }
       stats.toInsert++;
       if (APPLY) {
-        await prisma.message.create({
-          data: { conversationId, direction: "OUTBOUND", status: "SENT", content: text, whatsappKeyId: r.key.id, sentFromDevice: true, createdAt: at } as any,
+        // createMany + skipDuplicates: se o webhook gravar a mesma mensagem enquanto o
+        // script roda, pula em vez de abortar tudo.
+        await prisma.message.createMany({
+          data: [{ conversationId, direction: "OUTBOUND", status: "SENT", content: text, whatsappKeyId: r.key.id, sentFromDevice: true, createdAt: at } as any],
+          skipDuplicates: true,
         });
       }
     }
