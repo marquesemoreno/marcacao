@@ -4,6 +4,7 @@ import {
   listProceduresNotOffered,
   listAcquisitionRules,
 } from "@/actions/clinic";
+import { PageHeader } from "@/components/clinic/page-header";
 import { PrecosPageTabs } from "@/components/clinic/precos-page-tabs";
 import { toPlainClinicProcedureItem } from "@/lib/serialize";
 import { buildWhatsAppLink } from "@/lib/format";
@@ -35,7 +36,7 @@ export default async function ClinicSettingsPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-xl md:text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Preços e Horários</h1>
+      <PageHeader title="Configurações" subtitle={`Preços, horários e parâmetros · ${clinicProcedures.length} procedimento(s)`} />
 
       <PrecosPageTabs
         businessHours={businessHours}

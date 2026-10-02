@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { signOut } from "next-auth/react";
 import { useTheme } from "next-themes";
-import { LogOut, MessageSquarePlus, Moon, Sun } from "lucide-react";
+import Link from "next/link";
+import { LogOut, MessageSquarePlus, Moon, Sun, UserCog } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { FeedbackWidget } from "@/components/feedback-widget";
 
@@ -24,10 +25,13 @@ const itemClass =
  * clique impreciso deslogava; o botão roxo de bug flutuava por cima do painel. */
 export function UserMenu({
   userName,
+  subtitle,
   side = "right",
   compact = false,
 }: {
   userName: string | null | undefined;
+  /** Linha abaixo do nome (ex: "Equipe · Urolaser") — N3: usuário e função no rodapé. */
+  subtitle?: string;
   side?: "right" | "bottom";
   /** Só o avatar (barra recolhida / cabeçalho mobile). */
   compact?: boolean;
@@ -61,12 +65,22 @@ export function UserMenu({
           <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 border border-emerald-500/30 text-xs font-bold text-emerald-300">
             {initials(name)}
           </span>
-          {!compact && <span className="truncate text-sm font-medium text-slate-200">{name}</span>}
+          {!compact && (
+            <span className="min-w-0 flex flex-col">
+              <span className="truncate text-sm font-medium text-slate-200">{name}</span>
+              {subtitle && <span className="truncate text-xs text-slate-400">{subtitle}</span>}
+            </span>
+          )}
         </PopoverTrigger>
         <PopoverContent side={side} align="end" className="w-64 p-1.5">
-          <p className="px-2.5 pt-1.5 pb-2 text-sm font-semibold text-slate-900 dark:text-slate-100 truncate border-b border-slate-100 dark:border-slate-800 mb-1">
-            {name}
-          </p>
+          <div className="px-2.5 pt-1.5 pb-2 border-b border-slate-100 dark:border-slate-800 mb-1">
+            <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 truncate">{name}</p>
+            {subtitle && <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{subtitle}</p>}
+          </div>
+          <Link href="/clinic/perfil" onClick={() => setOpen(false)} className={itemClass}>
+            <UserCog className="h-4 w-4" />
+            Minha conta
+          </Link>
           <button type="button" className={itemClass} onClick={() => setTheme(isDark ? "light" : "dark")}>
             {isDark ? <Sun className="h-4 w-4 text-amber-500" /> : <Moon className="h-4 w-4 text-sky-500" />}
             {isDark ? "Usar tema claro" : "Usar tema escuro"}

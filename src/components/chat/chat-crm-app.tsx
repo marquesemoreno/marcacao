@@ -134,6 +134,8 @@ import {
 import { InboxLayout } from "./inbox-layout";
 import { CRMKanban } from "./crm-kanban";
 import type { NewContactExtra } from "@/lib/new-contact-extra";
+import { NewContactDialog } from "./new-contact-dialog";
+import { getClinicDefaultTicket } from "@/actions/clinic";
 import type { Agent, Contact, FunnelStage, InboxFilter, Message, UpdatePatientData } from "@/types/chat-crm";
 
 type Scope = "clinic" | "admin";
@@ -301,6 +303,12 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
   const [unassignedWaitMinutes, setUnassignedWaitMinutes] = useState<number | null>(null);
   const [unassignedCount, setUnassignedCount] = useState<number | null>(null);
   const [isLoadingContacts, setIsLoadingContacts] = useState(true);
+  // N2: ticket médio (soma por coluna) e "+ Adicionar" numa etapa do CRM.
+  const [clinicTicket, setClinicTicket] = useState<number | null>(null);
+  const [addToStage, setAddToStage] = useState<FunnelStage | null>(null);
+  useEffect(() => {
+    if (scope === "clinic" && view === "crm") getClinicDefaultTicket().then(setClinicTicket).catch(() => {});
+  }, [scope, view]);
   const [contactsLoadError, setContactsLoadError] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
   const [outboundFromDeviceStats, setOutboundFromDeviceStats] = useState<{
@@ -1121,6 +1129,7 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
           availableClinics={scope === "admin" ? availableClinics : undefined}
           onReassignClinic={scope === "admin" ? handleReassignClinic : undefined}
           onChangeAcquisition={scope === "admin" ? undefined : handleChangeAcquisition}
+          patientPageHref={scope === "admin" ? undefined : (id) => `${basePath}/pacientes/${id}`}
           clinicFilter={scope === "admin" ? clinicFilter : undefined}
           onClinicFilterChange={scope === "admin" ? setClinicFilter : undefined}
           outboundFromDeviceStats={scope === "admin" ? outboundFromDeviceStats : undefined}
@@ -1161,6 +1170,16 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
         <CRMKanban
           contacts={contacts}
           isLoading={isLoadingContacts}
+          ticket={clinicTicket}
+          onAssign={async (contactId, agentId) => {
+            const transferFn = scope === "admin" ? transferConversationAdmin : transferConversation;
+            const result = await transferFn(contactId, agentId);
+            if (!result.success) toast.error((result as { message?: string }).message || "Não foi possível atribuir.");
+            else toast.success("Conversa atribuída.");
+            await refreshContacts();
+          }}
+          profileHref={scope === "admin" ? undefined : (id) => `${basePath}/pacientes/${id}`}
+          onAddToStage={(stage) => setAddToStage(stage)}
           loadError={contactsLoadError}
           onRetry={() => {
             setIsLoadingContacts(true);
@@ -1172,6 +1191,31 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
           onReopen={handleReopen}
           onOpenContactChat={(id) => {
             router.push(`${basePath}/inbox?c=${id}`);
+          }}
+        />
+      )}
+      {view === "crm" && (
+        <NewContactDialog
+          open={addToStage !== null}
+          onOpenChange={(open) => !open && setAddToStage(null)}
+          clinics={scope === "admin" && availableClinics.length > 0 ? availableClinics : undefined}
+          onCheckPhone={handleCheckContactPhone}
+          onCreate={async (input) => {
+            const conversationId =
+              scope === "admin"
+                ? await createContactAdmin(input.name, input.phone, input.clinicId ?? "", input.extra)
+                : await createContact(input.name, input.phone, input.extra);
+            if (addToStage && addToStage !== "novos") await actions.updateConversationFunnelStage(conversationId, addToStage);
+            toast.success("Contato cadastrado no CRM.");
+            await refreshContacts();
+          }}
+          onOpenExisting={async (existing, input) => {
+            const conversationId =
+              existing.conversationId ??
+              (scope === "admin"
+                ? await createContactAdmin(existing.name, input.phone, input.clinicId ?? "")
+                : await createContact(existing.name, input.phone));
+            router.push(`${basePath}/inbox?c=${conversationId}`);
           }}
         />
       )}

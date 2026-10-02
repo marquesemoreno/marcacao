@@ -459,6 +459,12 @@ async function handleDeviceOutbound(
     },
   });
   await prisma.conversation.update({ where: { id: conversation.id }, data: { lastMessageAt: at } });
+  // Respondeu pelo celular = viu as mensagens do paciente (como no WhatsApp). Sem isso
+  // elas ficavam "não lidas" pra sempre no painel e inflavam os contadores.
+  await prisma.message.updateMany({
+    where: { conversationId: conversation.id, direction: "INBOUND", readAt: null, createdAt: { lte: at } },
+    data: { readAt: at },
+  });
   notifyInboxRealtime(conversation.clinicId).catch(() => {});
   return "saved";
 }

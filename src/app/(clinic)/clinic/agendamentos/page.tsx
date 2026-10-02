@@ -1,4 +1,5 @@
 import type { AppointmentStatus } from "@prisma/client";
+import { PageHeader } from "@/components/clinic/page-header";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { StatusFilter } from "@/components/clinic/status-filter";
@@ -37,10 +38,7 @@ export default async function ClinicAppointmentsPage({ searchParams }: Agendamen
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-        <h1 className="text-xl md:text-2xl font-semibold tracking-tight text-slate-900">Agendamentos de Hoje e Consultas</h1>
-        <BatchReminderButton />
-      </div>
+      <PageHeader title="Agenda" subtitle={`${appointments.length} agendamento(s) na lista`} actions={<BatchReminderButton />} />
 
       <StatusFilter basePath="/clinic/agendamentos" />
 

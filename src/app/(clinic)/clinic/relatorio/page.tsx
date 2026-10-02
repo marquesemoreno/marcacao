@@ -1,4 +1,5 @@
 import { PeriodFilter } from "@/components/clinic/period-filter";
+import { PageHeader } from "@/components/clinic/page-header";
 import { ReportSelectFilter } from "@/components/clinic/report-filters";
 import {
   HorizontalBarChart,
@@ -107,15 +108,10 @@ export default async function ClinicReportPage({
   return (
     <div className="space-y-8 font-sans flex-1 overflow-y-auto text-slate-900 dark:text-slate-100 p-6 md:p-8 max-w-7xl mx-auto w-full">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl md:text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">
-            Relatórios de Atendimento
-          </h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-            Métricas consolidadas de desempenho e recepção da {clinic.tradeName}
-            .
-          </p>
-        </div>
+        <PageHeader
+          title="Relatórios"
+          subtitle={`${chatReport.totalConversations} conversa(s) nos últimos ${days} dias · ${clinic.tradeName}`}
+        />
         <div className="flex flex-wrap items-center gap-2 shrink-0">
           <ReportSelectFilter
             basePath="/clinic/relatorio"

@@ -166,6 +166,7 @@ model User {
   clinic Clinic? @relation(fields: [clinicId], references: [id])
 
   assignedConversations Conversation[] @relation("ConversationAssignee")
+  stageChanges          ConversationStageChange[]
   sentMessages          Message[]
 
   @@map("users")
@@ -577,6 +578,7 @@ model Conversation {
   aiLogs       AiInteractionLog[]
   triages      MessageTriage[]
   qualityAudit ConversationQualityAudit?
+  stageChanges ConversationStageChange[]
 
   @@index([clinicId, status])
   @@index([contactId])
@@ -919,4 +921,21 @@ model InstagramAccount {
   clinic Clinic @relation(fields: [clinicId], references: [id])
 
   @@map("instagram_accounts")
+}
+
+/// Histórico de mudança de etapa do funil (N1 — linha do tempo da ficha do paciente).
+/// userId null = mudança automática (ex: chatbot). Só registra a partir de 2026-10.
+model ConversationStageChange {
+  id             String                  @id @default(cuid())
+  conversationId String                  @map("conversation_id")
+  fromStage      ConversationFunnelStage @map("from_stage")
+  toStage        ConversationFunnelStage @map("to_stage")
+  userId         String?                 @map("user_id")
+  createdAt      DateTime                @default(now()) @map("created_at")
+
+  conversation Conversation @relation(fields: [conversationId], references: [id])
+  user         User?        @relation(fields: [userId], references: [id])
+
+  @@index([conversationId, createdAt])
+  @@map("conversation_stage_changes")
 }

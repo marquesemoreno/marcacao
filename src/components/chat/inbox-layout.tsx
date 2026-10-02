@@ -6,6 +6,7 @@ import { AcquisitionBadge } from "@/components/chat/acquisition-badge";
 import { InstagramGlyph } from "@/components/chat/instagram-glyph";
 import { messagingWindowState } from "@/lib/messaging-window";
 import { displayName } from "@/lib/contact-display";
+import { useRouter } from "next/navigation";
 import { NewContactDialog } from "@/components/chat/new-contact-dialog";
 import type { NewContactExtra } from "@/lib/new-contact-extra";
 import React, { useEffect, useMemo, useRef, useState } from 'react';
@@ -233,6 +234,8 @@ interface InboxLayoutProps {
   onReassignClinic?: (clinicId: string) => Promise<void> | void;
   /** Só na visão da clínica — correção manual do canal de aquisição (Perfil & CRM). */
   onChangeAcquisition?: (contactId: string, channel: string | null) => Promise<void> | void;
+  /** N1 — quando definido, "Ver ficha" navega pra página do paciente em vez de abrir a gaveta. */
+  patientPageHref?: (conversationId: string) => string;
   /** Filtro de clínica da fila (scope admin, que vê todas juntas) — "" = todas.
    * Reaproveita availableClinics, que já lista as clínicas ativas. */
   clinicFilter?: string;
@@ -484,6 +487,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
   availableClinics,
   onReassignClinic,
   onChangeAcquisition,
+  patientPageHref,
   clinicFilter,
   onClinicFilterChange,
   onCreateContact,
@@ -501,6 +505,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
   onListGlpiEntities,
   onUpdateContactGlpiEntity,
 }) => {
+  const router = useRouter();
   const [composerMode, setComposerMode] = useState<'whatsapp' | 'internal_note'>('whatsapp');
   // P3: painel "Perfil & CRM" recolhível. Sem preferência salva, abre só em tela larga
   // (>= 1366px); abaixo disso abre como gaveta por cima da conversa.
@@ -1456,7 +1461,9 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                   <div className="flex items-center gap-1.5 flex-wrap">
                     <button
                       type="button"
-                      onClick={() => setIsPatientRecordOpen(true)}
+                      onClick={() =>
+                        patientPageHref ? router.push(patientPageHref(selectedContact.id)) : setIsPatientRecordOpen(true)
+                      }
                       className="font-semibold text-slate-900 dark:text-slate-100 text-base truncate hover:underline decoration-slate-400 underline-offset-2"
                       title="Ver ficha completa do paciente"
                     >

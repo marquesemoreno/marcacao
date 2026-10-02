@@ -126,6 +126,8 @@ export interface Contact {
   /** true quando a conversa foi transferida/atribuída a mim (por outro atendente ou
    * por um admin) e eu ainda não abri pra ver — vira selo na lista, some ao abrir. */
   hasUnseenAssignment: boolean;
+  /** Data (ISO) do primeiro contato nesta clínica — modal do card no CRM (N2). */
+  firstContactAt?: string;
   /** Responsável é quem está logado (usado no contador de não lidas do título da aba). */
   isAssignedToViewer?: boolean;
   /** Conversa tem dono e não sou eu — mostra o banner "Esta conversa está com X" +

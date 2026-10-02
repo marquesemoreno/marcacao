@@ -1,8 +1,9 @@
 "use client";
 
-import { formatPhone } from "@/lib/format";
+import { formatCurrency, formatPhone } from "@/lib/format";
+import { KanbanCardDialog } from "@/components/chat/kanban-card-dialog";
 import { displayName } from "@/lib/contact-display";
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Agent, Contact, FunnelStage } from '@/types/chat-crm';
 import { AvatarBadge } from './avatar-badge';
 import {
@@ -36,6 +37,13 @@ interface CRMKanbanProps {
   /** D1: a carga falhou — aviso com "Tentar de novo" em vez de um quadro vazio silencioso. */
   loadError?: boolean;
   onRetry?: () => void;
+  /** N2: ticket médio da clínica — soma em R$ por coluna. null = não configurado. */
+  ticket?: number | null;
+  onAssign?: (contactId: string, agentId: string) => void;
+  /** N2: link da ficha do paciente (só no painel da clínica). */
+  profileHref?: (contactId: string) => string;
+  /** N2: "+ Adicionar" no fim da coluna (cadastra contato já naquela etapa). */
+  onAddToStage?: (stage: FunnelStage) => void;
 }
 
 const STAGES: { id: KanbanStage; title: string; shortLabel: string; color: string; bgBadge: string }[] = [
@@ -62,6 +70,10 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
   isLoading = false,
   loadError = false,
   onRetry,
+  ticket = null,
+  onAssign,
+  profileHref,
+  onAddToStage,
   agents = [],
   onOpenContactChat,
   onMoveStage,
@@ -72,6 +84,12 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
   const [selectedAgent, setSelectedAgent] = useState<string>('todos');
   const [selectedDept, setSelectedDept] = useState<string>('todos');
   const [mobileSelectedStage, setMobileSelectedStage] = useState<KanbanStage | 'todos'>('todos');
+  // N2: card aberto no modal + proteção "arrastou, não abre" (o click dispara logo
+  // depois do drop no mesmo elemento).
+  const [openCardId, setOpenCardId] = useState<string | null>(null);
+  const [dragOverStage, setDragOverStage] = useState<KanbanStage | null>(null);
+  const draggingRef = useRef<string | null>(null);
+  const justDraggedRef = useRef(false);
 
   const moveStage = (contactId: string, targetStage: KanbanStage) => {
     const current = contacts.find((c) => c.id === contactId);
@@ -116,6 +134,11 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
 
     return matchesSearch && matchesAgent && matchesDept;
   });
+
+  const stageOf = (c: Contact) => (c.statusTag.label === 'Finalizado' ? 'finalizado' : c.funnelStage);
+  const openCard = openCardId ? contacts.find((c) => c.id === openCardId) ?? null : null;
+  const openColumn = openCard ? filtered.filter((c) => stageOf(c) === stageOf(openCard)) : [];
+  const openIndex = openCard ? openColumn.findIndex((c) => c.id === openCard.id) : -1;
 
   const hasActiveFilter =
     search.trim() !== '' || selectedAgent !== 'todos' || selectedDept !== 'todos' || mobileSelectedStage !== 'todos';
@@ -264,8 +287,25 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
             return (
               <div
                 key={stage.id}
-                className="flex-1 flex flex-col bg-slate-50/90 dark:bg-slate-900/60 rounded-lg border border-slate-200/90 dark:border-slate-800 overflow-hidden shadow-xs min-w-[280px] sm:min-w-0"
+                className={`flex-1 flex flex-col bg-slate-50/90 dark:bg-slate-900/60 rounded-lg border overflow-hidden shadow-xs min-w-[280px] sm:min-w-0 ${
+                  dragOverStage === stage.id ? 'border-emerald-400 ring-2 ring-emerald-400/40' : 'border-slate-200/90 dark:border-slate-800'
+                }`}
                 data-od-id={`kanban-column-${stage.id}`}
+                onDragOver={(e) => {
+                  if (!draggingRef.current) return;
+                  e.preventDefault();
+                  if (dragOverStage !== stage.id) setDragOverStage(stage.id);
+                }}
+                onDragLeave={() => setDragOverStage((cur) => (cur === stage.id ? null : cur))}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  const id = draggingRef.current;
+                  setDragOverStage(null);
+                  if (!id) return;
+                  const current = contacts.find((c) => c.id === id);
+                  const currentStage = current ? (current.statusTag.label === 'Finalizado' ? 'finalizado' : current.funnelStage) : null;
+                  if (currentStage !== stage.id) moveStage(id, stage.id);
+                }}
               >
                 <div className={`p-3 bg-white dark:bg-slate-900 border-t-4 ${stage.color} border-b border-slate-200 dark:border-slate-800 flex items-center justify-between`}>
                   <div>
@@ -281,8 +321,11 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
                         {stageContacts.length}
                       </span>
                     </div>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 font-mono mt-0.5 font-semibold">
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                       {stageContacts.length} paciente{stageContacts.length === 1 ? '' : 's'}
+                      {ticket !== null && stageContacts.length > 0 && (
+                        <span title="Quantidade × ticket médio da clínica"> · {formatCurrency(stageContacts.length * ticket)}</span>
+                      )}
                     </p>
                   </div>
                 </div>
@@ -299,7 +342,28 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
                       return (
                         <div
                           key={contact.id}
-                          className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 p-3.5 shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 space-y-3 group relative"
+                          role="button"
+                          tabIndex={0}
+                          aria-label={`Abrir detalhes de ${displayName(contact)}`}
+                          draggable
+                          onDragStart={(e) => {
+                            draggingRef.current = contact.id;
+                            e.dataTransfer.effectAllowed = 'move';
+                          }}
+                          onDragEnd={() => {
+                            draggingRef.current = null;
+                            setDragOverStage(null);
+                            justDraggedRef.current = true;
+                            setTimeout(() => (justDraggedRef.current = false), 250);
+                          }}
+                          onClick={() => {
+                            if (justDraggedRef.current) return;
+                            setOpenCardId(contact.id);
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && e.target === e.currentTarget) setOpenCardId(contact.id);
+                          }}
+                          className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 p-3.5 shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 space-y-3 group relative cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
                           data-od-id={`kanban-card-${contact.id}`}
                         >
                           <div className="flex items-start justify-between gap-2">
@@ -361,7 +425,11 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
                             </div>
                           </div>
 
-                          <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800 gap-1.5">
+                          <div
+                            className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800 gap-1.5"
+                            onClick={(e) => e.stopPropagation()}
+                            onKeyDown={(e) => e.stopPropagation()}
+                          >
                             <div className="flex items-center gap-1">
                               {stage.id !== 'novos' && (
                                 <button
@@ -411,12 +479,38 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
                       );
                     })
                   )}
+                  {onAddToStage && stage.id !== 'finalizado' && (
+                    <button
+                      type="button"
+                      onClick={() => onAddToStage(stage.id as FunnelStage)}
+                      className="w-full rounded-lg border border-dashed border-slate-300 dark:border-slate-700 py-2 text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-900"
+                    >
+                      + Adicionar
+                    </button>
+                  )}
                 </div>
               </div>
             );
           })}
         </div>
       </div>
+      {openCard && (
+        <KanbanCardDialog
+          contact={openCard}
+          currentStage={stageOf(openCard)}
+          stages={STAGES.map((st) => ({ id: st.id, title: st.title }))}
+          agents={agents}
+          ticket={ticket}
+          position={{ index: Math.max(0, openIndex), total: openColumn.length }}
+          onClose={() => setOpenCardId(null)}
+          onPrev={openIndex > 0 ? () => setOpenCardId(openColumn[openIndex - 1].id) : undefined}
+          onNext={openIndex >= 0 && openIndex < openColumn.length - 1 ? () => setOpenCardId(openColumn[openIndex + 1].id) : undefined}
+          onMove={(stage) => moveStage(openCard.id, stage as KanbanStage)}
+          onAssign={onAssign ? (agentId) => onAssign(openCard.id, agentId) : undefined}
+          onOpenChat={() => onOpenContactChat?.(openCard.id)}
+          profileHref={profileHref?.(openCard.id)}
+        />
+      )}
     </div>
   );
 };

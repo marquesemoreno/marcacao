@@ -1479,10 +1479,10 @@ export async function refreshContactPhotoAdmin(conversationId: string) {
 }
 
 export async function updateConversationFunnelStageAdmin(conversationId: string, stage: FunnelStage) {
-  await requireAdminSession();
+  const { userId } = await requireAdminSession();
 
   // Tag automática ao entrar em Orçamento/Agendado — ver updateConversationFunnelStage (inbox.ts).
-  const conversation = await prisma.conversation.findUnique({ where: { id: conversationId }, select: { tags: true } });
+  const conversation = await prisma.conversation.findUnique({ where: { id: conversationId }, select: { tags: true, funnelStage: true } });
   const funnelTag = stage === "orcamento" ? BUDGET_SENT_TAG : stage === "agendado" ? SCHEDULED_TAG : null;
   const shouldTag = funnelTag && conversation && !conversation.tags.includes(funnelTag);
 
@@ -1493,6 +1493,11 @@ export async function updateConversationFunnelStageAdmin(conversationId: string,
       ...(shouldTag ? { tags: { push: funnelTag } } : {}),
     },
   });
+  if (conversation && conversation.funnelStage !== funnelStageToDb[stage]) {
+    await prisma.conversationStageChange
+      .create({ data: { conversationId, fromStage: conversation.funnelStage, toStage: funnelStageToDb[stage], userId } })
+      .catch(() => {});
+  }
   revalidatePath("/admin/inbox");
   revalidatePath("/admin/crm");
 }

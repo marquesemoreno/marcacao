@@ -228,13 +228,26 @@ export async function listContactsPage(params: { q?: string; page?: number; conv
     prisma.conversation.count({ where }),
     prisma.conversation.findMany({
       where,
-      include: { contact: true },
+      include: { contact: true, assignedUser: { select: { name: true } } },
       orderBy: { contact: { name: "asc" } },
       skip: (page - 1) * CONTACTS_PAGE_SIZE,
       take: CONTACTS_PAGE_SIZE,
     }),
   ]);
-  return { rows: await buildContactRows(conversations, clinicId), total, page, pageSize: CONTACTS_PAGE_SIZE };
+  // N4: colunas da lista de pacientes (etapa, interesse/origem, última interação, atendente).
+  const base = await buildContactRows(conversations, clinicId);
+  const rows = base.map((row, i) => {
+    const c = conversations[i];
+    return {
+      ...row,
+      funnelStage: c.funnelStage,
+      acquisitionChannel: c.acquisitionChannel,
+      lastInteractionAt: (c.lastMessageAt ?? c.createdAt).toISOString(),
+      attendant: c.assignedUser?.name ?? null,
+      instagramUsername: c.contact.instagramUsername,
+    };
+  });
+  return { rows, total, page, pageSize: CONTACTS_PAGE_SIZE };
 }
 
 /** Lista conversas-destino pra "Reencaminhar mensagem" — só da mesma clínica da
@@ -1948,7 +1961,7 @@ export async function assignConversationToUser(conversationId: string, targetUse
 }
 
 export async function updateConversationFunnelStage(conversationId: string, stage: FunnelStage) {
-  const { clinicId } = await requireClinicSession();
+  const { clinicId, userId } = await requireClinicSession();
 
   const conversation = await prisma.conversation.findUnique({
     where: { id: conversationId },
@@ -1970,6 +1983,12 @@ export async function updateConversationFunnelStage(conversationId: string, stag
       ...(shouldTag ? { tags: { push: funnelTag } } : {}),
     },
   });
+  // N1: histórico de etapa (com autor) pra linha do tempo da ficha do paciente.
+  if (conversation.funnelStage !== funnelStageToDb[stage]) {
+    await prisma.conversationStageChange
+      .create({ data: { conversationId, fromStage: conversation.funnelStage, toStage: funnelStageToDb[stage], userId } })
+      .catch(() => {});
+  }
 
   if (stage === "agendado") {
     // Se a atendente já mandou alguma mensagem manual pro paciente há pouco tempo,
