@@ -862,7 +862,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry, 
         />
       )}
       <div
-        className={`relative max-w-[85%] sm:max-w-md md:max-w-lg rounded-2xl p-3.5 shadow-sm text-sm leading-relaxed transition-all ${
+        className={`relative max-w-[85%] md:max-w-[75%] min-w-0 break-words [overflow-wrap:anywhere] rounded-2xl p-3.5 shadow-sm text-[15px] leading-relaxed transition-all ${
           isAgent
             ? 'bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-100 dark:border-emerald-900 text-slate-900 dark:text-slate-100 rounded-tr-sm'
             : 'bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-tl-sm hover:border-slate-200 dark:hover:border-slate-600'
@@ -905,7 +905,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry, 
         ) : (
           <>
             <p
-              className={`whitespace-pre-wrap font-sans text-xs sm:text-[13.5px] leading-relaxed select-text ${
+              className={`whitespace-pre-wrap break-words [overflow-wrap:anywhere] font-sans text-[15px] leading-relaxed select-text ${
                 message.deleted ? 'italic line-through text-rose-500 dark:text-rose-400' : ''
               }`}
             >

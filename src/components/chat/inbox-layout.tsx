@@ -1761,7 +1761,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
             <div
               ref={messagesContainerRef}
               onScroll={handleMessagesScroll}
-              className="flex-1 overflow-y-auto p-3 sm:p-6 space-y-3 bg-[#F1F5F9] dark:bg-slate-950/60"
+              className="flex-1 overflow-y-auto overflow-x-hidden min-w-0 p-3 sm:p-6 space-y-3 bg-[#F1F5F9] dark:bg-slate-950/60"
               data-od-id="chat-messages-area"
             >
               {displayedMessages.length === 0 ? (
