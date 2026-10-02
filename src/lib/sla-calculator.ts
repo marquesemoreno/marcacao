@@ -84,34 +84,59 @@ export function formatSlaTime(minutes: number): string {
   return remainder === 0 ? `${hours}h` : `${hours}h ${remainder}m`;
 }
 
+/** SLA da recepção (decisão do produto, 2026-10-02): âmbar a partir de 15 min e
+ * vermelho a partir de 60 min de espera, contados em minutos de expediente. */
+export const SLA_WARNING_MINUTES = 15;
+export const SLA_CRITICAL_MINUTES = 60;
+
 function variantFor(minutes: number): SlaVariant {
-  if (minutes > 20) return "critical";
-  if (minutes >= 10) return "warning";
+  if (minutes >= SLA_CRITICAL_MINUTES) return "critical";
+  if (minutes >= SLA_WARNING_MINUTES) return "warning";
   return "normal";
 }
 
-/** Fonte única de verdade do "deveria mostrar SLA": mensagens sem mensagem ainda,
- * já respondida (última é OUTBOUND — inclui notas internas e respostas automáticas
- * de fluxo de confirmação, ver contexto do plano) ou conversa finalizada não mostram
- * nada. Caller (toChatContact) só repassa os dados brutos já buscados. */
+/** Duração em linguagem humana — "14 min", "3 h", "2 dias". Usada na fila (espera) e
+ * nos relatórios (tempo de resposta/resolução). */
+export function formatDurationHuman(minutes: number): string {
+  const m = Math.max(0, Math.round(minutes));
+  if (m < 1) return "menos de 1 min";
+  if (m < 60) return `${m} min`;
+  const hours = Math.round(m / 60);
+  if (hours < 24) return `${hours} h`;
+  const days = Math.floor(m / 1440);
+  return days === 1 ? "1 dia" : `${days} dias`;
+}
+
+type SlaMessage = { direction: "INBOUND" | "OUTBOUND"; type?: string; createdAt: Date };
+
+/** Fonte única do "tempo de espera" da fila (C4). Conta desde a 1ª mensagem do
+ * paciente ainda sem resposta da clínica (nota interna não é resposta); se a última
+ * mensagem é da clínica, não há espera. `formattedTime` é tempo REAL (o que o paciente
+ * sentiu — antes era só minutos de expediente e mostrava "1m" pra mensagem de ontem);
+ * a cor (`variant`) usa minutos de expediente contra o SLA 15/60. `recentMessages`
+ * vem da mais nova pra mais antiga (o take do listConversations). */
 export function getSlaInfo(input: {
-  lastMessage: { direction: "INBOUND" | "OUTBOUND"; createdAt: Date } | null;
+  recentMessages: SlaMessage[];
   conversationStatus: string;
   businessHours: BusinessHours | null;
   now?: Date;
 }): SlaInfo {
-  const { lastMessage, conversationStatus, businessHours } = input;
   const now = input.now ?? new Date();
-
-  if (!lastMessage || lastMessage.direction !== "INBOUND" || conversationStatus === "RESOLVED") {
+  const real = input.recentMessages.filter((m) => m.type !== "INTERNAL_NOTE");
+  if (input.conversationStatus === "RESOLVED" || real.length === 0 || real[0].direction !== "INBOUND") {
     return { shouldDisplay: false, waitingMinutes: 0, formattedTime: "", variant: "normal" };
   }
-
-  const waitingMinutes = computeBusinessMinutesElapsed(lastMessage.createdAt, now, businessHours);
+  let firstUnanswered = real[0];
+  for (const m of real) {
+    if (m.direction !== "INBOUND") break;
+    firstUnanswered = m;
+  }
+  const waitingMinutes = computeBusinessMinutesElapsed(firstUnanswered.createdAt, now, input.businessHours);
+  const realMinutes = (now.getTime() - firstUnanswered.createdAt.getTime()) / 60_000;
   return {
     shouldDisplay: true,
     waitingMinutes,
-    formattedTime: formatSlaTime(waitingMinutes),
+    formattedTime: formatDurationHuman(realMinutes),
     variant: variantFor(waitingMinutes),
   };
 }

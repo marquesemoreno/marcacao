@@ -145,9 +145,8 @@ function computeQueueState(conversation: ConversationWithRelations): Conversatio
  * payload de listConversations (take: 3), e o expediente da clínica (Clinic.businessHours,
  * também já incluído na query) pra contar só minutos úteis (ver sla-calculator.ts). */
 function computeSla(conversation: ConversationWithRelations) {
-  const lastMessage = conversation.messages[0] ?? null;
   return getSlaInfo({
-    lastMessage: lastMessage ? { direction: lastMessage.direction, createdAt: lastMessage.createdAt } : null,
+    recentMessages: conversation.messages.map((m) => ({ direction: m.direction, type: m.type, createdAt: m.createdAt })),
     conversationStatus: conversation.status,
     businessHours: (conversation.clinic?.businessHours as BusinessHours | null) ?? null,
   });
