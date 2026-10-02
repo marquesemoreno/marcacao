@@ -633,6 +633,10 @@ model Message {
   /// Marcação pessoal do atendente pra achar mensagens importantes depois — não existe
   /// conceito equivalente no WhatsApp, então isso nunca sincroniza com a Evolution API.
   starredAt      DateTime?        @map("starred_at")
+  /// Enviada pela clínica direto do WhatsApp do celular/WhatsApp Web (webhook com
+  /// key.fromMe), não pelo painel — senderUserId fica null (não dá pra saber qual
+  /// atendente), a UI mostra "Enviada pelo celular".
+  sentFromDevice Boolean          @default(false) @map("sent_from_device")
   createdAt      DateTime         @default(now()) @map("created_at")
 
   conversation  Conversation @relation(fields: [conversationId], references: [id])

@@ -280,7 +280,7 @@ export function toChatMessage(
   return {
     id: message.id,
     sender,
-    senderName: message.senderUser?.name,
+    senderName: message.senderUser?.name ?? (message.sentFromDevice ? "Enviada pelo celular" : undefined),
     // Mantém o conteúdo original visível (não troca por um placeholder) — só marca
     // `deleted` pra tela aplicar o estilo (vermelho/tachado), avisando que o remetente
     // apagou sem esconder o que a atendente já tinha visto.

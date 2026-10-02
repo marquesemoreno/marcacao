@@ -1314,7 +1314,7 @@ export async function getOutboundFromDeviceStatsAdmin(clinicId?: string) {
   const since = startOfTodayInBahia();
 
   const logs = await prisma.webhookLog.findMany({
-    where: { event: "whatsapp.inbound", status: "IGNORED", createdAt: { gte: since } },
+    where: { event: "whatsapp.inbound", status: { in: ["IGNORED", "SUCCESS"] }, createdAt: { gte: since } },
     select: { payload: true },
   });
 
