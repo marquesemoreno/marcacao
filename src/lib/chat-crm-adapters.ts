@@ -145,9 +145,8 @@ function computeQueueState(conversation: ConversationWithRelations): Conversatio
  * payload de listConversations (take: 3), e o expediente da clínica (Clinic.businessHours,
  * também já incluído na query) pra contar só minutos úteis (ver sla-calculator.ts). */
 function computeSla(conversation: ConversationWithRelations) {
-  const lastMessage = conversation.messages[0] ?? null;
   return getSlaInfo({
-    lastMessage: lastMessage ? { direction: lastMessage.direction, createdAt: lastMessage.createdAt } : null,
+    recentMessages: conversation.messages.map((m) => ({ direction: m.direction, type: m.type, createdAt: m.createdAt })),
     conversationStatus: conversation.status,
     businessHours: (conversation.clinic?.businessHours as BusinessHours | null) ?? null,
   });
@@ -204,6 +203,7 @@ export function toChatContact(conversation: ConversationWithRelations, viewerUse
     channel: channelFromDb[conversation.channel],
     unreadCount: conversation.unreadCount ?? 0,
     hasUnseenAssignment: hasUnseenAssignmentFor(conversation, viewerUserId),
+    isAssignedToViewer: Boolean(viewerUserId && conversation.assignedUserId === viewerUserId),
     // Banner "Esta conversa está com X" + botão "Assumir Conversa" (ver inbox-layout.tsx)
     // — só true quando tem dono E não sou eu, pra não aparecer na minha própria conversa.
     assignedToOther: Boolean(conversation.assignedUser && conversation.assignedUser.id !== viewerUserId),
@@ -280,7 +280,7 @@ export function toChatMessage(
   return {
     id: message.id,
     sender,
-    senderName: message.senderUser?.name,
+    senderName: message.senderUser?.name ?? (message.sentFromDevice ? "Enviada pelo celular" : undefined),
     // Mantém o conteúdo original visível (não troca por um placeholder) — só marca
     // `deleted` pra tela aplicar o estilo (vermelho/tachado), avisando que o remetente
     // apagou sem esconder o que a atendente já tinha visto.

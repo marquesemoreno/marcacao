@@ -9,6 +9,7 @@ import { notifyInboxRealtime } from "@/lib/supabase-server";
 import { MEDIA_DOWNLOAD_FAILED_PREFIX } from "@/lib/chat-messages";
 import { isBroadcastOptOutReply } from "@/lib/broadcast-csv";
 import { reopenIfResolved } from "@/lib/conversation-reopen";
+import { deviceOutboundTargetPhone, findPanelTwin } from "@/lib/device-outbound";
 import { autoAssignNewConversation } from "@/lib/conversation-auto-assign";
 import {
   URGENCY_TAG,
@@ -357,6 +358,111 @@ async function findOrCreateConversation(phone: string, name: string | undefined,
   });
 }
 
+/** Espera antes de checar duplicidade de uma mensagem fromMe — o painel e as automações
+ * (lembrete, confirmação, opt-out…) gravam a Message só DEPOIS que a Evolution responde,
+ * e o webhook dessa mesma mensagem costuma chegar antes disso. */
+const DEVICE_OUTBOUND_SETTLE_MS = 4000;
+
+/**
+ * C1 — resposta da clínica enviada FORA do painel (WhatsApp do celular / WhatsApp Web),
+ * webhook messages.upsert com key.fromMe. Antes era só logada e descartada, então a
+ * conversa parecia sem resposta: fila toda "Sem dono", 1ª resposta de 120 h nos
+ * relatórios. Agora vira Message OUTBOUND com sentFromDevice (sem atendente — não dá pra
+ * saber quem mandou). Mensagem que o próprio painel/automação enviou também volta como
+ * fromMe: deduplica por key.id e, se o painel ainda não gravou o keyId, pelo texto
+ * (findPanelTwin). Não atribui dono, não dispara IA/automação nenhuma.
+ */
+async function handleDeviceOutbound(
+  body: unknown,
+  keyObj: Record<string, unknown> | undefined,
+  resolvedClinicId: string | undefined,
+  evolutionConfig: Parameters<typeof fetchMediaBase64>[1]
+) {
+  const keyId = typeof keyObj?.id === "string" ? keyObj.id : undefined;
+  const phone = keyObj ? deviceOutboundTargetPhone(keyObj) : null;
+  if (!phone) return "ignored_target";
+
+  const incoming = extractIncomingMessage(body);
+  if (!incoming) return "ignored_type";
+
+  await new Promise((resolve) => setTimeout(resolve, DEVICE_OUTBOUND_SETTLE_MS));
+  if (keyId && (await prisma.message.findUnique({ where: { whatsappKeyId: keyId }, select: { id: true } }))) {
+    return "duplicate";
+  }
+
+  const fullPhone = formatToWhatsAppNumber(phone);
+  const alt = toggleNinthDigit(fullPhone);
+  const contact = await prisma.contact.findFirst({ where: { phone: { in: alt ? [fullPhone, alt] : [fullPhone] } } });
+
+  // Instância compartilhada (sem clínica resolvida): só grava em conversa que já existe —
+  // não dá pra adivinhar de qual clínica é uma conversa nova puxada pelo celular.
+  let conversation = contact
+    ? await prisma.conversation.findFirst({
+        where: { contactId: contact.id, channel: "WHATSAPP", ...(resolvedClinicId ? { clinicId: resolvedClinicId } : {}) },
+        orderBy: { createdAt: "desc" },
+      })
+    : null;
+  if (!conversation) {
+    if (!resolvedClinicId) return "no_conversation";
+    // Clínica puxou conversa nova pelo celular. Nome fica o telefone: o pushName de um
+    // evento fromMe é o da própria clínica, não do paciente.
+    const created = await findOrCreateConversation(fullPhone, undefined, resolvedClinicId);
+    conversation = created.conversation;
+    if (!conversation) return "no_conversation";
+  }
+
+  const at = new Date();
+  const recentPanel = await prisma.message.findMany({
+    where: { conversationId: conversation.id, direction: "OUTBOUND", whatsappKeyId: null, createdAt: { gte: new Date(at.getTime() - 3 * 60 * 1000) } },
+    select: { id: true, content: true, whatsappKeyId: true, createdAt: true },
+  });
+  const twin = findPanelTwin(recentPanel, { content: incoming.text, at });
+  if (twin) {
+    if (keyId) await prisma.message.update({ where: { id: twin.id }, data: { whatsappKeyId: keyId } }).catch(() => {});
+    return "duplicate";
+  }
+
+  let media: Record<string, string> = {};
+  let content = incoming.text;
+  if (incoming.media) {
+    const result = await fetchMediaBase64(incoming.media.key, evolutionConfig);
+    const uploaded = result.success
+      ? await uploadWhatsAppMedia(conversation.id, Buffer.from(result.base64, "base64"), incoming.media.mimeType)
+      : null;
+    if (uploaded) {
+      media =
+        incoming.media.kind === "audio"
+          ? { type: "AUDIO", mediaPath: uploaded.path, mimeType: incoming.media.mimeType, audioDuration: formatDuration(incoming.media.seconds) }
+          : {
+              type: "ATTACHMENT",
+              mediaPath: uploaded.path,
+              mimeType: incoming.media.mimeType,
+              attachmentName: incoming.media.fileName,
+              attachmentSize: formatFileSize(uploaded.sizeBytes || incoming.media.sizeBytes),
+            };
+      // Texto padrão de mídia recebida ("📷 Imagem recebida") não faz sentido pra envio.
+      if (/recebid[oa]$/.test(content)) content = "";
+    } else {
+      content = `${MEDIA_DOWNLOAD_FAILED_PREFIX} o anexo enviado pelo celular.`;
+    }
+  }
+
+  await prisma.message.create({
+    data: {
+      conversationId: conversation.id,
+      direction: "OUTBOUND",
+      status: "SENT",
+      content,
+      whatsappKeyId: keyId,
+      sentFromDevice: true,
+      ...(media as Partial<Prisma.MessageUncheckedCreateInput>),
+    },
+  });
+  await prisma.conversation.update({ where: { id: conversation.id }, data: { lastMessageAt: at } });
+  notifyInboxRealtime(conversation.clinicId).catch(() => {});
+  return "saved";
+}
+
 export async function POST(request: Request) {
   const requiredSecret = process.env.WHATSAPP_WEBHOOK_SECRET;
   if (requiredSecret) {
@@ -470,21 +576,28 @@ export async function POST(request: Request) {
   );
 
   if (isFromMe) {
-    // Registra pra dar visibilidade de quando uma atendente responde direto pelo
-    // celular físico (fora do painel) — nesse caso a mensagem nunca é vista aqui além
-    // desse log: não atualiza conversa, não atribui atendente, não conta como resposta.
-    // Bug real: atendente respondendo pelo celular parecia "não estar usando a
-    // plataforma" (nenhuma conversa nova atribuída a ela), sem nenhum rastro do motivo.
-    await logInbound(
-      {
-        kind: "outbound_from_device",
-        remoteJid: keyObj?.remoteJid ?? null,
-        instance: instanceNameFromPayload ?? null,
-        clinicId: resolvedClinicId ?? null,
-      },
-      "IGNORED"
-    );
-    return NextResponse.json({ ignored: true, reason: "outbound_message" }, { status: 200 });
+    // Resposta enviada fora do painel (celular / WhatsApp Web) — ver handleDeviceOutbound.
+    // O log "outbound_from_device" continua (alimenta o contador do admin), agora com o
+    // resultado: saved = virou mensagem na conversa; duplicate = era do próprio painel.
+    let outcome = "error";
+    try {
+      outcome = await handleDeviceOutbound(body, keyObj, resolvedClinicId, evolutionConfig);
+    } catch (error) {
+      console.error("Falha ao gravar mensagem enviada pelo celular:", error);
+    }
+    if (outcome !== "duplicate") {
+      await logInbound(
+        {
+          kind: "outbound_from_device",
+          outcome,
+          remoteJid: keyObj?.remoteJid ?? null,
+          instance: instanceNameFromPayload ?? null,
+          clinicId: resolvedClinicId ?? null,
+        },
+        outcome === "saved" ? "SUCCESS" : "IGNORED"
+      );
+    }
+    return NextResponse.json({ ok: true, status: `outbound_from_device:${outcome}` }, { status: 200 });
   }
 
   const reactionMessage = (dataPayload?.message as Record<string, unknown> | undefined)?.reactionMessage as

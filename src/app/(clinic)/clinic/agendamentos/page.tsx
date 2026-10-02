@@ -8,6 +8,8 @@ import { DoctorNameCell } from "@/components/clinic/doctor-name-cell";
 import { listClinicAppointments } from "@/actions/clinic";
 import { appointmentStatusLabels, appointmentStatusVariant, formatDate } from "@/lib/format";
 
+export const metadata = { title: "Agendamentos" };
+
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 

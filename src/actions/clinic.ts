@@ -23,6 +23,7 @@ import {
   mergeConfirmationStats,
   computeChannelConversion,
   UNIDENTIFIED_CHANNEL,
+  computeResponseStats,
 } from "@/lib/report-metrics";
 
 export async function getClinicInfo() {
@@ -131,7 +132,36 @@ export async function getClinicChatReport(days: number = 30, tags?: string[], ch
   const sentimentPct = (key: string) =>
     withSentiment.length > 0 ? Math.round(((sentimentCounts[key] ?? 0) / withSentiment.length) * 1000) / 10 : 0;
 
+  // D3: mediana em minutos de expediente, só com resposta humana (painel com atendente
+  // ou enviada pelo celular — mensagem automática não conta). Uma query só pra todas as
+  // conversas do período, não uma por conversa.
+  const ids = conversations.map((c) => c.id);
+  const timingRows = ids.length
+    ? await prisma.$queryRaw<{ id: string; first_inbound: Date | null; first_reply: Date | null }[]>`
+        SELECT c.id,
+          fi.first_inbound,
+          (SELECT MIN(m.created_at) FROM messages m
+            WHERE m.conversation_id = c.id AND m.direction = 'OUTBOUND' AND m.type <> 'INTERNAL_NOTE'
+              AND (m.sender_user_id IS NOT NULL OR m.sent_from_device = true)
+              AND m.created_at > fi.first_inbound) AS first_reply
+        FROM conversations c
+        CROSS JOIN LATERAL (
+          SELECT MIN(created_at) AS first_inbound FROM messages
+          WHERE conversation_id = c.id AND direction = 'INBOUND'
+        ) fi
+        WHERE c.id = ANY(${ids})`
+    : [];
+  const resolvedAtById = new Map(conversations.map((c) => [c.id, c.resolvedAt]));
+  const clinicHours = await prisma.clinic.findUnique({ where: { id: clinicId }, select: { businessHours: true } });
+  const responseStats = computeResponseStats(
+    timingRows
+      .filter((r) => r.first_inbound)
+      .map((r) => ({ firstInboundAt: r.first_inbound!, firstHumanReplyAt: r.first_reply, resolvedAt: resolvedAtById.get(r.id) ?? null })),
+    (clinicHours?.businessHours as BusinessHours | null) ?? null
+  );
+
   return {
+    responseStats,
     totalConversations: conversations.length,
     totalResolved,
     totalAgendados,

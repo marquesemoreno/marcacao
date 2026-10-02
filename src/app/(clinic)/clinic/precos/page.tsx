@@ -9,6 +9,8 @@ import { toPlainClinicProcedureItem } from "@/lib/serialize";
 import { buildWhatsAppLink } from "@/lib/format";
 import type { BusinessHours } from "@/lib/schemas/clinic";
 
+export const metadata = { title: "Preços e Horários" };
+
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 

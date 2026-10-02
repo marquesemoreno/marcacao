@@ -22,7 +22,7 @@ function PasswordField({
 
   return (
     <div>
-      <label htmlFor={id} className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+      <label htmlFor={id} className="text-xs font-bold text-slate-600 dark:text-slate-300">
         {label}
       </label>
       <div className="relative mt-1">

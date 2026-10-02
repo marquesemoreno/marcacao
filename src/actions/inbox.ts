@@ -1,5 +1,6 @@
 "use server";
 
+import { parseNewContactExtra, type NewContactExtra } from "@/lib/new-contact-extra";
 import { revalidatePath } from "next/cache";
 import { ConversationStatus, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
@@ -51,7 +52,7 @@ function autoAssignOnReply(conversation: { assignedUserId: string | null }, user
 /** Cadastra um contato novo (ou reaproveita um já existente pelo telefone) e garante
  * uma conversa aberta dessa clínica com ele — pra atendente iniciar contato proativo,
  * sem precisar esperar o paciente mandar mensagem primeiro. */
-export async function createContact(name: string, phone: string) {
+export async function createContact(name: string, phone: string, extra?: NewContactExtra) {
   const { clinicId } = await requireClinicSession();
 
   const trimmedName = name.trim();
@@ -63,10 +64,15 @@ export async function createContact(name: string, phone: string) {
     throw new Error("Telefone inválido. Informe com DDD e 9 dígitos (ex: 77999998888).");
   }
 
+  const existingContact = await prisma.contact.findUnique({
+    where: { phone: fullPhone },
+    select: { cpf: true, birthDate: true, convenio: true },
+  });
+  const extraData = parseNewContactExtra(extra, existingContact ?? undefined);
   const contact = await prisma.contact.upsert({
     where: { phone: fullPhone },
-    update: {},
-    create: { phone: fullPhone, name: trimmedName },
+    update: extraData,
+    create: { phone: fullPhone, name: trimmedName, ...extraData },
   });
 
   // Trava consultiva por contactId dentro da transação: sem ela, duas requisições quase
@@ -88,6 +94,19 @@ export async function createContact(name: string, phone: string) {
   revalidatePath("/clinic/inbox");
   notifyInboxRealtime(clinicId).catch(() => {});
   return conversation.id;
+}
+
+/** F2 — antes de cadastrar, avisa se o número já existe (o Contact é compartilhado entre
+ * clínicas; a conversa é desta clínica). null = número livre. */
+export async function checkContactPhone(phone: string) {
+  const { clinicId } = await requireClinicSession();
+  const fullPhone = formatToWhatsAppNumber(phone);
+  const contact = await prisma.contact.findUnique({
+    where: { phone: fullPhone },
+    select: { name: true, conversations: { where: { clinicId }, select: { id: true }, take: 1 } },
+  });
+  if (!contact) return null;
+  return { name: contact.name, conversationId: contact.conversations[0]?.id ?? null };
 }
 
 /** Uma linha por contato já cadastrado nesta clínica (cada um tem no máximo uma
@@ -114,7 +133,14 @@ export async function listAllContacts(search?: string) {
     include: { contact: true },
     orderBy: { contact: { name: "asc" } },
   });
+  return buildContactRows(conversations, clinicId);
+}
 
+type ContactConversation = Prisma.ConversationGetPayload<{ include: { contact: true } }>;
+
+/** Linhas da tabela de Contatos — "Última Consulta" (data + médico) em 1 query só, pra
+ * não virar N+1. Usado pela lista completa (busca do chat) e pela paginada (F3). */
+async function buildContactRows(conversations: ContactConversation[], clinicId: string) {
   // "Última Consulta" (data + médico) em 1 query só, pra não virar N+1 (uma consulta
   // por linha da tabela) — mesmo estilo de batching já usado pro unreadCount em
   // listConversations. Reduz pra mais recente por telefone em memória (já vem
@@ -158,6 +184,57 @@ export async function listAllContacts(search?: string) {
         : null,
     };
   });
+}
+
+const CONTACTS_PAGE_SIZE = 50;
+
+/** F3 — tabela de Contatos paginada no servidor (50 por página), com busca e filtros
+ * no banco. Antes a tela carregava todos (833 linhas) e filtrava no navegador. O filtro
+ * de médico é pelo médico da ÚLTIMA consulta, mesma regra da coluna exibida. */
+export async function listContactsPage(params: { q?: string; page?: number; convenio?: string; doctor?: string }) {
+  const { clinicId } = await requireClinicSession();
+  const page = Math.max(1, Math.floor(params.page ?? 1));
+  const q = params.q?.trim();
+  const qDigits = q?.replace(/\D/g, "");
+
+  let doctorPhones: string[] | null = null;
+  if (params.doctor) {
+    const appts = await prisma.appointment.findMany({
+      where: { clinicProcedure: { clinicId }, doctorName: { not: null } },
+      select: { patientPhone: true, doctorName: true },
+      orderBy: { date: "desc" },
+    });
+    const last = new Map<string, string>();
+    for (const a of appts) if (!last.has(a.patientPhone)) last.set(a.patientPhone, a.doctorName ?? "");
+    const target = params.doctor.toLowerCase();
+    doctorPhones = [...last].filter(([, d]) => d.toLowerCase() === target).map(([phone]) => phone);
+  }
+
+  const contactFilters: Prisma.ContactWhereInput[] = [];
+  if (q) {
+    contactFilters.push({
+      OR: [
+        { name: { contains: q, mode: "insensitive" } },
+        ...(qDigits && qDigits.length >= 3 ? [{ phone: { contains: qDigits } }, { cpf: { contains: qDigits } }] : []),
+        { convenio: { contains: q, mode: "insensitive" } },
+      ],
+    });
+  }
+  if (params.convenio) contactFilters.push({ convenio: { equals: params.convenio, mode: "insensitive" } });
+  if (doctorPhones) contactFilters.push({ phone: { in: doctorPhones } });
+
+  const where: Prisma.ConversationWhereInput = { clinicId, ...(contactFilters.length ? { contact: { AND: contactFilters } } : {}) };
+  const [total, conversations] = await Promise.all([
+    prisma.conversation.count({ where }),
+    prisma.conversation.findMany({
+      where,
+      include: { contact: true },
+      orderBy: { contact: { name: "asc" } },
+      skip: (page - 1) * CONTACTS_PAGE_SIZE,
+      take: CONTACTS_PAGE_SIZE,
+    }),
+  ]);
+  return { rows: await buildContactRows(conversations, clinicId), total, page, pageSize: CONTACTS_PAGE_SIZE };
 }
 
 /** Lista conversas-destino pra "Reencaminhar mensagem" — só da mesma clínica da
@@ -1084,6 +1161,12 @@ export async function getAttendantCapacity() {
 /** Minutos desde a última mensagem da conversa mais antiga parada em "Não Atribuídas" —
  * usado pra piscar a aba e alertar o atendente quando tem paciente esperando há muito
  * tempo sem ninguém assumir. `null` quando não há nenhuma conversa não atribuída. */
+/** Contador da aba "Não Atribuídas" (C3) — mesmo filtro de getOldestUnassignedWaitMinutes. */
+export async function getUnassignedCount() {
+  const { clinicId } = await requireClinicSession();
+  return prisma.conversation.count({ where: { clinicId, assignedUserId: null, status: { in: ACTIVE_STATUSES }, archivedAt: null } });
+}
+
 export async function getOldestUnassignedWaitMinutes() {
   const { clinicId } = await requireClinicSession();
   const oldest = await prisma.conversation.findFirst({

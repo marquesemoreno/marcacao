@@ -26,6 +26,8 @@ import {
   listClinicProcedures,
 } from "@/actions/clinic";
 import Link from "next/link";
+import { isProcedureAgenda } from "@/lib/doctor-names";
+import { formatDurationHuman, SLA_WARNING_MINUTES } from "@/lib/sla-calculator";
 import { formatCurrency, appointmentStatusLabels } from "@/lib/format";
 import {
   MessageSquare,
@@ -40,6 +42,8 @@ import {
   Wallet,
 } from "lucide-react";
 
+export const metadata = { title: "Relatórios" };
+
 /** Cor por status — mesma semântica já usada em appointmentStatusVariant (format.ts),
  * cada família de cor distinta (nunca duas cores parecidas pra status diferentes). */
 const STATUS_COLOR_CLASS = {
@@ -53,17 +57,6 @@ const STATUS_COLOR_CLASS = {
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-/** Formata segundos como "3 min"/"1h 20min" — mesmo helper de /admin/relatorio. */
-function formatDurationLabel(seconds: number | null): string {
-  if (seconds === null) return "—";
-  const minutes = Math.round(seconds / 60);
-  if (minutes < 60) return `${minutes} min`;
-  const hours = Math.floor(minutes / 60);
-  const remainingMinutes = minutes % 60;
-  return remainingMinutes > 0
-    ? `${hours}h ${remainingMinutes}min`
-    : `${hours}h`;
-}
 
 type RelatorioPageProps = {
   searchParams: Promise<{
@@ -102,6 +95,7 @@ export default async function ClinicReportPage({
     getClinicManagementReport(days, params.channel),
     getDistinctAcquisitionChannels(days),
   ]);
+  const rs = chatReport.responseStats;
   const topAttendantId = management.attendants.find(
     (a) => a.scheduled > 0,
   )?.userId;
@@ -150,8 +144,9 @@ export default async function ClinicReportPage({
                 "Taxa de conversão em agendamento (%)",
                 chatReport.conversionRate,
               ],
-              ["Tempo médio de 1ª resposta (s)", chatReport.avgFrtSec ?? "—"],
-              ["Tempo médio de resolução (s)", chatReport.avgTtrSec ?? "—"],
+              ["Mediana de 1ª resposta (min, horário comercial)", rs.medianFirstResponseMin ?? "—"],
+              ["Mediana de resolução (min, horário comercial)", rs.medianResolutionMin ?? "—"],
+              [`Respondidas em até ${SLA_WARNING_MINUTES} min (%)`, rs.withinSlaPct ?? "—"],
               ["Sentimento positivo (%)", chatReport.sentimentPositivePct],
               ["Sentimento neutro (%)", chatReport.sentimentNeutroPct],
               ["Sentimento negativo (%)", chatReport.sentimentNegativoPct],
@@ -193,7 +188,7 @@ export default async function ClinicReportPage({
               {management.estimatedRevenue !== null ? formatCurrency(management.estimatedRevenue) : "—"}
             </p>
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              {management.scheduledCount} agendamento(s) pelo WhatsApp
+              {management.scheduledCount} conversa(s) do WhatsApp finalizadas como agendamento
               {management.ticket !== null ? ` × ticket médio de ${formatCurrency(management.ticket)}` : ""}
             </p>
           </div>
@@ -212,11 +207,19 @@ export default async function ClinicReportPage({
         </div>
         {management.ticket === null && (
           <p className="text-xs text-slate-500 dark:text-slate-400">
-            Para estimar valores, informe o ticket médio de consulta em{" "}
-            <Link href="/clinic/precos" className="font-medium text-sky-700 dark:text-sky-400 underline underline-offset-2">
-              Preços e Horários
-            </Link>
-            .
+            {/* "Preços e Horários" não aparece no menu de clínicas com WhatsApp exclusivo —
+                não mandar pra uma tela que o perfil não enxerga. */}
+            {isExclusive ? (
+              "Para estimar valores, peça à equipe do Conecta Saúde para cadastrar o ticket médio de consulta da clínica."
+            ) : (
+              <>
+                Para estimar valores, informe o ticket médio de consulta em{" "}
+                <Link href="/clinic/precos" className="font-medium text-sky-700 dark:text-sky-400 underline underline-offset-2">
+                  Preços e Horários
+                </Link>
+                .
+              </>
+            )}
           </p>
         )}
       </div>
@@ -261,25 +264,32 @@ export default async function ClinicReportPage({
           </div>
 
           <div className="bg-white dark:bg-slate-900 p-5 rounded-lg border border-slate-200 dark:border-slate-800 shadow-xs space-y-2">
+            {/* D3: mediana, só horário de expediente e só conversas com resposta humana. */}
             <span className="text-xs font-medium text-slate-600 dark:text-slate-400">
-              Tempo Médio de Atendimento
+              Tempo de atendimento (mediana, em horário comercial)
             </span>
             <div className="flex items-center justify-between">
-              <span className="text-xs text-slate-500 dark:text-slate-400">
-                1ª Resposta
-              </span>
+              <span className="text-xs text-slate-500 dark:text-slate-400">1ª resposta</span>
               <span className="text-sm font-bold text-slate-900 dark:text-slate-100">
-                {formatDurationLabel(chatReport.avgFrtSec)}
+                {rs.medianFirstResponseMin !== null ? formatDurationHuman(rs.medianFirstResponseMin) : "—"}
               </span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-xs text-slate-500 dark:text-slate-400">
-                Resolução Total
-              </span>
+              <span className="text-xs text-slate-500 dark:text-slate-400">Resolução</span>
               <span className="text-sm font-bold text-slate-900 dark:text-slate-100">
-                {formatDurationLabel(chatReport.avgTtrSec)}
+                {rs.medianResolutionMin !== null ? formatDurationHuman(rs.medianResolutionMin) : "—"}
               </span>
             </div>
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-slate-500 dark:text-slate-400">Respondidas em até {SLA_WARNING_MINUTES} min</span>
+              <span className="text-sm font-bold text-slate-900 dark:text-slate-100">
+                {rs.withinSlaPct !== null ? `${rs.withinSlaPct}%` : "—"}
+              </span>
+            </div>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              {rs.answered} conversa(s) com resposta da equipe
+              {rs.unanswered > 0 ? `; ${rs.unanswered} sem resposta ficaram de fora` : ""}.
+            </p>
           </div>
         </div>
 
@@ -361,7 +371,7 @@ export default async function ClinicReportPage({
                     Atendimentos
                   </TableHead>
                   <TableHead className="text-right text-xs">
-                    Tempo Médio 1ª Resposta
+                    Tempo médio de 1ª resposta
                   </TableHead>
                   <TableHead className="text-right text-xs">
                     Agendamentos Concluídos
@@ -391,7 +401,7 @@ export default async function ClinicReportPage({
                       {a.total}
                     </TableCell>
                     <TableCell className="text-right font-mono">
-                      {formatDurationLabel(a.avgFrtSec)}
+                      {a.avgFrtSec !== null ? formatDurationHuman(a.avgFrtSec / 60) : "—"}
                     </TableCell>
                     <TableCell className="text-right font-mono">
                       {a.scheduled}
@@ -484,13 +494,19 @@ export default async function ClinicReportPage({
         <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-200">
           Demanda por Médico e Procedimento
         </h2>
+        {/* D2: base diferente do "Faturamento Estimado" (que conta conversas finalizadas
+            como agendamento) — aqui são agendamentos gravados no Conecta Saúde. */}
+        <p className="text-xs text-slate-500 dark:text-slate-400 -mt-2">
+          Base: agendamentos registrados no Conecta Saúde (pelo painel ou pela integração com o sistema da clínica) —
+          diferente das conversas do WhatsApp finalizadas como agendamento.
+        </p>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <div className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 p-5 shadow-xs space-y-3">
             <p className="text-xs font-medium text-slate-600 dark:text-slate-400">
               Médicos Mais Procurados
             </p>
             <HorizontalBarChart
-              data={management.topDoctors.map((d) => ({
+              data={management.topDoctors.filter((d) => !isProcedureAgenda(d.name)).map((d) => ({
                 label: d.name,
                 value: d.count,
                 colorClass: "bg-sky-500",
@@ -522,7 +538,7 @@ export default async function ClinicReportPage({
             />
             {kindTotal > 0 && (
               <p className="text-[11px] text-slate-400 dark:text-slate-500">
-                {kindTotal} agendamento(s) no período.
+                {kindTotal} agendamento(s) registrado(s) no Conecta Saúde no período.
               </p>
             )}
           </div>

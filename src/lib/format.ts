@@ -45,8 +45,13 @@ export function formatCpf(value: string) {
     .replace(/(\d{3})(\d{1,2})$/, "$1-$2");
 }
 
+/** Máscara/exibição de telefone brasileiro — "(77) 99123-4567" ou "(77) 3421-6407".
+ * Aceita o formato salvo no banco (55 + DDD + número): sem tirar o DDI, os 11 primeiros
+ * dígitos de "5577991234567" viravam um número embaralhado na tela. */
 export function formatPhone(value: string) {
-  const digits = value.replace(/\D/g, "").slice(0, 11);
+  let all = value.replace(/\D/g, "");
+  if (all.length >= 12 && all.startsWith("55")) all = all.slice(2);
+  const digits = all.slice(0, 11);
   if (digits.length <= 10) {
     return digits.replace(/(\d{2})(\d{4})(\d{0,4})/, "($1) $2-$3").trim();
   }

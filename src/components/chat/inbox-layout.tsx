@@ -1,9 +1,13 @@
 "use client";
 
+import { formatPhone } from "@/lib/format";
 import { ACQUISITION_CHANNELS } from "@/lib/acquisition";
 import { AcquisitionBadge } from "@/components/chat/acquisition-badge";
 import { InstagramGlyph } from "@/components/chat/instagram-glyph";
 import { messagingWindowState } from "@/lib/messaging-window";
+import { displayName } from "@/lib/contact-display";
+import { NewContactDialog } from "@/components/chat/new-contact-dialog";
+import type { NewContactExtra } from "@/lib/new-contact-extra";
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Contact,
@@ -66,6 +70,11 @@ import {
   IdCard,
   Mic,
   Star,
+  Pin,
+  BellOff,
+  CalendarClock,
+  PanelRightOpen,
+  PanelRightClose,
 } from 'lucide-react';
 
 const MAX_MEDIA_SIZE_BYTES = 15 * 1024 * 1024; // 15 MB — mesmo limite validado no servidor
@@ -90,17 +99,10 @@ const QUEUE_STATE_PRIORITY: Record<ConversationQueueState, number> = {
   AGUARDANDO_PACIENTE: 3,
 };
 
-const QUEUE_STATE_BADGE: Record<ConversationQueueState, { label: string; classes: string }> = {
-  URGENCIA_CLINICA: { label: '🚨 Urgência clínica', classes: 'bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300' },
-  REMARCACAO_PENDENTE: { label: '⚠️ Remarcação pendente', classes: 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300' },
-  SEM_DONO: { label: '⏳ Sem dono', classes: 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300' },
-  HUMANO_ATENDENDO: { label: '🧑 Humano atendendo', classes: 'bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300' },
-  IA_ATENDENDO: { label: '🤖 IA atendendo', classes: 'bg-violet-50 dark:bg-violet-950/60 text-violet-700 dark:text-violet-300' },
-  AGUARDANDO_PACIENTE: { label: '💬 Aguardando paciente', classes: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300' },
-};
-
 /** A partir de quantos minutos parado em "Não Atribuídas" a aba pisca pra alertar o atendente. */
 const UNASSIGNED_ALERT_THRESHOLD_MINUTES = 10;
+
+const CRM_PANEL_STORAGE_KEY = 'inbox-crm-panel';
 
 /** Todas as abas possíveis da fila — o atendente escolhe quais ficam visíveis (persiste no navegador). */
 const ALL_INBOX_TABS: { id: InboxFilter; label: string }[] = [
@@ -126,6 +128,13 @@ const FUNNEL_STEPS: { id: FunnelStage; label: string }[] = [
  * ativas ao mesmo tempo e confundia qual era a de verdade. */
 
 
+/** "Não atribuída" ou o primeiro nome do responsável — card da fila (P4). */
+function ownerLabel(c: Contact): string {
+  const agent = c.responsibleAgent?.trim();
+  if (!agent || agent.toLowerCase() === 'não atribuído') return 'Não atribuída';
+  return agent.split(' ')[0];
+}
+
 interface InboxLayoutProps {
   contacts: Contact[];
   agents: Agent[];
@@ -137,6 +146,8 @@ interface InboxLayoutProps {
   /** Minutos desde a última mensagem da conversa mais antiga em "Não Atribuídas" — pisca a
    * aba quando passa do limiar, mesmo se o atendente estiver vendo outra aba no momento. */
   unassignedWaitMinutes?: number | null;
+  /** Quantas conversas ativas estão sem responsável — contador da aba "Não Atribuídas". */
+  unassignedCount?: number | null;
   /** Contador ambiente da aba "Pendentes" — conversas ativas com última mensagem do
    * paciente ainda sem resposta (ver getPendingCount em actions/inbox.ts). Busca
    * independente da aba selecionada, mesmo padrão de unassignedWaitMinutes. */
@@ -228,7 +239,9 @@ interface InboxLayoutProps {
   onClinicFilterChange?: (clinicId: string) => void;
   /** Cadastra um contato novo e abre a conversa dele. `clinicId` só é usado (e obrigatório
    * na prática) no scope admin, que não está preso a uma clínica só — ver availableClinics. */
-  onCreateContact?: (name: string, phone: string, clinicId?: string) => Promise<void>;
+  onCreateContact?: (name: string, phone: string, clinicId?: string, extra?: NewContactExtra) => Promise<void>;
+  /** F2 — número já cadastrado? (null = livre) */
+  onCheckContactPhone?: (phone: string, clinicId?: string) => Promise<{ name: string; conversationId: string | null } | null>;
   onFinishAttendance: (resolutionData?: { reason: string; notes?: string }) => Promise<void> | void;
   fetchProcedures: (convenioId?: string) => Promise<PlainClinicProcedureItem[]>;
   fetchDoctors?: () => Promise<{ id: number; nome: string; crm: string; especialidade: string | null }[]>;
@@ -367,71 +380,49 @@ const ContactListItem = React.memo(function ContactListItem({
         )}
       </div>
 
+      {/* P4 — card em 3 linhas: quem/quando, prévia, espera + dono + não lidas. A etapa do
+          funil saiu do card (fica no filtro do CRM e no painel lateral). */}
       <div className="flex-1 min-w-0">
-        <div className="flex items-center justify-between mb-0.5 gap-2">
-          <h4 className={`text-xs sm:text-[13px] truncate flex items-center gap-1 ${c.unreadCount > 0 ? 'font-bold text-slate-900 dark:text-slate-100' : 'font-semibold text-slate-900 dark:text-slate-100'}`}>
-            {c.pinned && <span title="Fixada">📌</span>}
-            {c.isMuted && <span title="Silenciada">🔕</span>}
-            <span className="truncate">{c.name}</span>
+        <div className="flex items-center justify-between gap-2">
+          <h4 className={`text-sm truncate flex items-center gap-1 text-slate-900 dark:text-slate-100 ${c.unreadCount > 0 ? 'font-bold' : 'font-semibold'}`}>
+            {c.pinned && <Pin className="w-3 h-3 shrink-0 text-slate-400" aria-label="Fixada" />}
+            {c.isMuted && <BellOff className="w-3 h-3 shrink-0 text-slate-400" aria-label="Silenciada" />}
+            <span className="truncate">{displayName(c)}</span>
           </h4>
-          <span className="flex items-center gap-1.5 shrink-0">
-            <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">
-              {c.lastMessageTime}
-            </span>
-            {c.unreadCount > 0 && (
-              <span
-                className="min-w-[16px] h-4 px-1 rounded-md bg-emerald-600 text-white text-[9px] font-bold flex items-center justify-center"
-                title={`${c.unreadCount} mensagem(ns) não lida(s)`}
-              >
-                {c.unreadCount > 9 ? '9+' : c.unreadCount}
-              </span>
-            )}
-          </span>
+          <span className="shrink-0 text-xs text-slate-500 dark:text-slate-400">{c.lastMessageTime}</span>
         </div>
 
-        <p className={`text-[10px] font-bold mb-0.5 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md ${QUEUE_STATE_BADGE[c.queueState].classes}`}>
-          {QUEUE_STATE_BADGE[c.queueState].label}
-        </p>
+        {c.clinicName && <p className="text-xs font-medium text-sky-700 dark:text-sky-400 truncate">{c.clinicName}</p>}
 
-        {c.hasUnseenAssignment && (
-          <p className="text-[10px] font-bold text-amber-700 dark:text-amber-400 mb-0.5 flex items-center gap-1">
-            <Zap className="w-2.5 h-2.5" /> Transferida pra você
-          </p>
-        )}
+        <p className="text-sm text-slate-600 dark:text-slate-300 truncate leading-snug mt-0.5">{c.lastMessage}</p>
 
-        {c.clinicName && (
-          <p className="text-[10px] font-semibold text-sky-700 dark:text-sky-400 mb-0.5 truncate">{c.clinicName}</p>
-        )}
-
-        <p className="text-xs text-slate-500 dark:text-slate-400 truncate mb-1.5 leading-snug">
-          {c.lastMessage}
-        </p>
-
-        <div className="flex items-center justify-between gap-1">
-          <span
-            className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md border ${
-              c.statusTag.variant === 'emerald'
-                ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
-                : c.statusTag.variant === 'amber'
-                ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800'
-                : 'bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800'
-            }`}
-          >
-            {c.statusTag.label}
-          </span>
-
-          <span className="inline-flex items-center gap-1 shrink-0">
-            <SLABadge sla={c.sla} />
-            {c.responsibleAgent && c.responsibleAgent.toLowerCase() !== 'não atribuído' ? (
-              <span className="inline-flex items-center gap-0.5 text-[10px] font-medium text-slate-500 dark:text-slate-300 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-1.5 py-0.5 rounded-md truncate max-w-[85px]" title={`Atribuído a ${c.responsibleAgent}`}>
-                <User className="w-2.5 h-2.5 shrink-0" /> {c.responsibleAgent.split(' ')[0]}
+        <div className="flex items-center justify-between gap-2 mt-1">
+          <span className="inline-flex items-center gap-2 min-w-0 text-xs">
+            {c.hasUnseenAssignment ? (
+              <span className="inline-flex items-center gap-1 font-semibold text-amber-700 dark:text-amber-400">
+                <Zap className="w-3 h-3" /> Transferida pra você
+              </span>
+            ) : c.queueState === 'REMARCACAO_PENDENTE' ? (
+              <span className="inline-flex items-center gap-1 font-semibold text-amber-700 dark:text-amber-400">
+                <CalendarClock className="w-3 h-3" /> Remarcação pendente
               </span>
             ) : (
-              <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-800 px-1.5 py-0.5 rounded-md" title="Aguardando secretária">
-                <Clock className="w-2.5 h-2.5" /> Livre
-              </span>
+              <SLABadge sla={c.sla} />
             )}
+            <span className="inline-flex items-center gap-1 truncate text-slate-500 dark:text-slate-400" title={c.queueState === 'IA_ATENDENDO' ? 'Atendida pela IA' : `Responsável: ${ownerLabel(c)}`}>
+              {c.queueState === 'IA_ATENDENDO' ? <Bot className="w-3 h-3 shrink-0" /> : <User className="w-3 h-3 shrink-0" />}
+              <span className="truncate">{c.queueState === 'IA_ATENDENDO' ? 'IA' : ownerLabel(c)}</span>
+            </span>
           </span>
+          {c.unreadCount > 0 && (
+            <span
+              className="shrink-0 min-w-[20px] h-5 px-1.5 rounded-full bg-emerald-600 text-white text-xs font-bold flex items-center justify-center"
+              title={`${c.unreadCount} mensagem(ns) não lida(s)`}
+              aria-label={`${c.unreadCount} não lida(s)`}
+            >
+              {c.unreadCount > 99 ? '99+' : c.unreadCount}
+            </span>
+          )}
         </div>
       </div>
     </div>
@@ -448,6 +439,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
   attendantCapacity,
   unassignedWaitMinutes,
   pendingCount,
+  unassignedCount,
   outboundFromDeviceStats,
   selectedContactId,
   selectedContact,
@@ -495,6 +487,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
   clinicFilter,
   onClinicFilterChange,
   onCreateContact,
+  onCheckContactPhone,
   onFinishAttendance,
   fetchProcedures,
   fetchDoctors,
@@ -509,6 +502,35 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
   onUpdateContactGlpiEntity,
 }) => {
   const [composerMode, setComposerMode] = useState<'whatsapp' | 'internal_note'>('whatsapp');
+  // P3: painel "Perfil & CRM" recolhível. Sem preferência salva, abre só em tela larga
+  // (>= 1366px); abaixo disso abre como gaveta por cima da conversa.
+  const [crmPanelPref, setCrmPanelPref] = useState<'open' | 'closed' | null>(null);
+  const [isWideScreen, setIsWideScreen] = useState(true);
+  useEffect(() => {
+    const stored = localStorage.getItem(CRM_PANEL_STORAGE_KEY);
+    if (stored === 'open' || stored === 'closed') setCrmPanelPref(stored);
+    const mq = window.matchMedia('(min-width: 1366px)');
+    const update = () => setIsWideScreen(mq.matches);
+    update();
+    mq.addEventListener('change', update);
+    return () => mq.removeEventListener('change', update);
+  }, []);
+  const isCrmPanelOpen = crmPanelPref ? crmPanelPref === 'open' : isWideScreen;
+  const isCrmPanelOverlay = isCrmPanelOpen && !isWideScreen;
+  function setCrmPanelOpen(open: boolean) {
+    const value = open ? 'open' : 'closed';
+    setCrmPanelPref(value);
+    localStorage.setItem(CRM_PANEL_STORAGE_KEY, value);
+  }
+  // C5: botões flutuantes (Copiloto) somem enquanto o painel lateral está aberto —
+  // cobriam o seletor de etapa e o rodapé do painel.
+  useEffect(() => {
+    if (selectedContact && isCrmPanelOpen) document.body.dataset.crmPanelOpen = '1';
+    else delete document.body.dataset.crmPanelOpen;
+    return () => {
+      delete document.body.dataset.crmPanelOpen;
+    };
+  }, [selectedContact, isCrmPanelOpen]);
   /** Sheet amplo com a ficha completa do paciente (Resumo/Histórico/Tags) — aberto ao
    * clicar no nome do paciente no cabeçalho da conversa. Aditivo ao painel "Perfil &
    * CRM" fixo, que continua servindo de contexto rápido enquanto atende. */
@@ -569,10 +591,6 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
     setIsScheduleModalOpen(true);
   }
   const [isNewContactModalOpen, setIsNewContactModalOpen] = useState(false);
-  const [newContactName, setNewContactName] = useState('');
-  const [newContactPhone, setNewContactPhone] = useState('');
-  const [newContactClinicId, setNewContactClinicId] = useState('');
-  const [isSavingContact, setIsSavingContact] = useState(false);
   const [isQuickReplyOpen, setIsQuickReplyOpen] = useState(false);
   const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
   const quickReplyRef = useClickOutside<HTMLFormElement>(isQuickReplyOpen, () => setIsQuickReplyOpen(false));
@@ -1093,26 +1111,6 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
     }
   };
 
-  const handleSaveNewContact = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newContactName.trim() || !newContactPhone.trim() || !onCreateContact) return;
-    if (availableClinics && availableClinics.length > 0 && !newContactClinicId) return;
-
-    setIsSavingContact(true);
-    try {
-      await onCreateContact(newContactName, newContactPhone, newContactClinicId || undefined);
-      toast.success("Contato cadastrado com sucesso!");
-      setNewContactName('');
-      setNewContactPhone('');
-      setNewContactClinicId('');
-      setIsNewContactModalOpen(false);
-      setMobileView('chat');
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Não foi possível cadastrar o contato.");
-    } finally {
-      setIsSavingContact(false);
-    }
-  };
 
   const currentStageIndex = selectedContact ? FUNNEL_STEPS.findIndex((s) => s.id === selectedContact.funnelStage) : -1;
 
@@ -1150,21 +1148,25 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
               )}
               {attendantCapacity && (
                 <span
-                  className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md border ${
+                  className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-md border ${
                     attendantCapacity.activeCount >= attendantCapacity.maxLimit
                       ? "bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800"
                       : attendantCapacity.activeCount >= attendantCapacity.maxLimit - 1
                       ? "bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800"
                       : "bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800"
                   }`}
-                  title="Seu limite de conversas ativas simultâneas"
+                  title={
+                    attendantCapacity.activeCount >= attendantCapacity.maxLimit
+                      ? `Você está com ${attendantCapacity.activeCount} conversas em atendimento e seu limite é ${attendantCapacity.maxLimit}. Enquanto estiver no limite, não dá para assumir conversas novas — finalize ou transfira alguma.`
+                      : `Você está com ${attendantCapacity.activeCount} de ${attendantCapacity.maxLimit} conversas em atendimento ao mesmo tempo. Ao chegar no limite, não dá para assumir novas.`
+                  }
                 >
-                  <Zap className="w-2.5 h-2.5" />
-                  {attendantCapacity.activeCount}/{attendantCapacity.maxLimit}
+                  <Zap className="w-3 h-3" />
+                  Em atendimento: {attendantCapacity.activeCount}/{attendantCapacity.maxLimit}
                 </span>
               )}
-              <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-300 bg-slate-50 dark:bg-slate-800 px-2 py-0.5 rounded-md border border-slate-200/70 dark:border-slate-700">
-                {filteredContacts.length}
+              <span title="Quantidade de conversas na aba e com os filtros atuais" className="text-xs font-semibold text-slate-500 dark:text-slate-300 bg-slate-50 dark:bg-slate-800 px-2 py-0.5 rounded-md border border-slate-200/70 dark:border-slate-700">
+                {filteredContacts.length} {filteredContacts.length === 1 ? "conversa" : "conversas"}
               </span>
             </div>
           </div>
@@ -1202,7 +1204,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
               então é bom sinalizar quando isso está acontecendo. */}
           {outboundFromDeviceStats && outboundFromDeviceStats.total > 0 && (
             <div
-              className="flex items-center gap-1.5 text-[11px] font-semibold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-800 px-2.5 py-1.5 rounded-lg"
+              className="flex items-center gap-1.5 text-xs font-semibold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-800 px-2.5 py-1.5 rounded-lg"
               title={
                 outboundFromDeviceStats.byClinic.length > 0
                   ? outboundFromDeviceStats.byClinic.map((c) => `${c.clinicName}: ${c.count}`).join('\n') +
@@ -1221,30 +1223,38 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
           <div className="flex items-center gap-1.5">
           <div className="flex-1 flex items-center gap-0.5 p-0.5 bg-slate-100 dark:bg-slate-800/90 rounded-lg text-xs font-medium">
             {ALL_INBOX_TABS.filter((tab) => visibleTabIds.includes(tab.id)).map((tab) => {
-              // Pisca só quando o atendente NÃO está nessa aba — se ela já está olhando
-              // "Não Atribuídas", o paciente esperando já está visível, sem precisar de alerta.
-              const shouldAlert =
+              // C3: um único estilo de aba ativa. O alerta de espera sem responsável virou só
+              // a cor do contador (vermelho passado o limiar) — antes a aba inteira ficava
+              // rosa e parecia selecionada mesmo com "Todas" ativa.
+              const isUnassignedAlert =
                 tab.id === 'nao_atribuidas' &&
-                filterTab !== 'nao_atribuidas' &&
                 unassignedWaitMinutes != null &&
                 unassignedWaitMinutes >= UNASSIGNED_ALERT_THRESHOLD_MINUTES;
+              const count = tab.id === 'pendentes' ? pendingCount : tab.id === 'nao_atribuidas' ? unassignedCount : null;
+              const isActive = filterTab === tab.id;
               return (
                 <button
                   key={tab.id}
+                  type="button"
                   onClick={() => onFilterTabChange(tab.id)}
-                  title={shouldAlert ? `Paciente esperando há ${unassignedWaitMinutes} min sem atendente` : undefined}
-                  className={`flex-1 py-1 px-1.5 rounded-md text-[11px] transition-all whitespace-nowrap text-center inline-flex items-center justify-center gap-1 ${
-                    shouldAlert
-                      ? 'bg-rose-500 text-white font-bold shadow-sm animate-pulse'
-                      : filterTab === tab.id
-                        ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 font-semibold shadow-sm'
-                        : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+                  aria-pressed={isActive}
+                  title={isUnassignedAlert ? `Há paciente esperando há ${unassignedWaitMinutes} min sem responsável` : undefined}
+                  className={`flex-1 py-1.5 px-2 rounded-md text-xs transition-all whitespace-nowrap text-center inline-flex items-center justify-center gap-1 ${
+                    isActive
+                      ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 font-semibold shadow-sm'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
                   }`}
                 >
                   {tab.label}
-                  {tab.id === 'pendentes' && !!pendingCount && (
-                    <span className="min-w-[16px] px-1 rounded-md bg-rose-500 text-white text-[9px] font-bold leading-4">
-                      {pendingCount > 99 ? '99+' : pendingCount}
+                  {!!count && (
+                    <span
+                      className={`min-w-[18px] px-1 rounded-full text-xs font-bold leading-[18px] ${
+                        isUnassignedAlert || tab.id === 'pendentes'
+                          ? 'bg-rose-600 text-white'
+                          : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200'
+                      }`}
+                    >
+                      {count > 99 ? '99+' : count}
                     </span>
                   )}
                 </button>
@@ -1264,7 +1274,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
             </button>
             {isTabSettingsOpen && (
               <div className="absolute right-0 mt-1 w-48 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-lg py-1.5 z-30 animate-in fade-in zoom-in-95 duration-100">
-                <p className="px-3 py-1 text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wide">
+                <p className="px-3 py-1 text-xs font-bold text-slate-600 dark:text-slate-300">
                   Abas visíveis
                 </p>
                 {ALL_INBOX_TABS.map((tab) => (
@@ -1295,7 +1305,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
               value={agentFilter ?? ''}
               onChange={(e) => onAgentFilterChange(e.target.value)}
               aria-label="Filtrar por Atendente"
-              className="w-full h-8 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2 text-[11px] font-medium text-slate-600 dark:text-slate-300"
+              className="w-full h-8 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2 text-xs font-medium text-slate-600 dark:text-slate-300"
             >
               <option value="">Todos os atendentes</option>
               {agents
@@ -1313,7 +1323,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
             <button
               type="button"
               onClick={() => setIsTagFilterOpen((open) => !open)}
-              className="w-full flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-[11px] font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+              className="w-full flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
             >
               <span className="flex items-center gap-1.5 truncate">
                 <Filter className="w-3 h-3 text-slate-400 shrink-0" />
@@ -1329,7 +1339,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                     setSelectedTagFilter(null);
                     setIsTagFilterOpen(false);
                   }}
-                  className={`w-full px-3 py-1.5 text-left text-[11px] font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 ${
+                  className={`w-full px-3 py-1.5 text-left text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 ${
                     selectedTagFilter === null ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-600 dark:text-slate-300'
                   }`}
                 >
@@ -1344,7 +1354,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                     }}
                     className="w-full px-3 py-1.5 text-left hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center"
                   >
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold border ${preset.classes} ${selectedTagFilter === preset.label ? 'ring-2 ring-emerald-500/30' : ''}`}>
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold border ${preset.classes} ${selectedTagFilter === preset.label ? 'ring-2 ring-emerald-500/30' : ''}`}>
                       {preset.label}
                     </span>
                   </button>
@@ -1441,19 +1451,19 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                   <ChevronLeft className="w-5 h-5" />
                 </button>
 
-                <AvatarBadge name={selectedContact.name} photoUrl={selectedContact.avatar} size={38} className="ring-2 ring-slate-100 dark:ring-slate-800 shadow-sm shrink-0" />
+                <AvatarBadge name={displayName(selectedContact)} photoUrl={selectedContact.avatar} size={38} className="ring-2 ring-slate-100 dark:ring-slate-800 shadow-sm shrink-0" />
                 <div className="min-w-0">
                   <div className="flex items-center gap-1.5 flex-wrap">
                     <button
                       type="button"
                       onClick={() => setIsPatientRecordOpen(true)}
-                      className="font-semibold text-slate-900 dark:text-slate-100 text-xs sm:text-sm truncate hover:underline decoration-slate-400 underline-offset-2"
+                      className="font-semibold text-slate-900 dark:text-slate-100 text-base truncate hover:underline decoration-slate-400 underline-offset-2"
                       title="Ver ficha completa do paciente"
                     >
-                      {selectedContact.name}
+                      {displayName(selectedContact)}
                     </button>
                     <span
-                      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 text-[10px] font-medium shrink-0"
+                      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 text-xs font-medium shrink-0"
                       title="WhatsApp Conectado"
                     >
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
@@ -1466,13 +1476,13 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                             type="button"
                             onClick={() => setIsClinicMenuOpen((open) => !open)}
                             title="Clique para corrigir a clínica desta conversa"
-                            className="hidden sm:inline-flex items-center px-1.5 py-0.5 rounded-md bg-sky-50 dark:bg-sky-950/60 border border-sky-200 dark:border-sky-800 text-sky-700 dark:text-sky-300 text-[10px] font-medium truncate hover:bg-sky-100 dark:hover:bg-sky-900 transition-colors"
+                            className="hidden sm:inline-flex items-center px-1.5 py-0.5 rounded-md bg-sky-50 dark:bg-sky-950/60 border border-sky-200 dark:border-sky-800 text-sky-700 dark:text-sky-300 text-xs font-medium truncate hover:bg-sky-100 dark:hover:bg-sky-900 transition-colors"
                           >
                             {selectedContact.clinicName}
                           </button>
                           {isClinicMenuOpen && (
                             <div className="absolute left-0 mt-1 w-56 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-lg py-2 z-50 animate-in fade-in zoom-in-95 text-xs font-medium max-h-64 overflow-y-auto">
-                              <div className="px-3 py-1 text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase border-b border-slate-100 dark:border-slate-800 mb-1">
+                              <div className="px-3 py-1 text-xs font-bold text-slate-600 dark:text-slate-300 border-b border-slate-100 dark:border-slate-800 mb-1">
                                 Corrigir Clínica Desta Conversa
                               </div>
                               {availableClinics.map((clinic) => (
@@ -1491,7 +1501,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                           )}
                         </div>
                       ) : (
-                        <span className="hidden sm:inline-flex items-center px-1.5 py-0.5 rounded-md bg-sky-50 dark:bg-sky-950/60 border border-sky-200 dark:border-sky-800 text-sky-700 dark:text-sky-300 text-[10px] font-medium truncate">
+                        <span className="hidden sm:inline-flex items-center px-1.5 py-0.5 rounded-md bg-sky-50 dark:bg-sky-950/60 border border-sky-200 dark:border-sky-800 text-sky-700 dark:text-sky-300 text-xs font-medium truncate">
                           {selectedContact.clinicName}
                         </span>
                       )
@@ -1505,7 +1515,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                           {selectedContact.instagramUsername ? `@${selectedContact.instagramUsername}` : 'Instagram Direct'}
                         </>
                       ) : (
-                        selectedContact.phone
+                        formatPhone(selectedContact.phone)
                       )}
                     </p>
                     {selectedContact.acquisitionChannel && (
@@ -1517,6 +1527,16 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
 
               {/* Ações do Header: atendente, agendar (secundário) e menu */}
               <div className="flex items-center gap-1.5 sm:gap-2">
+                <button
+                  type="button"
+                  onClick={() => setCrmPanelOpen(!isCrmPanelOpen)}
+                  aria-label={isCrmPanelOpen ? 'Esconder painel do paciente' : 'Mostrar painel do paciente'}
+                  title={isCrmPanelOpen ? 'Esconder painel do paciente' : 'Mostrar painel do paciente'}
+                  aria-pressed={isCrmPanelOpen}
+                  className="hidden lg:flex size-9 items-center justify-center rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-800 dark:hover:text-slate-100"
+                >
+                  {isCrmPanelOpen ? <PanelRightClose className="w-4 h-4" /> : <PanelRightOpen className="w-4 h-4" />}
+                </button>
                 {(!selectedContact.responsibleAgent || selectedContact.responsibleAgent.toLowerCase() === "não atribuído") ? (
                   onClaimConversation && (
                     <button
@@ -1529,7 +1549,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                       }`}
                       title={
                         attendantCapacity && attendantCapacity.activeCount >= attendantCapacity.maxLimit
-                          ? `Você atingiu seu limite de ${attendantCapacity.maxLimit} conversas simultâneas`
+                          ? `Você está no seu limite de ${attendantCapacity.maxLimit} conversas em atendimento. Finalize ou transfira alguma para poder assumir esta.`
                           : "Assumir esta conversa para o seu atendimento"
                       }
                     >
@@ -1691,7 +1711,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                takeOverConversation em actions/inbox.ts — diferente de "Atribuir pra Mim",
                que só funciona em conversa sem dono). */}
             {selectedContact.assignedToOther && onTakeOverConversation && (
-              <div className="flex items-center justify-between gap-2 px-3 sm:px-6 py-1.5 bg-amber-50 dark:bg-amber-950/40 border-b border-amber-200 dark:border-amber-900 text-[11px]">
+              <div className="flex items-center justify-between gap-2 px-3 sm:px-6 py-1.5 bg-amber-50 dark:bg-amber-950/40 border-b border-amber-200 dark:border-amber-900 text-xs">
                 <span className="text-amber-800 dark:text-amber-300">
                   Esta conversa está com <strong>{selectedContact.responsibleAgent}</strong>.
                 </span>
@@ -1710,7 +1730,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                 <button
                   type="button"
                   onClick={() => setShowOnlyStarred((prev) => !prev)}
-                  className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10.5px] font-semibold border transition-colors ${
+                  className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold border transition-colors ${
                     showOnlyStarred
                       ? 'bg-amber-100 dark:bg-amber-950/60 border-amber-300 dark:border-amber-800 text-amber-800 dark:text-amber-300'
                       : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700'
@@ -1727,7 +1747,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
             <div
               ref={messagesContainerRef}
               onScroll={handleMessagesScroll}
-              className="flex-1 overflow-y-auto p-3 sm:p-6 space-y-3 bg-[#F1F5F9] dark:bg-slate-950/60"
+              className="flex-1 overflow-y-auto overflow-x-hidden min-w-0 p-3 sm:p-6 space-y-3 bg-[#F1F5F9] dark:bg-slate-950/60"
               data-od-id="chat-messages-area"
             >
               {displayedMessages.length === 0 ? (
@@ -1787,13 +1807,13 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                 {isQuickReplyOpen && (
                   <div className="absolute bottom-full left-0 mb-2 w-full max-w-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-lg py-2 z-30 max-h-64 overflow-y-auto animate-in fade-in slide-in-from-bottom-2 duration-150">
                     <div className="flex items-center justify-between px-3 py-1.5 border-b border-slate-100 dark:border-slate-800">
-                      <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400">
+                      <span className="text-xs font-bold text-slate-600 dark:text-slate-300">
                         Respostas Rápidas
                       </span>
                       <button
                         type="button"
                         onClick={() => setIsNewQuickReplyModalOpen(true)}
-                        className="text-[10px] font-semibold text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 flex items-center gap-1"
+                        className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 flex items-center gap-1"
                       >
                         <Plus className="w-3 h-3" />
                         Gerenciar
@@ -1864,14 +1884,14 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                     </div>
 
                     {composerMode === 'internal_note' && (
-                      <span className="text-[10px] text-amber-700 dark:text-amber-300 hidden sm:flex items-center gap-1 font-medium">
+                      <span className="text-xs text-amber-700 dark:text-amber-300 hidden sm:flex items-center gap-1 font-medium">
                         <Lock className="w-2.5 h-2.5" /> Visível só para a equipe
                       </span>
                     )}
                   </div>
 
                   {selectedContact?.channel === 'instagram' && composerMode === 'whatsapp' && instagramWindow !== 'OPEN' && (
-                    <div className="flex items-start gap-2 px-3 py-1.5 border-b border-amber-200/70 dark:border-amber-900/60 bg-amber-50/80 dark:bg-amber-950/30 text-[11px] text-amber-800 dark:text-amber-300">
+                    <div className="flex items-start gap-2 px-3 py-1.5 border-b border-amber-200/70 dark:border-amber-900/60 bg-amber-50/80 dark:bg-amber-950/30 text-xs text-amber-800 dark:text-amber-300">
                       <Clock className="w-3 h-3 mt-0.5 shrink-0" />
                       <span>
                         {instagramWindow === 'HUMAN_AGENT'
@@ -1884,10 +1904,10 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                   {replyingTo && (
                     <div className="flex items-start gap-2 px-3 py-2 border-b border-slate-200/70 dark:border-slate-800 bg-white/60 dark:bg-slate-900/40">
                       <div className="flex-1 min-w-0 rounded-lg border-l-[3px] border-emerald-500 bg-black/5 dark:bg-white/5 px-2.5 py-1.5">
-                        <p className="text-[11px] font-bold text-emerald-700 dark:text-emerald-400">
+                        <p className="text-xs font-bold text-emerald-700 dark:text-emerald-400">
                           {replyingTo.sender === 'agent' ? 'Você' : replyingTo.senderName || selectedContact?.name || 'Contato'}
                         </p>
-                        <p className="truncate text-[11px] text-slate-500 dark:text-slate-400 italic">
+                        <p className="truncate text-xs text-slate-500 dark:text-slate-400 italic">
                           {replyingTo.deleted ? 'Mensagem apagada' : replyingTo.text || '📎 Mídia'}
                         </p>
                       </div>
@@ -2009,7 +2029,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                                     </CommandGroup>
                                     <CommandGroup heading="Contatos">
                                       {isSearchingContacts ? (
-                                        <p className="px-3 py-2 text-[11px] text-slate-500 dark:text-slate-400">Buscando...</p>
+                                        <p className="px-3 py-2 text-xs text-slate-500 dark:text-slate-400">Buscando...</p>
                                       ) : contactSearchResults.length === 0 ? (
                                         <CommandEmpty className="text-xs text-slate-500 dark:text-slate-400">
                                           Nenhum contato encontrado.
@@ -2023,7 +2043,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                                             className="justify-between text-xs"
                                           >
                                             <span className="font-medium truncate">{c.name}</span>
-                                            <span className="text-[10px] text-slate-500 dark:text-slate-400 shrink-0">{c.phone}</span>
+                                            <span className="text-xs text-slate-500 dark:text-slate-400 shrink-0">{c.phone}</span>
                                           </CommandItem>
                                         ))
                                       )}
@@ -2082,7 +2102,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                       <button
                         type="button"
                         onClick={() => setIsQuickReplyOpen(!isQuickReplyOpen)}
-                        className="flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold text-slate-600 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors"
+                        className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-slate-600 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors"
                         title="Abrir menu de respostas rápidas"
                       >
                         <Zap className="w-3.5 h-3.5 text-amber-500" />
@@ -2093,7 +2113,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                         type="button"
                         onClick={handleGenerateIaReply}
                         disabled={isGeneratingIa}
-                        className="flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-semibold text-slate-500 dark:text-slate-300 hover:text-emerald-700 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 rounded-lg transition-all"
+                        className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold text-slate-500 dark:text-slate-300 hover:text-emerald-700 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 rounded-lg transition-all"
                         title="Sugerir resposta com IA baseada no contexto do paciente"
                       >
                         <Sparkles className={`w-3.5 h-3.5 ${isGeneratingIa ? 'animate-spin text-emerald-600' : ''}`} />
@@ -2130,25 +2150,35 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
          ========================================================================= */}
       {selectedContact && (
         <aside
-          className={`w-full lg:w-[300px] lg:min-w-[300px] lg:max-w-[300px] bg-slate-50 dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 shadow-sm flex-col h-full shrink-0 overflow-y-auto ${
+          className={`w-full lg:w-[320px] lg:min-w-[320px] lg:max-w-[320px] bg-slate-50 dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 shadow-sm flex-col h-full shrink-0 overflow-y-auto ${
             mobileView === 'crm'
               ? 'flex absolute inset-0 z-40 bg-slate-50 dark:bg-slate-900 animate-in slide-in-from-right duration-200'
               // Esconde enquanto o painel de agendamento está aberto — os dois disputam a
               // mesma faixa lateral, e mostrar os três (contatos + CRM + agendamento) juntos
               // deixava a conversa espremida demais.
-              : isScheduleModalOpen ? 'hidden' : 'hidden lg:flex'
+              : isScheduleModalOpen || !isCrmPanelOpen
+                ? 'hidden'
+                : isCrmPanelOverlay
+                  // P3: notebook (< 1366px) — gaveta por cima da conversa, não espreme o chat.
+                  ? 'hidden lg:flex lg:absolute lg:inset-y-0 lg:right-0 lg:z-30 lg:shadow-2xl animate-in slide-in-from-right duration-200'
+                  : 'hidden lg:flex'
           }`}
           data-od-id="inbox-crm-column"
         >
           <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
-            <h3 className="font-bold text-slate-900 dark:text-slate-100 text-sm flex items-center gap-2">
+            <h3 className="font-bold text-slate-900 dark:text-slate-100 text-base flex items-center gap-2">
               <UserPlus className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
               Perfil & CRM do Lead
             </h3>
             <button
-              onClick={() => setMobileView('chat')}
+              type="button"
+              onClick={() => {
+                if (mobileView === 'crm') setMobileView('chat');
+                else setCrmPanelOpen(false);
+              }}
               aria-label="Fechar painel"
-              className="lg:hidden size-11 -mr-2.5 flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+              title="Fechar painel"
+              className="size-11 -mr-2.5 flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
             >
               <X className="w-5 h-5" />
             </button>
@@ -2159,7 +2189,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
             {onGenerateCopilotSuggestions && (
               <div className="bg-white dark:bg-slate-800/40 border border-emerald-200/80 dark:border-emerald-800/60 rounded-xl p-4 space-y-3 shadow-sm">
                 <div className="flex items-center justify-between gap-2">
-                  <h4 className="text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                  <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
                     <Sparkles className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
                     Copilot — sugestões de resposta
                   </h4>
@@ -2167,7 +2197,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                     type="button"
                     onClick={handleGenerateCopilotSuggestions}
                     disabled={isLoadingCopilot}
-                    className="shrink-0 text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-300 disabled:opacity-50 flex items-center gap-1"
+                    className="shrink-0 text-xs font-semibold text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-300 disabled:opacity-50 flex items-center gap-1"
                   >
                     <Sparkles className={`w-3 h-3 ${isLoadingCopilot ? 'animate-spin' : ''}`} />
                     {isLoadingCopilot ? 'Gerando...' : copilotSuggestions.length > 0 ? 'Gerar de novo' : 'Gerar sugestões'}
@@ -2175,7 +2205,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                 </div>
 
                 {!isLoadingCopilot && copilotSuggestions.length === 0 && (
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
                     Peça pra IA rascunhar 2-3 respostas com base no histórico dessa conversa. Nada é enviado sem você escolher.
                   </p>
                 )}
@@ -2197,7 +2227,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                               setInputText(suggestion);
                               toast.success("Sugestão inserida na resposta!");
                             }}
-                            className="flex-1 px-2 py-1 text-[10.5px] font-semibold rounded-md border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                            className="flex-1 px-2 py-1 text-xs font-semibold rounded-md border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                           >
                             Inserir no chat
                           </button>
@@ -2207,7 +2237,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                               onSendMessage(suggestion, 'whatsapp');
                               setCopilotSuggestions([]);
                             }}
-                            className="flex-1 px-2 py-1 text-[10.5px] font-semibold rounded-md bg-emerald-600 hover:bg-emerald-700 text-white transition-colors"
+                            className="flex-1 px-2 py-1 text-xs font-semibold rounded-md bg-emerald-600 hover:bg-emerald-700 text-white transition-colors"
                           >
                             Enviar direto
                           </button>
@@ -2223,13 +2253,13 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
             <div className="bg-white dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-700/80 rounded-xl p-4 space-y-3 shadow-sm">
               <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-700/60 pb-3">
                 <div className="flex items-center gap-3 min-w-0">
-                  <AvatarBadge name={selectedContact.name} photoUrl={selectedContact.avatar} size={44} className="ring-2 ring-white dark:ring-slate-900 shadow-sm shrink-0" />
+                  <AvatarBadge name={displayName(selectedContact)} photoUrl={selectedContact.avatar} size={44} className="ring-2 ring-white dark:ring-slate-900 shadow-sm shrink-0" />
                   <div className="min-w-0">
                     <h4 className="font-bold text-slate-900 dark:text-slate-100 text-xs truncate">
-                      {selectedContact.name}
+                      {displayName(selectedContact)}
                     </h4>
                     {selectedContact.channel === 'instagram' && !selectedContact.phone ? (
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium flex items-center gap-1 mt-0.5">
+                      <p className="text-xs text-slate-500 dark:text-slate-400 font-medium flex items-center gap-1 mt-0.5">
                         <InstagramGlyph className="w-3 h-3" />
                         {selectedContact.instagramUsername ? `@${selectedContact.instagramUsername}` : 'Instagram Direct'}
                       </p>
@@ -2237,10 +2267,10 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                     <div className="flex items-center gap-1 mt-0.5">
                       <a
                         href={`tel:${selectedContact.phone}`}
-                        className="text-[11px] text-slate-500 dark:text-slate-400 font-medium flex items-center gap-1 hover:text-emerald-700 dark:hover:text-emerald-400"
+                        className="text-xs text-slate-500 dark:text-slate-400 font-medium flex items-center gap-1 hover:text-emerald-700 dark:hover:text-emerald-400"
                         title="Ligar para o paciente"
                       >
-                        <Phone className="w-3 h-3" /> {selectedContact.phone}
+                        <Phone className="w-3 h-3" /> {formatPhone(selectedContact.phone)}
                       </a>
                       <button
                         type="button"
@@ -2282,7 +2312,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
               {isEditingPatient ? (
                 <div className="space-y-2 pt-1">
                   <div>
-                    <label className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">Nome:</label>
+                    <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">Nome:</label>
                     <input
                       type="text"
                       value={editPatientName}
@@ -2291,7 +2321,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                     />
                   </div>
                   <div>
-                    <label className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">CPF:</label>
+                    <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">CPF:</label>
                     <input
                       type="text"
                       value={editPatientCpf}
@@ -2300,7 +2330,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                     />
                   </div>
                   <div>
-                    <label className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">Telefone (WhatsApp):</label>
+                    <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">Telefone (WhatsApp):</label>
                     <input
                       type="text"
                       value={editPatientPhone}
@@ -2311,7 +2341,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                   </div>
                   {onUpdateContactGlpiEntity && (
                     <div>
-                      <label className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">Empresa (GLPI):</label>
+                      <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">Empresa (GLPI):</label>
                       <select
                         value={editPatientGlpiEntityId ?? ""}
                         onChange={(e) => setEditPatientGlpiEntityId(e.target.value ? Number(e.target.value) : null)}
@@ -2383,7 +2413,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                 <div className="bg-white dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-700/80 rounded-xl p-4 shadow-sm space-y-3">
                   {upcoming.length > 0 && (
                     <div className="space-y-1.5">
-                      <label className="text-[11px] font-bold uppercase tracking-wide text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
+                      <label className="text-xs font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
                         <Calendar className="w-3.5 h-3.5" /> Próximos Agendamentos
                       </label>
                       <div className="space-y-1.5">{upcoming.map(renderConsultationRow)}</div>
@@ -2391,7 +2421,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                   )}
                   {past.length > 0 && (
                     <div className="space-y-1.5">
-                      <label className="text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                      <label className="text-sm font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
                         <Calendar className="w-3.5 h-3.5 text-slate-400" /> Histórico
                       </label>
                       <div className="space-y-1.5">{past.map(renderConsultationRow)}</div>
@@ -2404,13 +2434,13 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
             {/* Card 2: Tags & Observações */}
             <div className="bg-white dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-700/80 rounded-xl p-4 shadow-sm space-y-2">
               <div className="flex items-center justify-between">
-                <label className="text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                <label className="text-sm font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
                   <Tag className="w-3.5 h-3.5 text-slate-400" /> Tags do Paciente
                 </label>
                 {!isAddingTag && (
                   <button
                     onClick={() => setIsAddingTag(true)}
-                    className="text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 text-[11px] font-semibold flex items-center gap-0.5"
+                    className="text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 text-xs font-semibold flex items-center gap-0.5"
                   >
                     <Plus className="w-3.5 h-3.5" /> Adicionar
                   </button>
@@ -2419,12 +2449,12 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
 
               <div className="flex flex-wrap gap-1.5">
                 {selectedContact.tags.length === 0 && !isAddingTag && (
-                  <span className="text-[11px] text-slate-500 dark:text-slate-400">Nenhuma tag ainda.</span>
+                  <span className="text-xs text-slate-500 dark:text-slate-400">Nenhuma tag ainda.</span>
                 )}
                 {selectedContact.tags.map((tag) => (
                   <span
                     key={tag}
-                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-semibold border ${tagClasses(tag)}`}
+                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-semibold border ${tagClasses(tag)}`}
                   >
                     {tag}
                     <button onClick={() => onRemoveTag(tag)} aria-label={`Remover tag ${tag}`} className="p-1 -m-1 hover:text-slate-900 dark:hover:text-white">
@@ -2458,11 +2488,11 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                 aberta de botões (que, com muitos atendentes, empurrava o resto do
                 CRM pra fora da tela) + confirmação em modal rápido. */}
             <div className="bg-white dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-700/80 rounded-xl p-4 shadow-sm space-y-2">
-              <label className="text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+              <label className="text-sm font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
                 <UserPlus className="w-3.5 h-3.5 text-slate-400" /> Transferir Atendimento Para
               </label>
               {agents.length === 0 ? (
-                <p className="text-[11px] text-slate-500 dark:text-slate-400">Nenhum outro atendente disponível.</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">Nenhum outro atendente disponível.</p>
               ) : (
                 <Popover open={isTransferPopoverOpen} onOpenChange={setIsTransferPopoverOpen}>
                   <PopoverTrigger
@@ -2498,7 +2528,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                                 <span className={isCurrent ? 'font-semibold text-emerald-700 dark:text-emerald-400' : 'font-medium'}>
                                   {agent.name}
                                 </span>
-                                <span className="text-[10px] text-slate-500 dark:text-slate-400">{isCurrent ? 'Atual' : agent.role}</span>
+                                <span className="text-xs text-slate-500 dark:text-slate-400">{isCurrent ? 'Atual' : agent.role}</span>
                               </CommandItem>
                             );
                           })}
@@ -2551,7 +2581,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
 
             {/* Card 4: Etapa do Atendimento (seleção única — só a etapa atual fica em destaque) */}
             <div className="bg-white dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-700/80 rounded-xl p-4 shadow-sm space-y-2.5">
-              <label className="block text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+              <label className="text-sm font-semibold text-slate-700 dark:text-slate-200">
                 Etapa do Atendimento
               </label>
               <div className="grid grid-cols-2 gap-1.5" role="radiogroup" aria-label="Etapa do atendimento">
@@ -2579,7 +2609,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
               </div>
               {pendingFunnelStage && (
                 <div className="rounded-lg border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/40 p-2 space-y-1.5">
-                  <p className="text-[11px] font-medium text-amber-800 dark:text-amber-300">
+                  <p className="text-xs font-medium text-amber-800 dark:text-amber-300">
                     Pular direto para &quot;{FUNNEL_STEPS.find((s) => s.id === pendingFunnelStage)?.label}&quot;?
                   </p>
                   <div className="flex gap-1.5">
@@ -2589,14 +2619,14 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                         await onUpdateFunnelStage(pendingFunnelStage);
                         setPendingFunnelStage(null);
                       }}
-                      className="flex-1 px-2 py-1.5 rounded-md bg-emerald-600 text-white text-[11px] font-semibold hover:bg-emerald-700"
+                      className="flex-1 px-2 py-1.5 rounded-md bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700"
                     >
                       Confirmar
                     </button>
                     <button
                       type="button"
                       onClick={() => setPendingFunnelStage(null)}
-                      className="flex-1 px-2 py-1.5 rounded-md border border-slate-300 dark:border-slate-600 text-[11px] font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+                      className="flex-1 px-2 py-1.5 rounded-md border border-slate-300 dark:border-slate-600 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
                     >
                       Cancelar
                     </button>
@@ -2656,7 +2686,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                         <button
                           type="button"
                           onClick={() => setEditingReplyId(null)}
-                          className="px-3 py-1.5 text-[11px] font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg"
+                          className="px-3 py-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg"
                         >
                           Cancelar
                         </button>
@@ -2664,7 +2694,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                           type="button"
                           disabled={isSavingEditedReply}
                           onClick={handleSaveEditedQuickReply}
-                          className="px-3 py-1.5 text-[11px] font-semibold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 rounded-lg"
+                          className="px-3 py-1.5 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 rounded-lg"
                         >
                           {isSavingEditedReply ? "Salvando..." : "Salvar"}
                         </button>
@@ -2676,21 +2706,21 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                 if (pendingDeleteReplyId === reply.id) {
                   return (
                     <div key={reply.id} className="p-2.5 rounded-lg border border-rose-300 dark:border-rose-700 bg-rose-50/60 dark:bg-rose-950/30 space-y-1.5">
-                      <p className="text-[11px] font-medium text-rose-800 dark:text-rose-300">
+                      <p className="text-xs font-medium text-rose-800 dark:text-rose-300">
                         Excluir o atalho {reply.shortcut}?
                       </p>
                       <div className="flex gap-1.5">
                         <button
                           type="button"
                           onClick={() => handleDeleteQuickReply(reply.id)}
-                          className="flex-1 px-2 py-1.5 rounded-md bg-rose-600 text-white text-[11px] font-semibold hover:bg-rose-700"
+                          className="flex-1 px-2 py-1.5 rounded-md bg-rose-600 text-white text-xs font-semibold hover:bg-rose-700"
                         >
                           Confirmar exclusão
                         </button>
                         <button
                           type="button"
                           onClick={() => setPendingDeleteReplyId(null)}
-                          className="flex-1 px-2 py-1.5 rounded-md border border-slate-300 dark:border-slate-600 text-[11px] font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+                          className="flex-1 px-2 py-1.5 rounded-md border border-slate-300 dark:border-slate-600 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
                         >
                           Cancelar
                         </button>
@@ -2733,7 +2763,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
           )}
 
           <form onSubmit={handleSaveNewQuickReply} className="space-y-3 mt-3 pt-3 border-t border-slate-100 dark:border-slate-800">
-            <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">Novo atalho</p>
+            <p className="text-xs font-bold text-slate-600 dark:text-slate-300">Novo atalho</p>
             <div className="space-y-3">
               <div>
                 <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Atalho (ex: /horarios):</label>
@@ -2773,78 +2803,25 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
         </DialogContent>
       </Dialog>
 
-      {/* Modal de Novo Contato */}
-      <Dialog open={isNewContactModalOpen} onOpenChange={(open) => !open && setIsNewContactModalOpen(false)}>
-        <DialogContent className="max-w-md rounded-2xl p-6" showCloseButton={false}>
-          <DialogClose
-            aria-label="Fechar"
-            render={<button className="absolute top-2 right-2 size-11 flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors" />}
-          >
-            <X className="w-5 h-5" />
-          </DialogClose>
-          <DialogHeader>
-            <DialogTitle className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-              <UserPlus className="w-4 h-4 text-emerald-600" />
-              Novo Contato
-            </DialogTitle>
-          </DialogHeader>
-
-          <form onSubmit={handleSaveNewContact} className="space-y-4 mt-2">
-            <div className="space-y-3">
-              <div>
-                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Nome:</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Nome do paciente"
-                  value={newContactName}
-                  onChange={(e) => setNewContactName(e.target.value)}
-                  className="w-full px-3 py-2 text-xs border border-slate-200 dark:border-slate-800 rounded-lg bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 mt-1"
-                />
-              </div>
-
-              <div>
-                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">WhatsApp (com DDD):</label>
-                <input
-                  type="tel"
-                  required
-                  placeholder="77999998888"
-                  value={newContactPhone}
-                  onChange={(e) => setNewContactPhone(e.target.value)}
-                  className="w-full px-3 py-2 text-xs border border-slate-200 dark:border-slate-800 rounded-lg bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 mt-1 font-mono"
-                />
-              </div>
-
-              {availableClinics && availableClinics.length > 0 && (
-                <div>
-                  <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Clínica:</label>
-                  <select
-                    required
-                    value={newContactClinicId}
-                    onChange={(e) => setNewContactClinicId(e.target.value)}
-                    className="w-full px-3 py-2 text-xs border border-slate-200 dark:border-slate-800 rounded-lg bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 mt-1"
-                  >
-                    <option value="" disabled>Escolha a clínica...</option>
-                    {availableClinics.map((clinic) => (
-                      <option key={clinic.id} value={clinic.id}>{clinic.tradeName}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
-            </div>
-
-            <div className="flex justify-end gap-2 pt-2">
-              <button
-                type="submit"
-                disabled={isSavingContact}
-                className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-semibold text-xs rounded-lg shadow-sm"
-              >
-                {isSavingContact ? "Salvando..." : "Cadastrar Contato"}
-              </button>
-            </div>
-          </form>
-        </DialogContent>
-      </Dialog>
+      {/* Modal de Novo Contato (F2 — mesmo componente da tela de Contatos) */}
+      {onCreateContact && (
+        <NewContactDialog
+          open={isNewContactModalOpen}
+          onOpenChange={setIsNewContactModalOpen}
+          clinics={availableClinics && availableClinics.length > 0 ? availableClinics : undefined}
+          onCheckPhone={onCheckContactPhone ?? (async () => null)}
+          onCreate={async (input) => {
+            await onCreateContact(input.name, input.phone, input.clinicId, input.extra);
+            toast.success("Contato cadastrado com sucesso!");
+            setMobileView('chat');
+          }}
+          onOpenExisting={async (existing, input) => {
+            if (existing.conversationId) onSelectContact(existing.conversationId);
+            else await onCreateContact(existing.name, input.phone, input.clinicId);
+            setMobileView('chat');
+          }}
+        />
+      )}
 
       {/* Modal de Agendamento */}
       {selectedContact && (
@@ -2894,7 +2871,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
               Finalizar Atendimento do Paciente
             </DialogTitle>
             <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-              Selecione o desfecho obrigatório deste atendimento para {selectedContact.name}.
+              Selecione o desfecho obrigatório deste atendimento para {displayName(selectedContact)}.
             </p>
           </DialogHeader>
 
@@ -2926,7 +2903,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                   },
                 ].map((section) => (
                   <div key={section.group} className="space-y-1">
-                    <p className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+                    <p className="text-xs font-semibold text-slate-600 dark:text-slate-300">
                       {section.group}
                     </p>
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
@@ -2967,7 +2944,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
 
             <div className="flex flex-col items-end gap-1.5 pt-2 border-t border-slate-100 dark:border-slate-800">
               {!selectedReason && (
-                <p className="text-[10px] text-amber-600 dark:text-amber-400 font-medium">
+                <p className="text-xs text-amber-600 dark:text-amber-400 font-medium">
                   Selecione o motivo do encerramento acima para continuar.
                 </p>
               )}

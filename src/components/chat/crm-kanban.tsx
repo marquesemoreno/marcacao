@@ -1,5 +1,7 @@
 "use client";
 
+import { formatPhone } from "@/lib/format";
+import { displayName } from "@/lib/contact-display";
 import React, { useState } from 'react';
 import { Agent, Contact, FunnelStage } from '@/types/chat-crm';
 import { AvatarBadge } from './avatar-badge';
@@ -12,6 +14,12 @@ import {
   UserCheck,
   Building2,
   ExternalLink,
+  UserPlus,
+  MessagesSquare,
+  CircleDollarSign,
+  CalendarCheck,
+  Flag,
+  KanbanSquare,
 } from 'lucide-react';
 
 type KanbanStage = FunnelStage | 'finalizado';
@@ -23,20 +31,37 @@ interface CRMKanbanProps {
   onMoveStage: (contactId: string, stage: FunnelStage) => void;
   onFinish: (contactId: string) => void;
   onReopen: (contactId: string) => void;
+  /** D1: primeira carga em andamento — mostra "Carregando…" em vez de colunas zeradas. */
+  isLoading?: boolean;
+  /** D1: a carga falhou — aviso com "Tentar de novo" em vez de um quadro vazio silencioso. */
+  loadError?: boolean;
+  onRetry?: () => void;
 }
 
 const STAGES: { id: KanbanStage; title: string; shortLabel: string; color: string; bgBadge: string }[] = [
-  { id: 'novos', title: '🆕 Novos Pacientes', shortLabel: '🆕 Novos', color: 'border-amber-400', bgBadge: 'bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-800' },
-  { id: 'triagem', title: '💬 Em Atendimento', shortLabel: '💬 Em Atendimento', color: 'border-sky-400', bgBadge: 'bg-sky-100 dark:bg-sky-950/60 text-sky-800 dark:text-sky-300 border-sky-200 dark:border-sky-800' },
-  { id: 'orcamento', title: '💲 Orçamento / Dúvidas', shortLabel: '💲 Orçamento', color: 'border-purple-400', bgBadge: 'bg-purple-100 dark:bg-purple-950/60 text-purple-800 dark:text-purple-300 border-purple-200 dark:border-purple-800' },
-  { id: 'agendado', title: '🎟️ Agendamento Confirmado', shortLabel: '🎟️ Agendado', color: 'border-emerald-500', bgBadge: 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800' },
-  { id: 'finalizado', title: '🏁 Finalizado / Realizado', shortLabel: '🏁 Finalizado', color: 'border-slate-400', bgBadge: 'bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-700' },
+  { id: 'novos', title: 'Novos pacientes', shortLabel: 'Novos', color: 'border-amber-400', bgBadge: 'bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-800' },
+  { id: 'triagem', title: 'Em atendimento', shortLabel: 'Em atendimento', color: 'border-sky-400', bgBadge: 'bg-sky-100 dark:bg-sky-950/60 text-sky-800 dark:text-sky-300 border-sky-200 dark:border-sky-800' },
+  { id: 'orcamento', title: 'Orçamento / dúvidas', shortLabel: 'Orçamento', color: 'border-purple-400', bgBadge: 'bg-purple-100 dark:bg-purple-950/60 text-purple-800 dark:text-purple-300 border-purple-200 dark:border-purple-800' },
+  { id: 'agendado', title: 'Agendamento confirmado', shortLabel: 'Agendado', color: 'border-emerald-500', bgBadge: 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800' },
+  { id: 'finalizado', title: 'Finalizado / realizado', shortLabel: 'Finalizado', color: 'border-slate-400', bgBadge: 'bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-700' },
 ];
+
+/** Ícones de linha no lugar dos emojis dos títulos (mesma família do menu lateral). */
+const STAGE_ICONS: Record<KanbanStage, React.ComponentType<{ className?: string }>> = {
+  novos: UserPlus,
+  triagem: MessagesSquare,
+  orcamento: CircleDollarSign,
+  agendado: CalendarCheck,
+  finalizado: Flag,
+};
 
 const STAGE_ORDER: KanbanStage[] = ['novos', 'triagem', 'orcamento', 'agendado', 'finalizado'];
 
 export const CRMKanban: React.FC<CRMKanbanProps> = ({
   contacts,
+  isLoading = false,
+  loadError = false,
+  onRetry,
   agents = [],
   onOpenContactChat,
   onMoveStage,
@@ -92,6 +117,9 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
     return matchesSearch && matchesAgent && matchesDept;
   });
 
+  const hasActiveFilter =
+    search.trim() !== '' || selectedAgent !== 'todos' || selectedDept !== 'todos' || mobileSelectedStage !== 'todos';
+
   const visibleStages = mobileSelectedStage === 'todos'
     ? STAGES
     : STAGES.filter((s) => s.id === mobileSelectedStage);
@@ -104,7 +132,8 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
       <div className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-4 sm:px-6 py-3 flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 shrink-0">
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 flex-wrap">
           <h2 className="text-sm sm:text-base font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-            <span>📋 CRM</span>
+            <KanbanSquare className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+            <span>CRM</span>
             <span className="text-xs font-mono font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-2.5 py-0.5 rounded-full border border-slate-200 dark:border-slate-700">
               {filtered.length} paciente{filtered.length === 1 ? '' : 's'}
             </span>
@@ -128,11 +157,11 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
               onChange={(e) => setSelectedAgent(e.target.value)}
               className="w-full pl-8 pr-3 py-1.5 text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-semibold text-slate-700 dark:text-slate-200 appearance-none cursor-pointer"
             >
-              <option value="todos">👤 Todos Atendentes</option>
-              <option value="unassigned">⏳ Não Atribuídos</option>
+              <option value="todos">Todos os atendentes</option>
+              <option value="unassigned">Não atribuídos</option>
               {agents.map((ag) => (
                 <option key={ag.id} value={ag.name}>
-                  👤 {ag.name}
+                  {ag.name}
                 </option>
               ))}
             </select>
@@ -145,18 +174,54 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
               onChange={(e) => setSelectedDept(e.target.value)}
               className="w-full pl-8 pr-3 py-1.5 text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-semibold text-slate-700 dark:text-slate-200 appearance-none cursor-pointer"
             >
-              <option value="todos">🏥 Todos Deptos</option>
+              <option value="todos">Todos os departamentos</option>
               <option value="recepcao">Recepção</option>
               <option value="agendamento">Agendamento</option>
               <option value="financeiro">Financeiro</option>
             </select>
           </div>
+
+          {hasActiveFilter && (
+            <span className="inline-flex items-center gap-2 text-xs font-medium text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-lg px-2.5 py-1">
+              Filtro ativo
+              <button
+                type="button"
+                onClick={() => {
+                  setSearch('');
+                  setSelectedAgent('todos');
+                  setSelectedDept('todos');
+                  setMobileSelectedStage('todos');
+                }}
+                className="font-semibold underline underline-offset-2"
+              >
+                Limpar
+              </button>
+            </span>
+          )}
         </div>
 
       </div>
 
+      {(isLoading || loadError) && (
+        <div
+          role={loadError ? 'alert' : 'status'}
+          className={`mx-4 sm:mx-6 mt-3 rounded-lg border px-4 py-3 text-sm flex items-center justify-between gap-3 ${
+            loadError
+              ? 'border-rose-200 dark:border-rose-800 bg-rose-50 dark:bg-rose-950/40 text-rose-800 dark:text-rose-200'
+              : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300'
+          }`}
+        >
+          {loadError ? 'Não foi possível carregar os pacientes do CRM.' : 'Carregando pacientes…'}
+          {loadError && onRetry && (
+            <button type="button" onClick={onRetry} className="font-semibold underline underline-offset-2">
+              Tentar de novo
+            </button>
+          )}
+        </div>
+      )}
+
       <div className="md:hidden bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-3 py-2 flex items-center gap-1.5 overflow-x-auto no-scrollbar shrink-0">
-        <span className="text-[10px] font-mono text-slate-400 dark:text-slate-500 font-medium flex items-center gap-1 shrink-0">
+        <span className="text-xs font-mono text-slate-400 dark:text-slate-500 font-medium flex items-center gap-1 shrink-0">
           <Filter className="w-3 h-3" /> Etapa:
         </span>
         <button
@@ -183,7 +248,7 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
               }`}
             >
               <span>{s.shortLabel}</span>
-              <span className="text-[10px] opacity-80 font-mono">({count})</span>
+              <span className="text-xs opacity-80 font-mono">({count})</span>
             </button>
           );
         })}
@@ -205,12 +270,18 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
                 <div className={`p-3 bg-white dark:bg-slate-900 border-t-4 ${stage.color} border-b border-slate-200 dark:border-slate-800 flex items-center justify-between`}>
                   <div>
                     <div className="flex items-center gap-2">
-                      <h3 className="font-semibold text-xs sm:text-sm text-slate-900 dark:text-slate-100">{stage.title}</h3>
+                      <h3 className="font-semibold text-sm text-slate-900 dark:text-slate-100 inline-flex items-center gap-1.5">
+                        {(() => {
+                          const Icon = STAGE_ICONS[stage.id];
+                          return <Icon className="w-4 h-4 text-slate-500 dark:text-slate-400" />;
+                        })()}
+                        {stage.title}
+                      </h3>
                       <span className={`text-xs font-medium px-2.5 py-0.5 rounded-full font-mono border ${stage.bgBadge}`}>
                         {stageContacts.length}
                       </span>
                     </div>
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400 font-mono mt-0.5 font-semibold">
+                    <p className="text-xs text-slate-500 dark:text-slate-400 font-mono mt-0.5 font-semibold">
                       {stageContacts.length} paciente{stageContacts.length === 1 ? '' : 's'}
                     </p>
                   </div>
@@ -233,13 +304,13 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
                         >
                           <div className="flex items-start justify-between gap-2">
                             <div className="flex items-center gap-2.5 min-w-0">
-                              <AvatarBadge name={contact.name} photoUrl={contact.avatar} size={36} className="ring-2 ring-slate-100 dark:ring-slate-800 shrink-0" />
+                              <AvatarBadge name={displayName(contact)} photoUrl={contact.avatar} size={36} className="ring-2 ring-slate-100 dark:ring-slate-800 shrink-0" />
                               <div className="min-w-0">
                                 <h4 className="font-semibold text-xs text-slate-900 dark:text-slate-100 truncate">
-                                  {contact.name}
+                                  {displayName(contact)}
                                 </h4>
-                                <p className="text-[11px] text-slate-500 dark:text-slate-400 font-mono flex items-center gap-1 mt-0.5">
-                                  <Phone className="w-3 h-3 text-emerald-600 dark:text-emerald-400" /> {contact.phone}
+                                <p className="text-xs text-slate-500 dark:text-slate-400 font-mono flex items-center gap-1 mt-0.5">
+                                  <Phone className="w-3 h-3 text-emerald-600 dark:text-emerald-400" /> {formatPhone(contact.phone)}
                                 </p>
                               </div>
                             </div>
@@ -252,7 +323,7 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
                               }`}
                               title={isUnassigned ? "Nenhum atendente assumiu esta conversa" : `Atribuído a ${contact.responsibleAgent}`}
                             >
-                              {isUnassigned ? "⏳ Livre" : `👤 ${contact.responsibleAgent}`}
+                              {isUnassigned ? "Não atribuída" : contact.responsibleAgent}
                             </span>
                           </div>
 
@@ -261,7 +332,7 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
                               &ldquo;{contact.lastMessage}&rdquo;
                             </p>
                             {contact.lastMessageTime && (
-                              <p className="text-[10px] text-slate-400 font-mono font-medium">{contact.lastMessageTime}</p>
+                              <p className="text-xs text-slate-400 font-mono font-medium">{contact.lastMessageTime}</p>
                             )}
                           </div>
 
@@ -270,7 +341,7 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
                               {contact.tags.map((tag) => (
                                 <span
                                   key={tag}
-                                  className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700"
+                                  className="text-xs font-semibold px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700"
                                 >
                                   {tag}
                                 </span>
@@ -283,7 +354,7 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
                             </div>
 
                             <div className="flex items-center justify-between pt-1.5 border-t border-slate-100 dark:border-slate-800 text-xs">
-                              <span className="text-[11px] text-slate-400 font-medium">Estimado:</span>
+                              <span className="text-xs text-slate-400 font-medium">Estimado:</span>
                               <span className="font-mono font-bold text-emerald-700 dark:text-emerald-400">
                                 {contact.estimatedValue || '—'}
                               </span>
@@ -328,7 +399,7 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
                             {onOpenContactChat && (
                               <button
                                 onClick={() => onOpenContactChat(contact.id)}
-                                className="text-[11px] font-medium text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 flex items-center gap-1 hover:underline py-1 px-2.5 bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100/80 rounded-lg transition-all border border-emerald-200/60 dark:border-emerald-800 shadow-xs"
+                                className="text-xs font-medium text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 flex items-center gap-1 hover:underline py-1 px-2.5 bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100/80 rounded-lg transition-all border border-emerald-200/60 dark:border-emerald-800 shadow-xs"
                                 title="Abrir conversa na Caixa de Entrada"
                               >
                                 <ExternalLink className="w-3 h-3" />

@@ -1,16 +1,24 @@
+import type { Metadata } from "next";
 import { getServerSession } from "next-auth";
+import { PanelDarkDefault } from "@/components/panel-dark-default";
 import { authOptions } from "@/lib/auth";
-import { SignOutButton } from "@/components/sign-out-button";
-import { ThemeToggle } from "@/components/theme-toggle";
+import { UserMenu } from "@/components/clinic/user-menu";
 import { Logo } from "@/components/brand/logo";
 import { ClinicNav } from "@/components/clinic/clinic-nav";
 import { ClinicSidebar } from "@/components/clinic/clinic-sidebar";
-import { FeedbackWidget } from "@/components/feedback-widget";
 import { CopilotLauncher } from "@/components/clinic/copilot/copilot-launcher";
 import { getClinicInfo } from "@/actions/clinic";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
+
+/** Título por página no painel: "Chat · Urolaser · Conecta Saúde" (cada página define
+ * só o próprio nome em `metadata.title`). Antes todas herdavam o título do site dos
+ * pacientes ("Consultas e Exames Perto de Você"). */
+export async function generateMetadata(): Promise<Metadata> {
+  const clinic = await getClinicInfo();
+  return { title: { template: `%s · ${clinic.tradeName} · Conecta Saúde`, default: `${clinic.tradeName} · Conecta Saúde` } };
+}
 
 export default async function ClinicLayout({
   children,
@@ -22,6 +30,7 @@ export default async function ClinicLayout({
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100">
+      <PanelDarkDefault />
       <ClinicSidebar tradeName={clinic.tradeName} userName={session?.user.name} isExclusive={isExclusive} />
 
       {/* Barra superior compacta — só no mobile, onde o trilho fica escondido. */}
@@ -30,10 +39,7 @@ export default async function ClinicLayout({
           <Logo variant="icon-only" size="sm" />
           <span className="truncate text-xs font-extrabold text-slate-900 dark:text-slate-100">{clinic.tradeName}</span>
         </div>
-        <div className="flex items-center gap-2">
-          <ThemeToggle />
-          <SignOutButton />
-        </div>
+        <UserMenu userName={session?.user.name} side="bottom" compact />
       </header>
 
       <div className="flex-1 min-w-0 flex flex-col overflow-hidden md:pt-0 pt-14">
@@ -44,7 +50,6 @@ export default async function ClinicLayout({
         <main className="flex-1 overflow-hidden flex flex-col">{children}</main>
       </div>
 
-      <FeedbackWidget />
       <CopilotLauncher />
     </div>
   );

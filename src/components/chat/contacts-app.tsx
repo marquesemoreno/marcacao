@@ -1,12 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Search, Users, MessageCircle, UserPlus, Upload, X, Eye, Calendar } from "lucide-react";
 import { toast } from "sonner";
 import {
-  listAllContacts,
+  listContactsPage,
   createContact,
+  checkContactPhone,
   getChatContactHistory,
   updateContactInfo,
   updateConversationTags,
@@ -22,21 +23,27 @@ import {
 import {
   listAllContactsAdmin,
   createContactAdmin,
+  checkContactPhoneAdmin,
   listClinicsForReassignment,
   importContactsAdmin,
   type ImportContactsResult,
 } from "@/actions/admin-inbox";
 import { getDistinctConvenios, getDistinctDoctorNames } from "@/actions/clinic";
 import { parseContactsCsv, type ParsedContactRow } from "@/lib/contacts-csv";
-import { formatPhone, formatCpf } from "@/lib/format";
+import { formatPhone, formatCpf, toTitleCaseName } from "@/lib/format";
+import { displayName } from "@/lib/contact-display";
+import { splitDoctorAgendas } from "@/lib/doctor-names";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { AvatarBadge } from "@/components/chat/avatar-badge";
 import { PatientRecordSheet } from "@/components/chat/patient-record-sheet";
+import { NewContactDialog } from "@/components/chat/new-contact-dialog";
 import { ScheduleModal } from "@/components/chat/schedule-modal";
 import type { PatientRecordData, UpdatePatientData } from "@/types/chat-crm";
 
 type Scope = "clinic" | "admin";
+
+const CONTACTS_PAGE_SIZE = 50;
 
 type ContactRow = {
   conversationId: string;
@@ -70,11 +77,6 @@ const statusClasses: Record<ContactRow["status"], string> = {
 
 /** Remove o DDI 55 (armazenado junto no telefone do Contact) antes de formatar
  * como (DD) 9XXXX-XXXX — sem isso o formatPhone padrão desalinha os dígitos. */
-function formatContactPhone(phone: string) {
-  const digits = phone.replace(/\D/g, "");
-  const local = digits.length > 11 && digits.startsWith("55") ? digits.slice(2) : digits;
-  return formatPhone(local);
-}
 
 function rowToPatientRecord(row: ContactRow): PatientRecordData {
   return {
@@ -96,15 +98,22 @@ function rowToPatientRecord(row: ContactRow): PatientRecordData {
 
 export function ContactsApp({ scope, basePath }: { scope: Scope; basePath: string }) {
   const router = useRouter();
-  const [search, setSearch] = useState("");
+  // F3: busca, filtros e página vivem na URL (?q=&page=&convenio=&doctor=) — dá pra
+  // recarregar/compartilhar a tela no mesmo estado. Clínica pagina no servidor.
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
+  const urlQ = searchParams.get("q") ?? "";
+  const page = Math.max(1, Number(searchParams.get("page")) || 1);
+  const convenioFilter = searchParams.get("convenio") ?? "";
+  const doctorFilter = searchParams.get("doctor") ?? "";
+  const [search, setSearch] = useState(urlQ);
+  const [total, setTotal] = useState(0);
   const [contacts, setContacts] = useState<ContactRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   // Filtros "Convênio"/"Médico" — só clínica (o pedido é específico de /clinic/contatos;
   // admin mantém a tabela mais simples de hoje). Filtram em memória a lista já
   // carregada, sem query nova por filtro (mesma decisão do plano desta mudança).
-  const [convenioFilter, setConvenioFilter] = useState("");
-  const [doctorFilter, setDoctorFilter] = useState("");
   const [convenios, setConvenios] = useState<string[]>([]);
   const [doctors, setDoctors] = useState<string[]>([]);
 
@@ -119,10 +128,6 @@ export function ContactsApp({ scope, basePath }: { scope: Scope; basePath: strin
   const [scheduleContact, setScheduleContact] = useState<{ conversationId: string; name: string; cpf: string; phone: string } | null>(null);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [newName, setNewName] = useState("");
-  const [newPhone, setNewPhone] = useState("");
-  const [newClinicId, setNewClinicId] = useState("");
-  const [isSaving, setIsSaving] = useState(false);
   const [availableClinics, setAvailableClinics] = useState<{ id: string; tradeName: string }[]>([]);
 
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
@@ -133,22 +138,46 @@ export function ContactsApp({ scope, basePath }: { scope: Scope; basePath: strin
   const [isImporting, setIsImporting] = useState(false);
   const [importResult, setImportResult] = useState<ImportContactsResult | null>(null);
 
+  const updateParams = useCallback(
+    (changes: Record<string, string | number | null>) => {
+      const next = new URLSearchParams(searchParams.toString());
+      for (const [key, value] of Object.entries(changes)) {
+        if (value === null || value === "" || (key === "page" && value === 1)) next.delete(key);
+        else next.set(key, String(value));
+      }
+      const qs = next.toString();
+      router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    },
+    [searchParams, pathname, router]
+  );
+
+  // Digitação vai pra URL com atraso (e volta pra página 1).
+  useEffect(() => {
+    if (search === urlQ) return;
+    const timeout = setTimeout(() => updateParams({ q: search, page: null }), 300);
+    return () => clearTimeout(timeout);
+  }, [search, urlQ, updateParams]);
+
   const fetchContacts = useCallback(async () => {
-    const result =
-      scope === "admin" ? await listAllContactsAdmin(search || undefined) : await listAllContacts(search || undefined);
-    setContacts(result);
-  }, [scope, search]);
+    if (scope === "admin") {
+      const all = await listAllContactsAdmin(urlQ || undefined);
+      setContacts(all);
+      setTotal(all.length);
+    } else {
+      const result = await listContactsPage({ q: urlQ || undefined, page, convenio: convenioFilter || undefined, doctor: doctorFilter || undefined });
+      setContacts(result.rows);
+      setTotal(result.total);
+    }
+  }, [scope, urlQ, page, convenioFilter, doctorFilter]);
 
   useEffect(() => {
     let cancelled = false;
     setIsLoading(true);
-    const timeout = setTimeout(async () => {
-      await fetchContacts();
+    fetchContacts().finally(() => {
       if (!cancelled) setIsLoading(false);
-    }, 300);
+    });
     return () => {
       cancelled = true;
-      clearTimeout(timeout);
     };
   }, [fetchContacts]);
 
@@ -161,11 +190,12 @@ export function ContactsApp({ scope, basePath }: { scope: Scope; basePath: strin
     }
   }, [scope]);
 
-  const filteredContacts = contacts.filter((c) => {
-    if (convenioFilter && c.convenio !== convenioFilter) return false;
-    if (doctorFilter && c.lastAppointment?.doctorName !== doctorFilter) return false;
-    return true;
-  });
+  const doctorOptions = splitDoctorAgendas(doctors);
+
+  // Clínica já vem paginada do servidor; admin carrega tudo e pagina na tela.
+  const filteredContacts =
+    scope === "admin" ? contacts.slice((page - 1) * CONTACTS_PAGE_SIZE, page * CONTACTS_PAGE_SIZE) : contacts;
+  const pageCount = Math.max(1, Math.ceil(total / CONTACTS_PAGE_SIZE));
 
   async function handleOpenSheet(row: ContactRow) {
     setSheetContact(rowToPatientRecord(row));
@@ -216,27 +246,11 @@ export function ContactsApp({ scope, basePath }: { scope: Scope; basePath: strin
     await fetchContacts();
   }
 
-  async function handleSaveNewContact(event: React.FormEvent) {
-    event.preventDefault();
-    if (!newName.trim() || !newPhone.trim()) return;
-    if (scope === "admin" && availableClinics.length > 0 && !newClinicId) return;
-
-    setIsSaving(true);
-    try {
-      const conversationId =
-        scope === "admin" ? await createContactAdmin(newName, newPhone, newClinicId) : await createContact(newName, newPhone);
-      toast.success("Contato cadastrado com sucesso!");
-      setNewName("");
-      setNewPhone("");
-      setNewClinicId("");
-      setIsModalOpen(false);
-      router.push(`${basePath}/inbox?c=${conversationId}`);
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Não foi possível cadastrar o contato.");
-    } finally {
-      setIsSaving(false);
-    }
-  }
+  const handleCheckContactPhone = useCallback(
+    (phone: string, clinicId?: string) =>
+      scope === "admin" ? (clinicId ? checkContactPhoneAdmin(phone, clinicId) : Promise.resolve(null)) : checkContactPhone(phone),
+    [scope]
+  );
 
   function handleCsvChange(value: string) {
     setCsvText(value);
@@ -330,9 +344,11 @@ export function ContactsApp({ scope, basePath }: { scope: Scope; basePath: strin
         </div>
         {scope === "clinic" && (
           <>
+            {convenios.length > 0 && (
             <select
+              aria-label="Filtrar por convênio"
               value={convenioFilter}
-              onChange={(e) => setConvenioFilter(e.target.value)}
+              onChange={(e) => updateParams({ convenio: e.target.value, page: null })}
               className="h-9 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2.5 text-xs text-slate-700 dark:text-slate-300"
             >
               <option value="">Todos os convênios</option>
@@ -340,15 +356,26 @@ export function ContactsApp({ scope, basePath }: { scope: Scope; basePath: strin
                 <option key={c} value={c}>{c}</option>
               ))}
             </select>
+            )}
             <select
+              aria-label="Filtrar por médico da última consulta"
               value={doctorFilter}
-              onChange={(e) => setDoctorFilter(e.target.value)}
+              onChange={(e) => updateParams({ doctor: e.target.value, page: null })}
               className="h-9 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2.5 text-xs text-slate-700 dark:text-slate-300"
             >
               <option value="">Todos os médicos</option>
-              {doctors.map((d) => (
-                <option key={d} value={d}>{d}</option>
-              ))}
+              <optgroup label="Médicos">
+                {doctorOptions.doctors.map((d) => (
+                  <option key={d} value={d}>{toTitleCaseName(d)}</option>
+                ))}
+              </optgroup>
+              {doctorOptions.agendas.length > 0 && (
+                <optgroup label="Agendas de procedimento">
+                  {doctorOptions.agendas.map((d) => (
+                    <option key={d} value={d}>{toTitleCaseName(d)}</option>
+                  ))}
+                </optgroup>
+              )}
             </select>
           </>
         )}
@@ -387,23 +414,21 @@ export function ContactsApp({ scope, basePath }: { scope: Scope; basePath: strin
                     <button
                       type="button"
                       onClick={() => handleOpenSheet(contact)}
+                      aria-label={`Ver ficha de ${displayName(contact)}`}
                       className="flex items-center gap-2.5 text-left hover:underline decoration-slate-400 underline-offset-2"
                     >
-                      <AvatarBadge name={contact.name} size={32} />
-                      <div className="min-w-0">
-                        <p className="font-semibold text-slate-900 dark:text-slate-100 truncate max-w-[180px]">{contact.name}</p>
-                        <p className="text-xs text-slate-500 dark:text-slate-400 font-mono">{formatContactPhone(contact.phone)}</p>
-                      </div>
+                      <AvatarBadge name={displayName(contact)} size={32} />
+                      <span className="font-semibold text-sm text-slate-900 dark:text-slate-100 truncate max-w-[220px]">{displayName(contact)}</span>
                     </button>
                   </TableCell>
                   <TableCell className="font-mono text-xs text-slate-600 dark:text-slate-400">
-                    {formatContactPhone(contact.phone)}
+                    {formatPhone(contact.phone)}
                   </TableCell>
                   <TableCell>
                     <div className="flex flex-col gap-1">
                       <span className="font-mono text-xs text-slate-600 dark:text-slate-400">{contact.cpf ? formatCpf(contact.cpf) : "—"}</span>
                       {contact.convenio && (
-                        <Badge variant="outline" className="rounded-md w-fit text-[10px] px-1.5 py-0 h-4.5">
+                        <Badge variant="outline" className="rounded-md w-fit text-xs px-1.5 py-0 h-4.5">
                           {contact.convenio}
                         </Badge>
                       )}
@@ -414,7 +439,7 @@ export function ContactsApp({ scope, basePath }: { scope: Scope; basePath: strin
                       <div>
                         <p>{contact.lastAppointment.date}</p>
                         {contact.lastAppointment.doctorName && (
-                          <p className="text-slate-400 dark:text-slate-500">{contact.lastAppointment.doctorName}</p>
+                          <p className="text-slate-500 dark:text-slate-400">{toTitleCaseName(contact.lastAppointment.doctorName)}</p>
                         )}
                       </div>
                     ) : (
@@ -432,8 +457,10 @@ export function ContactsApp({ scope, basePath }: { scope: Scope; basePath: strin
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-1">
                       <button
+                        type="button"
                         onClick={() => handleOpenSheet(contact)}
-                        title="Ver Ficha"
+                        title="Ver ficha"
+                        aria-label={`Ver ficha de ${displayName(contact)}`}
                         className="p-1.5 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-800 dark:hover:text-slate-200"
                       >
                         <Eye className="size-3.5" />
@@ -441,7 +468,9 @@ export function ContactsApp({ scope, basePath }: { scope: Scope; basePath: strin
                       {scope === "clinic" && (
                         <button
                           onClick={() => setScheduleContact({ conversationId: contact.conversationId, name: contact.name, cpf: contact.cpf ?? "", phone: contact.phone })}
+                          type="button"
                           title="Agendar"
+                          aria-label={`Agendar para ${displayName(contact)}`}
                           className="p-1.5 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-800 dark:hover:text-slate-200"
                         >
                           <Calendar className="size-3.5" />
@@ -449,7 +478,9 @@ export function ContactsApp({ scope, basePath }: { scope: Scope; basePath: strin
                       )}
                       <button
                         onClick={() => router.push(`${basePath}/inbox?c=${contact.conversationId}`)}
-                        title="Abrir Conversa"
+                        type="button"
+                        title="Abrir conversa"
+                        aria-label={`Abrir conversa com ${displayName(contact)}`}
                         className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 dark:bg-emerald-600 px-2.5 py-1.5 text-xs font-medium text-white transition-all hover:bg-slate-800 dark:hover:bg-emerald-500"
                       >
                         <MessageCircle className="size-3.5" />
@@ -462,6 +493,33 @@ export function ContactsApp({ scope, basePath }: { scope: Scope; basePath: strin
           </TableBody>
         </Table>
       </div>
+
+      {total > 0 && (
+        <nav aria-label="Paginação de contatos" className="flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600 dark:text-slate-300">
+          <span>
+            Mostrando {(page - 1) * CONTACTS_PAGE_SIZE + 1}–{Math.min(page * CONTACTS_PAGE_SIZE, total)} de {total} contato(s)
+          </span>
+          <span className="inline-flex items-center gap-2">
+            <button
+              type="button"
+              disabled={page <= 1 || isLoading}
+              onClick={() => updateParams({ page: page - 1 })}
+              className="rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Anterior
+            </button>
+            <span aria-current="page">Página {page} de {pageCount}</span>
+            <button
+              type="button"
+              disabled={page >= pageCount || isLoading}
+              onClick={() => updateParams({ page: page + 1 })}
+              className="rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Próxima
+            </button>
+          </span>
+        </nav>
+      )}
 
       {sheetContact && (
         <PatientRecordSheet
@@ -489,79 +547,29 @@ export function ContactsApp({ scope, basePath }: { scope: Scope; basePath: strin
         />
       )}
 
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 backdrop-blur-xs p-4">
-          <form
-            onSubmit={handleSaveNewContact}
-            className="max-w-md w-full bg-white dark:bg-slate-900 rounded-lg p-6 shadow-xl space-y-4 border border-slate-200 dark:border-slate-800"
-          >
-            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
-              <h3 className="font-semibold text-slate-900 dark:text-slate-100 text-sm flex items-center gap-2">
-                <UserPlus className="w-4 h-4 text-emerald-600" />
-                Novo Contato
-              </h3>
-              <button type="button" onClick={() => setIsModalOpen(false)}>
-                <X className="w-5 h-5 text-slate-400" />
-              </button>
-            </div>
-
-            <div className="space-y-3">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-xs font-medium text-slate-600 dark:text-slate-400">Nome:</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="Nome do paciente"
-                    value={newName}
-                    onChange={(event) => setNewName(event.target.value)}
-                    className="w-full h-9 px-3 text-xs border border-slate-200 dark:border-slate-800 rounded-lg bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 mt-1"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-xs font-medium text-slate-600 dark:text-slate-400">WhatsApp (com DDD):</label>
-                  <input
-                    type="tel"
-                    required
-                    placeholder="77999998888"
-                    value={newPhone}
-                    onChange={(event) => setNewPhone(event.target.value)}
-                    className="w-full h-9 px-3 text-xs border border-slate-200 dark:border-slate-800 rounded-lg bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 mt-1 font-mono"
-                  />
-                </div>
-              </div>
-
-              {scope === "admin" && availableClinics.length > 0 && (
-                <div>
-                  <label className="text-xs font-medium text-slate-600 dark:text-slate-400">Clínica:</label>
-                  <select
-                    required
-                    value={newClinicId}
-                    onChange={(event) => setNewClinicId(event.target.value)}
-                    className="w-full px-3 py-2 text-xs border border-slate-200 dark:border-slate-800 rounded-lg bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 mt-1"
-                  >
-                    <option value="" disabled>Escolha a clínica...</option>
-                    {availableClinics.map((clinic) => (
-                      <option key={clinic.id} value={clinic.id}>{clinic.tradeName}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
-            </div>
-
-            <div className="flex justify-end gap-2 pt-2">
-              <button
-                type="submit"
-                disabled={isSaving}
-                className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-semibold text-xs rounded-lg shadow-sm"
-              >
-                {isSaving ? "Salvando..." : "Cadastrar Contato"}
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
+      <NewContactDialog
+        open={isModalOpen}
+        onOpenChange={setIsModalOpen}
+        clinics={scope === "admin" ? availableClinics : undefined}
+        onCheckPhone={handleCheckContactPhone}
+        onCreate={async (input) => {
+          const conversationId =
+            scope === "admin"
+              ? await createContactAdmin(input.name, input.phone, input.clinicId ?? "", input.extra)
+              : await createContact(input.name, input.phone, input.extra);
+          toast.success("Contato cadastrado com sucesso!");
+          router.push(`${basePath}/inbox?c=${conversationId}`);
+        }}
+        onOpenExisting={async (existing, input) => {
+          // Existe em outra clínica (sem conversa aqui): createContact só cria a conversa.
+          const conversationId =
+            existing.conversationId ??
+            (scope === "admin"
+              ? await createContactAdmin(existing.name, input.phone, input.clinicId ?? "")
+              : await createContact(existing.name, input.phone));
+          router.push(`${basePath}/inbox?c=${conversationId}`);
+        }}
+      />
 
       {isImportModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 backdrop-blur-xs p-4">
@@ -597,7 +605,7 @@ export function ContactsApp({ scope, basePath }: { scope: Scope; basePath: strin
                   <label htmlFor="contacts-csv" className="text-xs font-medium text-slate-600 dark:text-slate-400">
                     Lista de contatos (CSV — vírgula ou ponto-e-vírgula, cabeçalho opcional)
                   </label>
-                  <label className="inline-flex items-center gap-1.5 text-[11px] font-medium text-emerald-700 dark:text-emerald-400 cursor-pointer">
+                  <label className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-700 dark:text-emerald-400 cursor-pointer">
                     <Upload className="w-3.5 h-3.5" /> Enviar arquivo
                     <input
                       type="file"
@@ -615,13 +623,13 @@ export function ContactsApp({ scope, basePath }: { scope: Scope; basePath: strin
                   placeholder={"nome,telefone\nMaria Silva,77999998888"}
                   className="w-full mt-1 px-3 py-2 text-xs font-mono rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 resize-none"
                 />
-                <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                   Sem cabeçalho, assume a ordem nome, telefone, cpf. Com cabeçalho, as colunas podem vir em
                   qualquer ordem — precisa ter uma coluna de nome e uma de telefone (CPF é opcional).
                 </p>
-                {csvError && <p className="mt-1 text-[11px] font-semibold text-red-600 dark:text-red-400">{csvError}</p>}
+                {csvError && <p className="mt-1 text-xs font-semibold text-red-600 dark:text-red-400">{csvError}</p>}
                 {csvRows.length > 0 && (
-                  <p className="mt-1 text-[11px] font-semibold text-emerald-700 dark:text-emerald-400">
+                  <p className="mt-1 text-xs font-semibold text-emerald-700 dark:text-emerald-400">
                     {csvRows.length} contato(s) reconhecido(s).
                   </p>
                 )}
@@ -649,7 +657,7 @@ export function ContactsApp({ scope, basePath }: { scope: Scope; basePath: strin
                         {importResult.skipped.length} pulado(s):
                       </p>
                       {importResult.skipped.map((item, index) => (
-                        <p key={index} className="text-[11px] text-slate-500 dark:text-slate-400">
+                        <p key={index} className="text-xs text-slate-500 dark:text-slate-400">
                           {item.name || "(sem nome)"} — {item.phone || "(sem telefone)"}: {item.reason}
                         </p>
                       ))}

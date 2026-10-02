@@ -2,8 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { ChevronsLeft, ChevronsRight } from "lucide-react";
-import { SignOutButton } from "@/components/sign-out-button";
-import { ThemeToggle } from "@/components/theme-toggle";
+import { UserMenu } from "@/components/clinic/user-menu";
 import { Logo } from "@/components/brand/logo";
 import { ClinicNav } from "@/components/clinic/clinic-nav";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
@@ -75,23 +74,8 @@ export function ClinicSidebar({
       </div>
 
       <div className="border-t border-slate-800 px-3 py-3 space-y-2">
-        {!isCollapsed && userName && (
-          <p className="truncate px-1 text-xs font-bold text-slate-300 font-mono">{userName}</p>
-        )}
-        <div className={`flex items-center gap-2 ${isCollapsed ? "flex-col" : "justify-between"}`}>
-          {isCollapsed && userName ? (
-            <Tooltip>
-              <TooltipTrigger className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-800 text-[10px] font-extrabold text-slate-200 font-mono">
-                {initials(userName)}
-              </TooltipTrigger>
-              <TooltipContent side="right">{userName}</TooltipContent>
-            </Tooltip>
-          ) : null}
-          <div className={`flex items-center gap-2 ${isCollapsed ? "flex-col" : ""}`}>
-            <ThemeToggle />
-            <SignOutButton />
-          </div>
-        </div>
+        {/* P2: tema, sugestão/bug e Sair (com confirmação) ficam no menu do usuário. */}
+        <UserMenu userName={userName} compact={isCollapsed} />
         <button
           type="button"
           onClick={toggleCollapsed}

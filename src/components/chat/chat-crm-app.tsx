@@ -28,12 +28,14 @@ import {
   updateCannedResponse,
   deleteCannedResponse,
   createContact,
+  checkContactPhone,
   listClinicProceduresForAppointment,
   listClinicDoctorsForAppointment,
   listClinicConveniosForAppointment,
   getClinicDoctorAgenda,
   listClinicPatientsForAppointment,
   getOldestUnassignedWaitMinutes,
+  getUnassignedCount,
   getPendingCount,
   suggestIaReply,
   markConversationRead,
@@ -83,12 +85,14 @@ import {
   updateCannedResponseAdmin,
   deleteCannedResponseAdmin,
   createContactAdmin,
+  checkContactPhoneAdmin,
   listClinicProceduresForAppointmentAdmin,
   listClinicDoctorsForAppointmentAdmin,
   listClinicConveniosForAppointmentAdmin,
   getClinicDoctorAgendaAdmin,
   listClinicPatientsForAppointmentAdmin,
   getOldestUnassignedWaitMinutesAdmin,
+  getUnassignedCountAdmin,
   getPendingCountAdmin,
   suggestIaReplyAdmin,
   listClinicsForReassignment,
@@ -129,6 +133,7 @@ import {
 } from "@/lib/browser-notifications";
 import { InboxLayout } from "./inbox-layout";
 import { CRMKanban } from "./crm-kanban";
+import type { NewContactExtra } from "@/lib/new-contact-extra";
 import type { Agent, Contact, FunnelStage, InboxFilter, Message, UpdatePatientData } from "@/types/chat-crm";
 
 type Scope = "clinic" | "admin";
@@ -294,6 +299,9 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
   /** Filtro de clínica da fila — só existe no scope admin, que vê todas juntas. "" = todas. */
   const [clinicFilter, setClinicFilter] = useState("");
   const [unassignedWaitMinutes, setUnassignedWaitMinutes] = useState<number | null>(null);
+  const [unassignedCount, setUnassignedCount] = useState<number | null>(null);
+  const [isLoadingContacts, setIsLoadingContacts] = useState(true);
+  const [contactsLoadError, setContactsLoadError] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
   const [outboundFromDeviceStats, setOutboundFromDeviceStats] = useState<{
     total: number;
@@ -316,6 +324,7 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
     // muito tempo em "Não Atribuídas" mesmo quando o atendente está vendo "Minhas".
     const waitFn = scope === "admin" ? getOldestUnassignedWaitMinutesAdmin : getOldestUnassignedWaitMinutes;
     waitFn().then(setUnassignedWaitMinutes).catch(() => {});
+    (scope === "admin" ? getUnassignedCountAdmin : getUnassignedCount)().then(setUnassignedCount).catch(() => {});
 
     // Idem — badge ambiente da aba "Pendentes" (ver getPendingCount em actions/inbox.ts).
     const pendingFn = scope === "admin" ? getPendingCountAdmin : getPendingCount;
@@ -345,18 +354,36 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
       })
       .catch(() => {});
 
-    const result =
-      view === "crm"
-        ? (
-            await Promise.all([
-              actions.listChatContacts("todas", searchQuery || undefined, clinicIdArg),
-              actions.listChatContacts("finalizadas", searchQuery || undefined, clinicIdArg),
-            ])
-          ).flat()
-        : await actions.listChatContacts(filterTab, searchQuery || undefined, clinicIdArg, agentFilter || undefined);
+    // D1: falha na carga não pode virar "0 pacientes" silencioso — antes uma exceção aqui
+    // deixava o quadro do CRM zerado sem aviso nenhum.
+    let result: Contact[];
+    try {
+      result =
+        view === "crm"
+          ? (
+              await Promise.all([
+                actions.listChatContacts("todas", searchQuery || undefined, clinicIdArg),
+                actions.listChatContacts("finalizadas", searchQuery || undefined, clinicIdArg),
+              ])
+            ).flat()
+          : await actions.listChatContacts(filterTab, searchQuery || undefined, clinicIdArg, agentFilter || undefined);
+    } catch (error) {
+      console.error("Falha ao carregar conversas:", error);
+      setContactsLoadError(true);
+      setIsLoadingContacts(false);
+      return;
+    }
+    setContactsLoadError(false);
+    setIsLoadingContacts(false);
     setContacts(result);
 
-    const totalUnread = result.reduce((sum, item) => sum + item.unreadCount, 0);
+    // Título da aba: só não lidas que são minhas ou sem responsável — as atribuídas a
+    // outra atendente não são trabalho meu e inflavam o contador.
+    const isUnassigned = (c: Contact) => !c.responsibleAgent || c.responsibleAgent.toLowerCase() === "não atribuído";
+    const totalUnread = result.reduce(
+      (sum, item) => (item.isAssignedToViewer || isUnassigned(item) ? sum + item.unreadCount : sum),
+      0
+    );
     updateTabTitleUnreadCount(totalUnread);
 
     // Silenciada suprime som/notificação desktop, não o badge de não lida acima
@@ -525,9 +552,15 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
   /** scope=admin exige escolher a clínica (ele não está preso a uma só); scope=clinic
    * usa sempre a da sessão logada — por isso não dá pra passar isso por `actions`
    * genérico, as duas versões têm assinaturas diferentes. */
-  async function handleCreateContact(name: string, phone: string, clinicId?: string) {
+  const handleCheckContactPhone = useCallback(
+    (phone: string, clinicId?: string) =>
+      scope === "admin" ? (clinicId ? checkContactPhoneAdmin(phone, clinicId) : Promise.resolve(null)) : checkContactPhone(phone),
+    [scope]
+  );
+
+  async function handleCreateContact(name: string, phone: string, clinicId?: string, extra?: NewContactExtra) {
     const conversationId =
-      scope === "admin" ? await createContactAdmin(name, phone, clinicId ?? "") : await createContact(name, phone);
+      scope === "admin" ? await createContactAdmin(name, phone, clinicId ?? "", extra) : await createContact(name, phone, extra);
     await refreshContacts();
     selectContact(conversationId);
   }
@@ -1023,8 +1056,10 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
     }
   }
 
+  // P6: herda a altura do <main> do layout (que já desconta a barra do mobile) — o
+  // calc(100vh-3.5rem) antigo descontava 56px também no desktop e sobrava uma faixa.
   return (
-    <div className="flex h-[calc(100vh-3.5rem)] w-full flex-col overflow-hidden">
+    <div className="flex h-full min-h-0 w-full flex-col overflow-hidden">
       {view === "inbox" ? (
         <InboxLayout
           contacts={contacts}
@@ -1035,6 +1070,7 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
           onLoadOlderMessages={handleLoadOlderMessages}
           attendantCapacity={attendantCapacity}
           unassignedWaitMinutes={unassignedWaitMinutes}
+          unassignedCount={unassignedCount}
           pendingCount={pendingCount}
           selectedContactId={selectedContactId}
           selectedContact={selectedContact}
@@ -1089,6 +1125,7 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
           onClinicFilterChange={scope === "admin" ? setClinicFilter : undefined}
           outboundFromDeviceStats={scope === "admin" ? outboundFromDeviceStats : undefined}
           onCreateContact={handleCreateContact}
+          onCheckContactPhone={handleCheckContactPhone}
           onFinishAttendance={handleFinishAttendance}
           fetchProcedures={fetchProcedures}
           fetchDoctors={fetchDoctors}
@@ -1123,6 +1160,12 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
       ) : (
         <CRMKanban
           contacts={contacts}
+          isLoading={isLoadingContacts}
+          loadError={contactsLoadError}
+          onRetry={() => {
+            setIsLoadingContacts(true);
+            refreshContacts();
+          }}
           agents={agents}
           onMoveStage={handleMoveStage}
           onFinish={handleFinish}
