@@ -8,7 +8,7 @@ export const revalidate = 0;
 export default async function ClinicCrmPage() {
   const { clinicId } = await requireClinicSession();
   return (
-    <div className="h-full">
+    <div className="h-full min-h-0">
       <Suspense fallback={null}>
         <ChatCrmApp scope="clinic" basePath="/clinic" view="crm" clinicId={clinicId} />
       </Suspense>

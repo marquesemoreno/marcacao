@@ -1027,8 +1027,10 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
     }
   }
 
+  // P6: herda a altura do <main> do layout (que já desconta a barra do mobile) — o
+  // calc(100vh-3.5rem) antigo descontava 56px também no desktop e sobrava uma faixa.
   return (
-    <div className="flex h-[calc(100vh-3.5rem)] w-full flex-col overflow-hidden">
+    <div className="flex h-full min-h-0 w-full flex-col overflow-hidden">
       {view === "inbox" ? (
         <InboxLayout
           contacts={contacts}
