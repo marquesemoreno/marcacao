@@ -156,7 +156,7 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
       </div>
 
       <div className="md:hidden bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-3 py-2 flex items-center gap-1.5 overflow-x-auto no-scrollbar shrink-0">
-        <span className="text-[10px] font-mono text-slate-400 dark:text-slate-500 font-medium flex items-center gap-1 shrink-0">
+        <span className="text-xs font-mono text-slate-400 dark:text-slate-500 font-medium flex items-center gap-1 shrink-0">
           <Filter className="w-3 h-3" /> Etapa:
         </span>
         <button
@@ -183,7 +183,7 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
               }`}
             >
               <span>{s.shortLabel}</span>
-              <span className="text-[10px] opacity-80 font-mono">({count})</span>
+              <span className="text-xs opacity-80 font-mono">({count})</span>
             </button>
           );
         })}
@@ -210,7 +210,7 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
                         {stageContacts.length}
                       </span>
                     </div>
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400 font-mono mt-0.5 font-semibold">
+                    <p className="text-xs text-slate-500 dark:text-slate-400 font-mono mt-0.5 font-semibold">
                       {stageContacts.length} paciente{stageContacts.length === 1 ? '' : 's'}
                     </p>
                   </div>
@@ -238,7 +238,7 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
                                 <h4 className="font-semibold text-xs text-slate-900 dark:text-slate-100 truncate">
                                   {contact.name}
                                 </h4>
-                                <p className="text-[11px] text-slate-500 dark:text-slate-400 font-mono flex items-center gap-1 mt-0.5">
+                                <p className="text-xs text-slate-500 dark:text-slate-400 font-mono flex items-center gap-1 mt-0.5">
                                   <Phone className="w-3 h-3 text-emerald-600 dark:text-emerald-400" /> {contact.phone}
                                 </p>
                               </div>
@@ -261,7 +261,7 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
                               &ldquo;{contact.lastMessage}&rdquo;
                             </p>
                             {contact.lastMessageTime && (
-                              <p className="text-[10px] text-slate-400 font-mono font-medium">{contact.lastMessageTime}</p>
+                              <p className="text-xs text-slate-400 font-mono font-medium">{contact.lastMessageTime}</p>
                             )}
                           </div>
 
@@ -270,7 +270,7 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
                               {contact.tags.map((tag) => (
                                 <span
                                   key={tag}
-                                  className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700"
+                                  className="text-xs font-semibold px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700"
                                 >
                                   {tag}
                                 </span>
@@ -283,7 +283,7 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
                             </div>
 
                             <div className="flex items-center justify-between pt-1.5 border-t border-slate-100 dark:border-slate-800 text-xs">
-                              <span className="text-[11px] text-slate-400 font-medium">Estimado:</span>
+                              <span className="text-xs text-slate-400 font-medium">Estimado:</span>
                               <span className="font-mono font-bold text-emerald-700 dark:text-emerald-400">
                                 {contact.estimatedValue || '—'}
                               </span>
@@ -328,7 +328,7 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
                             {onOpenContactChat && (
                               <button
                                 onClick={() => onOpenContactChat(contact.id)}
-                                className="text-[11px] font-medium text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 flex items-center gap-1 hover:underline py-1 px-2.5 bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100/80 rounded-lg transition-all border border-emerald-200/60 dark:border-emerald-800 shadow-xs"
+                                className="text-xs font-medium text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 flex items-center gap-1 hover:underline py-1 px-2.5 bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100/80 rounded-lg transition-all border border-emerald-200/60 dark:border-emerald-800 shadow-xs"
                                 title="Abrir conversa na Caixa de Entrada"
                               >
                                 <ExternalLink className="w-3 h-3" />

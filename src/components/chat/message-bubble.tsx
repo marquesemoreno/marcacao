@@ -72,10 +72,10 @@ interface MessageBubbleProps {
  * em inbox-layout.tsx). Clicar não faz scroll-to-message nesta fase. */
 const QuotedMessagePreview: React.FC<{ quoted: NonNullable<Message['quotedMessage']> }> = ({ quoted }) => (
   <div className="mb-1.5 rounded-lg border-l-[3px] border-emerald-500 bg-black/5 dark:bg-white/5 px-2.5 py-1.5">
-    <p className="text-[11px] font-bold text-emerald-700 dark:text-emerald-400">
+    <p className="text-xs font-bold text-emerald-700 dark:text-emerald-400">
       {quoted.sender === 'agent' ? 'Você' : quoted.senderName || 'Contato'}
     </p>
-    <p className="truncate text-[11px] text-slate-500 dark:text-slate-400 italic">
+    <p className="truncate text-xs text-slate-500 dark:text-slate-400 italic">
       {quoted.deleted ? 'Mensagem apagada' : quoted.text || '📎 Mídia'}
     </p>
   </div>
@@ -126,7 +126,7 @@ const ForwardButton: React.FC<{
           <CommandInput placeholder="Encaminhar para..." value={query} onValueChange={setQuery} />
           <CommandList>
             {isSearching ? (
-              <p className="px-3 py-2 text-[11px] text-slate-500 dark:text-slate-400">Buscando...</p>
+              <p className="px-3 py-2 text-xs text-slate-500 dark:text-slate-400">Buscando...</p>
             ) : results.length === 0 ? (
               <CommandEmpty className="text-xs text-slate-500 dark:text-slate-400">Nenhuma conversa encontrada.</CommandEmpty>
             ) : (
@@ -142,7 +142,7 @@ const ForwardButton: React.FC<{
                     className="justify-between text-xs"
                   >
                     <span className="font-medium truncate">{r.name}</span>
-                    <span className="text-[10px] text-slate-500 dark:text-slate-400 shrink-0">{r.phone}</span>
+                    <span className="text-xs text-slate-500 dark:text-slate-400 shrink-0">{r.phone}</span>
                   </CommandItem>
                 ))}
               </CommandGroup>
@@ -278,7 +278,7 @@ function getAttachmentTypeStyle(mimeType?: string, fileName?: string) {
 /** Aviso + botão de reenviar pra mensagens que falharam ao sair — sem isso o
  * atendente só via um ícone vermelho sem explicação nem como corrigir. */
 const FailedSendNotice: React.FC<{ onRetry?: () => void }> = ({ onRetry }) => (
-  <div className="mt-1 flex items-center justify-end gap-1.5 text-[10.5px] font-semibold text-red-500">
+  <div className="mt-1 flex items-center justify-end gap-1.5 text-xs font-semibold text-red-500">
     <span>Falha ao enviar.</span>
     {onRetry && (
       <button onClick={onRetry} className="underline decoration-red-500/70 hover:text-red-600" type="button">
@@ -445,7 +445,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry, 
   // paciente/atendente apagou essa mensagem no WhatsApp (evento messages.delete).
   const DeletedBadge = () => (
     <div
-      className={`flex items-center gap-1 mb-1.5 text-[10.5px] font-semibold uppercase tracking-wide ${
+      className={`flex items-center gap-1 mb-1.5 text-xs font-semibold ${
         isAgent ? 'text-emerald-100/80' : 'text-rose-500 dark:text-rose-400'
       }`}
     >
@@ -460,14 +460,14 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry, 
       <div className="flex justify-center my-2 w-full px-2 sm:px-4" data-od-id={`media-failed-${message.id}`}>
         <div className="inline-flex max-w-md items-center gap-2 rounded-full border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 pl-3 pr-1.5 py-1.5">
           <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
-          <span className="truncate text-[11px] text-amber-800 dark:text-amber-300" title={message.text}>
+          <span className="truncate text-xs text-amber-800 dark:text-amber-300" title={message.text}>
             {message.text}
           </span>
           {onRequestResend && (
             <button
               type="button"
               onClick={onRequestResend}
-              className="shrink-0 rounded-full bg-amber-100 dark:bg-amber-900/60 hover:bg-amber-200 dark:hover:bg-amber-800 px-2.5 py-1 text-[10.5px] font-bold text-amber-900 dark:text-amber-200 transition-colors"
+              className="shrink-0 rounded-full bg-amber-100 dark:bg-amber-900/60 hover:bg-amber-200 dark:hover:bg-amber-800 px-2.5 py-1 text-xs font-bold text-amber-900 dark:text-amber-200 transition-colors"
             >
               Solicitar reenvio
             </button>
@@ -484,8 +484,8 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry, 
         <div className="flex max-w-xs sm:max-w-sm items-start gap-2 rounded-xl border border-emerald-200/80 dark:border-emerald-800/60 bg-emerald-50 dark:bg-emerald-950/40 px-3 py-2">
           <CheckCircle2 className="w-3.5 h-3.5 mt-0.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
           <div className="min-w-0 flex-1">
-            <p className="text-[11px] leading-snug font-medium text-emerald-800 dark:text-emerald-300">{message.text}</p>
-            <div className="mt-0.5 flex items-center gap-1 text-[10px] text-emerald-700/70 dark:text-emerald-400/70 font-mono">
+            <p className="text-xs leading-snug font-medium text-emerald-800 dark:text-emerald-300">{message.text}</p>
+            <div className="mt-0.5 flex items-center gap-1 text-xs text-emerald-700/70 dark:text-emerald-400/70 font-mono">
               <span>{message.timestamp}</span>
               {isAgent && <MessageStatusTicks status={message.deliveryStatus} />}
             </div>
@@ -570,14 +570,14 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry, 
                 })}
               </div>
 
-              <div className="flex justify-between items-center text-[10.5px] opacity-85 font-mono">
+              <div className="flex justify-between items-center text-xs opacity-85 font-mono">
                 <div className="flex items-center gap-2">
                   <span>{message.audioDuration || '--:--'}</span>
                   {/* Seletor de Velocidade */}
                   <button
                     onClick={cycleSpeed}
                     disabled={!hasRealAudio}
-                    className="px-1.5 py-0.5 rounded font-mono font-extrabold text-[10px] transition-colors disabled:opacity-40 disabled:cursor-not-allowed bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200"
+                    className="px-1.5 py-0.5 rounded font-mono font-extrabold text-xs transition-colors disabled:opacity-40 disabled:cursor-not-allowed bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200"
                     title="Alternar velocidade de reprodução (1x, 1.5x, 2x)"
                   >
                     {playbackSpeed}
@@ -606,7 +606,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry, 
                 type="button"
                 onClick={handleTranscribeAudio}
                 disabled={isTranscribing}
-                className="mt-2.5 pt-2.5 border-t border-black/5 dark:border-white/10 w-full text-left text-[10.5px] font-semibold text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-300 disabled:opacity-60 flex items-center gap-1"
+                className="mt-2.5 pt-2.5 border-t border-black/5 dark:border-white/10 w-full text-left text-xs font-semibold text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-300 disabled:opacity-60 flex items-center gap-1"
               >
                 <FileText className="w-3 h-3" />
                 {isTranscribing ? 'Transcrevendo...' : 'Transcrever áudio (IA)'}
@@ -666,7 +666,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry, 
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-semibold truncate">{fileName}</p>
-                  <p className="text-[10px] opacity-80 font-mono">
+                  <p className="text-xs opacity-80 font-mono">
                     {fileSize || (hasRealFile ? '' : 'Anexo indisponível')}
                   </p>
                 </div>
@@ -708,7 +708,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry, 
                         type="button"
                         onClick={handleProcessDocument}
                         disabled={isProcessingDocument}
-                        className="w-full text-left text-[10.5px] font-semibold text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-300 disabled:opacity-60 flex items-center gap-1"
+                        className="w-full text-left text-xs font-semibold text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-300 disabled:opacity-60 flex items-center gap-1"
                       >
                         <FileText className="w-3 h-3" />
                         {isProcessingDocument ? 'Analisando...' : 'Analisar Documento (IA)'}
@@ -719,7 +719,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry, 
               </div>
             )}
 
-            <div className="flex items-center justify-end gap-1 text-[10px] text-slate-400 mt-1">
+            <div className="flex items-center justify-end gap-1 text-xs text-slate-400 mt-1">
               <span>{message.timestamp}</span>
               {isAgent && <MessageStatusTicks status={message.deliveryStatus} />}
             </div>
@@ -755,7 +755,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry, 
                 <div className="flex flex-col items-center justify-center p-8 bg-slate-50 dark:bg-slate-950 border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl space-y-3">
                   <ImageIcon className="w-16 h-16 text-teal-500" />
                   <p className="text-xs font-bold text-slate-700 dark:text-slate-200">{fileName}</p>
-                  {fileSize && <span className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">{fileSize}</span>}
+                  {fileSize && <span className="text-xs text-slate-500 dark:text-slate-400 font-mono">{fileSize}</span>}
                 </div>
               )}
 
@@ -827,10 +827,10 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry, 
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-xs font-semibold truncate">{contactName || 'Contato'}</p>
-              {contactPhone && <p className="text-[10px] opacity-80 font-mono">{contactPhone}</p>}
+              {contactPhone && <p className="text-xs opacity-80 font-mono">{contactPhone}</p>}
             </div>
           </div>
-          <div className="flex items-center justify-end gap-1 text-[10px] text-slate-400 mt-1.5">
+          <div className="flex items-center justify-end gap-1 text-xs text-slate-400 mt-1.5">
             <span>{message.timestamp}</span>
             {isAgent && <MessageStatusTicks status={message.deliveryStatus} />}
           </div>
@@ -888,7 +888,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry, 
                 type="button"
                 onClick={() => setIsEditing(false)}
                 disabled={isSavingEdit}
-                className="px-2.5 py-1 rounded-md text-[11px] font-semibold transition-colors disabled:opacity-50 text-slate-500 dark:text-slate-300 hover:bg-slate-200/70 dark:hover:bg-slate-700"
+                className="px-2.5 py-1 rounded-md text-xs font-semibold transition-colors disabled:opacity-50 text-slate-500 dark:text-slate-300 hover:bg-slate-200/70 dark:hover:bg-slate-700"
               >
                 Cancelar
               </button>
@@ -896,7 +896,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry, 
                 type="button"
                 onClick={handleSaveEdit}
                 disabled={isSavingEdit}
-                className="px-2.5 py-1 rounded-md text-[11px] font-bold transition-colors disabled:opacity-60 bg-emerald-600 text-white hover:bg-emerald-700"
+                className="px-2.5 py-1 rounded-md text-xs font-bold transition-colors disabled:opacity-60 bg-emerald-600 text-white hover:bg-emerald-700"
               >
                 {isSavingEdit ? 'Salvando...' : 'Salvar'}
               </button>
@@ -911,7 +911,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry, 
             >
               {message.text}
             </p>
-            <div className="flex items-center justify-end gap-1.5 text-[10px] text-slate-400 mt-1">
+            <div className="flex items-center justify-end gap-1.5 text-xs text-slate-400 mt-1">
               {message.canEdit && onEditMessage && (
                 <button
                   type="button"
@@ -945,7 +945,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry, 
                     {(Object.keys(INVOICE_FIELD_LABELS) as (keyof InvoiceData)[])
                       .filter((field) => invoiceData[field])
                       .map((field) => (
-                        <p key={field} className="text-[11px] text-slate-600 dark:text-slate-300">
+                        <p key={field} className="text-xs text-slate-600 dark:text-slate-300">
                           <span className="font-bold">{INVOICE_FIELD_LABELS[field]}:</span> {invoiceData[field]}
                         </p>
                       ))}
@@ -959,7 +959,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry, 
                             .join('\n')
                         )
                       }
-                      className="mt-1 text-[10.5px] font-semibold text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-300 flex items-center gap-1"
+                      className="mt-1 text-xs font-semibold text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-300 flex items-center gap-1"
                     >
                       {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
                       {copied ? 'Copiado!' : 'Copiar dados'}
@@ -971,7 +971,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry, 
                       type="button"
                       onClick={handleExtractInvoiceData}
                       disabled={isExtractingInvoiceData}
-                      className="w-full text-left text-[10.5px] font-semibold text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-300 disabled:opacity-60 flex items-center gap-1"
+                      className="w-full text-left text-xs font-semibold text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-300 disabled:opacity-60 flex items-center gap-1"
                     >
                       <FileText className="w-3 h-3" />
                       {isExtractingInvoiceData ? 'Extraindo...' : 'Extrair dados (IA)'}

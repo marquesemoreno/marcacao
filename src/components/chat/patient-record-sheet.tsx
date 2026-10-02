@@ -237,7 +237,7 @@ export function PatientRecordSheet({ contact, open, onOpenChange, onUpdatePatien
               <div className="bg-white dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/80 rounded-xl p-4 shadow-sm space-y-3">
                 {upcoming.length > 0 && (
                   <div className="space-y-1.5">
-                    <Label className="text-[11px] font-bold uppercase tracking-wide text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
+                    <Label className="text-xs font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
                       <Calendar className="w-3.5 h-3.5" /> Próximos Agendamentos
                     </Label>
                     <div className="space-y-1.5">{upcoming.map(renderConsultationRow)}</div>
@@ -245,7 +245,7 @@ export function PatientRecordSheet({ contact, open, onOpenChange, onUpdatePatien
                 )}
                 {past.length > 0 && (
                   <div className="space-y-1.5">
-                    <Label className="text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                    <Label className="text-xs font-bold text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
                       <Calendar className="w-3.5 h-3.5 text-slate-400" /> Histórico
                     </Label>
                     <div className="space-y-1.5">{past.map(renderConsultationRow)}</div>
@@ -273,7 +273,7 @@ export function PatientRecordSheet({ contact, open, onOpenChange, onUpdatePatien
                     )}
                     <div className="min-w-0 flex-1">
                       <p className="truncate font-medium text-slate-800 dark:text-slate-200">{item.attachmentName || "Arquivo"}</p>
-                      <p className="text-[10px] text-slate-500 dark:text-slate-400">
+                      <p className="text-xs text-slate-500 dark:text-slate-400">
                         {item.createdAt} {formatFileSize(item.attachmentSize) && `· ${formatFileSize(item.attachmentSize)}`}
                       </p>
                     </div>
@@ -296,7 +296,7 @@ export function PatientRecordSheet({ contact, open, onOpenChange, onUpdatePatien
 
           <TabsContent value="observacoes" className="min-h-0 flex-1 overflow-y-auto space-y-3 p-4">
             <div className="bg-white dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/80 rounded-xl p-4 shadow-sm space-y-2">
-              <Label className="text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+              <Label className="text-xs font-bold text-slate-600 dark:text-slate-300">
                 Observação Interna Permanente
               </Label>
               <textarea
@@ -313,14 +313,14 @@ export function PatientRecordSheet({ contact, open, onOpenChange, onUpdatePatien
 
             <div className="bg-white dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/80 rounded-xl p-4 shadow-sm space-y-2">
               <div className="flex items-center justify-between">
-                <Label className="text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                <Label className="text-xs font-bold text-slate-600 dark:text-slate-300">
                   Tags do Paciente
                 </Label>
                 {!isAddingTag && (
                   <button
                     type="button"
                     onClick={() => setIsAddingTag(true)}
-                    className="text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 text-[11px] font-semibold flex items-center gap-0.5"
+                    className="text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 text-xs font-semibold flex items-center gap-0.5"
                   >
                     <Plus className="w-3.5 h-3.5" /> Adicionar
                   </button>
@@ -329,12 +329,12 @@ export function PatientRecordSheet({ contact, open, onOpenChange, onUpdatePatien
 
               <div className="flex flex-wrap gap-1.5">
                 {contact.tags.length === 0 && !isAddingTag && (
-                  <span className="text-[11px] text-slate-500 dark:text-slate-400">Nenhuma tag ainda.</span>
+                  <span className="text-xs text-slate-500 dark:text-slate-400">Nenhuma tag ainda.</span>
                 )}
                 {contact.tags.map((tag) => (
                   <span
                     key={tag}
-                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-semibold border ${tagClasses(tag)}`}
+                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-semibold border ${tagClasses(tag)}`}
                   >
                     {tag}
                     <button type="button" onClick={() => onRemoveTag(tag)} aria-label={`Remover tag ${tag}`} className="p-1 -m-1 hover:text-slate-900 dark:hover:text-white">

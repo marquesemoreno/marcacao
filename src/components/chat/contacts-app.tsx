@@ -403,7 +403,7 @@ export function ContactsApp({ scope, basePath }: { scope: Scope; basePath: strin
                     <div className="flex flex-col gap-1">
                       <span className="font-mono text-xs text-slate-600 dark:text-slate-400">{contact.cpf ? formatCpf(contact.cpf) : "—"}</span>
                       {contact.convenio && (
-                        <Badge variant="outline" className="rounded-md w-fit text-[10px] px-1.5 py-0 h-4.5">
+                        <Badge variant="outline" className="rounded-md w-fit text-xs px-1.5 py-0 h-4.5">
                           {contact.convenio}
                         </Badge>
                       )}
@@ -597,7 +597,7 @@ export function ContactsApp({ scope, basePath }: { scope: Scope; basePath: strin
                   <label htmlFor="contacts-csv" className="text-xs font-medium text-slate-600 dark:text-slate-400">
                     Lista de contatos (CSV — vírgula ou ponto-e-vírgula, cabeçalho opcional)
                   </label>
-                  <label className="inline-flex items-center gap-1.5 text-[11px] font-medium text-emerald-700 dark:text-emerald-400 cursor-pointer">
+                  <label className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-700 dark:text-emerald-400 cursor-pointer">
                     <Upload className="w-3.5 h-3.5" /> Enviar arquivo
                     <input
                       type="file"
@@ -615,13 +615,13 @@ export function ContactsApp({ scope, basePath }: { scope: Scope; basePath: strin
                   placeholder={"nome,telefone\nMaria Silva,77999998888"}
                   className="w-full mt-1 px-3 py-2 text-xs font-mono rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 resize-none"
                 />
-                <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                   Sem cabeçalho, assume a ordem nome, telefone, cpf. Com cabeçalho, as colunas podem vir em
                   qualquer ordem — precisa ter uma coluna de nome e uma de telefone (CPF é opcional).
                 </p>
-                {csvError && <p className="mt-1 text-[11px] font-semibold text-red-600 dark:text-red-400">{csvError}</p>}
+                {csvError && <p className="mt-1 text-xs font-semibold text-red-600 dark:text-red-400">{csvError}</p>}
                 {csvRows.length > 0 && (
-                  <p className="mt-1 text-[11px] font-semibold text-emerald-700 dark:text-emerald-400">
+                  <p className="mt-1 text-xs font-semibold text-emerald-700 dark:text-emerald-400">
                     {csvRows.length} contato(s) reconhecido(s).
                   </p>
                 )}
@@ -649,7 +649,7 @@ export function ContactsApp({ scope, basePath }: { scope: Scope; basePath: strin
                         {importResult.skipped.length} pulado(s):
                       </p>
                       {importResult.skipped.map((item, index) => (
-                        <p key={index} className="text-[11px] text-slate-500 dark:text-slate-400">
+                        <p key={index} className="text-xs text-slate-500 dark:text-slate-400">
                           {item.name || "(sem nome)"} — {item.phone || "(sem telefone)"}: {item.reason}
                         </p>
                       ))}
