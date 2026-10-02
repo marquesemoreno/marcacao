@@ -26,6 +26,7 @@ import {
   listClinicProcedures,
 } from "@/actions/clinic";
 import Link from "next/link";
+import { isProcedureAgenda } from "@/lib/doctor-names";
 import { formatCurrency, appointmentStatusLabels } from "@/lib/format";
 import {
   MessageSquare,
@@ -193,7 +194,7 @@ export default async function ClinicReportPage({
               {management.estimatedRevenue !== null ? formatCurrency(management.estimatedRevenue) : "—"}
             </p>
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              {management.scheduledCount} agendamento(s) pelo WhatsApp
+              {management.scheduledCount} conversa(s) do WhatsApp finalizadas como agendamento
               {management.ticket !== null ? ` × ticket médio de ${formatCurrency(management.ticket)}` : ""}
             </p>
           </div>
@@ -484,13 +485,19 @@ export default async function ClinicReportPage({
         <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-200">
           Demanda por Médico e Procedimento
         </h2>
+        {/* D2: base diferente do "Faturamento Estimado" (que conta conversas finalizadas
+            como agendamento) — aqui são agendamentos gravados no Conecta Saúde. */}
+        <p className="text-xs text-slate-500 dark:text-slate-400 -mt-2">
+          Base: agendamentos registrados no Conecta Saúde (pelo painel ou pela integração com o sistema da clínica) —
+          diferente das conversas do WhatsApp finalizadas como agendamento.
+        </p>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <div className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 p-5 shadow-xs space-y-3">
             <p className="text-xs font-medium text-slate-600 dark:text-slate-400">
               Médicos Mais Procurados
             </p>
             <HorizontalBarChart
-              data={management.topDoctors.map((d) => ({
+              data={management.topDoctors.filter((d) => !isProcedureAgenda(d.name)).map((d) => ({
                 label: d.name,
                 value: d.count,
                 colorClass: "bg-sky-500",
@@ -522,7 +529,7 @@ export default async function ClinicReportPage({
             />
             {kindTotal > 0 && (
               <p className="text-[11px] text-slate-400 dark:text-slate-500">
-                {kindTotal} agendamento(s) no período.
+                {kindTotal} agendamento(s) registrado(s) no Conecta Saúde no período.
               </p>
             )}
           </div>
