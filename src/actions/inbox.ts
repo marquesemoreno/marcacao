@@ -133,7 +133,14 @@ export async function listAllContacts(search?: string) {
     include: { contact: true },
     orderBy: { contact: { name: "asc" } },
   });
+  return buildContactRows(conversations, clinicId);
+}
 
+type ContactConversation = Prisma.ConversationGetPayload<{ include: { contact: true } }>;
+
+/** Linhas da tabela de Contatos — "Última Consulta" (data + médico) em 1 query só, pra
+ * não virar N+1. Usado pela lista completa (busca do chat) e pela paginada (F3). */
+async function buildContactRows(conversations: ContactConversation[], clinicId: string) {
   // "Última Consulta" (data + médico) em 1 query só, pra não virar N+1 (uma consulta
   // por linha da tabela) — mesmo estilo de batching já usado pro unreadCount em
   // listConversations. Reduz pra mais recente por telefone em memória (já vem
@@ -177,6 +184,57 @@ export async function listAllContacts(search?: string) {
         : null,
     };
   });
+}
+
+const CONTACTS_PAGE_SIZE = 50;
+
+/** F3 — tabela de Contatos paginada no servidor (50 por página), com busca e filtros
+ * no banco. Antes a tela carregava todos (833 linhas) e filtrava no navegador. O filtro
+ * de médico é pelo médico da ÚLTIMA consulta, mesma regra da coluna exibida. */
+export async function listContactsPage(params: { q?: string; page?: number; convenio?: string; doctor?: string }) {
+  const { clinicId } = await requireClinicSession();
+  const page = Math.max(1, Math.floor(params.page ?? 1));
+  const q = params.q?.trim();
+  const qDigits = q?.replace(/\D/g, "");
+
+  let doctorPhones: string[] | null = null;
+  if (params.doctor) {
+    const appts = await prisma.appointment.findMany({
+      where: { clinicProcedure: { clinicId }, doctorName: { not: null } },
+      select: { patientPhone: true, doctorName: true },
+      orderBy: { date: "desc" },
+    });
+    const last = new Map<string, string>();
+    for (const a of appts) if (!last.has(a.patientPhone)) last.set(a.patientPhone, a.doctorName ?? "");
+    const target = params.doctor.toLowerCase();
+    doctorPhones = [...last].filter(([, d]) => d.toLowerCase() === target).map(([phone]) => phone);
+  }
+
+  const contactFilters: Prisma.ContactWhereInput[] = [];
+  if (q) {
+    contactFilters.push({
+      OR: [
+        { name: { contains: q, mode: "insensitive" } },
+        ...(qDigits && qDigits.length >= 3 ? [{ phone: { contains: qDigits } }, { cpf: { contains: qDigits } }] : []),
+        { convenio: { contains: q, mode: "insensitive" } },
+      ],
+    });
+  }
+  if (params.convenio) contactFilters.push({ convenio: { equals: params.convenio, mode: "insensitive" } });
+  if (doctorPhones) contactFilters.push({ phone: { in: doctorPhones } });
+
+  const where: Prisma.ConversationWhereInput = { clinicId, ...(contactFilters.length ? { contact: { AND: contactFilters } } : {}) };
+  const [total, conversations] = await Promise.all([
+    prisma.conversation.count({ where }),
+    prisma.conversation.findMany({
+      where,
+      include: { contact: true },
+      orderBy: { contact: { name: "asc" } },
+      skip: (page - 1) * CONTACTS_PAGE_SIZE,
+      take: CONTACTS_PAGE_SIZE,
+    }),
+  ]);
+  return { rows: await buildContactRows(conversations, clinicId), total, page, pageSize: CONTACTS_PAGE_SIZE };
 }
 
 /** Lista conversas-destino pra "Reencaminhar mensagem" — só da mesma clínica da

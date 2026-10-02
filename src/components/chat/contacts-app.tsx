@@ -1,11 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Search, Users, MessageCircle, UserPlus, Upload, X, Eye, Calendar } from "lucide-react";
 import { toast } from "sonner";
 import {
-  listAllContacts,
+  listContactsPage,
   createContact,
   checkContactPhone,
   getChatContactHistory,
@@ -40,6 +40,8 @@ import { ScheduleModal } from "@/components/chat/schedule-modal";
 import type { PatientRecordData, UpdatePatientData } from "@/types/chat-crm";
 
 type Scope = "clinic" | "admin";
+
+const CONTACTS_PAGE_SIZE = 50;
 
 type ContactRow = {
   conversationId: string;
@@ -99,15 +101,22 @@ function rowToPatientRecord(row: ContactRow): PatientRecordData {
 
 export function ContactsApp({ scope, basePath }: { scope: Scope; basePath: string }) {
   const router = useRouter();
-  const [search, setSearch] = useState("");
+  // F3: busca, filtros e página vivem na URL (?q=&page=&convenio=&doctor=) — dá pra
+  // recarregar/compartilhar a tela no mesmo estado. Clínica pagina no servidor.
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
+  const urlQ = searchParams.get("q") ?? "";
+  const page = Math.max(1, Number(searchParams.get("page")) || 1);
+  const convenioFilter = searchParams.get("convenio") ?? "";
+  const doctorFilter = searchParams.get("doctor") ?? "";
+  const [search, setSearch] = useState(urlQ);
+  const [total, setTotal] = useState(0);
   const [contacts, setContacts] = useState<ContactRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   // Filtros "Convênio"/"Médico" — só clínica (o pedido é específico de /clinic/contatos;
   // admin mantém a tabela mais simples de hoje). Filtram em memória a lista já
   // carregada, sem query nova por filtro (mesma decisão do plano desta mudança).
-  const [convenioFilter, setConvenioFilter] = useState("");
-  const [doctorFilter, setDoctorFilter] = useState("");
   const [convenios, setConvenios] = useState<string[]>([]);
   const [doctors, setDoctors] = useState<string[]>([]);
 
@@ -132,22 +141,46 @@ export function ContactsApp({ scope, basePath }: { scope: Scope; basePath: strin
   const [isImporting, setIsImporting] = useState(false);
   const [importResult, setImportResult] = useState<ImportContactsResult | null>(null);
 
+  const updateParams = useCallback(
+    (changes: Record<string, string | number | null>) => {
+      const next = new URLSearchParams(searchParams.toString());
+      for (const [key, value] of Object.entries(changes)) {
+        if (value === null || value === "" || (key === "page" && value === 1)) next.delete(key);
+        else next.set(key, String(value));
+      }
+      const qs = next.toString();
+      router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    },
+    [searchParams, pathname, router]
+  );
+
+  // Digitação vai pra URL com atraso (e volta pra página 1).
+  useEffect(() => {
+    if (search === urlQ) return;
+    const timeout = setTimeout(() => updateParams({ q: search, page: null }), 300);
+    return () => clearTimeout(timeout);
+  }, [search, urlQ, updateParams]);
+
   const fetchContacts = useCallback(async () => {
-    const result =
-      scope === "admin" ? await listAllContactsAdmin(search || undefined) : await listAllContacts(search || undefined);
-    setContacts(result);
-  }, [scope, search]);
+    if (scope === "admin") {
+      const all = await listAllContactsAdmin(urlQ || undefined);
+      setContacts(all);
+      setTotal(all.length);
+    } else {
+      const result = await listContactsPage({ q: urlQ || undefined, page, convenio: convenioFilter || undefined, doctor: doctorFilter || undefined });
+      setContacts(result.rows);
+      setTotal(result.total);
+    }
+  }, [scope, urlQ, page, convenioFilter, doctorFilter]);
 
   useEffect(() => {
     let cancelled = false;
     setIsLoading(true);
-    const timeout = setTimeout(async () => {
-      await fetchContacts();
+    fetchContacts().finally(() => {
       if (!cancelled) setIsLoading(false);
-    }, 300);
+    });
     return () => {
       cancelled = true;
-      clearTimeout(timeout);
     };
   }, [fetchContacts]);
 
@@ -160,11 +193,10 @@ export function ContactsApp({ scope, basePath }: { scope: Scope; basePath: strin
     }
   }, [scope]);
 
-  const filteredContacts = contacts.filter((c) => {
-    if (convenioFilter && c.convenio !== convenioFilter) return false;
-    if (doctorFilter && c.lastAppointment?.doctorName !== doctorFilter) return false;
-    return true;
-  });
+  // Clínica já vem paginada do servidor; admin carrega tudo e pagina na tela.
+  const filteredContacts =
+    scope === "admin" ? contacts.slice((page - 1) * CONTACTS_PAGE_SIZE, page * CONTACTS_PAGE_SIZE) : contacts;
+  const pageCount = Math.max(1, Math.ceil(total / CONTACTS_PAGE_SIZE));
 
   async function handleOpenSheet(row: ContactRow) {
     setSheetContact(rowToPatientRecord(row));
@@ -315,7 +347,7 @@ export function ContactsApp({ scope, basePath }: { scope: Scope; basePath: strin
           <>
             <select
               value={convenioFilter}
-              onChange={(e) => setConvenioFilter(e.target.value)}
+              onChange={(e) => updateParams({ convenio: e.target.value, page: null })}
               className="h-9 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2.5 text-xs text-slate-700 dark:text-slate-300"
             >
               <option value="">Todos os convênios</option>
@@ -325,7 +357,7 @@ export function ContactsApp({ scope, basePath }: { scope: Scope; basePath: strin
             </select>
             <select
               value={doctorFilter}
-              onChange={(e) => setDoctorFilter(e.target.value)}
+              onChange={(e) => updateParams({ doctor: e.target.value, page: null })}
               className="h-9 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2.5 text-xs text-slate-700 dark:text-slate-300"
             >
               <option value="">Todos os médicos</option>
@@ -445,6 +477,33 @@ export function ContactsApp({ scope, basePath }: { scope: Scope; basePath: strin
           </TableBody>
         </Table>
       </div>
+
+      {total > 0 && (
+        <nav aria-label="Paginação de contatos" className="flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600 dark:text-slate-300">
+          <span>
+            Mostrando {(page - 1) * CONTACTS_PAGE_SIZE + 1}–{Math.min(page * CONTACTS_PAGE_SIZE, total)} de {total} contato(s)
+          </span>
+          <span className="inline-flex items-center gap-2">
+            <button
+              type="button"
+              disabled={page <= 1 || isLoading}
+              onClick={() => updateParams({ page: page - 1 })}
+              className="rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Anterior
+            </button>
+            <span aria-current="page">Página {page} de {pageCount}</span>
+            <button
+              type="button"
+              disabled={page >= pageCount || isLoading}
+              onClick={() => updateParams({ page: page + 1 })}
+              className="rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Próxima
+            </button>
+          </span>
+        </nav>
+      )}
 
       {sheetContact && (
         <PatientRecordSheet
