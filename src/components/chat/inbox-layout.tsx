@@ -139,6 +139,8 @@ interface InboxLayoutProps {
   /** Minutos desde a última mensagem da conversa mais antiga em "Não Atribuídas" — pisca a
    * aba quando passa do limiar, mesmo se o atendente estiver vendo outra aba no momento. */
   unassignedWaitMinutes?: number | null;
+  /** Quantas conversas ativas estão sem responsável — contador da aba "Não Atribuídas". */
+  unassignedCount?: number | null;
   /** Contador ambiente da aba "Pendentes" — conversas ativas com última mensagem do
    * paciente ainda sem resposta (ver getPendingCount em actions/inbox.ts). Busca
    * independente da aba selecionada, mesmo padrão de unassignedWaitMinutes. */
@@ -428,6 +430,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
   attendantCapacity,
   unassignedWaitMinutes,
   pendingCount,
+  unassignedCount,
   outboundFromDeviceStats,
   selectedContactId,
   selectedContact,
@@ -1201,30 +1204,38 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
           <div className="flex items-center gap-1.5">
           <div className="flex-1 flex items-center gap-0.5 p-0.5 bg-slate-100 dark:bg-slate-800/90 rounded-lg text-xs font-medium">
             {ALL_INBOX_TABS.filter((tab) => visibleTabIds.includes(tab.id)).map((tab) => {
-              // Pisca só quando o atendente NÃO está nessa aba — se ela já está olhando
-              // "Não Atribuídas", o paciente esperando já está visível, sem precisar de alerta.
-              const shouldAlert =
+              // C3: um único estilo de aba ativa. O alerta de espera sem responsável virou só
+              // a cor do contador (vermelho passado o limiar) — antes a aba inteira ficava
+              // rosa e parecia selecionada mesmo com "Todas" ativa.
+              const isUnassignedAlert =
                 tab.id === 'nao_atribuidas' &&
-                filterTab !== 'nao_atribuidas' &&
                 unassignedWaitMinutes != null &&
                 unassignedWaitMinutes >= UNASSIGNED_ALERT_THRESHOLD_MINUTES;
+              const count = tab.id === 'pendentes' ? pendingCount : tab.id === 'nao_atribuidas' ? unassignedCount : null;
+              const isActive = filterTab === tab.id;
               return (
                 <button
                   key={tab.id}
+                  type="button"
                   onClick={() => onFilterTabChange(tab.id)}
-                  title={shouldAlert ? `Paciente esperando há ${unassignedWaitMinutes} min sem atendente` : undefined}
-                  className={`flex-1 py-1 px-1.5 rounded-md text-[11px] transition-all whitespace-nowrap text-center inline-flex items-center justify-center gap-1 ${
-                    shouldAlert
-                      ? 'bg-rose-500 text-white font-bold shadow-sm animate-pulse'
-                      : filterTab === tab.id
-                        ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 font-semibold shadow-sm'
-                        : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+                  aria-pressed={isActive}
+                  title={isUnassignedAlert ? `Há paciente esperando há ${unassignedWaitMinutes} min sem responsável` : undefined}
+                  className={`flex-1 py-1.5 px-2 rounded-md text-xs transition-all whitespace-nowrap text-center inline-flex items-center justify-center gap-1 ${
+                    isActive
+                      ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 font-semibold shadow-sm'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
                   }`}
                 >
                   {tab.label}
-                  {tab.id === 'pendentes' && !!pendingCount && (
-                    <span className="min-w-[16px] px-1 rounded-md bg-rose-500 text-white text-[9px] font-bold leading-4">
-                      {pendingCount > 99 ? '99+' : pendingCount}
+                  {!!count && (
+                    <span
+                      className={`min-w-[18px] px-1 rounded-full text-[11px] font-bold leading-[18px] ${
+                        isUnassignedAlert || tab.id === 'pendentes'
+                          ? 'bg-rose-600 text-white'
+                          : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200'
+                      }`}
+                    >
+                      {count > 99 ? '99+' : count}
                     </span>
                   )}
                 </button>

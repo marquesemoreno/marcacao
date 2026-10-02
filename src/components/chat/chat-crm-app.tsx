@@ -34,6 +34,7 @@ import {
   getClinicDoctorAgenda,
   listClinicPatientsForAppointment,
   getOldestUnassignedWaitMinutes,
+  getUnassignedCount,
   getPendingCount,
   suggestIaReply,
   markConversationRead,
@@ -89,6 +90,7 @@ import {
   getClinicDoctorAgendaAdmin,
   listClinicPatientsForAppointmentAdmin,
   getOldestUnassignedWaitMinutesAdmin,
+  getUnassignedCountAdmin,
   getPendingCountAdmin,
   suggestIaReplyAdmin,
   listClinicsForReassignment,
@@ -294,6 +296,7 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
   /** Filtro de clínica da fila — só existe no scope admin, que vê todas juntas. "" = todas. */
   const [clinicFilter, setClinicFilter] = useState("");
   const [unassignedWaitMinutes, setUnassignedWaitMinutes] = useState<number | null>(null);
+  const [unassignedCount, setUnassignedCount] = useState<number | null>(null);
   const [pendingCount, setPendingCount] = useState(0);
   const [outboundFromDeviceStats, setOutboundFromDeviceStats] = useState<{
     total: number;
@@ -316,6 +319,7 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
     // muito tempo em "Não Atribuídas" mesmo quando o atendente está vendo "Minhas".
     const waitFn = scope === "admin" ? getOldestUnassignedWaitMinutesAdmin : getOldestUnassignedWaitMinutes;
     waitFn().then(setUnassignedWaitMinutes).catch(() => {});
+    (scope === "admin" ? getUnassignedCountAdmin : getUnassignedCount)().then(setUnassignedCount).catch(() => {});
 
     // Idem — badge ambiente da aba "Pendentes" (ver getPendingCount em actions/inbox.ts).
     const pendingFn = scope === "admin" ? getPendingCountAdmin : getPendingCount;
@@ -1035,6 +1039,7 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
           onLoadOlderMessages={handleLoadOlderMessages}
           attendantCapacity={attendantCapacity}
           unassignedWaitMinutes={unassignedWaitMinutes}
+          unassignedCount={unassignedCount}
           pendingCount={pendingCount}
           selectedContactId={selectedContactId}
           selectedContact={selectedContact}

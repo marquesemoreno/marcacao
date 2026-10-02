@@ -1084,6 +1084,12 @@ export async function getAttendantCapacity() {
 /** Minutos desde a última mensagem da conversa mais antiga parada em "Não Atribuídas" —
  * usado pra piscar a aba e alertar o atendente quando tem paciente esperando há muito
  * tempo sem ninguém assumir. `null` quando não há nenhuma conversa não atribuída. */
+/** Contador da aba "Não Atribuídas" (C3) — mesmo filtro de getOldestUnassignedWaitMinutes. */
+export async function getUnassignedCount() {
+  const { clinicId } = await requireClinicSession();
+  return prisma.conversation.count({ where: { clinicId, assignedUserId: null, status: { in: ACTIVE_STATUSES }, archivedAt: null } });
+}
+
 export async function getOldestUnassignedWaitMinutes() {
   const { clinicId } = await requireClinicSession();
   const oldest = await prisma.conversation.findFirst({
