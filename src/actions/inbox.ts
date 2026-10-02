@@ -1,5 +1,6 @@
 "use server";
 
+import { parseNewContactExtra, type NewContactExtra } from "@/lib/new-contact-extra";
 import { revalidatePath } from "next/cache";
 import { ConversationStatus, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
@@ -51,7 +52,7 @@ function autoAssignOnReply(conversation: { assignedUserId: string | null }, user
 /** Cadastra um contato novo (ou reaproveita um já existente pelo telefone) e garante
  * uma conversa aberta dessa clínica com ele — pra atendente iniciar contato proativo,
  * sem precisar esperar o paciente mandar mensagem primeiro. */
-export async function createContact(name: string, phone: string) {
+export async function createContact(name: string, phone: string, extra?: NewContactExtra) {
   const { clinicId } = await requireClinicSession();
 
   const trimmedName = name.trim();
@@ -63,10 +64,15 @@ export async function createContact(name: string, phone: string) {
     throw new Error("Telefone inválido. Informe com DDD e 9 dígitos (ex: 77999998888).");
   }
 
+  const existingContact = await prisma.contact.findUnique({
+    where: { phone: fullPhone },
+    select: { cpf: true, birthDate: true, convenio: true },
+  });
+  const extraData = parseNewContactExtra(extra, existingContact ?? undefined);
   const contact = await prisma.contact.upsert({
     where: { phone: fullPhone },
-    update: {},
-    create: { phone: fullPhone, name: trimmedName },
+    update: extraData,
+    create: { phone: fullPhone, name: trimmedName, ...extraData },
   });
 
   // Trava consultiva por contactId dentro da transação: sem ela, duas requisições quase
@@ -88,6 +94,19 @@ export async function createContact(name: string, phone: string) {
   revalidatePath("/clinic/inbox");
   notifyInboxRealtime(clinicId).catch(() => {});
   return conversation.id;
+}
+
+/** F2 — antes de cadastrar, avisa se o número já existe (o Contact é compartilhado entre
+ * clínicas; a conversa é desta clínica). null = número livre. */
+export async function checkContactPhone(phone: string) {
+  const { clinicId } = await requireClinicSession();
+  const fullPhone = formatToWhatsAppNumber(phone);
+  const contact = await prisma.contact.findUnique({
+    where: { phone: fullPhone },
+    select: { name: true, conversations: { where: { clinicId }, select: { id: true }, take: 1 } },
+  });
+  if (!contact) return null;
+  return { name: contact.name, conversationId: contact.conversations[0]?.id ?? null };
 }
 
 /** Uma linha por contato já cadastrado nesta clínica (cada um tem no máximo uma

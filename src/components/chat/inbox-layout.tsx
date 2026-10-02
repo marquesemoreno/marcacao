@@ -5,6 +5,8 @@ import { AcquisitionBadge } from "@/components/chat/acquisition-badge";
 import { InstagramGlyph } from "@/components/chat/instagram-glyph";
 import { messagingWindowState } from "@/lib/messaging-window";
 import { displayName } from "@/lib/contact-display";
+import { NewContactDialog } from "@/components/chat/new-contact-dialog";
+import type { NewContactExtra } from "@/lib/new-contact-extra";
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Contact,
@@ -236,7 +238,9 @@ interface InboxLayoutProps {
   onClinicFilterChange?: (clinicId: string) => void;
   /** Cadastra um contato novo e abre a conversa dele. `clinicId` só é usado (e obrigatório
    * na prática) no scope admin, que não está preso a uma clínica só — ver availableClinics. */
-  onCreateContact?: (name: string, phone: string, clinicId?: string) => Promise<void>;
+  onCreateContact?: (name: string, phone: string, clinicId?: string, extra?: NewContactExtra) => Promise<void>;
+  /** F2 — número já cadastrado? (null = livre) */
+  onCheckContactPhone?: (phone: string, clinicId?: string) => Promise<{ name: string; conversationId: string | null } | null>;
   onFinishAttendance: (resolutionData?: { reason: string; notes?: string }) => Promise<void> | void;
   fetchProcedures: (convenioId?: string) => Promise<PlainClinicProcedureItem[]>;
   fetchDoctors?: () => Promise<{ id: number; nome: string; crm: string; especialidade: string | null }[]>;
@@ -482,6 +486,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
   clinicFilter,
   onClinicFilterChange,
   onCreateContact,
+  onCheckContactPhone,
   onFinishAttendance,
   fetchProcedures,
   fetchDoctors,
@@ -585,10 +590,6 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
     setIsScheduleModalOpen(true);
   }
   const [isNewContactModalOpen, setIsNewContactModalOpen] = useState(false);
-  const [newContactName, setNewContactName] = useState('');
-  const [newContactPhone, setNewContactPhone] = useState('');
-  const [newContactClinicId, setNewContactClinicId] = useState('');
-  const [isSavingContact, setIsSavingContact] = useState(false);
   const [isQuickReplyOpen, setIsQuickReplyOpen] = useState(false);
   const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
   const quickReplyRef = useClickOutside<HTMLFormElement>(isQuickReplyOpen, () => setIsQuickReplyOpen(false));
@@ -1109,26 +1110,6 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
     }
   };
 
-  const handleSaveNewContact = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newContactName.trim() || !newContactPhone.trim() || !onCreateContact) return;
-    if (availableClinics && availableClinics.length > 0 && !newContactClinicId) return;
-
-    setIsSavingContact(true);
-    try {
-      await onCreateContact(newContactName, newContactPhone, newContactClinicId || undefined);
-      toast.success("Contato cadastrado com sucesso!");
-      setNewContactName('');
-      setNewContactPhone('');
-      setNewContactClinicId('');
-      setIsNewContactModalOpen(false);
-      setMobileView('chat');
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Não foi possível cadastrar o contato.");
-    } finally {
-      setIsSavingContact(false);
-    }
-  };
 
   const currentStageIndex = selectedContact ? FUNNEL_STEPS.findIndex((s) => s.id === selectedContact.funnelStage) : -1;
 
@@ -2821,78 +2802,25 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
         </DialogContent>
       </Dialog>
 
-      {/* Modal de Novo Contato */}
-      <Dialog open={isNewContactModalOpen} onOpenChange={(open) => !open && setIsNewContactModalOpen(false)}>
-        <DialogContent className="max-w-md rounded-2xl p-6" showCloseButton={false}>
-          <DialogClose
-            aria-label="Fechar"
-            render={<button className="absolute top-2 right-2 size-11 flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors" />}
-          >
-            <X className="w-5 h-5" />
-          </DialogClose>
-          <DialogHeader>
-            <DialogTitle className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-              <UserPlus className="w-4 h-4 text-emerald-600" />
-              Novo Contato
-            </DialogTitle>
-          </DialogHeader>
-
-          <form onSubmit={handleSaveNewContact} className="space-y-4 mt-2">
-            <div className="space-y-3">
-              <div>
-                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Nome:</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Nome do paciente"
-                  value={newContactName}
-                  onChange={(e) => setNewContactName(e.target.value)}
-                  className="w-full px-3 py-2 text-xs border border-slate-200 dark:border-slate-800 rounded-lg bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 mt-1"
-                />
-              </div>
-
-              <div>
-                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">WhatsApp (com DDD):</label>
-                <input
-                  type="tel"
-                  required
-                  placeholder="77999998888"
-                  value={newContactPhone}
-                  onChange={(e) => setNewContactPhone(e.target.value)}
-                  className="w-full px-3 py-2 text-xs border border-slate-200 dark:border-slate-800 rounded-lg bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 mt-1 font-mono"
-                />
-              </div>
-
-              {availableClinics && availableClinics.length > 0 && (
-                <div>
-                  <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Clínica:</label>
-                  <select
-                    required
-                    value={newContactClinicId}
-                    onChange={(e) => setNewContactClinicId(e.target.value)}
-                    className="w-full px-3 py-2 text-xs border border-slate-200 dark:border-slate-800 rounded-lg bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 mt-1"
-                  >
-                    <option value="" disabled>Escolha a clínica...</option>
-                    {availableClinics.map((clinic) => (
-                      <option key={clinic.id} value={clinic.id}>{clinic.tradeName}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
-            </div>
-
-            <div className="flex justify-end gap-2 pt-2">
-              <button
-                type="submit"
-                disabled={isSavingContact}
-                className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-semibold text-xs rounded-lg shadow-sm"
-              >
-                {isSavingContact ? "Salvando..." : "Cadastrar Contato"}
-              </button>
-            </div>
-          </form>
-        </DialogContent>
-      </Dialog>
+      {/* Modal de Novo Contato (F2 — mesmo componente da tela de Contatos) */}
+      {onCreateContact && (
+        <NewContactDialog
+          open={isNewContactModalOpen}
+          onOpenChange={setIsNewContactModalOpen}
+          clinics={availableClinics && availableClinics.length > 0 ? availableClinics : undefined}
+          onCheckPhone={onCheckContactPhone ?? (async () => null)}
+          onCreate={async (input) => {
+            await onCreateContact(input.name, input.phone, input.clinicId, input.extra);
+            toast.success("Contato cadastrado com sucesso!");
+            setMobileView('chat');
+          }}
+          onOpenExisting={async (existing, input) => {
+            if (existing.conversationId) onSelectContact(existing.conversationId);
+            else await onCreateContact(existing.name, input.phone, input.clinicId);
+            setMobileView('chat');
+          }}
+        />
+      )}
 
       {/* Modal de Agendamento */}
       {selectedContact && (

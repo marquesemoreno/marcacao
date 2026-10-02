@@ -1,5 +1,6 @@
 "use server";
 
+import { parseNewContactExtra, type NewContactExtra } from "@/lib/new-contact-extra";
 import { revalidatePath } from "next/cache";
 import { ConversationStatus, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
@@ -209,7 +210,18 @@ export async function listClinicsForReassignment() {
 
 /** Mesma ideia de createContact (inbox.ts), mas o admin escolhe a clínica na hora,
  * já que ele não está vinculado a uma só. */
-export async function createContactAdmin(name: string, phone: string, clinicId: string) {
+export async function checkContactPhoneAdmin(phone: string, clinicId: string) {
+  await requireAdminSession();
+  const fullPhone = formatToWhatsAppNumber(phone);
+  const contact = await prisma.contact.findUnique({
+    where: { phone: fullPhone },
+    select: { name: true, conversations: { where: { clinicId }, select: { id: true }, take: 1 } },
+  });
+  if (!contact) return null;
+  return { name: contact.name, conversationId: contact.conversations[0]?.id ?? null };
+}
+
+export async function createContactAdmin(name: string, phone: string, clinicId: string, extra?: NewContactExtra) {
   await requireAdminSession();
 
   const clinic = await prisma.clinic.findUnique({ where: { id: clinicId }, select: { id: true } });
@@ -224,10 +236,15 @@ export async function createContactAdmin(name: string, phone: string, clinicId: 
     throw new Error("Telefone inválido. Informe com DDD e 9 dígitos (ex: 77999998888).");
   }
 
+  const existingContact = await prisma.contact.findUnique({
+    where: { phone: fullPhone },
+    select: { cpf: true, birthDate: true, convenio: true },
+  });
+  const extraData = parseNewContactExtra(extra, existingContact ?? undefined);
   const contact = await prisma.contact.upsert({
     where: { phone: fullPhone },
-    update: {},
-    create: { phone: fullPhone, name: trimmedName },
+    update: extraData,
+    create: { phone: fullPhone, name: trimmedName, ...extraData },
   });
 
   let conversation = await prisma.conversation.findFirst({

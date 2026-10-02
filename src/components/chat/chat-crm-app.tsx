@@ -28,6 +28,7 @@ import {
   updateCannedResponse,
   deleteCannedResponse,
   createContact,
+  checkContactPhone,
   listClinicProceduresForAppointment,
   listClinicDoctorsForAppointment,
   listClinicConveniosForAppointment,
@@ -84,6 +85,7 @@ import {
   updateCannedResponseAdmin,
   deleteCannedResponseAdmin,
   createContactAdmin,
+  checkContactPhoneAdmin,
   listClinicProceduresForAppointmentAdmin,
   listClinicDoctorsForAppointmentAdmin,
   listClinicConveniosForAppointmentAdmin,
@@ -131,6 +133,7 @@ import {
 } from "@/lib/browser-notifications";
 import { InboxLayout } from "./inbox-layout";
 import { CRMKanban } from "./crm-kanban";
+import type { NewContactExtra } from "@/lib/new-contact-extra";
 import type { Agent, Contact, FunnelStage, InboxFilter, Message, UpdatePatientData } from "@/types/chat-crm";
 
 type Scope = "clinic" | "admin";
@@ -529,9 +532,15 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
   /** scope=admin exige escolher a clínica (ele não está preso a uma só); scope=clinic
    * usa sempre a da sessão logada — por isso não dá pra passar isso por `actions`
    * genérico, as duas versões têm assinaturas diferentes. */
-  async function handleCreateContact(name: string, phone: string, clinicId?: string) {
+  const handleCheckContactPhone = useCallback(
+    (phone: string, clinicId?: string) =>
+      scope === "admin" ? (clinicId ? checkContactPhoneAdmin(phone, clinicId) : Promise.resolve(null)) : checkContactPhone(phone),
+    [scope]
+  );
+
+  async function handleCreateContact(name: string, phone: string, clinicId?: string, extra?: NewContactExtra) {
     const conversationId =
-      scope === "admin" ? await createContactAdmin(name, phone, clinicId ?? "") : await createContact(name, phone);
+      scope === "admin" ? await createContactAdmin(name, phone, clinicId ?? "", extra) : await createContact(name, phone, extra);
     await refreshContacts();
     selectContact(conversationId);
   }
@@ -1096,6 +1105,7 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
           onClinicFilterChange={scope === "admin" ? setClinicFilter : undefined}
           outboundFromDeviceStats={scope === "admin" ? outboundFromDeviceStats : undefined}
           onCreateContact={handleCreateContact}
+          onCheckContactPhone={handleCheckContactPhone}
           onFinishAttendance={handleFinishAttendance}
           fetchProcedures={fetchProcedures}
           fetchDoctors={fetchDoctors}

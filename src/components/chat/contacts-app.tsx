@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import {
   listAllContacts,
   createContact,
+  checkContactPhone,
   getChatContactHistory,
   updateContactInfo,
   updateConversationTags,
@@ -22,6 +23,7 @@ import {
 import {
   listAllContactsAdmin,
   createContactAdmin,
+  checkContactPhoneAdmin,
   listClinicsForReassignment,
   importContactsAdmin,
   type ImportContactsResult,
@@ -33,6 +35,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { AvatarBadge } from "@/components/chat/avatar-badge";
 import { PatientRecordSheet } from "@/components/chat/patient-record-sheet";
+import { NewContactDialog } from "@/components/chat/new-contact-dialog";
 import { ScheduleModal } from "@/components/chat/schedule-modal";
 import type { PatientRecordData, UpdatePatientData } from "@/types/chat-crm";
 
@@ -119,10 +122,6 @@ export function ContactsApp({ scope, basePath }: { scope: Scope; basePath: strin
   const [scheduleContact, setScheduleContact] = useState<{ conversationId: string; name: string; cpf: string; phone: string } | null>(null);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [newName, setNewName] = useState("");
-  const [newPhone, setNewPhone] = useState("");
-  const [newClinicId, setNewClinicId] = useState("");
-  const [isSaving, setIsSaving] = useState(false);
   const [availableClinics, setAvailableClinics] = useState<{ id: string; tradeName: string }[]>([]);
 
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
@@ -216,27 +215,11 @@ export function ContactsApp({ scope, basePath }: { scope: Scope; basePath: strin
     await fetchContacts();
   }
 
-  async function handleSaveNewContact(event: React.FormEvent) {
-    event.preventDefault();
-    if (!newName.trim() || !newPhone.trim()) return;
-    if (scope === "admin" && availableClinics.length > 0 && !newClinicId) return;
-
-    setIsSaving(true);
-    try {
-      const conversationId =
-        scope === "admin" ? await createContactAdmin(newName, newPhone, newClinicId) : await createContact(newName, newPhone);
-      toast.success("Contato cadastrado com sucesso!");
-      setNewName("");
-      setNewPhone("");
-      setNewClinicId("");
-      setIsModalOpen(false);
-      router.push(`${basePath}/inbox?c=${conversationId}`);
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Não foi possível cadastrar o contato.");
-    } finally {
-      setIsSaving(false);
-    }
-  }
+  const handleCheckContactPhone = useCallback(
+    (phone: string, clinicId?: string) =>
+      scope === "admin" ? (clinicId ? checkContactPhoneAdmin(phone, clinicId) : Promise.resolve(null)) : checkContactPhone(phone),
+    [scope]
+  );
 
   function handleCsvChange(value: string) {
     setCsvText(value);
@@ -489,79 +472,29 @@ export function ContactsApp({ scope, basePath }: { scope: Scope; basePath: strin
         />
       )}
 
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 backdrop-blur-xs p-4">
-          <form
-            onSubmit={handleSaveNewContact}
-            className="max-w-md w-full bg-white dark:bg-slate-900 rounded-lg p-6 shadow-xl space-y-4 border border-slate-200 dark:border-slate-800"
-          >
-            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
-              <h3 className="font-semibold text-slate-900 dark:text-slate-100 text-sm flex items-center gap-2">
-                <UserPlus className="w-4 h-4 text-emerald-600" />
-                Novo Contato
-              </h3>
-              <button type="button" onClick={() => setIsModalOpen(false)}>
-                <X className="w-5 h-5 text-slate-400" />
-              </button>
-            </div>
-
-            <div className="space-y-3">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-xs font-medium text-slate-600 dark:text-slate-400">Nome:</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="Nome do paciente"
-                    value={newName}
-                    onChange={(event) => setNewName(event.target.value)}
-                    className="w-full h-9 px-3 text-xs border border-slate-200 dark:border-slate-800 rounded-lg bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 mt-1"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-xs font-medium text-slate-600 dark:text-slate-400">WhatsApp (com DDD):</label>
-                  <input
-                    type="tel"
-                    required
-                    placeholder="77999998888"
-                    value={newPhone}
-                    onChange={(event) => setNewPhone(event.target.value)}
-                    className="w-full h-9 px-3 text-xs border border-slate-200 dark:border-slate-800 rounded-lg bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 mt-1 font-mono"
-                  />
-                </div>
-              </div>
-
-              {scope === "admin" && availableClinics.length > 0 && (
-                <div>
-                  <label className="text-xs font-medium text-slate-600 dark:text-slate-400">Clínica:</label>
-                  <select
-                    required
-                    value={newClinicId}
-                    onChange={(event) => setNewClinicId(event.target.value)}
-                    className="w-full px-3 py-2 text-xs border border-slate-200 dark:border-slate-800 rounded-lg bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 mt-1"
-                  >
-                    <option value="" disabled>Escolha a clínica...</option>
-                    {availableClinics.map((clinic) => (
-                      <option key={clinic.id} value={clinic.id}>{clinic.tradeName}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
-            </div>
-
-            <div className="flex justify-end gap-2 pt-2">
-              <button
-                type="submit"
-                disabled={isSaving}
-                className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-semibold text-xs rounded-lg shadow-sm"
-              >
-                {isSaving ? "Salvando..." : "Cadastrar Contato"}
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
+      <NewContactDialog
+        open={isModalOpen}
+        onOpenChange={setIsModalOpen}
+        clinics={scope === "admin" ? availableClinics : undefined}
+        onCheckPhone={handleCheckContactPhone}
+        onCreate={async (input) => {
+          const conversationId =
+            scope === "admin"
+              ? await createContactAdmin(input.name, input.phone, input.clinicId ?? "", input.extra)
+              : await createContact(input.name, input.phone, input.extra);
+          toast.success("Contato cadastrado com sucesso!");
+          router.push(`${basePath}/inbox?c=${conversationId}`);
+        }}
+        onOpenExisting={async (existing, input) => {
+          // Existe em outra clínica (sem conversa aqui): createContact só cria a conversa.
+          const conversationId =
+            existing.conversationId ??
+            (scope === "admin"
+              ? await createContactAdmin(existing.name, input.phone, input.clinicId ?? "")
+              : await createContact(existing.name, input.phone));
+          router.push(`${basePath}/inbox?c=${conversationId}`);
+        }}
+      />
 
       {isImportModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 backdrop-blur-xs p-4">
