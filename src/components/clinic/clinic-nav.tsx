@@ -10,7 +10,7 @@ import {
   Receipt,
   BarChart3,
   Megaphone,
-  Settings,
+  UserCog,
   type LucideIcon,
 } from "lucide-react";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
@@ -23,7 +23,7 @@ const fullNavItems: { href: string; label: string; icon: LucideIcon; exact?: boo
   { href: "/clinic/precos", label: "Tabela de Procedimentos", icon: Receipt },
   { href: "/clinic/disparos", label: "Disparos", icon: Megaphone },
   { href: "/clinic/relatorio", label: "Relatórios", icon: BarChart3 },
-  { href: "/clinic/perfil", label: "Configurações", icon: Settings },
+  { href: "/clinic/perfil", label: "Minha conta", icon: UserCog },
 ];
 
 // Clínicas com instância própria de WhatsApp (atendimento exclusivo, fora dos processos
@@ -37,7 +37,7 @@ const exclusiveNavItems: { href: string; label: string; icon: LucideIcon; exact?
   { href: "/clinic/contatos", label: "Contatos", icon: Users },
   { href: "/clinic/disparos", label: "Disparos", icon: Megaphone },
   { href: "/clinic/relatorio", label: "Relatórios", icon: BarChart3 },
-  { href: "/clinic/perfil", label: "Configurações", icon: Settings },
+  { href: "/clinic/perfil", label: "Minha conta", icon: UserCog },
 ];
 
 /** Navegação do painel da clínica — mesmo padrão visual/estrutural do AdminNav

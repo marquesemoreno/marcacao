@@ -207,11 +207,19 @@ export default async function ClinicReportPage({
         </div>
         {management.ticket === null && (
           <p className="text-xs text-slate-500 dark:text-slate-400">
-            Para estimar valores, informe o ticket médio de consulta em{" "}
-            <Link href="/clinic/precos" className="font-medium text-sky-700 dark:text-sky-400 underline underline-offset-2">
-              Preços e Horários
-            </Link>
-            .
+            {/* "Preços e Horários" não aparece no menu de clínicas com WhatsApp exclusivo —
+                não mandar pra uma tela que o perfil não enxerga. */}
+            {isExclusive ? (
+              "Para estimar valores, peça à equipe do Conecta Saúde para cadastrar o ticket médio de consulta da clínica."
+            ) : (
+              <>
+                Para estimar valores, informe o ticket médio de consulta em{" "}
+                <Link href="/clinic/precos" className="font-medium text-sky-700 dark:text-sky-400 underline underline-offset-2">
+                  Preços e Horários
+                </Link>
+                .
+              </>
+            )}
           </p>
         )}
       </div>
