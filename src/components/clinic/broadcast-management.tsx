@@ -8,7 +8,9 @@ import {
   createClinicBroadcastCampaign,
   startClinicBroadcastCampaign,
   pauseClinicBroadcastCampaign,
+  clinicHasBridgeAudience,
 } from "@/actions/clinic-broadcast";
+import { BridgeAudiencePicker } from "@/components/clinic/bridge-audience-picker";
 import { parseBroadcastCsv, BROADCAST_OPT_OUT_FOOTER, type ParsedBroadcastRecipient } from "@/lib/broadcast-csv";
 import { RescheduleBroadcastModal } from "@/components/clinic/reschedule-broadcast-modal";
 
@@ -42,6 +44,8 @@ export function BroadcastManagement() {
   const [image, setImage] = useState<File | null>(null);
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
   const [rescheduleModalOpen, setRescheduleModalOpen] = useState(false);
+  const [hasBridge, setHasBridge] = useState(false);
+  const [audienceSource, setAudienceSource] = useState<"csv" | "bridge">("csv");
 
   async function loadCampaigns() {
     setLoading(true);
@@ -56,7 +60,15 @@ export function BroadcastManagement() {
 
   useEffect(() => {
     loadCampaigns();
+    clinicHasBridgeAudience().then(setHasBridge).catch(() => {});
   }, []);
+
+  function switchSource(next: "csv" | "bridge") {
+    setAudienceSource(next);
+    setRecipients([]);
+    setCsvText("");
+    setCsvError(null);
+  }
 
   function handleCsvChange(value: string) {
     setCsvText(value);
@@ -93,7 +105,11 @@ export function BroadcastManagement() {
 
   async function handleCreate() {
     if (recipients.length === 0) {
-      toast.error("Cole ou envie um CSV válido antes de criar a campanha.");
+      toast.error(
+        audienceSource === "bridge"
+          ? "Clique em Ver prévia e confira o público antes de criar a campanha."
+          : "Cole ou envie um CSV válido antes de criar a campanha."
+      );
       return;
     }
     setCreating(true);
@@ -229,6 +245,36 @@ export function BroadcastManagement() {
           )}
         </div>
 
+        {hasBridge && (
+          <div>
+            <p className="text-xs font-medium text-slate-600 dark:text-slate-400">Público</p>
+            <div className="mt-1 inline-flex rounded-lg border border-slate-200 dark:border-slate-800 p-0.5 text-xs">
+              {(
+                [
+                  ["bridge", "Pacientes do sistema da clínica"],
+                  ["csv", "Lista CSV"],
+                ] as const
+              ).map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => switchSource(value)}
+                  className={`px-3 py-1 rounded-md font-medium ${
+                    audienceSource === value
+                      ? "bg-emerald-600 text-white"
+                      : "text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {audienceSource === "bridge" ? (
+          <BridgeAudiencePicker onRecipients={setRecipients} />
+        ) : (
         <div>
           <div className="flex items-center justify-between">
             <label htmlFor="broadcast-csv" className="text-xs font-medium text-slate-600 dark:text-slate-400">
@@ -263,6 +309,7 @@ export function BroadcastManagement() {
             </p>
           )}
         </div>
+        )}
 
         <button
           type="button"

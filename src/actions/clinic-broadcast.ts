@@ -8,6 +8,8 @@ import { uploadWhatsAppMedia } from "@/lib/whatsapp-media";
 import { type ParsedBroadcastRecipient } from "@/lib/broadcast-csv";
 import { RESCHEDULE_PENDING_TAG } from "@/lib/conversation-tags";
 import { formatDate } from "@/lib/format";
+import { fetchBridgeCampaignPatients } from "@/lib/hospital-bridge";
+import { buildCampaignAudience } from "@/lib/campaign-audience";
 
 const ALLOWED_IMAGE_MIME_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 const MAX_IMAGE_SIZE_BYTES = 15 * 1024 * 1024; // mesmo limite já usado pra mídia do inbox
@@ -214,4 +216,54 @@ export async function createRescheduleBroadcast(doctorName: string, date: Date, 
   revalidatePath("/clinic/disparos");
   revalidatePath("/clinic/inbox");
   return { success: true as const, campaignId: campaign.id, recipientCount: normalized.length };
+}
+
+export type BridgeAudienceFilters = {
+  sexo?: "F" | "M";
+  /** Última marcação nos últimos N meses. */
+  months: number;
+  minAge?: number;
+  maxAge?: number;
+};
+
+/** Prévia do público tirado direto do sistema da clínica (Firebird via bridge) — sem CSV.
+ * Devolve os destinatários prontos pra createClinicBroadcastCampaign, que continua sendo
+ * o único lugar que cria campanha (mesma dedup/opt-out/imagem). */
+export async function previewBridgeAudience(filters: BridgeAudienceFilters) {
+  const { clinicId } = await requireClinicSession();
+  const months = Math.min(Math.max(Math.round(filters.months) || 12, 1), 60);
+  const since = new Date();
+  since.setMonth(since.getMonth() - months);
+
+  const patients = await fetchBridgeCampaignPatients(clinicId, {
+    sexo: filters.sexo,
+    desde: since.toISOString().slice(0, 10),
+  });
+  const optedOutPhones = new Set(
+    (await prisma.contact.findMany({ where: { optedOutOfBroadcastsAt: { not: null }, phone: { not: null } }, select: { phone: true } }))
+      .map((c) => c.phone)
+      .filter((p): p is string => !!p)
+  );
+  const { recipients, stats } = buildCampaignAudience(patients, {
+    minAge: filters.minAge || undefined,
+    maxAge: filters.maxAge || undefined,
+    optedOutPhones,
+  });
+
+  return {
+    stats: { ...stats, recipients: recipients.length },
+    recipients,
+    // Amostra pra conferência na tela — telefone parcialmente oculto.
+    sample: recipients.slice(0, 8).map((r) => ({
+      saudacao: r.variables.saudacao,
+      phone: `${r.phone.slice(0, 4)} ••••• ${r.phone.slice(-4)}`,
+    })),
+  };
+}
+
+/** Clínica tem integração com o sistema hospitalar ativa? (mostra a opção na tela) */
+export async function clinicHasBridgeAudience() {
+  const { clinicId } = await requireClinicSession();
+  const integration = await prisma.hospitalIntegration.findUnique({ where: { clinicId }, select: { active: true } });
+  return Boolean(integration?.active);
 }

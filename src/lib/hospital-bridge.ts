@@ -1,4 +1,5 @@
 import "server-only";
+import type { BridgeCampaignPatient } from "@/lib/campaign-audience";
 import { prisma } from "@/lib/prisma";
 import type { PlainClinicProcedureItem, PlainAppointment } from "@/lib/serialize";
 import { sendWhatsAppMessage, formatToWhatsAppNumber } from "@/lib/whatsapp";
@@ -494,4 +495,35 @@ export async function createBridgeAppointment(
       },
     },
   };
+}
+
+/** Pacientes com marcação a partir de `desde` (AAAA-MM-DD), opcionalmente por sexo —
+ * público de campanha (ver buildCampaignAudience em campaign-audience.ts). Diferente das
+ * outras funções daqui, LANÇA erro com a mensagem real: a tela de prévia precisa dizer
+ * por que não veio lista (bridge fora do ar, versão antiga sem o endpoint, coluna que
+ * não existe no Firebird dessa clínica…), em vez de mostrar "0 pacientes". */
+export async function fetchBridgeCampaignPatients(
+  clinicId: string,
+  filters: { sexo?: "F" | "M"; desde: string }
+): Promise<BridgeCampaignPatient[]> {
+  const config = await getBridgeConfig(clinicId);
+  if (!config) throw new Error("Esta clínica não tem integração com o sistema hospitalar ativa.");
+  const url = new URL(`${config.apiUrl}/api/pacientes-campanha`);
+  url.searchParams.set("desde", filters.desde);
+  if (filters.sexo) url.searchParams.set("sexo", filters.sexo);
+
+  let response: Response;
+  try {
+    response = await fetch(url, { headers: { "x-api-token": config.apiToken }, signal: AbortSignal.timeout(60000), cache: "no-store" });
+  } catch {
+    throw new Error("O sistema da clínica não respondeu (bridge fora do ar ou lento). Tente de novo em instantes.");
+  }
+  if (response.status === 404) {
+    throw new Error("O bridge desta clínica ainda está na versão antiga — atualize o index.js e reinicie o pm2.");
+  }
+  const data = (await response.json().catch(() => null)) as { pacientes?: BridgeCampaignPatient[]; error?: string; detalhe?: string } | null;
+  if (!response.ok || !Array.isArray(data?.pacientes)) {
+    throw new Error(`Erro do sistema da clínica: ${data?.detalhe ?? data?.error ?? `HTTP ${response.status}`}`);
+  }
+  return data.pacientes;
 }
