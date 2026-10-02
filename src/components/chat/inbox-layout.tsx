@@ -70,6 +70,8 @@ import {
   Pin,
   BellOff,
   CalendarClock,
+  PanelRightOpen,
+  PanelRightClose,
 } from 'lucide-react';
 
 const MAX_MEDIA_SIZE_BYTES = 15 * 1024 * 1024; // 15 MB — mesmo limite validado no servidor
@@ -96,6 +98,8 @@ const QUEUE_STATE_PRIORITY: Record<ConversationQueueState, number> = {
 
 /** A partir de quantos minutos parado em "Não Atribuídas" a aba pisca pra alertar o atendente. */
 const UNASSIGNED_ALERT_THRESHOLD_MINUTES = 10;
+
+const CRM_PANEL_STORAGE_KEY = 'inbox-crm-panel';
 
 /** Todas as abas possíveis da fila — o atendente escolhe quais ficam visíveis (persiste no navegador). */
 const ALL_INBOX_TABS: { id: InboxFilter; label: string }[] = [
@@ -492,6 +496,35 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
   onUpdateContactGlpiEntity,
 }) => {
   const [composerMode, setComposerMode] = useState<'whatsapp' | 'internal_note'>('whatsapp');
+  // P3: painel "Perfil & CRM" recolhível. Sem preferência salva, abre só em tela larga
+  // (>= 1366px); abaixo disso abre como gaveta por cima da conversa.
+  const [crmPanelPref, setCrmPanelPref] = useState<'open' | 'closed' | null>(null);
+  const [isWideScreen, setIsWideScreen] = useState(true);
+  useEffect(() => {
+    const stored = localStorage.getItem(CRM_PANEL_STORAGE_KEY);
+    if (stored === 'open' || stored === 'closed') setCrmPanelPref(stored);
+    const mq = window.matchMedia('(min-width: 1366px)');
+    const update = () => setIsWideScreen(mq.matches);
+    update();
+    mq.addEventListener('change', update);
+    return () => mq.removeEventListener('change', update);
+  }, []);
+  const isCrmPanelOpen = crmPanelPref ? crmPanelPref === 'open' : isWideScreen;
+  const isCrmPanelOverlay = isCrmPanelOpen && !isWideScreen;
+  function setCrmPanelOpen(open: boolean) {
+    const value = open ? 'open' : 'closed';
+    setCrmPanelPref(value);
+    localStorage.setItem(CRM_PANEL_STORAGE_KEY, value);
+  }
+  // C5: botões flutuantes (Copiloto) somem enquanto o painel lateral está aberto —
+  // cobriam o seletor de etapa e o rodapé do painel.
+  useEffect(() => {
+    if (selectedContact && isCrmPanelOpen) document.body.dataset.crmPanelOpen = '1';
+    else delete document.body.dataset.crmPanelOpen;
+    return () => {
+      delete document.body.dataset.crmPanelOpen;
+    };
+  }, [selectedContact, isCrmPanelOpen]);
   /** Sheet amplo com a ficha completa do paciente (Resumo/Histórico/Tags) — aberto ao
    * clicar no nome do paciente no cabeçalho da conversa. Aditivo ao painel "Perfil &
    * CRM" fixo, que continua servindo de contexto rápido enquanto atende. */
@@ -1508,6 +1541,16 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
 
               {/* Ações do Header: atendente, agendar (secundário) e menu */}
               <div className="flex items-center gap-1.5 sm:gap-2">
+                <button
+                  type="button"
+                  onClick={() => setCrmPanelOpen(!isCrmPanelOpen)}
+                  aria-label={isCrmPanelOpen ? 'Esconder painel do paciente' : 'Mostrar painel do paciente'}
+                  title={isCrmPanelOpen ? 'Esconder painel do paciente' : 'Mostrar painel do paciente'}
+                  aria-pressed={isCrmPanelOpen}
+                  className="hidden lg:flex size-9 items-center justify-center rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-800 dark:hover:text-slate-100"
+                >
+                  {isCrmPanelOpen ? <PanelRightClose className="w-4 h-4" /> : <PanelRightOpen className="w-4 h-4" />}
+                </button>
                 {(!selectedContact.responsibleAgent || selectedContact.responsibleAgent.toLowerCase() === "não atribuído") ? (
                   onClaimConversation && (
                     <button
@@ -2121,13 +2164,18 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
          ========================================================================= */}
       {selectedContact && (
         <aside
-          className={`w-full lg:w-[300px] lg:min-w-[300px] lg:max-w-[300px] bg-slate-50 dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 shadow-sm flex-col h-full shrink-0 overflow-y-auto ${
+          className={`w-full lg:w-[320px] lg:min-w-[320px] lg:max-w-[320px] bg-slate-50 dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 shadow-sm flex-col h-full shrink-0 overflow-y-auto ${
             mobileView === 'crm'
               ? 'flex absolute inset-0 z-40 bg-slate-50 dark:bg-slate-900 animate-in slide-in-from-right duration-200'
               // Esconde enquanto o painel de agendamento está aberto — os dois disputam a
               // mesma faixa lateral, e mostrar os três (contatos + CRM + agendamento) juntos
               // deixava a conversa espremida demais.
-              : isScheduleModalOpen ? 'hidden' : 'hidden lg:flex'
+              : isScheduleModalOpen || !isCrmPanelOpen
+                ? 'hidden'
+                : isCrmPanelOverlay
+                  // P3: notebook (< 1366px) — gaveta por cima da conversa, não espreme o chat.
+                  ? 'hidden lg:flex lg:absolute lg:inset-y-0 lg:right-0 lg:z-30 lg:shadow-2xl animate-in slide-in-from-right duration-200'
+                  : 'hidden lg:flex'
           }`}
           data-od-id="inbox-crm-column"
         >
@@ -2137,9 +2185,14 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
               Perfil & CRM do Lead
             </h3>
             <button
-              onClick={() => setMobileView('chat')}
+              type="button"
+              onClick={() => {
+                if (mobileView === 'crm') setMobileView('chat');
+                else setCrmPanelOpen(false);
+              }}
               aria-label="Fechar painel"
-              className="lg:hidden size-11 -mr-2.5 flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+              title="Fechar painel"
+              className="size-11 -mr-2.5 flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
             >
               <X className="w-5 h-5" />
             </button>
