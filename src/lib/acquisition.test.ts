@@ -69,6 +69,11 @@ describe("detectAcquisition", () => {
     expect(detectAcquisition({ text: "Vim pelo Facebook de vocês" }, []).channel).toBe("Facebook Orgânico");
   });
 
+  it("link rastreado do site da própria clínica", () => {
+    expect(detectAcquisition({ text: "Olá! Vim pelo site e quero agendar uma consulta." }, []).channel).toBe("Site da Clínica");
+    expect(detectAcquisition({ text: "vi no site #site" }, []).channel).toBe("Site da Clínica");
+  });
+
   it("regra específica da clínica vence a palavra-chave genérica", () => {
     const rules = [{ keyword: "vim pelo instagram", channel: "Instagram Ads" }];
     expect(detectAcquisition({ text: "Vim pelo Instagram, quero agendar" }, rules).channel).toBe("Instagram Ads");

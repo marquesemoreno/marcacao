@@ -18,6 +18,7 @@ export const ACQUISITION_CHANNELS = [
   "Instagram Orgânico",
   "Facebook Orgânico",
   "Site Conecta Saúde",
+  "Site da Clínica",
   INSTAGRAM_DIRECT_CHANNEL,
   DIRECT_CHANNEL,
 ] as const;
@@ -38,6 +39,9 @@ const KEYWORD_CHANNEL_RULES: { keywords: string[]; channel: string }[] = [
   { keywords: ["google", "pesquisei no google", "#gmn"], channel: "Google Meu Negócio" },
   { keywords: ["instagram", "insta", "stories", "#ig"], channel: "Instagram Orgânico" },
   { keywords: ["facebook", "#fb"], channel: "Facebook Orgânico" },
+  // Botão de WhatsApp do site da própria clínica — frase inteira, não só "site", pra não
+  // pegar "o site de vocês está fora do ar?".
+  { keywords: ["vim pelo site", "#site"], channel: "Site da Clínica" },
 ];
 
 function channelFromKeyword(text: string): string | null {

@@ -27,6 +27,7 @@ export default async function ClinicSettingsPage() {
         { channel: "Google Meu Negócio", url: buildWhatsAppLink(clinic.whatsapp, "Olá! Vim pelo Google e quero agendar uma consulta.") },
         { channel: "Instagram (Bio)", url: buildWhatsAppLink(clinic.whatsapp, "Olá! Vim pelo Instagram e quero agendar uma consulta.") },
         { channel: "Facebook", url: buildWhatsAppLink(clinic.whatsapp, "Olá! Vim pelo Facebook e quero agendar uma consulta.") },
+        { channel: "Site da Clínica", url: buildWhatsAppLink(clinic.whatsapp, "Olá! Vim pelo site e quero agendar uma consulta.") },
       ]
     : [];
 
