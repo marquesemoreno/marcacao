@@ -4,6 +4,7 @@ import { ACQUISITION_CHANNELS } from "@/lib/acquisition";
 import { AcquisitionBadge } from "@/components/chat/acquisition-badge";
 import { InstagramGlyph } from "@/components/chat/instagram-glyph";
 import { messagingWindowState } from "@/lib/messaging-window";
+import { displayName } from "@/lib/contact-display";
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Contact,
@@ -66,6 +67,9 @@ import {
   IdCard,
   Mic,
   Star,
+  Pin,
+  BellOff,
+  CalendarClock,
 } from 'lucide-react';
 
 const MAX_MEDIA_SIZE_BYTES = 15 * 1024 * 1024; // 15 MB — mesmo limite validado no servidor
@@ -88,15 +92,6 @@ const QUEUE_STATE_PRIORITY: Record<ConversationQueueState, number> = {
   HUMANO_ATENDENDO: 3,
   IA_ATENDENDO: 3,
   AGUARDANDO_PACIENTE: 3,
-};
-
-const QUEUE_STATE_BADGE: Record<ConversationQueueState, { label: string; classes: string }> = {
-  URGENCIA_CLINICA: { label: '🚨 Urgência clínica', classes: 'bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300' },
-  REMARCACAO_PENDENTE: { label: '⚠️ Remarcação pendente', classes: 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300' },
-  SEM_DONO: { label: '⏳ Sem dono', classes: 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300' },
-  HUMANO_ATENDENDO: { label: '🧑 Humano atendendo', classes: 'bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300' },
-  IA_ATENDENDO: { label: '🤖 IA atendendo', classes: 'bg-violet-50 dark:bg-violet-950/60 text-violet-700 dark:text-violet-300' },
-  AGUARDANDO_PACIENTE: { label: '💬 Aguardando paciente', classes: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300' },
 };
 
 /** A partir de quantos minutos parado em "Não Atribuídas" a aba pisca pra alertar o atendente. */
@@ -125,6 +120,13 @@ const FUNNEL_STEPS: { id: FunnelStage; label: string }[] = [
  * "concluída" com check verde também, que fazia várias etapas parecerem
  * ativas ao mesmo tempo e confundia qual era a de verdade. */
 
+
+/** "Não atribuída" ou o primeiro nome do responsável — card da fila (P4). */
+function ownerLabel(c: Contact): string {
+  const agent = c.responsibleAgent?.trim();
+  if (!agent || agent.toLowerCase() === 'não atribuído') return 'Não atribuída';
+  return agent.split(' ')[0];
+}
 
 interface InboxLayoutProps {
   contacts: Contact[];
@@ -367,71 +369,49 @@ const ContactListItem = React.memo(function ContactListItem({
         )}
       </div>
 
+      {/* P4 — card em 3 linhas: quem/quando, prévia, espera + dono + não lidas. A etapa do
+          funil saiu do card (fica no filtro do CRM e no painel lateral). */}
       <div className="flex-1 min-w-0">
-        <div className="flex items-center justify-between mb-0.5 gap-2">
-          <h4 className={`text-xs sm:text-[13px] truncate flex items-center gap-1 ${c.unreadCount > 0 ? 'font-bold text-slate-900 dark:text-slate-100' : 'font-semibold text-slate-900 dark:text-slate-100'}`}>
-            {c.pinned && <span title="Fixada">📌</span>}
-            {c.isMuted && <span title="Silenciada">🔕</span>}
-            <span className="truncate">{c.name}</span>
+        <div className="flex items-center justify-between gap-2">
+          <h4 className={`text-sm truncate flex items-center gap-1 text-slate-900 dark:text-slate-100 ${c.unreadCount > 0 ? 'font-bold' : 'font-semibold'}`}>
+            {c.pinned && <Pin className="w-3 h-3 shrink-0 text-slate-400" aria-label="Fixada" />}
+            {c.isMuted && <BellOff className="w-3 h-3 shrink-0 text-slate-400" aria-label="Silenciada" />}
+            <span className="truncate">{displayName(c)}</span>
           </h4>
-          <span className="flex items-center gap-1.5 shrink-0">
-            <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">
-              {c.lastMessageTime}
-            </span>
-            {c.unreadCount > 0 && (
-              <span
-                className="min-w-[16px] h-4 px-1 rounded-md bg-emerald-600 text-white text-[9px] font-bold flex items-center justify-center"
-                title={`${c.unreadCount} mensagem(ns) não lida(s)`}
-              >
-                {c.unreadCount > 9 ? '9+' : c.unreadCount}
-              </span>
-            )}
-          </span>
+          <span className="shrink-0 text-xs text-slate-500 dark:text-slate-400">{c.lastMessageTime}</span>
         </div>
 
-        <p className={`text-[10px] font-bold mb-0.5 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md ${QUEUE_STATE_BADGE[c.queueState].classes}`}>
-          {QUEUE_STATE_BADGE[c.queueState].label}
-        </p>
+        {c.clinicName && <p className="text-xs font-medium text-sky-700 dark:text-sky-400 truncate">{c.clinicName}</p>}
 
-        {c.hasUnseenAssignment && (
-          <p className="text-[10px] font-bold text-amber-700 dark:text-amber-400 mb-0.5 flex items-center gap-1">
-            <Zap className="w-2.5 h-2.5" /> Transferida pra você
-          </p>
-        )}
+        <p className="text-sm text-slate-600 dark:text-slate-300 truncate leading-snug mt-0.5">{c.lastMessage}</p>
 
-        {c.clinicName && (
-          <p className="text-[10px] font-semibold text-sky-700 dark:text-sky-400 mb-0.5 truncate">{c.clinicName}</p>
-        )}
-
-        <p className="text-xs text-slate-500 dark:text-slate-400 truncate mb-1.5 leading-snug">
-          {c.lastMessage}
-        </p>
-
-        <div className="flex items-center justify-between gap-1">
-          <span
-            className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md border ${
-              c.statusTag.variant === 'emerald'
-                ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
-                : c.statusTag.variant === 'amber'
-                ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800'
-                : 'bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800'
-            }`}
-          >
-            {c.statusTag.label}
-          </span>
-
-          <span className="inline-flex items-center gap-1 shrink-0">
-            <SLABadge sla={c.sla} />
-            {c.responsibleAgent && c.responsibleAgent.toLowerCase() !== 'não atribuído' ? (
-              <span className="inline-flex items-center gap-0.5 text-[10px] font-medium text-slate-500 dark:text-slate-300 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-1.5 py-0.5 rounded-md truncate max-w-[85px]" title={`Atribuído a ${c.responsibleAgent}`}>
-                <User className="w-2.5 h-2.5 shrink-0" /> {c.responsibleAgent.split(' ')[0]}
+        <div className="flex items-center justify-between gap-2 mt-1">
+          <span className="inline-flex items-center gap-2 min-w-0 text-xs">
+            {c.hasUnseenAssignment ? (
+              <span className="inline-flex items-center gap-1 font-semibold text-amber-700 dark:text-amber-400">
+                <Zap className="w-3 h-3" /> Transferida pra você
+              </span>
+            ) : c.queueState === 'REMARCACAO_PENDENTE' ? (
+              <span className="inline-flex items-center gap-1 font-semibold text-amber-700 dark:text-amber-400">
+                <CalendarClock className="w-3 h-3" /> Remarcação pendente
               </span>
             ) : (
-              <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-800 px-1.5 py-0.5 rounded-md" title="Aguardando secretária">
-                <Clock className="w-2.5 h-2.5" /> Livre
-              </span>
+              <SLABadge sla={c.sla} />
             )}
+            <span className="inline-flex items-center gap-1 truncate text-slate-500 dark:text-slate-400" title={c.queueState === 'IA_ATENDENDO' ? 'Atendida pela IA' : `Responsável: ${ownerLabel(c)}`}>
+              {c.queueState === 'IA_ATENDENDO' ? <Bot className="w-3 h-3 shrink-0" /> : <User className="w-3 h-3 shrink-0" />}
+              <span className="truncate">{c.queueState === 'IA_ATENDENDO' ? 'IA' : ownerLabel(c)}</span>
+            </span>
           </span>
+          {c.unreadCount > 0 && (
+            <span
+              className="shrink-0 min-w-[20px] h-5 px-1.5 rounded-full bg-emerald-600 text-white text-xs font-bold flex items-center justify-center"
+              title={`${c.unreadCount} mensagem(ns) não lida(s)`}
+              aria-label={`${c.unreadCount} não lida(s)`}
+            >
+              {c.unreadCount > 99 ? '99+' : c.unreadCount}
+            </span>
+          )}
         </div>
       </div>
     </div>
