@@ -1166,21 +1166,25 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
               )}
               {attendantCapacity && (
                 <span
-                  className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md border ${
+                  className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-md border ${
                     attendantCapacity.activeCount >= attendantCapacity.maxLimit
                       ? "bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800"
                       : attendantCapacity.activeCount >= attendantCapacity.maxLimit - 1
                       ? "bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800"
                       : "bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800"
                   }`}
-                  title="Seu limite de conversas ativas simultâneas"
+                  title={
+                    attendantCapacity.activeCount >= attendantCapacity.maxLimit
+                      ? `Você está com ${attendantCapacity.activeCount} conversas em atendimento e seu limite é ${attendantCapacity.maxLimit}. Enquanto estiver no limite, não dá para assumir conversas novas — finalize ou transfira alguma.`
+                      : `Você está com ${attendantCapacity.activeCount} de ${attendantCapacity.maxLimit} conversas em atendimento ao mesmo tempo. Ao chegar no limite, não dá para assumir novas.`
+                  }
                 >
-                  <Zap className="w-2.5 h-2.5" />
-                  {attendantCapacity.activeCount}/{attendantCapacity.maxLimit}
+                  <Zap className="w-3 h-3" />
+                  Em atendimento: {attendantCapacity.activeCount}/{attendantCapacity.maxLimit}
                 </span>
               )}
-              <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-300 bg-slate-50 dark:bg-slate-800 px-2 py-0.5 rounded-md border border-slate-200/70 dark:border-slate-700">
-                {filteredContacts.length}
+              <span title="Quantidade de conversas na aba e com os filtros atuais" className="text-xs font-semibold text-slate-500 dark:text-slate-300 bg-slate-50 dark:bg-slate-800 px-2 py-0.5 rounded-md border border-slate-200/70 dark:border-slate-700">
+                {filteredContacts.length} {filteredContacts.length === 1 ? "conversa" : "conversas"}
               </span>
             </div>
           </div>
@@ -1563,7 +1567,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                       }`}
                       title={
                         attendantCapacity && attendantCapacity.activeCount >= attendantCapacity.maxLimit
-                          ? `Você atingiu seu limite de ${attendantCapacity.maxLimit} conversas simultâneas`
+                          ? `Você está no seu limite de ${attendantCapacity.maxLimit} conversas em atendimento. Finalize ou transfira alguma para poder assumir esta.`
                           : "Assumir esta conversa para o seu atendimento"
                       }
                     >
