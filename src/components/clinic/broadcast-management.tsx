@@ -1,7 +1,8 @@
 "use client";
 
+import { PageHeader } from "@/components/clinic/page-header";
 import { useEffect, useState } from "react";
-import { Megaphone, Loader2, Play, Pause, Upload, Image as ImageIcon, X, AlertTriangle } from "lucide-react";
+import { Loader2, Play, Pause, Upload, Image as ImageIcon, X, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import {
   listClinicBroadcastCampaigns,
@@ -154,11 +155,10 @@ export function BroadcastManagement() {
 
   return (
     <div className="p-4 sm:p-6 space-y-6 max-w-4xl mx-auto">
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <Megaphone className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-          <h1 className="text-xl md:text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Disparo de mensagens</h1>
-        </div>
+      <PageHeader
+        title="Disparos"
+        subtitle={loading ? "Carregando…" : `${campaigns.filter((c) => c.status === "RUNNING").length} em andamento · ${campaigns.length} campanha(s)`}
+        actions={
         <button
           type="button"
           onClick={() => setRescheduleModalOpen(true)}
@@ -167,7 +167,8 @@ export function BroadcastManagement() {
           <AlertTriangle className="w-3.5 h-3.5" />
           Aviso / Remarcação em Massa
         </button>
-      </div>
+        }
+      />
 
       <RescheduleBroadcastModal
         open={rescheduleModalOpen}

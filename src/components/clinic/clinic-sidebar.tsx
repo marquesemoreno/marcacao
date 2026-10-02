@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ChevronsLeft, ChevronsRight } from "lucide-react";
+import { ChevronsLeft, ChevronsRight, Search } from "lucide-react";
+import { openGlobalSearch } from "@/components/clinic/global-search";
 import { UserMenu } from "@/components/clinic/user-menu";
 import { Logo } from "@/components/brand/logo";
 import { ClinicNav } from "@/components/clinic/clinic-nav";
@@ -69,13 +70,34 @@ export function ClinicSidebar({
         </div>
       )}
 
+      {/* N3: busca global (paciente, telefone, conversa) — atalho "/" em qualquer tela. */}
+      <div className={isCollapsed ? "px-2 mt-3" : "px-3 mt-3"}>
+        <button
+          type="button"
+          onClick={openGlobalSearch}
+          aria-label="Buscar paciente, telefone ou conversa (atalho /)"
+          title="Buscar (atalho /)"
+          className={`flex w-full items-center gap-2 rounded-lg border border-slate-700 bg-slate-800/60 text-sm text-slate-300 hover:bg-slate-800 hover:text-white ${
+            isCollapsed ? "justify-center h-9" : "h-9 px-3"
+          }`}
+        >
+          <Search className="h-4 w-4 shrink-0" />
+          {!isCollapsed && (
+            <>
+              <span className="flex-1 text-left">Buscar</span>
+              <kbd className="rounded border border-slate-600 px-1.5 text-xs text-slate-400">/</kbd>
+            </>
+          )}
+        </button>
+      </div>
+
       <div className="flex-1 overflow-y-auto overflow-x-hidden mt-1">
         <ClinicNav exclusiveWhatsapp={isExclusive} collapsed={isCollapsed} />
       </div>
 
       <div className="border-t border-slate-800 px-3 py-3 space-y-2">
         {/* P2: tema, sugestão/bug e Sair (com confirmação) ficam no menu do usuário. */}
-        <UserMenu userName={userName} compact={isCollapsed} />
+        <UserMenu userName={userName} subtitle={`Equipe · ${tradeName}`} compact={isCollapsed} />
         <button
           type="button"
           onClick={toggleCollapsed}

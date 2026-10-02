@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { PanelDarkDefault } from "@/components/panel-dark-default";
 import { authOptions } from "@/lib/auth";
 import { UserMenu } from "@/components/clinic/user-menu";
+import { GlobalSearch } from "@/components/clinic/global-search";
 import { Logo } from "@/components/brand/logo";
 import { ClinicNav } from "@/components/clinic/clinic-nav";
 import { ClinicSidebar } from "@/components/clinic/clinic-sidebar";
@@ -39,7 +40,7 @@ export default async function ClinicLayout({
           <Logo variant="icon-only" size="sm" />
           <span className="truncate text-xs font-extrabold text-slate-900 dark:text-slate-100">{clinic.tradeName}</span>
         </div>
-        <UserMenu userName={session?.user.name} side="bottom" compact />
+        <UserMenu userName={session?.user.name} subtitle={`Equipe · ${clinic.tradeName}`} side="bottom" compact />
       </header>
 
       <div className="flex-1 min-w-0 flex flex-col overflow-hidden md:pt-0 pt-14">
@@ -51,6 +52,7 @@ export default async function ClinicLayout({
       </div>
 
       <CopilotLauncher />
+      <GlobalSearch />
     </div>
   );
 }

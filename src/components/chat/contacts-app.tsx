@@ -1,8 +1,9 @@
 "use client";
 
+import { PageHeader } from "@/components/clinic/page-header";
 import { useCallback, useEffect, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Search, Users, MessageCircle, UserPlus, Upload, X, Eye, Calendar } from "lucide-react";
+import { Search, MessageCircle, UserPlus, Upload, X, Eye, Calendar } from "lucide-react";
 import { toast } from "sonner";
 import {
   listContactsPage,
@@ -310,15 +311,10 @@ export function ContactsApp({ scope, basePath }: { scope: Scope; basePath: strin
 
   return (
     <div className="flex-1 space-y-5 overflow-y-auto p-4 sm:p-6 font-sans text-slate-900 dark:text-slate-100">
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex flex-col gap-1">
-          <h1 className="flex items-center gap-2 text-xl md:text-2xl font-semibold tracking-tight">
-            <Users className="size-6 text-slate-500" /> Contatos
-          </h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400">
-            Central de fichas dos pacientes — busque por nome, telefone, CPF ou convênio.
-          </p>
-        </div>
+      <PageHeader
+        title="Pacientes"
+        subtitle={isLoading && total === 0 ? "Carregando…" : `${total} paciente${total === 1 ? "" : "s"}${urlQ || convenioFilter || doctorFilter ? " com os filtros atuais" : ""}`}
+        actions={
         <div className="flex shrink-0 items-center gap-2">
           {scope === "admin" && (
             <button
@@ -335,7 +331,8 @@ export function ContactsApp({ scope, basePath }: { scope: Scope; basePath: strin
             <UserPlus className="size-4" /> Novo Contato
           </button>
         </div>
-      </div>
+        }
+      />
 
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative max-w-md flex-1 min-w-[220px]">
