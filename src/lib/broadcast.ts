@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { sendWhatsAppMessage, sendWhatsAppMedia } from "@/lib/whatsapp";
 import { getSignedMediaUrl } from "@/lib/whatsapp-media";
 import { buildBroadcastMessage } from "@/lib/broadcast-csv";
+import { isWithinMarketingWindow, MARKETING_DAILY_CAP, startOfBrazilDay } from "@/lib/broadcast-schedule";
 
 const BATCH_SIZE = Number(process.env.BROADCAST_BATCH_SIZE) || 3;
 
@@ -21,10 +22,24 @@ export async function dispatchNextBatch(): Promise<{ processed: number }> {
   const campaigns = await prisma.broadcastCampaign.findMany({ where: { status: "RUNNING" } });
   let processed = 0;
 
+  const now = new Date();
   for (const campaign of campaigns) {
+    // Marketing (sem tagOnSend): só seg–sex 09–17h, 1 por chamada (o gatilho chama a cada
+    // 4–6 min) e no máximo MARKETING_DAILY_CAP por dia. Aviso de remarcação (tagOnSend) é
+    // urgente e mantém o ritmo antigo, a qualquer hora.
+    const isMarketing = !campaign.tagOnSend;
+    let take = BATCH_SIZE;
+    if (isMarketing) {
+      if (!isWithinMarketingWindow(now)) continue;
+      const sentToday = await prisma.broadcastRecipient.count({
+        where: { campaignId: campaign.id, status: "SENT", sentAt: { gte: startOfBrazilDay(now) } },
+      });
+      if (sentToday >= MARKETING_DAILY_CAP) continue;
+      take = 1;
+    }
     const recipients = await prisma.broadcastRecipient.findMany({
       where: { campaignId: campaign.id, status: "PENDING" },
-      take: BATCH_SIZE,
+      take,
       orderBy: { createdAt: "asc" },
     });
 
