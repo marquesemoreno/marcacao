@@ -1,4 +1,5 @@
 import { getServerSession } from "next-auth";
+import { PanelDarkDefault } from "@/components/panel-dark-default";
 import { authOptions } from "@/lib/auth";
 import { SignOutButton } from "@/components/sign-out-button";
 import { Logo } from "@/components/brand/logo";
@@ -17,6 +18,7 @@ export default async function AdminLayout({
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100">
+      <PanelDarkDefault />
       {/* Trilho de navegação — sempre escuro, independente do tema claro/escuro do
           conteúdo (mesma lógica de identidade fixa usada no dashboard do MSP). */}
       <aside className="hidden md:flex w-60 shrink-0 flex-col bg-slate-900 border-r border-slate-800">

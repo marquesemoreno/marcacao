@@ -1,4 +1,5 @@
 import { getServerSession } from "next-auth";
+import { PanelDarkDefault } from "@/components/panel-dark-default";
 import { authOptions } from "@/lib/auth";
 import { UserMenu } from "@/components/clinic/user-menu";
 import { Logo } from "@/components/brand/logo";
@@ -20,6 +21,7 @@ export default async function ClinicLayout({
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100">
+      <PanelDarkDefault />
       <ClinicSidebar tradeName={clinic.tradeName} userName={session?.user.name} isExclusive={isExclusive} />
 
       {/* Barra superior compacta — só no mobile, onde o trilho fica escondido. */}
