@@ -2,6 +2,8 @@
  * tipo de atendimento e horário de pico) — separadas das queries em
  * src/actions/clinic.ts pra dar pra testar sem banco. */
 import { toTitleCaseName } from "./format";
+import { computeBusinessMinutesElapsed, SLA_WARNING_MINUTES } from "./sla-calculator";
+import type { BusinessHours } from "./schemas/clinic";
 
 const pct = (part: number, total: number) => (total > 0 ? Math.round((part / total) * 1000) / 10 : 0);
 
@@ -186,4 +188,32 @@ export function computeChannelConversion(
       estimatedRevenue: ticket !== null ? e.scheduled * ticket : null,
     }))
     .sort((a, b) => b.scheduled - a.scheduled || b.conversations - a.conversations);
+}
+
+export type ResponseTimingRow = { firstInboundAt: Date; firstHumanReplyAt: Date | null; resolvedAt: Date | null };
+
+function median(values: number[]): number | null {
+  if (values.length === 0) return null;
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[mid] : Math.round((sorted[mid - 1] + sorted[mid]) / 2);
+}
+
+/** D3 — tempos do relatório legíveis: MEDIANA (uma conversa esquecida não puxa tudo pra
+ * "2734h"), só minutos de EXPEDIENTE da clínica, e só conversas com resposta humana
+ * (painel ou celular — mensagem automática não conta). Resolução também a partir da
+ * 1ª mensagem do paciente. SLA = 1ª resposta em até SLA_WARNING_MINUTES de expediente. */
+export function computeResponseStats(rows: ResponseTimingRow[], businessHours: BusinessHours | null) {
+  const answered = rows.filter((r) => r.firstHumanReplyAt);
+  const frt = answered.map((r) => computeBusinessMinutesElapsed(r.firstInboundAt, r.firstHumanReplyAt!, businessHours));
+  const ttr = answered
+    .filter((r) => r.resolvedAt)
+    .map((r) => computeBusinessMinutesElapsed(r.firstInboundAt, r.resolvedAt!, businessHours));
+  return {
+    answered: answered.length,
+    unanswered: rows.length - answered.length,
+    medianFirstResponseMin: median(frt),
+    medianResolutionMin: median(ttr),
+    withinSlaPct: frt.length ? pct(frt.filter((m) => m <= SLA_WARNING_MINUTES).length, frt.length) : null,
+  };
 }

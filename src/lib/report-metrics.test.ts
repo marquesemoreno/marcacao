@@ -9,6 +9,7 @@ import {
   computeBridgeConfirmationStats,
   mergeConfirmationStats,
   computeChannelConversion,
+  computeResponseStats,
 } from "./report-metrics";
 
 describe("computeAttendantPerformance", () => {
@@ -142,5 +143,34 @@ describe("computeChannelConversion", () => {
 
   it("sem ticket, receita estimada é null", () => {
     expect(computeChannelConversion([{ acquisitionChannel: "X", status: "OPEN", resolutionReason: null }], null)[0].estimatedRevenue).toBeNull();
+  });
+});
+
+describe("computeResponseStats", () => {
+  // segunda 2026-09-07, expediente padrão 08–18h (UTC-3)
+  const at = (hhmm: string) => new Date(`2026-09-07T${hhmm}:00-03:00`);
+  it("mediana em minutos de expediente, ignora sem resposta, % dentro do SLA", () => {
+    const stats = computeResponseStats(
+      [
+        { firstInboundAt: at("09:00"), firstHumanReplyAt: at("09:05"), resolvedAt: at("10:00") },
+        { firstInboundAt: at("09:00"), firstHumanReplyAt: at("09:20"), resolvedAt: null },
+        { firstInboundAt: at("09:00"), firstHumanReplyAt: at("11:00"), resolvedAt: at("12:00") },
+        { firstInboundAt: at("09:00"), firstHumanReplyAt: null, resolvedAt: at("09:30") },
+      ],
+      null
+    );
+    expect(stats).toEqual({ answered: 3, unanswered: 1, medianFirstResponseMin: 20, medianResolutionMin: 120, withinSlaPct: 33.3 });
+  });
+
+  it("mensagem fora do expediente só conta a partir da abertura", () => {
+    const stats = computeResponseStats(
+      [{ firstInboundAt: new Date("2026-09-04T22:00:00Z"), firstHumanReplyAt: new Date("2026-09-07T11:10:00Z"), resolvedAt: null }],
+      { seg: { open: "08:00", close: "18:00" }, ter: { closed: true }, qua: { closed: true }, qui: { closed: true }, sex: { open: "08:00", close: "18:00" }, sab: { closed: true }, dom: { closed: true } }
+    );
+    expect(stats.medianFirstResponseMin).toBe(10);
+  });
+
+  it("sem conversas respondidas devolve null", () => {
+    expect(computeResponseStats([], null)).toEqual({ answered: 0, unanswered: 0, medianFirstResponseMin: null, medianResolutionMin: null, withinSlaPct: null });
   });
 });
