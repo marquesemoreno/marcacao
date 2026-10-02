@@ -244,10 +244,12 @@ export async function previewBridgeAudience(filters: BridgeAudienceFilters) {
       .map((c) => c.phone)
       .filter((p): p is string => !!p)
   );
+  const clinic = await prisma.clinic.findUniqueOrThrow({ where: { id: clinicId }, select: { campaignExcludedPatientIds: true } });
   const { recipients, stats } = buildCampaignAudience(patients, {
     minAge: filters.minAge || undefined,
     maxAge: filters.maxAge || undefined,
     optedOutPhones,
+    excludedPatientIds: new Set(clinic.campaignExcludedPatientIds),
   });
 
   return {
@@ -266,4 +268,21 @@ export async function clinicHasBridgeAudience() {
   const { clinicId } = await requireClinicSession();
   const integration = await prisma.hospitalIntegration.findUnique({ where: { clinicId }, select: { active: true } });
   return Boolean(integration?.active);
+}
+
+/** Lista de exclusão de campanhas (códigos de paciente do sistema da clínica). */
+export async function getCampaignExclusions() {
+  const { clinicId } = await requireClinicSession();
+  const clinic = await prisma.clinic.findUniqueOrThrow({ where: { id: clinicId }, select: { campaignExcludedPatientIds: true } });
+  return clinic.campaignExcludedPatientIds;
+}
+
+/** Substitui a lista inteira — aceita códigos separados por vírgula, espaço ou linha. */
+export async function setCampaignExclusions(raw: string) {
+  const { clinicId } = await requireClinicSession();
+  const ids = [...new Set(raw.split(/[\s,;]+/).map((t) => t.trim()).filter(Boolean).map(Number))];
+  if (ids.some((n) => !Number.isInteger(n) || n <= 0)) throw new Error("Use só os códigos numéricos dos pacientes.");
+  if (ids.length > 5000) throw new Error("Lista grande demais.");
+  await prisma.clinic.update({ where: { id: clinicId }, data: { campaignExcludedPatientIds: ids.sort((a, b) => a - b) } });
+  return ids.length;
 }

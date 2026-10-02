@@ -200,6 +200,10 @@ model Clinic {
   /// Protegida do /clinic/relatorio quando o procedimento não tem preço (ex: agendamentos
   /// do Firebird, que caem num procedimento genérico). Null = sem estimativa.
   defaultTicket         Decimal? @map("default_ticket") @db.Decimal(10, 2)
+  /// Códigos de paciente do sistema da clínica (PACIENTE.CODIGOPAC no Firebird) que nunca
+  /// entram em campanha pelo público "Pacientes do sistema da clínica" — ex: cadastro com
+  /// sexo errado. Ver buildCampaignAudience em src/lib/campaign-audience.ts.
+  campaignExcludedPatientIds Int[] @default([]) @map("campaign_excluded_patient_ids")
   createdAt             DateTime @default(now()) @map("created_at")
   updatedAt             DateTime @updatedAt @map("updated_at")
 

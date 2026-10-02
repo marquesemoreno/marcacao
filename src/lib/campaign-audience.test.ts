@@ -69,3 +69,14 @@ describe("buildCampaignAudience", () => {
     expect(buildCampaignAudience([p({}), p({ id: 2 })], { optedOutPhones: new Set(), today }).stats.total).toBe(2);
   });
 });
+
+describe("buildCampaignAudience — lista de exclusão", () => {
+  it("tira pacientes pelo código do sistema da clínica e conta à parte", () => {
+    const { recipients, stats } = buildCampaignAudience(
+      [p({ id: 10 }), p({ id: 11, telefone: "77988887777" })],
+      { optedOutPhones: new Set(), excludedPatientIds: new Set([10]), today }
+    );
+    expect(recipients.map((r) => r.phone)).toEqual(["5577988887777"]);
+    expect(stats.excludedManual).toBe(1);
+  });
+});

@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Database, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { previewBridgeAudience, type BridgeAudienceFilters } from "@/actions/clinic-broadcast";
+import { previewBridgeAudience, getCampaignExclusions, setCampaignExclusions, type BridgeAudienceFilters } from "@/actions/clinic-broadcast";
 import type { ParsedBroadcastRecipient } from "@/lib/broadcast-csv";
 
 type Preview = Awaited<ReturnType<typeof previewBridgeAudience>>;
@@ -20,6 +20,33 @@ export function BridgeAudiencePicker({ onRecipients }: { onRecipients: (r: Parse
   const [maxAge, setMaxAge] = useState("");
   const [loading, setLoading] = useState(false);
   const [preview, setPreview] = useState<Preview | null>(null);
+  const [exclusions, setExclusions] = useState("");
+  const [savedExclusions, setSavedExclusions] = useState("");
+  const [savingExclusions, setSavingExclusions] = useState(false);
+
+  useEffect(() => {
+    getCampaignExclusions()
+      .then((ids) => {
+        const text = ids.join(", ");
+        setExclusions(text);
+        setSavedExclusions(text);
+      })
+      .catch(() => {});
+  }, []);
+
+  async function handleSaveExclusions() {
+    setSavingExclusions(true);
+    try {
+      const count = await setCampaignExclusions(exclusions);
+      setSavedExclusions(exclusions);
+      toast.success(`Lista de exclusão salva (${count} paciente(s)).`);
+      invalidate();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível salvar a lista.");
+    } finally {
+      setSavingExclusions(false);
+    }
+  }
 
   function invalidate() {
     setPreview(null);
@@ -76,6 +103,29 @@ export function BridgeAudiencePicker({ onRecipients }: { onRecipients: (r: Parse
         </label>
       </div>
 
+      <div>
+        <label htmlFor="campaign-exclusions" className="text-[11px] font-medium text-slate-600 dark:text-slate-400">
+          Lista de exclusão — códigos de paciente do sistema da clínica que nunca recebem campanha
+        </label>
+        <div className="mt-1 flex gap-2">
+          <input
+            id="campaign-exclusions"
+            value={exclusions}
+            onChange={(e) => setExclusions(e.target.value)}
+            placeholder="Ex.: 9982, 11704"
+            className="flex-1 h-8 px-2 text-xs rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100"
+          />
+          <button
+            type="button"
+            disabled={savingExclusions || exclusions === savedExclusions}
+            onClick={handleSaveExclusions}
+            className="px-3 h-8 text-xs font-medium rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-40"
+          >
+            {savingExclusions ? "Salvando…" : "Salvar"}
+          </button>
+        </div>
+      </div>
+
       <button
         type="button"
         disabled={loading}
@@ -92,6 +142,7 @@ export function BridgeAudiencePicker({ onRecipients }: { onRecipients: (r: Parse
             {s.recipients} destinatário(s) — de {s.total} paciente(s) encontrados no sistema.
           </p>
           <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-0.5">
+            <li>Na lista de exclusão: <strong>{s.excludedManual}</strong></li>
             <li>Fora pela idade: <strong>{s.excludedAge}</strong></li>
             <li>Sem data de nascimento (fora): <strong>{s.excludedNoBirthDate}</strong></li>
             <li>Telefone inválido: <strong>{s.invalidPhone}</strong></li>

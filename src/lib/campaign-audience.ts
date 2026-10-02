@@ -18,6 +18,9 @@ export type AudienceOptions = {
   maxAge?: number;
   /** Contact.phone de quem já respondeu "9"/"sair" (formato 55+DDD+número). */
   optedOutPhones: Set<string>;
+  /** Códigos de paciente (PACIENTE.CODIGOPAC) que a clínica tirou de campanhas — ex:
+   * homem cadastrado como sexo feminino no sistema da clínica (Clinic.campaignExcludedPatientIds). */
+  excludedPatientIds?: Set<number>;
   today?: Date;
 };
 
@@ -37,12 +40,16 @@ const firstName = (full: string) => toTitleCaseName(full.trim().split(/\s+/)[0] 
 
 export function buildCampaignAudience(patients: BridgeCampaignPatient[], options: AudienceOptions) {
   const today = options.today ?? new Date();
-  const stats = { total: patients.length, excludedAge: 0, excludedNoBirthDate: 0, invalidPhone: 0, optedOut: 0, sharedPhones: 0 };
+  const stats = { total: patients.length, excludedManual: 0, excludedAge: 0, excludedNoBirthDate: 0, invalidPhone: 0, optedOut: 0, sharedPhones: 0 };
 
   // Filtra idade ANTES de agrupar por telefone: a filha menor com o celular da mãe não
   // pode transformar a mensagem da mãe em "sem nome".
   const byPhone = new Map<string, BridgeCampaignPatient[]>();
   for (const patient of patients) {
+    if (options.excludedPatientIds?.has(Number(patient.id))) {
+      stats.excludedManual++;
+      continue;
+    }
     const needsAge = options.minAge != null || options.maxAge != null;
     if (needsAge) {
       const age = patient.nascimento ? ageOn(patient.nascimento, today) : null;
