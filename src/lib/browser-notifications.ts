@@ -55,7 +55,9 @@ export function showDesktopNotification(
 export function updateTabTitleUnreadCount(unreadCount: number) {
   if (typeof document === "undefined") return;
 
-  const baseTitle = "Chat / WhatsApp | Conecta Saúde";
+  // Mantém o título da página atual (definido por página no layout da clínica) e só
+  // troca o prefixo "(N) " — antes sobrescrevia tudo com "Chat / WhatsApp", até no CRM.
+  const baseTitle = document.title.replace(/^\(\d+\+?\)\s*/, "") || "Conecta Saúde";
   if (unreadCount > 0) {
     document.title = `(${unreadCount}) ${baseTitle}`;
   } else {

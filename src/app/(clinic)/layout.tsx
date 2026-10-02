@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { getServerSession } from "next-auth";
 import { PanelDarkDefault } from "@/components/panel-dark-default";
 import { authOptions } from "@/lib/auth";
@@ -10,6 +11,14 @@ import { getClinicInfo } from "@/actions/clinic";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
+
+/** Título por página no painel: "Chat · Urolaser · Conecta Saúde" (cada página define
+ * só o próprio nome em `metadata.title`). Antes todas herdavam o título do site dos
+ * pacientes ("Consultas e Exames Perto de Você"). */
+export async function generateMetadata(): Promise<Metadata> {
+  const clinic = await getClinicInfo();
+  return { title: { template: `%s · ${clinic.tradeName} · Conecta Saúde`, default: `${clinic.tradeName} · Conecta Saúde` } };
+}
 
 export default async function ClinicLayout({
   children,

@@ -1,6 +1,8 @@
 import { Suspense } from "react";
 import { ContactsApp } from "@/components/chat/contacts-app";
 
+export const metadata = { title: "Contatos" };
+
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 

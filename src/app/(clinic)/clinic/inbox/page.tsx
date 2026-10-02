@@ -2,6 +2,8 @@ import { Suspense } from "react";
 import { ChatCrmApp } from "@/components/chat/chat-crm-app";
 import { requireClinicSession } from "@/lib/session";
 
+export const metadata = { title: "Chat" };
+
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 

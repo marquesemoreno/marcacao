@@ -377,7 +377,13 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
     setIsLoadingContacts(false);
     setContacts(result);
 
-    const totalUnread = result.reduce((sum, item) => sum + item.unreadCount, 0);
+    // Título da aba: só não lidas que são minhas ou sem responsável — as atribuídas a
+    // outra atendente não são trabalho meu e inflavam o contador.
+    const isUnassigned = (c: Contact) => !c.responsibleAgent || c.responsibleAgent.toLowerCase() === "não atribuído";
+    const totalUnread = result.reduce(
+      (sum, item) => (item.isAssignedToViewer || isUnassigned(item) ? sum + item.unreadCount : sum),
+      0
+    );
     updateTabTitleUnreadCount(totalUnread);
 
     // Silenciada suprime som/notificação desktop, não o badge de não lida acima

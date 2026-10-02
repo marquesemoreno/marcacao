@@ -42,6 +42,8 @@ import {
   Wallet,
 } from "lucide-react";
 
+export const metadata = { title: "Relatórios" };
+
 /** Cor por status — mesma semântica já usada em appointmentStatusVariant (format.ts),
  * cada família de cor distinta (nunca duas cores parecidas pra status diferentes). */
 const STATUS_COLOR_CLASS = {
