@@ -198,6 +198,11 @@ export function ContactsApp({ scope, basePath }: { scope: Scope; basePath: strin
   const pageCount = Math.max(1, Math.ceil(total / CONTACTS_PAGE_SIZE));
 
   async function handleOpenSheet(row: ContactRow) {
+    // N1: no painel da clínica a ficha é uma página; o admin continua com a gaveta.
+    if (scope === "clinic") {
+      router.push(`/clinic/pacientes/${row.conversationId}`);
+      return;
+    }
     setSheetContact(rowToPatientRecord(row));
     setIsSheetOpen(true);
     const history = await getChatContactHistory(row.conversationId).catch(() => []);

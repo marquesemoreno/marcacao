@@ -1121,6 +1121,7 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
           availableClinics={scope === "admin" ? availableClinics : undefined}
           onReassignClinic={scope === "admin" ? handleReassignClinic : undefined}
           onChangeAcquisition={scope === "admin" ? undefined : handleChangeAcquisition}
+          patientPageHref={scope === "admin" ? undefined : (id) => `${basePath}/pacientes/${id}`}
           clinicFilter={scope === "admin" ? clinicFilter : undefined}
           onClinicFilterChange={scope === "admin" ? setClinicFilter : undefined}
           outboundFromDeviceStats={scope === "admin" ? outboundFromDeviceStats : undefined}

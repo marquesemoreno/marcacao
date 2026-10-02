@@ -1948,7 +1948,7 @@ export async function assignConversationToUser(conversationId: string, targetUse
 }
 
 export async function updateConversationFunnelStage(conversationId: string, stage: FunnelStage) {
-  const { clinicId } = await requireClinicSession();
+  const { clinicId, userId } = await requireClinicSession();
 
   const conversation = await prisma.conversation.findUnique({
     where: { id: conversationId },
@@ -1970,6 +1970,12 @@ export async function updateConversationFunnelStage(conversationId: string, stag
       ...(shouldTag ? { tags: { push: funnelTag } } : {}),
     },
   });
+  // N1: histórico de etapa (com autor) pra linha do tempo da ficha do paciente.
+  if (conversation.funnelStage !== funnelStageToDb[stage]) {
+    await prisma.conversationStageChange
+      .create({ data: { conversationId, fromStage: conversation.funnelStage, toStage: funnelStageToDb[stage], userId } })
+      .catch(() => {});
+  }
 
   if (stage === "agendado") {
     // Se a atendente já mandou alguma mensagem manual pro paciente há pouco tempo,
