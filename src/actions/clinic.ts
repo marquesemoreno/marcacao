@@ -536,6 +536,13 @@ export async function updateClinicDefaultTicket(formData: FormData) {
   revalidatePath("/clinic/relatorio");
 }
 
+/** Ticket médio (soma em R$ das colunas do CRM — N2). null = não configurado. */
+export async function getClinicDefaultTicket() {
+  const { clinicId } = await requireClinicSession();
+  const clinic = await prisma.clinic.findUniqueOrThrow({ where: { id: clinicId }, select: { defaultTicket: true } });
+  return clinic.defaultTicket !== null ? Number(clinic.defaultTicket) : null;
+}
+
 export async function listAcquisitionRules() {
   const { clinicId } = await requireClinicSession();
   return prisma.acquisitionRule.findMany({

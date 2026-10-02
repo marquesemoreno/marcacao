@@ -58,7 +58,7 @@ const FIELDS: { key: EditableField; label: string; type?: string }[] = [
 ];
 
 /** N1 — ficha do paciente como página (substitui a gaveta). */
-export function PatientPage({ profile }: { profile: PatientProfile }) {
+export function PatientPage({ profile, autoSchedule = false }: { profile: PatientProfile; autoSchedule?: boolean }) {
   const router = useRouter();
   const p = profile;
   const name = displayName(p.contact);
@@ -77,7 +77,8 @@ export function PatientPage({ profile }: { profile: PatientProfile }) {
     preferredDoctor: p.contact.preferredDoctor ?? "",
     notes: p.contact.notes ?? "",
   }));
-  const [scheduling, setScheduling] = useState(false);
+  // "Agendar" do modal do CRM chega com ?agendar=1 — já abre o agendamento.
+  const [scheduling, setScheduling] = useState(autoSchedule && Boolean(profile.contact.phone));
   const consent = CONSENT[p.consent] ?? CONSENT.NOT_ASKED;
 
   const valueOf = (key: EditableField): string => {
