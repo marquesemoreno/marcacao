@@ -30,7 +30,9 @@ import {
 } from "@/actions/admin-inbox";
 import { getDistinctConvenios, getDistinctDoctorNames } from "@/actions/clinic";
 import { parseContactsCsv, type ParsedContactRow } from "@/lib/contacts-csv";
-import { formatPhone, formatCpf } from "@/lib/format";
+import { formatPhone, formatCpf, toTitleCaseName } from "@/lib/format";
+import { displayName } from "@/lib/contact-display";
+import { splitDoctorAgendas } from "@/lib/doctor-names";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { AvatarBadge } from "@/components/chat/avatar-badge";
@@ -193,6 +195,8 @@ export function ContactsApp({ scope, basePath }: { scope: Scope; basePath: strin
     }
   }, [scope]);
 
+  const doctorOptions = splitDoctorAgendas(doctors);
+
   // Clínica já vem paginada do servidor; admin carrega tudo e pagina na tela.
   const filteredContacts =
     scope === "admin" ? contacts.slice((page - 1) * CONTACTS_PAGE_SIZE, page * CONTACTS_PAGE_SIZE) : contacts;
@@ -345,7 +349,9 @@ export function ContactsApp({ scope, basePath }: { scope: Scope; basePath: strin
         </div>
         {scope === "clinic" && (
           <>
+            {convenios.length > 0 && (
             <select
+              aria-label="Filtrar por convênio"
               value={convenioFilter}
               onChange={(e) => updateParams({ convenio: e.target.value, page: null })}
               className="h-9 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2.5 text-xs text-slate-700 dark:text-slate-300"
@@ -355,15 +361,26 @@ export function ContactsApp({ scope, basePath }: { scope: Scope; basePath: strin
                 <option key={c} value={c}>{c}</option>
               ))}
             </select>
+            )}
             <select
+              aria-label="Filtrar por médico da última consulta"
               value={doctorFilter}
               onChange={(e) => updateParams({ doctor: e.target.value, page: null })}
               className="h-9 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2.5 text-xs text-slate-700 dark:text-slate-300"
             >
               <option value="">Todos os médicos</option>
-              {doctors.map((d) => (
-                <option key={d} value={d}>{d}</option>
-              ))}
+              <optgroup label="Médicos">
+                {doctorOptions.doctors.map((d) => (
+                  <option key={d} value={d}>{toTitleCaseName(d)}</option>
+                ))}
+              </optgroup>
+              {doctorOptions.agendas.length > 0 && (
+                <optgroup label="Agendas de procedimento">
+                  {doctorOptions.agendas.map((d) => (
+                    <option key={d} value={d}>{toTitleCaseName(d)}</option>
+                  ))}
+                </optgroup>
+              )}
             </select>
           </>
         )}
@@ -402,13 +419,11 @@ export function ContactsApp({ scope, basePath }: { scope: Scope; basePath: strin
                     <button
                       type="button"
                       onClick={() => handleOpenSheet(contact)}
+                      aria-label={`Ver ficha de ${displayName(contact)}`}
                       className="flex items-center gap-2.5 text-left hover:underline decoration-slate-400 underline-offset-2"
                     >
-                      <AvatarBadge name={contact.name} size={32} />
-                      <div className="min-w-0">
-                        <p className="font-semibold text-slate-900 dark:text-slate-100 truncate max-w-[180px]">{contact.name}</p>
-                        <p className="text-xs text-slate-500 dark:text-slate-400 font-mono">{formatContactPhone(contact.phone)}</p>
-                      </div>
+                      <AvatarBadge name={displayName(contact)} size={32} />
+                      <span className="font-semibold text-sm text-slate-900 dark:text-slate-100 truncate max-w-[220px]">{displayName(contact)}</span>
                     </button>
                   </TableCell>
                   <TableCell className="font-mono text-xs text-slate-600 dark:text-slate-400">
@@ -429,7 +444,7 @@ export function ContactsApp({ scope, basePath }: { scope: Scope; basePath: strin
                       <div>
                         <p>{contact.lastAppointment.date}</p>
                         {contact.lastAppointment.doctorName && (
-                          <p className="text-slate-400 dark:text-slate-500">{contact.lastAppointment.doctorName}</p>
+                          <p className="text-slate-500 dark:text-slate-400">{toTitleCaseName(contact.lastAppointment.doctorName)}</p>
                         )}
                       </div>
                     ) : (
@@ -447,8 +462,10 @@ export function ContactsApp({ scope, basePath }: { scope: Scope; basePath: strin
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-1">
                       <button
+                        type="button"
                         onClick={() => handleOpenSheet(contact)}
-                        title="Ver Ficha"
+                        title="Ver ficha"
+                        aria-label={`Ver ficha de ${displayName(contact)}`}
                         className="p-1.5 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-800 dark:hover:text-slate-200"
                       >
                         <Eye className="size-3.5" />
@@ -456,7 +473,9 @@ export function ContactsApp({ scope, basePath }: { scope: Scope; basePath: strin
                       {scope === "clinic" && (
                         <button
                           onClick={() => setScheduleContact({ conversationId: contact.conversationId, name: contact.name, cpf: contact.cpf ?? "", phone: contact.phone })}
+                          type="button"
                           title="Agendar"
+                          aria-label={`Agendar para ${displayName(contact)}`}
                           className="p-1.5 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-800 dark:hover:text-slate-200"
                         >
                           <Calendar className="size-3.5" />
@@ -464,7 +483,9 @@ export function ContactsApp({ scope, basePath }: { scope: Scope; basePath: strin
                       )}
                       <button
                         onClick={() => router.push(`${basePath}/inbox?c=${contact.conversationId}`)}
-                        title="Abrir Conversa"
+                        type="button"
+                        title="Abrir conversa"
+                        aria-label={`Abrir conversa com ${displayName(contact)}`}
                         className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 dark:bg-emerald-600 px-2.5 py-1.5 text-xs font-medium text-white transition-all hover:bg-slate-800 dark:hover:bg-emerald-500"
                       >
                         <MessageCircle className="size-3.5" />
