@@ -25,6 +25,11 @@ interface CRMKanbanProps {
   onMoveStage: (contactId: string, stage: FunnelStage) => void;
   onFinish: (contactId: string) => void;
   onReopen: (contactId: string) => void;
+  /** D1: primeira carga em andamento — mostra "Carregando…" em vez de colunas zeradas. */
+  isLoading?: boolean;
+  /** D1: a carga falhou — aviso com "Tentar de novo" em vez de um quadro vazio silencioso. */
+  loadError?: boolean;
+  onRetry?: () => void;
 }
 
 const STAGES: { id: KanbanStage; title: string; shortLabel: string; color: string; bgBadge: string }[] = [
@@ -39,6 +44,9 @@ const STAGE_ORDER: KanbanStage[] = ['novos', 'triagem', 'orcamento', 'agendado',
 
 export const CRMKanban: React.FC<CRMKanbanProps> = ({
   contacts,
+  isLoading = false,
+  loadError = false,
+  onRetry,
   agents = [],
   onOpenContactChat,
   onMoveStage,
@@ -93,6 +101,9 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
 
     return matchesSearch && matchesAgent && matchesDept;
   });
+
+  const hasActiveFilter =
+    search.trim() !== '' || selectedAgent !== 'todos' || selectedDept !== 'todos' || mobileSelectedStage !== 'todos';
 
   const visibleStages = mobileSelectedStage === 'todos'
     ? STAGES
@@ -153,9 +164,45 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
               <option value="financeiro">Financeiro</option>
             </select>
           </div>
+
+          {hasActiveFilter && (
+            <span className="inline-flex items-center gap-2 text-xs font-medium text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-lg px-2.5 py-1">
+              Filtro ativo
+              <button
+                type="button"
+                onClick={() => {
+                  setSearch('');
+                  setSelectedAgent('todos');
+                  setSelectedDept('todos');
+                  setMobileSelectedStage('todos');
+                }}
+                className="font-semibold underline underline-offset-2"
+              >
+                Limpar
+              </button>
+            </span>
+          )}
         </div>
 
       </div>
+
+      {(isLoading || loadError) && (
+        <div
+          role={loadError ? 'alert' : 'status'}
+          className={`mx-4 sm:mx-6 mt-3 rounded-lg border px-4 py-3 text-sm flex items-center justify-between gap-3 ${
+            loadError
+              ? 'border-rose-200 dark:border-rose-800 bg-rose-50 dark:bg-rose-950/40 text-rose-800 dark:text-rose-200'
+              : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300'
+          }`}
+        >
+          {loadError ? 'Não foi possível carregar os pacientes do CRM.' : 'Carregando pacientes…'}
+          {loadError && onRetry && (
+            <button type="button" onClick={onRetry} className="font-semibold underline underline-offset-2">
+              Tentar de novo
+            </button>
+          )}
+        </div>
+      )}
 
       <div className="md:hidden bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-3 py-2 flex items-center gap-1.5 overflow-x-auto no-scrollbar shrink-0">
         <span className="text-xs font-mono text-slate-400 dark:text-slate-500 font-medium flex items-center gap-1 shrink-0">

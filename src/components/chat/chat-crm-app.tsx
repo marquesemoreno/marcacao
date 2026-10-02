@@ -300,6 +300,8 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
   const [clinicFilter, setClinicFilter] = useState("");
   const [unassignedWaitMinutes, setUnassignedWaitMinutes] = useState<number | null>(null);
   const [unassignedCount, setUnassignedCount] = useState<number | null>(null);
+  const [isLoadingContacts, setIsLoadingContacts] = useState(true);
+  const [contactsLoadError, setContactsLoadError] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
   const [outboundFromDeviceStats, setOutboundFromDeviceStats] = useState<{
     total: number;
@@ -352,15 +354,27 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
       })
       .catch(() => {});
 
-    const result =
-      view === "crm"
-        ? (
-            await Promise.all([
-              actions.listChatContacts("todas", searchQuery || undefined, clinicIdArg),
-              actions.listChatContacts("finalizadas", searchQuery || undefined, clinicIdArg),
-            ])
-          ).flat()
-        : await actions.listChatContacts(filterTab, searchQuery || undefined, clinicIdArg, agentFilter || undefined);
+    // D1: falha na carga não pode virar "0 pacientes" silencioso — antes uma exceção aqui
+    // deixava o quadro do CRM zerado sem aviso nenhum.
+    let result: Contact[];
+    try {
+      result =
+        view === "crm"
+          ? (
+              await Promise.all([
+                actions.listChatContacts("todas", searchQuery || undefined, clinicIdArg),
+                actions.listChatContacts("finalizadas", searchQuery || undefined, clinicIdArg),
+              ])
+            ).flat()
+          : await actions.listChatContacts(filterTab, searchQuery || undefined, clinicIdArg, agentFilter || undefined);
+    } catch (error) {
+      console.error("Falha ao carregar conversas:", error);
+      setContactsLoadError(true);
+      setIsLoadingContacts(false);
+      return;
+    }
+    setContactsLoadError(false);
+    setIsLoadingContacts(false);
     setContacts(result);
 
     const totalUnread = result.reduce((sum, item) => sum + item.unreadCount, 0);
@@ -1140,6 +1154,12 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
       ) : (
         <CRMKanban
           contacts={contacts}
+          isLoading={isLoadingContacts}
+          loadError={contactsLoadError}
+          onRetry={() => {
+            setIsLoadingContacts(true);
+            refreshContacts();
+          }}
           agents={agents}
           onMoveStage={handleMoveStage}
           onFinish={handleFinish}
