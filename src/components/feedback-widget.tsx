@@ -8,11 +8,13 @@ import { submitFeedbackReport, submitFeedbackReportAdmin } from "@/actions/feedb
 import type { FeedbackType } from "@/lib/feedback";
 
 const DEFAULT_TRIGGER_CLASSES =
-  "fixed bottom-5 right-5 z-50 inline-flex items-center justify-center w-12 h-12 rounded-full bg-violet-600 hover:bg-violet-700 text-white shadow-2xl transition-all hover:scale-105 active:scale-95 cursor-pointer print:hidden";
+  "fixed bottom-5 right-5 z-50 inline-flex items-center justify-center w-12 h-12 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white shadow-2xl transition-all hover:scale-105 active:scale-95 cursor-pointer print:hidden";
 
 export function FeedbackWidget({
   admin = false,
   trigger,
+  open: controlledOpen,
+  onOpenChange: onControlledOpenChange,
 }: {
   /** Painel admin não tem uma única clínica dona da sessão — usa a Server Action
    * equivalente (submitFeedbackReportAdmin) em vez de exigir sessão de clínica. */
@@ -22,8 +24,15 @@ export function FeedbackWidget({
    * sentido um botão inline do que outro elemento flutuante disputando o canto
    * da tela. */
   trigger?: React.ReactNode;
+  /** Modo controlado (C5) — aberto pelo item "Enviar sugestão ou reportar bug" do menu
+   * do usuário, sem botão próprio na tela. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 } = {}) {
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
+  const isControlled = controlledOpen !== undefined;
+  const open = isControlled ? controlledOpen : internalOpen;
+  const setOpen = (next: boolean) => (isControlled ? onControlledOpenChange?.(next) : setInternalOpen(next));
   const [type, setType] = useState<FeedbackType>("SUGGESTION");
   const [description, setDescription] = useState("");
   const [image, setImage] = useState<File | null>(null);
@@ -78,13 +87,15 @@ export function FeedbackWidget({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogTrigger
-        className={trigger ? undefined : DEFAULT_TRIGGER_CLASSES}
-        title="Enviar sugestão ou reportar bug"
-        aria-label="Enviar sugestão ou reportar bug"
-      >
-        {trigger ?? <MessageSquarePlus className="w-5 h-5" />}
-      </DialogTrigger>
+      {!isControlled && (
+        <DialogTrigger
+          className={trigger ? undefined : DEFAULT_TRIGGER_CLASSES}
+          title="Enviar sugestão ou reportar bug"
+          aria-label="Enviar sugestão ou reportar bug"
+        >
+          {trigger ?? <MessageSquarePlus className="w-5 h-5" />}
+        </DialogTrigger>
+      )}
 
       <DialogContent className="max-w-md rounded-3xl p-6 sm:p-8">
         <DialogHeader className="space-y-1">
