@@ -25,6 +25,7 @@ import {
   getDistinctDoctorNames,
   getDistinctAcquisitionChannels,
   listClinicProcedures,
+  getClinicCampaignReport,
 } from "@/actions/clinic";
 import Link from "next/link";
 import { isProcedureAgenda } from "@/lib/doctor-names";
@@ -41,6 +42,7 @@ import {
   Clock,
   ShieldCheck,
   Wallet,
+  Megaphone,
 } from "lucide-react";
 
 export const metadata = { title: "Relatórios" };
@@ -85,6 +87,7 @@ export default async function ClinicReportPage({
     procedureOptions,
     management,
     channelOptions,
+    campaigns,
   ] = await Promise.all([
     getClinicChatReport(days, params.tag ? [params.tag] : undefined, params.channel),
     isExclusive
@@ -95,6 +98,7 @@ export default async function ClinicReportPage({
     isExclusive ? Promise.resolve([]) : listClinicProcedures(),
     getClinicManagementReport(days, params.channel),
     getDistinctAcquisitionChannels(days),
+    getClinicCampaignReport(days),
   ]);
   const rs = chatReport.responseStats;
   const topAttendantId = management.attendants.find(
@@ -540,6 +544,75 @@ export default async function ClinicReportPage({
           </div>
         </div>
       </div>
+
+      {/* =========================================================================
+          CAMPANHAS DE DISPARO — progresso e retorno (em andamento ou do período)
+         ========================================================================= */}
+      {campaigns.length > 0 && (
+        <div className="space-y-4">
+          <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-200">Campanhas de Disparo</h2>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {campaigns.map((c) => {
+              const s = c.stats;
+              const progress = s.total > 0 ? Math.round(((s.sent + s.failed + s.optedOut) / s.total) * 100) : 0;
+              return (
+                <div key={c.id} className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 p-5 shadow-xs space-y-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="font-semibold text-sm truncate">{c.name}</p>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                        Criada em {new Date(c.createdAt).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })}
+                        {c.tag && <> · tag <span className="font-medium text-slate-700 dark:text-slate-300">{c.tag}</span></>}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <Badge variant="outline">
+                        {c.status === "RUNNING" ? "Enviando" : c.status === "PAUSED" ? "Pausada" : "Concluída"}
+                      </Badge>
+                      <Megaphone className="w-5 h-5 text-pink-600" />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between text-xs text-slate-600 dark:text-slate-400">
+                      <span>{s.sent} de {s.total} enviadas</span>
+                      <span>{s.pending} na fila</span>
+                    </div>
+                    <div className="h-2 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden" role="progressbar" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100} aria-label="Progresso do envio">
+                      <div className="h-full bg-pink-500" style={{ width: `${progress}%` }} />
+                    </div>
+                  </div>
+
+                  <dl className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div>
+                      <dt className="text-[11px] text-slate-500 dark:text-slate-400">Responderam</dt>
+                      <dd className="text-lg font-semibold font-mono">{s.replied}</dd>
+                      <dd className="text-[11px] text-slate-500 dark:text-slate-400">{s.replyRate}% das enviadas</dd>
+                    </div>
+                    <div>
+                      <dt className="text-[11px] text-slate-500 dark:text-slate-400">Agendados</dt>
+                      <dd className="text-lg font-semibold font-mono">{s.scheduled}</dd>
+                      <dd className="text-[11px] text-slate-500 dark:text-slate-400">etapa Agendado no CRM</dd>
+                    </div>
+                    <div>
+                      <dt className="text-[11px] text-slate-500 dark:text-slate-400">Pediram pra sair</dt>
+                      <dd className="text-lg font-semibold font-mono">{s.optedOut}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-[11px] text-slate-500 dark:text-slate-400">Falharam</dt>
+                      <dd className="text-lg font-semibold font-mono">{s.failed}</dd>
+                      <dd className="text-[11px] text-slate-500 dark:text-slate-400">número sem WhatsApp</dd>
+                    </div>
+                  </dl>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                    Resposta = mensagem da paciente em até 7 dias depois de receber.
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* =========================================================================
           FLUXO / HORÁRIOS DE PICO

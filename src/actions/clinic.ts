@@ -5,6 +5,8 @@ import type { AppointmentStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireClinicSession } from "@/lib/session";
 import { startOfUTCDay, addUTCDays } from "@/lib/date";
+import { computeCampaignStats, phoneKey, type CampaignStats } from "@/lib/campaign-report";
+import { RESCHEDULE_PENDING_TAG as CAMPAIGN_RESCHEDULE_TAG } from "@/lib/conversation-tags";
 import {
   updateClinicProcedureSchema,
   addClinicProcedureSchema,
@@ -608,4 +610,91 @@ export async function updateClinicBusinessHours(formData: FormData) {
     data: { businessHours: parsed },
   });
   revalidatePath("/clinic/precos");
+}
+
+export type CampaignReportRow = {
+  id: string;
+  name: string;
+  status: "RUNNING" | "PAUSED" | "COMPLETED";
+  tag: string | null;
+  createdAt: string;
+  stats: CampaignStats;
+};
+
+/** Campanhas de disparo (marketing) da clínica pro relatório: em andamento/pausadas, ou
+ * criadas no período. Aviso de remarcação em massa fica de fora (não é campanha). */
+export async function getClinicCampaignReport(days: number = 30): Promise<CampaignReportRow[]> {
+  const { clinicId } = await requireClinicSession();
+  const since = addUTCDays(startOfUTCDay(new Date()), -days);
+
+  const campaigns = await prisma.broadcastCampaign.findMany({
+    where: {
+      clinicId,
+      status: { not: "DRAFT" },
+      // (Prisma: `not` em coluna nullable exclui os null — por isso o OR explícito.)
+      AND: [
+        { OR: [{ status: { in: ["RUNNING", "PAUSED"] } }, { createdAt: { gte: since } }] },
+        { OR: [{ tagOnSend: null }, { tagOnSend: { not: CAMPAIGN_RESCHEDULE_TAG } }] },
+      ],
+    },
+    orderBy: { createdAt: "desc" },
+    take: 10,
+    select: {
+      id: true,
+      name: true,
+      status: true,
+      tagOnSend: true,
+      createdAt: true,
+      recipients: { select: { phone: true, status: true, sentAt: true } },
+    },
+  });
+  if (campaigns.length === 0) return [];
+
+  // Contatos de todos os destinatários (com e sem o 9) + mensagens recebidas depois do
+  // primeiro envio de cada campanha.
+  const phones = new Set<string>();
+  for (const c of campaigns) {
+    for (const r of c.recipients) {
+      const key = phoneKey(r.phone);
+      phones.add(key);
+      if (key.startsWith("55") && key.length === 12) phones.add(key.slice(0, 4) + "9" + key.slice(4));
+    }
+  }
+  const firstSent = Math.min(
+    ...campaigns.flatMap((c) => c.recipients.map((r) => r.sentAt?.getTime() ?? Infinity)),
+  );
+  const contacts = await prisma.contact.findMany({
+    where: { phone: { in: [...phones] } },
+    select: {
+      phone: true,
+      optedOutOfBroadcastsAt: true,
+      conversations: {
+        where: { clinicId },
+        select: {
+          funnelStage: true,
+          messages: {
+            where: { direction: "INBOUND", createdAt: { gt: Number.isFinite(firstSent) ? new Date(firstSent) : new Date() } },
+            select: { createdAt: true },
+          },
+        },
+      },
+    },
+  });
+  const contactRows = contacts
+    .filter((c) => c.phone)
+    .map((c) => ({
+      phone: c.phone as string,
+      optedOutAt: c.optedOutOfBroadcastsAt,
+      inboundAt: c.conversations.flatMap((cv) => cv.messages.map((m) => m.createdAt)),
+      scheduled: c.conversations.some((cv) => cv.funnelStage === "AGENDADO"),
+    }));
+
+  return campaigns.map((c) => ({
+    id: c.id,
+    name: c.name,
+    status: c.status as CampaignReportRow["status"],
+    tag: c.tagOnSend,
+    createdAt: c.createdAt.toISOString(),
+    stats: computeCampaignStats(c.recipients, contactRows),
+  }));
 }
