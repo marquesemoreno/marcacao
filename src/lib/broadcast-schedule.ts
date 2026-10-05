@@ -1,5 +1,5 @@
-/** Regras de ritmo das campanhas de marketing (disparo em massa sem tagOnSend) — pra não
- * queimar o número da clínica no WhatsApp. Aviso de remarcação (tagOnSend) NÃO passa por
+/** Regras de ritmo das campanhas de marketing (todo disparo em massa que não é o aviso de
+ * remarcação) — pra não queimar o número da clínica no WhatsApp. Aviso de remarcação NÃO passa por
  * aqui: é urgente e sai a qualquer hora. Brasil sem horário de verão: offset fixo -3h. */
 const BRAZIL_OFFSET_MS = 3 * 3_600_000;
 

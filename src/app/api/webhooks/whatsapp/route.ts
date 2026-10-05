@@ -19,6 +19,7 @@ import {
   CONFIRMED_TAG,
   CANCELLED_TAG,
   RESCHEDULED_TAG,
+  RESCHEDULE_PENDING_TAG,
   nextTagsForOutcome,
 } from "@/lib/conversation-tags";
 import { detectProcedureInterestTag, detectSourceTag } from "@/lib/auto-tags";
@@ -755,6 +756,26 @@ export async function POST(request: Request) {
     const tagsToPush: string[] = [];
     const procedureTag = detectProcedureInterestTag(incoming.text);
     if (procedureTag && !conversation.tags.includes(procedureTag)) tagsToPush.push(procedureTag);
+    // Resposta a campanha de marketing com tag de acompanhamento (ex: Outubro Rosa): o
+    // paciente que não tinha conversa ainda não recebeu a tag no envio — marca aqui.
+    try {
+      const phones = [incoming.phone, toggleNinthDigit(incoming.phone)].filter((p): p is string => !!p);
+      const recent = await prisma.broadcastRecipient.findMany({
+        where: {
+          phone: { in: phones },
+          status: "SENT",
+          sentAt: { gte: new Date(Date.now() - 30 * 86_400_000) },
+          campaign: { clinicId: conversation.clinicId, tagOnSend: { not: null } },
+        },
+        select: { campaign: { select: { tagOnSend: true } } },
+      });
+      for (const r of recent) {
+        const tag = r.campaign.tagOnSend;
+        if (tag && tag !== RESCHEDULE_PENDING_TAG && !conversation.tags.includes(tag) && !tagsToPush.includes(tag)) tagsToPush.push(tag);
+      }
+    } catch (error) {
+      console.error("Falha ao marcar resposta de campanha:", error);
+    }
     if (isNewConversation) {
       const sourceTag = detectSourceTag(incoming.text);
       if (sourceTag && !conversation.tags.includes(sourceTag)) tagsToPush.push(sourceTag);

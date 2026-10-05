@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { sendWhatsAppMessage, sendWhatsAppMedia } from "@/lib/whatsapp";
 import { getSignedMediaUrl } from "@/lib/whatsapp-media";
 import { buildBroadcastMessage } from "@/lib/broadcast-csv";
+import { RESCHEDULE_PENDING_TAG } from "@/lib/conversation-tags";
 import { isWithinMarketingWindow, MARKETING_DAILY_CAP, startOfBrazilDay } from "@/lib/broadcast-schedule";
 
 const BATCH_SIZE = Number(process.env.BROADCAST_BATCH_SIZE) || 3;
@@ -24,10 +25,10 @@ export async function dispatchNextBatch(): Promise<{ processed: number }> {
 
   const now = new Date();
   for (const campaign of campaigns) {
-    // Marketing (sem tagOnSend): só seg–sex 09–17h, 1 por chamada (o gatilho chama a cada
-    // 4–6 min) e no máximo MARKETING_DAILY_CAP por dia. Aviso de remarcação (tagOnSend) é
-    // urgente e mantém o ritmo antigo, a qualquer hora.
-    const isMarketing = !campaign.tagOnSend;
+    // Marketing (tudo que não é aviso de remarcação, com ou sem tag de acompanhamento): só
+    // seg–sex 09–17h, 1 por chamada (o gatilho chama a cada 4–6 min) e no máximo
+    // MARKETING_DAILY_CAP por dia. Aviso de remarcação é urgente e mantém o ritmo antigo.
+    const isMarketing = campaign.tagOnSend !== RESCHEDULE_PENDING_TAG;
     let take = BATCH_SIZE;
     if (isMarketing) {
       if (!isWithinMarketingWindow(now)) continue;
@@ -101,8 +102,9 @@ export async function dispatchNextBatch(): Promise<{ processed: number }> {
           await prisma.conversation.update({
             where: { id: conversation.id },
             data: {
-              status: "OPEN",
-              lastMessageAt: new Date(),
+              // Campanha de marketing só marca a conversa (pra acompanhar quem recebeu);
+              // não reabre nem joga pro topo da fila — isso é só do aviso de remarcação.
+              ...(isMarketing ? {} : { status: "OPEN" as const, lastMessageAt: new Date() }),
               ...(conversation.tags.includes(campaign.tagOnSend) ? {} : { tags: { push: campaign.tagOnSend } }),
             },
           });
