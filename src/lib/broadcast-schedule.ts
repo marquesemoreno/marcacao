@@ -21,3 +21,12 @@ export function startOfBrazilDay(now: Date): Date {
   const br = new Date(now.getTime() - BRAZIL_OFFSET_MS);
   return new Date(Date.UTC(br.getUTCFullYear(), br.getUTCMonth(), br.getUTCDate()) + BRAZIL_OFFSET_MS);
 }
+
+/** Intervalo entre mensagens de marketing: sorteado entre 4 e 6 min a cada checagem (o
+ * cron da Vercel chama a cada minuto). Controlado aqui no servidor pela última mensagem
+ * enviada — chamada em dobro nunca encurta o intervalo. `random` em [0, 1). */
+export function isMarketingGapElapsed(lastSentAt: Date | null, now: Date, random: number): boolean {
+  if (!lastSentAt) return true;
+  const gapMs = (4 + random * 2) * 60_000;
+  return now.getTime() - lastSentAt.getTime() >= gapMs;
+}

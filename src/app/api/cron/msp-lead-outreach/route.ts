@@ -1,9 +1,7 @@
 import { NextResponse } from "next/server";
 import { runMspOutreachTick } from "@/lib/msp-lead-outreach";
 
-/** Chamado a cada 5min pelo GitHub Actions (ver lead-outreach-dispatch.yml — mesmo
- * workflow que já dispara /api/cron/lead-outreach, plano Hobby da Vercel não aceita
- * cron sub-diário). A frequência dessa chamada não é a frequência do disparo: cada
+/** Chamado a cada 5min pelo Vercel Cron (ver vercel.json). A frequência dessa chamada não é a frequência do disparo: cada
  * chamada só manda mensagem se já passou do `nextRunAt` guardado. */
 export async function GET(request: Request) {
   const authHeader = request.headers.get("authorization");

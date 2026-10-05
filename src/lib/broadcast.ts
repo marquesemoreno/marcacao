@@ -4,7 +4,7 @@ import { sendWhatsAppMessage, sendWhatsAppMedia } from "@/lib/whatsapp";
 import { getSignedMediaUrl } from "@/lib/whatsapp-media";
 import { buildBroadcastMessage } from "@/lib/broadcast-csv";
 import { RESCHEDULE_PENDING_TAG } from "@/lib/conversation-tags";
-import { isWithinMarketingWindow, MARKETING_DAILY_CAP, startOfBrazilDay } from "@/lib/broadcast-schedule";
+import { isMarketingGapElapsed, isWithinMarketingWindow, MARKETING_DAILY_CAP, startOfBrazilDay } from "@/lib/broadcast-schedule";
 
 const BATCH_SIZE = Number(process.env.BROADCAST_BATCH_SIZE) || 3;
 
@@ -16,7 +16,7 @@ function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-/** Processa um lote pequeno de cada campanha RUNNING — chamado pelo cron a cada minuto
+/** Processa um lote pequeno de cada campanha RUNNING — chamado pelo Vercel Cron a cada minuto
  * (src/app/api/cron/broadcast-dispatch), nunca manda a lista inteira de uma vez: é
  * justamente esse throttling que reduz o risco de o número ser banido por spam. */
 export async function dispatchNextBatch(): Promise<{ processed: number }> {
@@ -26,7 +26,7 @@ export async function dispatchNextBatch(): Promise<{ processed: number }> {
   const now = new Date();
   for (const campaign of campaigns) {
     // Marketing (tudo que não é aviso de remarcação, com ou sem tag de acompanhamento): só
-    // seg–sex 09–17h, 1 por chamada (o gatilho chama a cada 4–6 min) e no máximo
+    // seg–sex 09–17h, 1 por vez com 4–6 min sorteados desde a última enviada e no máximo
     // MARKETING_DAILY_CAP por dia. Aviso de remarcação é urgente e mantém o ritmo antigo.
     const isMarketing = campaign.tagOnSend !== RESCHEDULE_PENDING_TAG;
     let take = BATCH_SIZE;
@@ -36,6 +36,12 @@ export async function dispatchNextBatch(): Promise<{ processed: number }> {
         where: { campaignId: campaign.id, status: "SENT", sentAt: { gte: startOfBrazilDay(now) } },
       });
       if (sentToday >= MARKETING_DAILY_CAP) continue;
+      const last = await prisma.broadcastRecipient.findFirst({
+        where: { campaignId: campaign.id, status: "SENT" },
+        orderBy: { sentAt: "desc" },
+        select: { sentAt: true },
+      });
+      if (!isMarketingGapElapsed(last?.sentAt ?? null, now, Math.random())) continue;
       take = 1;
     }
     const recipients = await prisma.broadcastRecipient.findMany({

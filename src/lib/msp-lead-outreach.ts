@@ -31,7 +31,7 @@ export type MspOutreachTickResult =
   | { sent: false; reason: "disabled" | "not_due" | "outside_window" | "no_leads" | "clinic_not_found" | "send_failed" }
   | { sent: true; leadId: string };
 
-/** Chamado a cada 5min pelo GitHub Actions (ver lead-outreach-dispatch.yml e
+/** Chamado a cada 5min pelo Vercel Cron (ver vercel.json e
  * /api/cron/msp-lead-outreach). Manda no MÁXIMO 1 mensagem por chamada — o
  * espaçamento de verdade vem do `nextRunAt`, não da frequência do cron em si. */
 export async function runMspOutreachTick(): Promise<MspOutreachTickResult> {
