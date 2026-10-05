@@ -1,5 +1,6 @@
 import "server-only";
 import OpenAI from "openai";
+import { classifyReplyWithJev } from "./jev";
 
 export type AppointmentReplyAction = "CONFIRMED" | "CANCELLED" | "RESCHEDULE" | "UNCLEAR";
 
@@ -50,8 +51,15 @@ const VALID_ACTIONS: AppointmentReplyAction[] = ["CONFIRMED", "CANCELLED", "RESC
  * Retorna "UNCLEAR" (nunca lança) se a IA não estiver configurada ou a chamada
  * falhar — o chamador trata isso exatamente como uma resposta que não bateu com
  * nenhuma opção conhecida, caindo pro atendimento manual de sempre.
+ *
+ * Desde 2026-10 tenta primeiro o Jev (ver jev.ts): decisão tipada com confiança —
+ * abaixo de JEV_MIN_CONFIDENCE vira UNCLEAR (recepção). OpenAI só se o Jev estiver
+ * indisponível. `lembrete` = texto do pedido de confirmação que o paciente respondeu.
  */
-export async function classifyAppointmentReply(text: string): Promise<AppointmentReplyAction> {
+export async function classifyAppointmentReply(text: string, lembrete?: string | null): Promise<AppointmentReplyAction> {
+  const jevAction = await classifyReplyWithJev(text, lembrete);
+  if (jevAction) return jevAction;
+
   const openai = getOpenAiClient();
   if (!openai) return "UNCLEAR";
 

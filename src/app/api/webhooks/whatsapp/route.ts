@@ -1009,7 +1009,7 @@ export async function POST(request: Request) {
   // "Executiva": a ação decidida aqui é executada de verdade (confirma/cancela o
   // agendamento), sem revisão humana antes — ver aviso de auditoria abaixo.
   if (isConfirmationContext && !newStatus && !rescheduleRequested) {
-    const aiAction = await classifyAppointmentReply(incoming.text);
+    const aiAction = await classifyAppointmentReply(incoming.text, lastOutbound?.content);
     if (aiAction === "CONFIRMED" || aiAction === "CANCELLED") {
       newStatus = aiAction;
       classifiedByAi = true;
