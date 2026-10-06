@@ -59,6 +59,7 @@ describe("formatDurationHuman", () => {
     expect(formatDurationHuman(60)).toBe("1 h");
     expect(formatDurationHuman(200)).toBe("3 h");
     expect(formatDurationHuman(60 * 24)).toBe("1 dia");
+    expect(formatDurationHuman(60 * 24 - 20)).toBe("1 dia"); // 23h40 arredondava pra 24 h e virava "0 dias"
     expect(formatDurationHuman(60 * 24 * 2 + 300)).toBe("2 dias");
   });
 });
