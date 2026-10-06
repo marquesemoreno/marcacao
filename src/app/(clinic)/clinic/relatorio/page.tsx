@@ -157,6 +157,13 @@ export default async function ClinicReportPage({
           />
           <PeriodFilter basePath="/clinic/relatorio" />
           <ReportExportButton
+            clinic={clinic.tradeName}
+            days={days}
+            filters={[
+              ...(params.tag ? [`Tag: ${params.tag}`] : []),
+              ...(params.channel ? [`Canal: ${params.channel}`] : []),
+              ...(params.doctor ? [`Médico: ${params.doctor}`] : []),
+            ]}
             rows={[
               ["Conversas no período", chatReport.totalConversations],
               ["Conversas resolvidas", chatReport.totalResolved],
@@ -170,8 +177,13 @@ export default async function ClinicReportPage({
               ["Sentimento positivo (%)", chatReport.sentimentPositivePct],
               ["Sentimento neutro (%)", chatReport.sentimentNeutroPct],
               ["Sentimento negativo (%)", chatReport.sentimentNegativoPct],
-              ["Faturamento estimado (R$)", management.estimatedRevenue ?? "—"],
-              ["Receita protegida (R$)", management.protectedRevenue ?? "—"],
+              ["Lembretes enviados", management.confirmations.totalSent],
+              ["Confirmaram (%)", management.confirmations.confirmedPct],
+              ["Cancelaram (%)", management.confirmations.cancelledPct],
+              ["Pediram para remarcar (%)", management.confirmations.rescheduledPct],
+              ["Sem retorno (%)", management.confirmations.noReplyPct],
+              ["Faturamento estimado (R$) — estimativa", management.estimatedRevenue ?? "—"],
+              ["Valor das consultas confirmadas (R$) — estimativa", management.protectedRevenue ?? "—"],
               ...management.channelConversion.map(
                 (c) =>
                   [`Agendamentos via ${c.channel}`, c.scheduled] as [string, string | number],
