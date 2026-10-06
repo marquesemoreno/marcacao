@@ -96,6 +96,7 @@ const COMPOSER_EMOJIS = [
 const UNASSIGNED_ALERT_THRESHOLD_MINUTES = 10;
 
 const CRM_PANEL_STORAGE_KEY = 'inbox-crm-panel';
+const AUTO_ADVANCE_STORAGE_KEY = 'inbox-auto-advance';
 
 /** Todas as abas possíveis da fila — o atendente escolhe quais ficam visíveis (persiste no navegador). */
 const ALL_INBOX_TABS: { id: InboxFilter; label: string }[] = [
@@ -940,6 +941,20 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
   // Atalhos de teclado da fila (crítica de design, out/2026). Não disparam digitando
   // num campo, com Ctrl/Alt/Cmd ou com algum diálogo aberto. "/" é a busca global.
   const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
+  // Abrir a próxima conversa ao finalizar — liga/desliga no diálogo de atalhos; fica
+  // guardado neste navegador (não na conta).
+  const [autoAdvance, setAutoAdvance] = useState(true);
+  useEffect(() => {
+    try {
+      if (localStorage.getItem(AUTO_ADVANCE_STORAGE_KEY) === '0') setAutoAdvance(false);
+    } catch {}
+  }, []);
+  function toggleAutoAdvance(next: boolean) {
+    setAutoAdvance(next);
+    try {
+      localStorage.setItem(AUTO_ADVANCE_STORAGE_KEY, next ? '1' : '0');
+    } catch {}
+  }
   const selectedIdRef = useRef<string | undefined>(undefined);
   selectedIdRef.current = selectedContact?.id;
   useEffect(() => {
@@ -3177,7 +3192,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
               ['n', 'Ir para a conversa mais urgente da fila'],
               ['i', 'Escrever nota interna (o paciente não vê)'],
               ['a', 'Atribuir a conversa a mim'],
-              ['e', 'Finalizar atendimento (abre a próxima da fila)'],
+              ['e', 'Finalizar atendimento'],
               ['/', 'Buscar paciente, telefone ou conversa'],
               ['?', 'Mostrar estes atalhos'],
             ].map(([key, label]) => (
@@ -3190,6 +3205,15 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
             ))}
           </dl>
           <p className="text-xs text-slate-500 dark:text-slate-400">Os atalhos não funcionam enquanto você digita numa caixa de texto.</p>
+          <label className="flex items-center gap-2 border-t border-slate-200 dark:border-slate-800 pt-3 text-sm text-slate-700 dark:text-slate-200">
+            <input
+              type="checkbox"
+              checked={autoAdvance}
+              onChange={(e) => toggleAutoAdvance(e.target.checked)}
+              className="size-4 accent-emerald-600"
+            />
+            Ao finalizar, abrir a próxima conversa da fila
+          </label>
         </DialogContent>
       </Dialog>
 
@@ -3300,8 +3324,9 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                 onClick={async () => {
                   if (!selectedReason || isFinishingAttendance) return;
                   setIsFinishingAttendance(true);
-                  // Próximo da fila (a de cima que não é esta) — abre sozinho ao finalizar.
-                  const nextInQueue = filteredContacts.find((c) => c.id !== selectedContact?.id);
+                  // Próximo da fila (a de cima que não é esta) — abre sozinho ao finalizar,
+                  // a menos que a atendente tenha desligado (preferência deste navegador).
+                  const nextInQueue = autoAdvance ? filteredContacts.find((c) => c.id !== selectedContact?.id) : undefined;
                   try {
                     await onFinishAttendance({ reason: selectedReason, notes: finishNotes });
                     setIsFinishModalOpen(false);

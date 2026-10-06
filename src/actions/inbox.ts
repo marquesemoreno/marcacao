@@ -2105,3 +2105,39 @@ export async function undoReactivateAiForConversation(conversationId: string) {
   notifyInboxRealtime(clinicId).catch(() => {});
   return { success: true };
 }
+
+/** Responsável atual de cada conversa (pra "Desfazer" da atribuição em massa). */
+export async function getConversationOwners(conversationIds: string[]) {
+  const { clinicId } = await requireClinicSession();
+  return prisma.conversation.findMany({
+    where: { id: { in: conversationIds }, clinicId },
+    select: { id: true, assignedUserId: true },
+  });
+}
+
+/** Desfaz a atribuição em massa: devolve cada conversa ao responsável anterior (ou a
+ * nenhum) e registra nota interna. */
+export async function restoreConversationOwners(owners: { id: string; assignedUserId: string | null }[]) {
+  const { clinicId } = await requireClinicSession();
+  const allowed = await prisma.conversation.findMany({
+    where: { id: { in: owners.map((o) => o.id) }, clinicId },
+    select: { id: true },
+  });
+  const ok = new Set(allowed.map((c) => c.id));
+  owners = owners.filter((o) => ok.has(o.id));
+  for (const o of owners) {
+    await prisma.conversation.update({ where: { id: o.id }, data: { assignedUserId: o.assignedUserId } });
+    await prisma.message.create({
+      data: {
+        conversationId: o.id,
+        direction: "OUTBOUND",
+        type: "INTERNAL_NOTE",
+        content: "↩️ Atribuição em massa desfeita — conversa voltou para o responsável anterior.",
+        status: "SENT",
+      },
+    });
+  }
+  revalidatePath("/clinic/inbox");
+  notifyInboxRealtime(clinicId).catch(() => {});
+  return { success: true, restored: owners.length };
+}

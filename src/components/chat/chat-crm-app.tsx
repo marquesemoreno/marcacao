@@ -20,6 +20,8 @@ import {
   takeOverConversation,
   reactivateAiForConversation,
   undoReactivateAiForConversation,
+  getConversationOwners,
+  restoreConversationOwners,
   transferConversation,
   getAttendantCapacity,
   resolveConversation,
@@ -78,6 +80,8 @@ import {
   claimConversationAdmin,
   reactivateAiForConversationAdmin,
   undoReactivateAiForConversationAdmin,
+  getConversationOwnersAdmin,
+  restoreConversationOwnersAdmin,
   transferConversationAdmin,
   getAttendantCapacityAdmin,
   resolveConversationAdmin,
@@ -1067,14 +1071,34 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
 
   async function handleBulkAssign(conversationIds: string[], agentId: string) {
     const transferFn = scope === "admin" ? transferConversationAdmin : transferConversation;
-    let ok = 0;
+    const ownersFn = scope === "admin" ? getConversationOwnersAdmin : getConversationOwners;
+    const restoreFn = scope === "admin" ? restoreConversationOwnersAdmin : restoreConversationOwners;
+    // Guarda quem era o responsável antes — o aviso tem "Desfazer" (crítica #3).
+    const before = await ownersFn(conversationIds).catch(() => []);
+    const moved: { id: string; assignedUserId: string | null }[] = [];
     for (const id of conversationIds) {
       const result = await transferFn(id, agentId).catch(() => ({ success: false }));
-      if (result.success) ok++;
+      if (result.success) {
+        const prev = before.find((o) => o.id === id);
+        if (prev) moved.push(prev);
+      }
     }
+    const ok = moved.length;
     const agentName = agents.find((a) => a.id === agentId)?.name ?? "atendente";
-    if (ok === conversationIds.length) toast.success(`${ok} conversa(s) atribuída(s) a ${agentName}.`);
-    else toast.error(`${ok} de ${conversationIds.length} atribuídas — algumas falharam (ex: limite de conversas da atendente).`);
+    const undo =
+      ok > 0
+        ? {
+            label: "Desfazer",
+            onClick: async () => {
+              const r = await restoreFn(moved).catch(() => ({ success: false }));
+              if (r.success) toast.success("Desfeito: as conversas voltaram para quem estava antes.");
+              else toast.error("Não foi possível desfazer.");
+              await refreshContacts();
+            },
+          }
+        : undefined;
+    if (ok === conversationIds.length) toast.success(`${ok} conversa(s) atribuída(s) a ${agentName}.`, { duration: 8000, action: undo });
+    else toast.error(`${ok} de ${conversationIds.length} atribuídas — algumas falharam (ex: limite de conversas da atendente).`, { duration: 8000, action: undo });
     await refreshContacts();
   }
 
