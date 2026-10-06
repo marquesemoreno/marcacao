@@ -59,6 +59,9 @@ const STATUS_COLOR_CLASS = {
   NO_SHOW: "bg-slate-500",
 } as const;
 
+/** Percentual no formato brasileiro (64,1%). */
+const pctBR = (n: number) => `${n.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%`;
+
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
@@ -217,7 +220,7 @@ export default async function ClinicReportPage({
           <div className="space-y-1 sm:pr-5">
             <dt className="text-sm text-slate-600 dark:text-slate-400">Respondidas em até {SLA_WARNING_MINUTES} min</dt>
             <dd className={`text-3xl font-bold tabular-nums ${rs.withinSlaPct === null ? "text-slate-900 dark:text-slate-100" : rs.withinSlaPct >= 80 ? "text-emerald-700 dark:text-emerald-400" : rs.withinSlaPct >= 50 ? "text-amber-700 dark:text-amber-400" : "text-rose-700 dark:text-rose-400"}`}>
-              {rs.withinSlaPct !== null ? `${rs.withinSlaPct}%` : "—"}
+              {rs.withinSlaPct !== null ? pctBR(rs.withinSlaPct) : "—"}
             </dd>
             <dd>
               <ReportDelta current={rs.withinSlaPct} previous={prevRs.withinSlaPct} unit="pts" better="up" days={days} />
@@ -229,7 +232,7 @@ export default async function ClinicReportPage({
           <div className="space-y-1 sm:px-5">
             <dt className="text-sm text-slate-600 dark:text-slate-400">Pacientes que confirmaram o lembrete</dt>
             <dd className="text-3xl font-bold tabular-nums text-slate-900 dark:text-slate-100">
-              {management.confirmations.totalSent > 0 ? `${management.confirmations.confirmedPct}%` : "—"}
+              {management.confirmations.totalSent > 0 ? pctBR(management.confirmations.confirmedPct) : "—"}
             </dd>
             <dd>
               <ReportDelta
@@ -286,7 +289,7 @@ export default async function ClinicReportPage({
               <TrendingUp className="w-4 h-4 text-slate-400" />
             </div>
             <p className="text-3xl font-bold text-slate-900 dark:text-slate-100">
-              {chatReport.conversionRate}%
+              {pctBR(chatReport.conversionRate)}
             </p>
             <p className="text-xs text-slate-500 dark:text-slate-400">
               {chatReport.totalAgendados} de {chatReport.totalResolved}{" "}
@@ -315,7 +318,7 @@ export default async function ClinicReportPage({
             <div className="flex items-center justify-between">
               <span className="text-xs text-slate-500 dark:text-slate-400">Respondidas em até {SLA_WARNING_MINUTES} min</span>
               <span className="text-sm font-bold text-slate-900 dark:text-slate-100">
-                {rs.withinSlaPct !== null ? `${rs.withinSlaPct}%` : "—"}
+                {rs.withinSlaPct !== null ? pctBR(rs.withinSlaPct) : "—"}
               </span>
             </div>
             <p className="text-xs text-slate-500 dark:text-slate-400">
@@ -400,7 +403,7 @@ export default async function ClinicReportPage({
                       {a.scheduled}
                     </TableCell>
                     <TableCell className="pr-5 text-right tabular-nums font-semibold">
-                      {a.conversionRate}%
+                      {pctBR(a.conversionRate)}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -469,7 +472,7 @@ export default async function ClinicReportPage({
                   <p className="text-2xl font-semibold tabular-nums">
                     {m.value}{" "}
                     <span className="text-sm text-slate-500 dark:text-slate-400">
-                      ({m.pctValue}%)
+                      ({pctBR(m.pctValue)})
                     </span>
                   </p>
                   <p className="text-xs text-slate-600 dark:text-slate-400">
@@ -513,7 +516,7 @@ export default async function ClinicReportPage({
                     <TableCell className="pl-5 font-medium">{c.channel}</TableCell>
                     <TableCell className="text-right tabular-nums">{c.conversations}</TableCell>
                     <TableCell className="text-right tabular-nums">{c.scheduled}</TableCell>
-                    <TableCell className="text-right tabular-nums">{c.conversionRate}%</TableCell>
+                    <TableCell className="text-right tabular-nums">{pctBR(c.conversionRate)}</TableCell>
                     <TableCell className="pr-5 text-right tabular-nums font-semibold">
                       {c.estimatedRevenue !== null ? formatCurrency(c.estimatedRevenue) : "—"}
                     </TableCell>
@@ -571,7 +574,7 @@ export default async function ClinicReportPage({
                     <div>
                       <dt className="text-xs text-slate-600 dark:text-slate-400">Responderam</dt>
                       <dd className="text-lg font-semibold tabular-nums">{s.replied}</dd>
-                      <dd className="text-xs text-slate-600 dark:text-slate-400">{s.replyRate}% das enviadas</dd>
+                      <dd className="text-xs text-slate-600 dark:text-slate-400">{pctBR(s.replyRate)} das enviadas</dd>
                     </div>
                     <div>
                       <dt className="text-xs text-slate-600 dark:text-slate-400">Agendados</dt>
@@ -733,7 +736,7 @@ export default async function ClinicReportPage({
                 <XCircle className="w-5 h-5 text-rose-600" />
               </div>
               <p className="text-2xl font-semibold tabular-nums">
-                {appointmentsReport.cancellationRate}%
+                {pctBR(appointmentsReport.cancellationRate)}
               </p>
               <p className="text-xs text-slate-600 dark:text-slate-400 font-medium">
                 {appointmentsReport.countByStatus.CANCELLED} cancelados,{" "}
