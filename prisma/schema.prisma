@@ -267,6 +267,8 @@ model HospitalIntegration {
   /// bridge-reminder.ts. Default false: não muda o comportamento de clínica nenhuma
   /// só por existir a coluna.
   skipWeekendReminders Boolean   @default(false) @map("skip_weekend_reminders")
+  /// Lembretes D-1 suspensos até esta data (ex: número restrito pela Meta em 06/10/2026).
+  remindersPausedUntil DateTime? @map("reminders_paused_until")
   lastCheckedAt        DateTime? @map("last_checked_at")
   lastCheckOk          Boolean?  @map("last_check_ok")
   createdAt            DateTime  @default(now()) @map("created_at")

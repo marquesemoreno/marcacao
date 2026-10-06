@@ -4,6 +4,9 @@ import { formatToWhatsAppNumber, sendWhatsAppMessage, sendWhatsAppMedia } from "
 import { fetchBridgeDailyAgenda } from "@/lib/hospital-bridge";
 import { buildBridgeReminderMessage, buildUrolaserLaraReminderMessage, nextReminderTargetDate } from "@/lib/bridge-reminder";
 import { getBaseUrl } from "@/lib/format";
+import { isWithinReminderWindow, shouldSendReminder } from "@/lib/automated-pacing";
+import { isMarketingGapElapsed } from "@/lib/broadcast-schedule";
+import { lastAutomatedSend, marketingCampaignReady } from "@/lib/automated-pacing-server";
 
 /** Imagem da "Lara" (mascote/atendente virtual da Urolaser, ver buildUrolaserLaraReminderMessage)
  * servida como asset estático — permanente e sem custo de Storage, ao contrário de um
@@ -42,13 +45,20 @@ function formatIsoDateToBr(iso: string): string {
  * dessa chamada — usado pra disparo manual antecipado (ex: pedir a confirmação
  * de terça numa sexta, por causa de feriado na véspera), por isso ignora
  * skipWeekendReminders: é uma escolha explícita de data, não o cálculo padrão. */
-export async function dispatchBridgeReminders(options?: { clinicId?: string; dateIso?: string }) {
+export async function dispatchBridgeReminders(options?: { clinicId?: string; dateIso?: string; max?: number }) {
   const explicitDate = options?.dateIso
     ? { iso: options.dateIso, formatted: formatIsoDateToBr(options.dateIso) }
     : null;
 
   const clinics = await prisma.clinic.findMany({
-    where: { hospitalIntegration: { active: true }, ...(options?.clinicId ? { id: options.clinicId } : {}) },
+    where: {
+      hospitalIntegration: {
+        active: true,
+        // Pausa por clínica (ex: número restrito pela Meta) — ver remindersPausedUntil.
+        OR: [{ remindersPausedUntil: null }, { remindersPausedUntil: { lt: new Date() } }],
+      },
+      ...(options?.clinicId ? { id: options.clinicId } : {}),
+    },
     select: { id: true, tradeName: true, name: true, hospitalIntegration: { select: { skipWeekendReminders: true } } },
   });
 
@@ -70,6 +80,7 @@ export async function dispatchBridgeReminders(options?: { clinicId?: string; dat
         skipped++;
         continue;
       }
+      if (options?.max !== undefined && attempted >= options.max) break;
 
       if (attempted > 0) await sleep(randomDelayMs());
       attempted++;
@@ -139,4 +150,32 @@ export async function dispatchBridgeReminders(options?: { clinicId?: string; dat
   }
 
   return { sent, skipped, failed };
+}
+
+/** Chamado a cada minuto (cron broadcast-dispatch): no máximo UM lembrete por clínica,
+ * 08–18h, com 4–6 min desde a última mensagem automática da clínica e intercalando com a
+ * campanha (ver automated-pacing.ts). Substitui o disparo diário em rajada das 09h. */
+export async function dispatchReminderTick(): Promise<{ sent: number }> {
+  const now = new Date();
+  if (!isWithinReminderWindow(now)) return { sent: 0 };
+  const clinics = await prisma.clinic.findMany({
+    where: {
+      hospitalIntegration: { active: true, OR: [{ remindersPausedUntil: null }, { remindersPausedUntil: { lt: now } }] },
+    },
+    select: { id: true },
+  });
+  let sent = 0;
+  for (const clinic of clinics) {
+    const last = await lastAutomatedSend(clinic.id);
+    const ok = shouldSendReminder({
+      inWindow: true,
+      gapElapsed: isMarketingGapElapsed(last.at, now, Math.random()),
+      lastKind: last.kind,
+      campaignReady: last.kind === "reminder" ? await marketingCampaignReady(clinic.id, now) : false,
+    });
+    if (!ok) continue;
+    const result = await dispatchBridgeReminders({ clinicId: clinic.id, max: 1 });
+    sent += result.sent;
+  }
+  return { sent };
 }
