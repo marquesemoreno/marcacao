@@ -5,6 +5,9 @@
  *   npx tsx --env-file=.env scripts/recover-evolution-messages.ts          (simulação)
  *   npx tsx --env-file=.env scripts/recover-evolution-messages.ts --apply  (grava)
  *
+ * Outros incidentes: --from=ISO --to=ISO --clinic=<trecho do nome fantasia>
+ * (ex: queda da Vercel em 06/10/2026: --from=2026-10-06T17:55:00Z --to=2026-10-06T19:36:00Z --clinic=Santa)
+ *
  * Reimplementa o mínimo do webhook inline porque whatsapp-media.ts / supabase-server.ts
  * são "server-only" e não rodam fora do Next. Idempotente: pula whatsappKeyId que já existe.
  */
@@ -12,8 +15,10 @@ import { PrismaClient } from "@prisma/client";
 import { createClient } from "@supabase/supabase-js";
 
 const APPLY = process.argv.includes("--apply");
-const FROM = "2026-09-25T22:22:15Z";
-const TO = "2026-09-27T05:00:00Z";
+const arg = (name: string) => process.argv.find((a) => a.startsWith(`--${name}=`))?.slice(name.length + 3);
+const FROM = arg("from") ?? "2026-09-25T22:22:15Z";
+const TO = arg("to") ?? "2026-09-27T05:00:00Z";
+const CLINIC = arg("clinic");
 const BUCKET = "whatsapp-media";
 
 const prisma = new PrismaClient();
@@ -95,7 +100,10 @@ async function evo(inst: { apiUrl: string; apiKey: string; instanceName: string 
 
 (async () => {
   console.log(APPLY ? "=== GRAVANDO ===" : "=== SIMULAÇÃO (use --apply pra gravar) ===");
-  const instances = await prisma.whatsappInstance.findMany({ include: { clinic: { select: { id: true, tradeName: true } } } });
+  const instances = await prisma.whatsappInstance.findMany({
+    where: CLINIC ? { clinic: { tradeName: { contains: CLINIC } } } : {},
+    include: { clinic: { select: { id: true, tradeName: true } } },
+  });
 
   for (const inst of instances) {
     const recs: Rec[] = [];
