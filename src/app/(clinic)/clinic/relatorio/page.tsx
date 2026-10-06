@@ -29,7 +29,9 @@ import {
 } from "@/actions/clinic";
 import Link from "next/link";
 import { isProcedureAgenda } from "@/lib/doctor-names";
-import { formatDurationHuman, SLA_WARNING_MINUTES } from "@/lib/sla-calculator";
+import { formatDurationHuman, SLA_CRITICAL_MINUTES, SLA_WARNING_MINUTES } from "@/lib/sla-calculator";
+import { ReportDelta } from "@/components/clinic/report-delta";
+import { UNIDENTIFIED_CHANNEL } from "@/lib/report-metrics";
 import { formatCurrency, appointmentStatusLabels } from "@/lib/format";
 import {
   MessageSquare,
@@ -88,6 +90,8 @@ export default async function ClinicReportPage({
     management,
     channelOptions,
     campaigns,
+    prevChat,
+    prevManagement,
   ] = await Promise.all([
     getClinicChatReport(days, params.tag ? [params.tag] : undefined, params.channel),
     isExclusive
@@ -99,8 +103,24 @@ export default async function ClinicReportPage({
     getClinicManagementReport(days, params.channel),
     getDistinctAcquisitionChannels(days),
     getClinicCampaignReport(days),
+    // Mesma janela imediatamente antes — comparação ("↑ 8 pts vs 30 dias anteriores").
+    getClinicChatReport(days, params.tag ? [params.tag] : undefined, params.channel, true),
+    getClinicManagementReport(days, params.channel, true),
   ]);
   const rs = chatReport.responseStats;
+  const prevRs = prevChat.responseStats;
+  // Resumo do período: as 3 perguntas do gestor, respondidas antes de qualquer detalhe.
+  const topChannel = management.channelConversion.find(
+    (c) => c.scheduled > 0 && c.channel !== UNIDENTIFIED_CHANNEL,
+  );
+  const slaTone = (min: number | null) =>
+    min === null
+      ? "text-slate-900 dark:text-slate-100"
+      : min <= SLA_WARNING_MINUTES
+        ? "text-emerald-700 dark:text-emerald-400"
+        : min <= SLA_CRITICAL_MINUTES
+          ? "text-amber-700 dark:text-amber-400"
+          : "text-rose-700 dark:text-rose-400";
   const topAttendantId = management.attendants.find(
     (a) => a.scheduled > 0,
   )?.userId;
@@ -175,6 +195,56 @@ export default async function ClinicReportPage({
       </div>
 
       {/* =========================================================================
+          RESUMO DO PERÍODO — as 3 perguntas do gestor, com comparação
+         ========================================================================= */}
+      <section aria-labelledby="resumo-titulo" className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-xs">
+        <h2 id="resumo-titulo" className="text-base font-semibold text-slate-900 dark:text-slate-100">
+          Resumo dos últimos {days} dias
+        </h2>
+        <dl className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-5 sm:divide-x divide-slate-200 dark:divide-slate-800">
+          <div className="space-y-1 sm:pr-5">
+            <dt className="text-sm text-slate-600 dark:text-slate-400">Respondidas em até {SLA_WARNING_MINUTES} min</dt>
+            <dd className={`text-3xl font-bold tabular-nums ${rs.withinSlaPct === null ? "text-slate-900 dark:text-slate-100" : rs.withinSlaPct >= 80 ? "text-emerald-700 dark:text-emerald-400" : rs.withinSlaPct >= 50 ? "text-amber-700 dark:text-amber-400" : "text-rose-700 dark:text-rose-400"}`}>
+              {rs.withinSlaPct !== null ? `${rs.withinSlaPct}%` : "—"}
+            </dd>
+            <dd>
+              <ReportDelta current={rs.withinSlaPct} previous={prevRs.withinSlaPct} unit="pts" better="up" days={days} />
+            </dd>
+            {rs.withinSlaPct === null && (
+              <dd className="text-xs text-slate-600 dark:text-slate-400">Nenhuma conversa respondida pela equipe no período.</dd>
+            )}
+          </div>
+          <div className="space-y-1 sm:px-5">
+            <dt className="text-sm text-slate-600 dark:text-slate-400">Pacientes que confirmaram o lembrete</dt>
+            <dd className="text-3xl font-bold tabular-nums text-slate-900 dark:text-slate-100">
+              {management.confirmations.totalSent > 0 ? `${management.confirmations.confirmedPct}%` : "—"}
+            </dd>
+            <dd>
+              <ReportDelta
+                current={management.confirmations.totalSent > 0 ? management.confirmations.confirmedPct : null}
+                previous={prevManagement.confirmations.totalSent > 0 ? prevManagement.confirmations.confirmedPct : null}
+                unit="pts"
+                better="up"
+                days={days}
+              />
+            </dd>
+            {management.confirmations.totalSent === 0 && (
+              <dd className="text-xs text-slate-600 dark:text-slate-400">Nenhum lembrete enviado no período.</dd>
+            )}
+          </div>
+          <div className="space-y-1 sm:pl-5">
+            <dt className="text-sm text-slate-600 dark:text-slate-400">Canal que mais trouxe agendamentos</dt>
+            <dd className="text-xl font-bold text-slate-900 dark:text-slate-100 truncate">{topChannel ? topChannel.channel : "—"}</dd>
+            <dd className="text-xs text-slate-600 dark:text-slate-400">
+              {topChannel
+                ? `${topChannel.scheduled} agendamento(s) de ${topChannel.conversations} conversa(s)`
+                : "Nenhum agendamento com canal identificado no período."}
+            </dd>
+          </div>
+        </dl>
+      </section>
+
+      {/* =========================================================================
           ECONOMICS — faturamento estimado e receita protegida
          ========================================================================= */}
       <div className="space-y-4">
@@ -245,6 +315,7 @@ export default async function ClinicReportPage({
             <p className="text-xs text-slate-500 dark:text-slate-400">
               {chatReport.totalResolved} resolvidas no período
             </p>
+            <ReportDelta current={chatReport.totalConversations} previous={prevChat.totalConversations} unit="%" better="up" days={days} />
           </div>
 
           <div className="bg-white dark:bg-slate-900 p-5 rounded-lg border border-slate-200 dark:border-slate-800 shadow-xs space-y-1.5">
@@ -261,6 +332,7 @@ export default async function ClinicReportPage({
               {chatReport.totalAgendados} de {chatReport.totalResolved}{" "}
               resolvidos
             </p>
+            <ReportDelta current={chatReport.conversionRate} previous={prevChat.conversionRate} unit="pts" better="up" days={days} />
           </div>
 
           <div className="bg-white dark:bg-slate-900 p-5 rounded-lg border border-slate-200 dark:border-slate-800 shadow-xs space-y-2">
@@ -270,7 +342,7 @@ export default async function ClinicReportPage({
             </span>
             <div className="flex items-center justify-between">
               <span className="text-xs text-slate-500 dark:text-slate-400">1ª resposta</span>
-              <span className="text-sm font-bold text-slate-900 dark:text-slate-100">
+              <span className={`text-sm font-bold tabular-nums ${slaTone(rs.medianFirstResponseMin)}`}>
                 {rs.medianFirstResponseMin !== null ? formatDurationHuman(rs.medianFirstResponseMin) : "—"}
               </span>
             </div>
