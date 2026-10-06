@@ -194,6 +194,8 @@ interface InboxLayoutProps {
   ) => Promise<{ success: boolean; error?: string } | void> | { success: boolean; error?: string } | void;
   onUpdateFunnelStage: (stage: FunnelStage) => Promise<void> | void;
   onClaimConversation?: () => Promise<void> | void;
+  /** Atribui várias conversas da fila de uma vez (seleção múltipla). */
+  onBulkAssign?: (conversationIds: string[], agentId: string) => Promise<void> | void;
   /** "Assumir Conversa" — reatribui à força pra mim mesmo se a conversa já tiver dono
    * (diferente de onClaimConversation, que só funciona em conversa sem dono). Mostrado
    * no banner "Esta conversa está com X" quando selectedContact.assignedToOther. */
@@ -272,6 +274,9 @@ const ContactListItem = React.memo(function ContactListItem({
   contact: c,
   isSelected,
   onSelect,
+  isChecked = false,
+  selectionMode = false,
+  onToggleCheck,
   onTogglePin,
   onMuteConversation,
   onArchiveConversation,
@@ -279,6 +284,10 @@ const ContactListItem = React.memo(function ContactListItem({
   contact: Contact;
   isSelected: boolean;
   onSelect: (id: string) => void;
+  /** Seleção múltipla (atribuir em massa). Ausente = sem caixa de seleção. */
+  isChecked?: boolean;
+  selectionMode?: boolean;
+  onToggleCheck?: (id: string) => void;
   onTogglePin?: (contactId: string, pinned: boolean) => Promise<void> | void;
   onMuteConversation?: (contactId: string, until: Date | null) => Promise<void> | void;
   onArchiveConversation?: (contactId: string, archived: boolean) => Promise<void> | void;
@@ -368,6 +377,22 @@ const ContactListItem = React.memo(function ContactListItem({
         </PopoverContent>
       </Popover>
 
+      {onToggleCheck && (
+        <label
+          onClick={(e) => e.stopPropagation()}
+          className={`absolute left-1 top-1 z-10 flex size-5 items-center justify-center rounded-md bg-white/90 dark:bg-slate-900/90 transition-opacity ${
+            selectionMode || isChecked ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus-within:opacity-100'
+          }`}
+        >
+          <input
+            type="checkbox"
+            checked={isChecked}
+            onChange={() => onToggleCheck(c.id)}
+            aria-label={`Selecionar conversa com ${displayName(c)}`}
+            className="size-3.5 accent-emerald-600 cursor-pointer"
+          />
+        </label>
+      )}
       <div className="relative shrink-0">
         <AvatarBadge name={c.name} photoUrl={c.avatar} size={34} className="ring-2 ring-white dark:ring-slate-900 shadow-sm" />
         {c.channel === 'whatsapp' && (
@@ -485,6 +510,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
   onUpdatePatient,
   onUpdateFunnelStage,
   onClaimConversation,
+  onBulkAssign,
   onTakeOverConversation,
   onLoadContactMedia,
   agentFilter,
@@ -854,6 +880,68 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
         .sort(compareQueue),
     [contacts, selectedDept, selectedTagFilter, searchQuery]
   );
+
+  // Seleção múltipla da fila (atribuir em massa) — vale pra lista que está na tela.
+  const [bulkSelected, setBulkSelected] = useState<Set<string>>(new Set());
+  const [isBulkAssigning, setIsBulkAssigning] = useState(false);
+  const toggleBulk = React.useCallback((id: string) => {
+    setBulkSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+  useEffect(() => {
+    const visible = new Set(filteredContacts.map((c) => c.id));
+    setBulkSelected((prev) => {
+      const kept = [...prev].filter((id) => visible.has(id));
+      return kept.length === prev.size ? prev : new Set(kept);
+    });
+  }, [filteredContacts]);
+
+  // Atalhos de teclado da fila (crítica de design, out/2026). Não disparam digitando
+  // num campo, com Ctrl/Alt/Cmd ou com algum diálogo aberto. "/" é a busca global.
+  const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
+  const selectedIdRef = useRef<string | undefined>(undefined);
+  selectedIdRef.current = selectedContact?.id;
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      const el = e.target as HTMLElement | null;
+      if (el && (el.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName))) return;
+      if (document.querySelector('[role="dialog"], [role="alertdialog"]')) return;
+      const list = filteredContacts;
+      const idx = list.findIndex((c) => c.id === selectedIdRef.current);
+      if (e.key === 'ArrowDown' || e.key === 'j') {
+        if (list.length === 0) return;
+        e.preventDefault();
+        const next = list[Math.min(idx + 1, list.length - 1)] ?? list[0];
+        handleSelectContactMobile(next.id);
+        document.querySelector(`[data-od-id="contact-card-${next.id}"]`)?.scrollIntoView({ block: 'nearest' });
+      } else if (e.key === 'ArrowUp' || e.key === 'k') {
+        if (list.length === 0) return;
+        e.preventDefault();
+        const prev = list[Math.max(idx - 1, 0)] ?? list[0];
+        handleSelectContactMobile(prev.id);
+        document.querySelector(`[data-od-id="contact-card-${prev.id}"]`)?.scrollIntoView({ block: 'nearest' });
+      } else if (e.key === 'a' && selectedIdRef.current && onClaimConversation) {
+        e.preventDefault();
+        onClaimConversation();
+      } else if (e.key === 'e' && selectedIdRef.current) {
+        e.preventDefault();
+        setIsFinishModalOpen(true);
+      } else if (e.key === 'r' && selectedIdRef.current) {
+        e.preventDefault();
+        document.querySelector<HTMLTextAreaElement>('[data-od-id="chat-composer-input"]')?.focus();
+      } else if (e.key === '?') {
+        e.preventDefault();
+        setIsShortcutsOpen(true);
+      }
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [filteredContacts, handleSelectContactMobile, onClaimConversation]);
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1387,6 +1475,42 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
           </div>
         </div>
 
+        {bulkSelected.size > 0 && onBulkAssign && (
+          <div className="flex items-center gap-2 border-b border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/50 px-3 py-2 text-xs">
+            <span className="font-semibold text-emerald-900 dark:text-emerald-200 tabular-nums">{bulkSelected.size} selecionada(s)</span>
+            <select
+              defaultValue=""
+              disabled={isBulkAssigning}
+              aria-label="Atribuir conversas selecionadas a"
+              onChange={async (e) => {
+                const agentId = e.target.value;
+                e.target.value = '';
+                if (!agentId) return;
+                setIsBulkAssigning(true);
+                try {
+                  await onBulkAssign([...bulkSelected], agentId);
+                  setBulkSelected(new Set());
+                } finally {
+                  setIsBulkAssigning(false);
+                }
+              }}
+              className="h-7 min-w-0 flex-1 rounded-md border border-emerald-300 dark:border-emerald-800 bg-white dark:bg-slate-900 px-2 text-xs text-slate-800 dark:text-slate-100"
+            >
+              <option value="" disabled>{isBulkAssigning ? 'Atribuindo…' : 'Atribuir a…'}</option>
+              {agents.map((agent) => (
+                <option key={agent.id} value={agent.id}>{agent.name}</option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={() => setBulkSelected(new Set())}
+              className="shrink-0 rounded-md px-2 py-1 font-semibold text-emerald-900 dark:text-emerald-200 hover:bg-emerald-100 dark:hover:bg-emerald-900/50"
+            >
+              Limpar
+            </button>
+          </div>
+        )}
+
         {/* Lista de Conversas */}
         <div className="flex-1 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800/80">
           {filteredContacts.length === 0 && isLoadingContacts ? (
@@ -1414,6 +1538,9 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                 contact={c}
                 isSelected={c.id === selectedContact?.id}
                 onSelect={handleSelectContactMobile}
+                isChecked={bulkSelected.has(c.id)}
+                selectionMode={bulkSelected.size > 0}
+                onToggleCheck={onBulkAssign ? toggleBulk : undefined}
                 onTogglePin={onTogglePin}
                 onMuteConversation={onMuteConversation}
                 onArchiveConversation={onArchiveConversation}
@@ -2001,6 +2128,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                   ) : (
                     <>
                   <textarea
+                    data-od-id="chat-composer-input"
                     rows={2}
                     value={inputText}
                     onChange={(e) => handleInputChange(e.target.value)}
@@ -2902,6 +3030,32 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
           onLoadMedia={onLoadContactMedia}
         />
       )}
+
+      <Dialog open={isShortcutsOpen} onOpenChange={setIsShortcutsOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Atalhos do Chat</DialogTitle>
+          </DialogHeader>
+          <dl className="grid grid-cols-[auto_1fr] items-center gap-x-4 gap-y-2 text-sm">
+            {[
+              ['↑ ↓', 'Conversa anterior / próxima da fila'],
+              ['r', 'Responder (vai para a caixa de texto)'],
+              ['a', 'Atribuir a conversa a mim'],
+              ['e', 'Finalizar atendimento'],
+              ['/', 'Buscar paciente, telefone ou conversa'],
+              ['?', 'Mostrar estes atalhos'],
+            ].map(([key, label]) => (
+              <React.Fragment key={key}>
+                <dt>
+                  <kbd className="rounded-md border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-1.5 py-0.5 font-mono text-xs text-slate-700 dark:text-slate-200">{key}</kbd>
+                </dt>
+                <dd className="text-slate-600 dark:text-slate-300">{label}</dd>
+              </React.Fragment>
+            ))}
+          </dl>
+          <p className="text-xs text-slate-500 dark:text-slate-400">Os atalhos não funcionam enquanto você digita numa caixa de texto.</p>
+        </DialogContent>
+      </Dialog>
 
       {/* Modal de Motivo Obrigatório de Resolução */}
       {selectedContact && (

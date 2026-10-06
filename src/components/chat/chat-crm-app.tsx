@@ -1054,6 +1054,19 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
     return actions.processMessageDocument(messageId);
   }
 
+  async function handleBulkAssign(conversationIds: string[], agentId: string) {
+    const transferFn = scope === "admin" ? transferConversationAdmin : transferConversation;
+    let ok = 0;
+    for (const id of conversationIds) {
+      const result = await transferFn(id, agentId).catch(() => ({ success: false }));
+      if (result.success) ok++;
+    }
+    const agentName = agents.find((a) => a.id === agentId)?.name ?? "atendente";
+    if (ok === conversationIds.length) toast.success(`${ok} conversa(s) atribuída(s) a ${agentName}.`);
+    else toast.error(`${ok} de ${conversationIds.length} atribuídas — algumas falharam (ex: limite de conversas da atendente).`);
+    await refreshContacts();
+  }
+
   async function handleTransferAgent(agentId: string) {
     if (!selectedContactId) return;
     const transferFn = scope === "admin" ? transferConversationAdmin : transferConversation;
@@ -1118,6 +1131,7 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
           onUpdatePatient={handleUpdatePatient}
           onUpdateFunnelStage={handleUpdateFunnelStage}
           onClaimConversation={handleClaimConversation}
+          onBulkAssign={handleBulkAssign}
           onTakeOverConversation={scope === "clinic" ? handleTakeOverConversation : undefined}
           onLoadContactMedia={actions.listContactMedia}
           onReactivateAi={handleReactivateAi}
