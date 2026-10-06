@@ -417,11 +417,11 @@ const ContactListItem = React.memo(function ContactListItem({
           funil saiu do card (fica no filtro do CRM e no painel lateral). */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between gap-2">
-          <h4 className={`text-sm truncate flex items-center gap-1 text-slate-900 dark:text-slate-100 ${c.unreadCount > 0 ? 'font-bold' : 'font-semibold'}`}>
+          <h3 className={`text-sm truncate flex items-center gap-1 text-slate-900 dark:text-slate-100 ${c.unreadCount > 0 ? 'font-bold' : 'font-semibold'}`}>
             {c.pinned && <Pin className="w-3 h-3 shrink-0 text-slate-400" aria-label="Fixada" />}
             {c.isMuted && <BellOff className="w-3 h-3 shrink-0 text-slate-400" aria-label="Silenciada" />}
             <span className="truncate">{displayName(c)}</span>
-          </h4>
+          </h3>
           {showWait ? (
             <span
               className={`shrink-0 inline-flex items-center gap-1 text-xs font-bold tabular-nums ${waitClass}`}
@@ -458,7 +458,7 @@ const ContactListItem = React.memo(function ContactListItem({
           </span>
           {c.unreadCount > 0 && (
             <span
-              className="shrink-0 min-w-[20px] h-5 px-1.5 rounded-full bg-emerald-600 text-white text-xs font-bold flex items-center justify-center"
+              className="shrink-0 min-w-[20px] h-5 px-1.5 rounded-full bg-emerald-700 text-white text-xs font-bold tabular-nums flex items-center justify-center"
               title={`${c.unreadCount} mensagem(ns) não lida(s)`}
               aria-label={`${c.unreadCount} não lida(s)`}
             >
@@ -1239,7 +1239,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
         {/* Header & Busca */}
         <div className="p-3.5 sm:p-4 border-b border-slate-100 dark:border-slate-800 space-y-3 bg-white dark:bg-slate-900">
           <div className="flex items-center justify-between gap-1">
-            <h2 className="font-bold text-slate-900 dark:text-slate-100 text-sm tracking-tight flex items-center gap-2 whitespace-nowrap">
+            <h2 className="font-bold text-slate-900 dark:text-slate-100 text-base tracking-tight flex items-center gap-2 whitespace-nowrap">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
               Fila de Atendimento
             </h2>
@@ -1359,9 +1359,9 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                   {tab.label}
                   {!!count && (
                     <span
-                      className={`min-w-[18px] px-1 rounded-full text-xs font-bold leading-[18px] ${
+                      className={`min-w-[18px] px-1 rounded-full text-xs font-bold tabular-nums leading-[18px] ${
                         isUnassignedAlert || tab.id === 'pendentes'
-                          ? 'bg-rose-600 text-white'
+                          ? 'bg-rose-700 text-white'
                           : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200'
                       }`}
                     >
@@ -2144,7 +2144,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                         ? 'Escreva uma instrução interna para a equipe...'
                         : 'Digite a resposta para o paciente...'
                     }
-                    className="w-full p-3 bg-transparent text-xs sm:text-sm text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none resize-none"
+                    className="w-full p-3 bg-transparent text-base sm:text-sm text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none resize-none"
                   />
 
                   <div className="flex items-center justify-between gap-2 px-3 py-2 border-t border-slate-200/60 dark:border-slate-800">

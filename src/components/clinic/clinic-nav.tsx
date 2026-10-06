@@ -99,7 +99,7 @@ export function ClinicNav({
         {!collapsed && <span className={isHorizontal ? "" : "truncate flex-1"}>{item.label}</span>}
         {count > 0 &&
           (collapsed ? (
-            <span className="absolute top-1 right-1 min-w-4 h-4 px-1 rounded-full bg-rose-600 text-[10px] font-bold leading-4 text-white text-center">
+            <span className="absolute top-1 right-1 min-w-5 h-5 px-1 rounded-full bg-rose-700 text-xs font-bold tabular-nums leading-5 text-white text-center">
               {badgeText}
             </span>
           ) : (
