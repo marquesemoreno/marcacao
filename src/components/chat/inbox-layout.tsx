@@ -3202,9 +3202,9 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
           </DialogHeader>
           <dl className="grid grid-cols-[auto_1fr] items-center gap-x-4 gap-y-2 text-sm">
             {[
-              ['↑ ↓', 'Conversa anterior / próxima da fila'],
+              ['↑ ↓  ou  k j', 'Conversa anterior / próxima da fila'],
               ['r', 'Responder (vai para a caixa de texto)'],
-              ['n', 'Ir para a conversa mais urgente da fila'],
+              ['n', 'Ir para a conversa mais urgente (fora a que está aberta)'],
               ['i', 'Escrever nota interna (o paciente não vê)'],
               ['Alt + A', 'Atribuir a conversa a mim'],
               ['Alt + E', 'Finalizar atendimento'],
@@ -3345,7 +3345,12 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                   try {
                     await onFinishAttendance({ reason: selectedReason, notes: finishNotes });
                     setIsFinishModalOpen(false);
-                    if (nextInQueue) handleSelectContactMobile(nextInQueue.id);
+                    if (nextInQueue) {
+                      handleSelectContactMobile(nextInQueue.id);
+                      toast(`Abrindo a próxima: ${displayName(nextInQueue)}`, {
+                        description: 'Pra não avançar sozinho, desligue no diálogo de atalhos (?).',
+                      });
+                    }
                     setSelectedReason(null);
                     setFinishNotes("");
                     setInputText("");
