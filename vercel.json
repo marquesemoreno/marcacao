@@ -2,10 +2,6 @@
   "regions": ["gru1"],
   "crons": [
     {
-      "path": "/api/cron/appointment-reminders",
-      "schedule": "0 12 * * *"
-    },
-    {
       "path": "/api/cron/no-response-tagging",
       "schedule": "0 * * * *"
     },

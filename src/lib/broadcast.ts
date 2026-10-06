@@ -4,6 +4,7 @@ import { sendWhatsAppMessage, sendWhatsAppMedia } from "@/lib/whatsapp";
 import { getSignedMediaUrl } from "@/lib/whatsapp-media";
 import { buildBroadcastMessage } from "@/lib/broadcast-csv";
 import { RESCHEDULE_PENDING_TAG } from "@/lib/conversation-tags";
+import { lastAutomatedSend } from "@/lib/automated-pacing-server";
 import { isMarketingGapElapsed, isWithinMarketingWindow, MARKETING_DAILY_CAP, startOfBrazilDay } from "@/lib/broadcast-schedule";
 
 const BATCH_SIZE = Number(process.env.BROADCAST_BATCH_SIZE) || 3;
@@ -36,12 +37,10 @@ export async function dispatchNextBatch(): Promise<{ processed: number }> {
         where: { campaignId: campaign.id, status: "SENT", sentAt: { gte: startOfBrazilDay(now) } },
       });
       if (sentToday >= MARKETING_DAILY_CAP) continue;
-      const last = await prisma.broadcastRecipient.findFirst({
-        where: { campaignId: campaign.id, status: "SENT" },
-        orderBy: { sentAt: "desc" },
-        select: { sentAt: true },
-      });
-      if (!isMarketingGapElapsed(last?.sentAt ?? null, now, Math.random())) continue;
+      // Intervalo único da clínica: conta desde a última mensagem automática de qualquer
+      // tipo (lembrete D-1 ou campanha) — nunca saem juntos (ver automated-pacing.ts).
+      const last = await lastAutomatedSend(campaign.clinicId);
+      if (!isMarketingGapElapsed(last.at, now, Math.random())) continue;
       take = 1;
     }
     const recipients = await prisma.broadcastRecipient.findMany({
