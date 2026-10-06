@@ -23,7 +23,7 @@ import { MessageBubble } from './message-bubble';
 import { ScheduleModal } from './schedule-modal';
 import { AvatarBadge } from './avatar-badge';
 import { PatientRecordSheet, type MediaItem } from './patient-record-sheet';
-import { compareQueue, queueGroup, QUEUE_GROUP_LABEL, type QueueGroup } from "@/lib/queue-order";
+import { compareQueue, queueGroup, QUEUE_GROUP_LABEL, STALE_WAIT_MINUTES, type QueueGroup } from "@/lib/queue-order";
 import { tagClasses, renderConsultationRow, PRESET_TAGS } from './patient-record-shared';
 import { FeedbackWidget } from '@/components/feedback-widget';
 import type { PlainClinicProcedureItem } from '@/lib/serialize';
@@ -326,6 +326,10 @@ const ContactListItem = React.memo(function ContactListItem({
       ? 'text-amber-700 dark:text-amber-400'
       : 'text-slate-700 dark:text-slate-200';
   const showWait = c.sla.shouldDisplay && !c.hasUnseenAssignment && c.queueState !== 'REMARCACAO_PENDENTE';
+  // Alerta cheio só pra quem ainda dá pra salvar: no grupo "Sem resposta há +48 h" a
+  // espera fica discreta (senão quase toda a fila fica vermelha e o alarme vira ruído).
+  const isStaleWait = c.sla.realWaitingMinutes > STALE_WAIT_MINUTES;
+  const isCriticalChip = c.sla.variant === 'critical' && !isStaleWait;
   return (
     <div
       onClick={() => onSelect(c.id)}
@@ -335,11 +339,21 @@ const ContactListItem = React.memo(function ContactListItem({
       }`}
       data-od-id={`contact-card-${c.id}`}
     >
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onSelect(c.id);
+        }}
+        aria-label={`Abrir conversa com ${displayName(c)}${c.unreadCount > 0 ? `, ${c.unreadCount} não lida(s)` : ''}`}
+        aria-current={isSelected ? 'true' : undefined}
+        className="absolute inset-0 z-0 rounded-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-500"
+      />
       <Popover open={isCardMenuOpen} onOpenChange={(open) => { setIsCardMenuOpen(open); if (!open) setIsMuteSubmenuOpen(false); }}>
         <PopoverTrigger
           onClick={(e) => e.stopPropagation()}
           className={`absolute top-1.5 right-1.5 p-1 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-200/70 dark:hover:bg-slate-700/70 transition-opacity ${
-            isCardMenuOpen ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+            isCardMenuOpen ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus-visible:opacity-100'
           }`}
           title="Mais opções"
         >
@@ -421,14 +435,14 @@ const ContactListItem = React.memo(function ContactListItem({
           {showWait ? (
             <span
               className={`shrink-0 inline-flex items-center gap-1 text-xs font-bold tabular-nums ${
-                c.sla.variant === 'critical' ? 'rounded-md bg-rose-700 px-1.5 py-0.5 text-white' : waitClass
+                isCriticalChip ? 'rounded-md bg-rose-700 px-1.5 py-0.5 text-white' : isStaleWait ? 'font-semibold text-slate-500 dark:text-slate-400' : waitClass
               }`}
               title={`Paciente aguardando resposta há ${c.sla.formattedTime} · última mensagem ${c.lastMessageTime}`}
             >
-              {c.sla.variant === 'critical' ? <AlertTriangle className="w-3 h-3" aria-hidden /> : <Clock className="w-3 h-3" aria-hidden />}
+              {isCriticalChip ? <AlertTriangle className="w-3 h-3" aria-hidden /> : <Clock className="w-3 h-3" aria-hidden />}
               {c.sla.formattedTime}
               <span className="sr-only">
-                {c.sla.variant === 'critical' ? ' aguardando resposta, atrasada' : ' aguardando resposta'}
+                {isCriticalChip ? ' aguardando resposta, atrasada' : ' aguardando resposta'}
               </span>
             </span>
           ) : (
@@ -963,10 +977,22 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
   selectedIdRef.current = selectedContact?.id;
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      if (e.ctrlKey || e.metaKey) return;
       const el = e.target as HTMLElement | null;
       if (el && (el.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName))) return;
       if (document.querySelector('[role="dialog"], [role="alertdialog"]')) return;
+      // Alt+A assume, Alt+E finaliza — teclas que mudam estado exigem Alt (recepção é
+      // interrompida o tempo todo; uma letra solta não pode agir na conversa aberta).
+      if (e.altKey) {
+        if (e.code === 'KeyA' && selectedIdRef.current && onClaimConversation) {
+          e.preventDefault();
+          onClaimConversation();
+        } else if (e.code === 'KeyE' && selectedIdRef.current) {
+          e.preventDefault();
+          setIsFinishModalOpen(true);
+        }
+        return;
+      }
       const list = filteredContacts;
       const idx = list.findIndex((c) => c.id === selectedIdRef.current);
       if (e.key === 'ArrowDown' || e.key === 'j') {
@@ -981,12 +1007,6 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
         const prev = list[Math.max(idx - 1, 0)] ?? list[0];
         handleSelectContactMobile(prev.id);
         document.querySelector(`[data-od-id="contact-card-${prev.id}"]`)?.scrollIntoView({ block: 'nearest' });
-      } else if (e.key === 'a' && selectedIdRef.current && onClaimConversation) {
-        e.preventDefault();
-        onClaimConversation();
-      } else if (e.key === 'e' && selectedIdRef.current) {
-        e.preventDefault();
-        setIsFinishModalOpen(true);
       } else if (e.key === 'r' && selectedIdRef.current) {
         e.preventDefault();
         document.querySelector<HTMLTextAreaElement>('[data-od-id="chat-composer-input"]')?.focus();
@@ -3182,12 +3202,12 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
           </DialogHeader>
           <dl className="grid grid-cols-[auto_1fr] items-center gap-x-4 gap-y-2 text-sm">
             {[
-              ['↑ ↓', 'Conversa anterior / próxima da fila'],
+              ['↑ ↓  ou  k j', 'Conversa anterior / próxima da fila'],
               ['r', 'Responder (vai para a caixa de texto)'],
-              ['n', 'Ir para a conversa mais urgente da fila'],
+              ['n', 'Ir para a conversa mais urgente (fora a que está aberta)'],
               ['i', 'Escrever nota interna (o paciente não vê)'],
-              ['a', 'Atribuir a conversa a mim'],
-              ['e', 'Finalizar atendimento'],
+              ['Alt + A', 'Atribuir a conversa a mim'],
+              ['Alt + E', 'Finalizar atendimento'],
               ['/', 'Buscar paciente, telefone ou conversa'],
               ['?', 'Mostrar estes atalhos'],
             ].map(([key, label]) => (
@@ -3325,7 +3345,12 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                   try {
                     await onFinishAttendance({ reason: selectedReason, notes: finishNotes });
                     setIsFinishModalOpen(false);
-                    if (nextInQueue) handleSelectContactMobile(nextInQueue.id);
+                    if (nextInQueue) {
+                      handleSelectContactMobile(nextInQueue.id);
+                      toast(`Abrindo a próxima: ${displayName(nextInQueue)}`, {
+                        description: 'Pra não avançar sozinho, desligue no diálogo de atalhos (?).',
+                      });
+                    }
                     setSelectedReason(null);
                     setFinishNotes("");
                     setInputText("");
