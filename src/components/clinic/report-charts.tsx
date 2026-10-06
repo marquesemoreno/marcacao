@@ -13,19 +13,21 @@ export function HorizontalBarChart({ data, unit }: { data: BarDatum[]; unit?: st
     return <p className="text-xs text-slate-500 dark:text-slate-400">Nenhum dado no período.</p>;
   }
   return (
-    <div className="space-y-2.5">
+    // Lista pro leitor de tela ("Dr. X: 12"); as barras são decorativas (aria-hidden).
+    <div className="space-y-2.5" role="list">
       {data.map((d) => (
-        <div key={d.label} className="flex items-center gap-3">
+        <div key={d.label} className="flex items-center gap-3" role="listitem">
           <span className="w-28 sm:w-36 shrink-0 truncate text-xs font-medium text-slate-600 dark:text-slate-300">
             {d.label}
           </span>
-          <div className="flex-1 h-5 flex items-center">
+          <div className="flex-1 h-5 flex items-center" aria-hidden>
             <div
-              className={`h-5 rounded-r-[4px] ${d.colorClass} transition-all`}
+              className={`h-5 rounded-r-[4px] ${d.colorClass}`}
               style={{ width: `${Math.max(2, (d.value / max) * 100)}%` }}
             />
           </div>
-          <span className="w-14 shrink-0 text-right text-xs font-mono font-semibold text-slate-700 dark:text-slate-200">
+          <span className="w-14 shrink-0 text-right text-xs font-semibold tabular-nums text-slate-700 dark:text-slate-200">
+            <span className="sr-only">: </span>
             {d.value}
             {unit}
           </span>
@@ -60,7 +62,7 @@ export function SentimentBar({
 
   return (
     <div className="space-y-3">
-      <div className="flex h-3 w-full gap-0.5 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+      <div className="flex h-3 w-full gap-0.5 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800" aria-hidden>
         {segments
           .filter((s) => s.pct > 0)
           .map((s) => (
@@ -72,7 +74,7 @@ export function SentimentBar({
             />
           ))}
       </div>
-      <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] font-medium text-slate-600 dark:text-slate-300">
+      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs font-medium text-slate-600 dark:text-slate-300">
         {segments.map((s) => (
           <span key={s.key} className="inline-flex items-center gap-1.5">
             <span className={`inline-block w-2 h-2 rounded-full ${s.colorClass}`} />
@@ -94,18 +96,19 @@ export function VerticalBarChart({ data }: { data: { label: string; value: numbe
   }
   const peak = Math.max(...data.map((d) => d.value));
   return (
-    <div className="flex items-end gap-1.5 sm:gap-2 h-44 pt-5">
+    <div className="flex items-end gap-1 sm:gap-2 h-44 pt-5" role="list">
       {data.map((d) => (
-        <div key={d.label} className="flex-1 flex flex-col items-center gap-1 h-full min-w-0">
-          <span className="text-[10px] font-mono font-semibold text-slate-700 dark:text-slate-200">{d.value}</span>
-          <div className="flex-1 w-full flex items-end justify-center min-h-0">
+        <div key={d.label} className="flex-1 flex flex-col items-center gap-1 h-full min-w-0" role="listitem">
+          <span className="sr-only">{d.label}: </span>
+          <span className="text-xs font-semibold tabular-nums text-slate-700 dark:text-slate-200">{d.value}</span>
+          <div className="flex-1 w-full flex items-end justify-center min-h-0" aria-hidden>
             <div
               className={`w-full max-w-10 rounded-t-[4px] ${d.value === peak ? "bg-sky-600" : "bg-sky-400/70 dark:bg-sky-500/50"}`}
               style={{ height: `${Math.max(2, (d.value / max) * 100)}%` }}
               title={`${d.label}: ${d.value}`}
             />
           </div>
-          <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400">{d.label}</span>
+          <span className="text-xs font-medium text-slate-600 dark:text-slate-400" aria-hidden>{d.label}</span>
         </div>
       ))}
     </div>

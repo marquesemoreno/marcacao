@@ -324,7 +324,7 @@ export default async function ClinicReportPage({
             neutroPct={chatReport.sentimentNeutroPct}
             negativoPct={chatReport.sentimentNegativoPct}
           />
-          <p className="text-[11px] text-slate-400 dark:text-slate-500">
+          <p className="text-xs text-slate-600 dark:text-slate-400">
             {chatReport.sentimentAuditedCount} conversa(s) auditada(s) por IA /
             regras automáticas no período.
           </p>
@@ -378,16 +378,16 @@ export default async function ClinicReportPage({
                         )}
                       </span>
                     </TableCell>
-                    <TableCell className="text-right font-mono">
+                    <TableCell className="text-right tabular-nums">
                       {a.total}
                     </TableCell>
-                    <TableCell className="text-right font-mono">
+                    <TableCell className="text-right tabular-nums">
                       {a.avgFrtSec !== null ? formatDurationHuman(a.avgFrtSec / 60) : "—"}
                     </TableCell>
-                    <TableCell className="text-right font-mono">
+                    <TableCell className="text-right tabular-nums">
                       {a.scheduled}
                     </TableCell>
-                    <TableCell className="pr-5 text-right font-mono font-semibold">
+                    <TableCell className="pr-5 text-right tabular-nums font-semibold">
                       {a.conversionRate}%
                     </TableCell>
                   </TableRow>
@@ -454,13 +454,13 @@ export default async function ClinicReportPage({
                     </span>
                     <m.Icon className={`w-4 h-4 ${m.iconClass}`} />
                   </div>
-                  <p className="text-2xl font-semibold font-mono">
+                  <p className="text-2xl font-semibold tabular-nums">
                     {m.value}{" "}
                     <span className="text-sm text-slate-500 dark:text-slate-400">
                       ({m.pctValue}%)
                     </span>
                   </p>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                  <p className="text-xs text-slate-600 dark:text-slate-400">
                     {m.hint}
                   </p>
                 </div>
@@ -499,10 +499,10 @@ export default async function ClinicReportPage({
                 {management.channelConversion.map((c) => (
                   <TableRow key={c.channel}>
                     <TableCell className="pl-5 font-medium">{c.channel}</TableCell>
-                    <TableCell className="text-right font-mono">{c.conversations}</TableCell>
-                    <TableCell className="text-right font-mono">{c.scheduled}</TableCell>
-                    <TableCell className="text-right font-mono">{c.conversionRate}%</TableCell>
-                    <TableCell className="pr-5 text-right font-mono font-semibold">
+                    <TableCell className="text-right tabular-nums">{c.conversations}</TableCell>
+                    <TableCell className="text-right tabular-nums">{c.scheduled}</TableCell>
+                    <TableCell className="text-right tabular-nums">{c.conversionRate}%</TableCell>
+                    <TableCell className="pr-5 text-right tabular-nums font-semibold">
                       {c.estimatedRevenue !== null ? formatCurrency(c.estimatedRevenue) : "—"}
                     </TableCell>
                   </TableRow>
@@ -511,7 +511,7 @@ export default async function ClinicReportPage({
             </Table>
           )}
         </div>
-        <p className="text-[11px] text-slate-400 dark:text-slate-500">
+        <p className="text-xs text-slate-600 dark:text-slate-400">
           Canal detectado na 1ª mensagem do paciente (anúncio do Meta, UTM ou texto de campanha). “Não identificado” =
           conversas anteriores ao rastreamento ou abertas por lembrete/disparo da clínica.
         </p>
@@ -532,7 +532,7 @@ export default async function ClinicReportPage({
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <p className="font-semibold text-sm truncate">{c.name}</p>
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                      <p className="text-xs text-slate-600 dark:text-slate-400">
                         Criada em {new Date(c.createdAt).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })}
                         {c.tag && <> · tag <span className="font-medium text-slate-700 dark:text-slate-300">{c.tag}</span></>}
                       </p>
@@ -557,26 +557,26 @@ export default async function ClinicReportPage({
 
                   <dl className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                     <div>
-                      <dt className="text-[11px] text-slate-500 dark:text-slate-400">Responderam</dt>
-                      <dd className="text-lg font-semibold font-mono">{s.replied}</dd>
-                      <dd className="text-[11px] text-slate-500 dark:text-slate-400">{s.replyRate}% das enviadas</dd>
+                      <dt className="text-xs text-slate-600 dark:text-slate-400">Responderam</dt>
+                      <dd className="text-lg font-semibold tabular-nums">{s.replied}</dd>
+                      <dd className="text-xs text-slate-600 dark:text-slate-400">{s.replyRate}% das enviadas</dd>
                     </div>
                     <div>
-                      <dt className="text-[11px] text-slate-500 dark:text-slate-400">Agendados</dt>
-                      <dd className="text-lg font-semibold font-mono">{s.scheduled}</dd>
-                      <dd className="text-[11px] text-slate-500 dark:text-slate-400">etapa Agendado no CRM</dd>
+                      <dt className="text-xs text-slate-600 dark:text-slate-400">Agendados</dt>
+                      <dd className="text-lg font-semibold tabular-nums">{s.scheduled}</dd>
+                      <dd className="text-xs text-slate-600 dark:text-slate-400">etapa Agendado no CRM</dd>
                     </div>
                     <div>
-                      <dt className="text-[11px] text-slate-500 dark:text-slate-400">Pediram pra sair</dt>
-                      <dd className="text-lg font-semibold font-mono">{s.optedOut}</dd>
+                      <dt className="text-xs text-slate-600 dark:text-slate-400">Pediram pra sair</dt>
+                      <dd className="text-lg font-semibold tabular-nums">{s.optedOut}</dd>
                     </div>
                     <div>
-                      <dt className="text-[11px] text-slate-500 dark:text-slate-400">Falharam</dt>
-                      <dd className="text-lg font-semibold font-mono">{s.failed}</dd>
-                      <dd className="text-[11px] text-slate-500 dark:text-slate-400">número sem WhatsApp</dd>
+                      <dt className="text-xs text-slate-600 dark:text-slate-400">Falharam</dt>
+                      <dd className="text-lg font-semibold tabular-nums">{s.failed}</dd>
+                      <dd className="text-xs text-slate-600 dark:text-slate-400">número sem WhatsApp</dd>
                     </div>
                   </dl>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                  <p className="text-xs text-slate-600 dark:text-slate-400">
                     Resposta = mensagem da paciente em até 7 dias depois de receber.
                   </p>
                 </div>
@@ -636,7 +636,7 @@ export default async function ClinicReportPage({
               ]}
             />
             {kindTotal > 0 && (
-              <p className="text-[11px] text-slate-400 dark:text-slate-500">
+              <p className="text-xs text-slate-600 dark:text-slate-400">
                 {kindTotal} agendamento(s) registrado(s) no Conecta Saúde no período.
               </p>
             )}
@@ -705,10 +705,10 @@ export default async function ClinicReportPage({
                 </span>
                 <CalendarCheck className="w-5 h-5 text-sky-600" />
               </div>
-              <p className="text-2xl font-semibold font-mono">
+              <p className="text-2xl font-semibold tabular-nums">
                 {appointmentsReport.totalAppointments}
               </p>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+              <p className="text-xs text-slate-600 dark:text-slate-400 font-medium">
                 {appointmentsReport.countByStatus.COMPLETED} concluídos
               </p>
             </div>
@@ -720,10 +720,10 @@ export default async function ClinicReportPage({
                 </span>
                 <XCircle className="w-5 h-5 text-rose-600" />
               </div>
-              <p className="text-2xl font-semibold font-mono">
+              <p className="text-2xl font-semibold tabular-nums">
                 {appointmentsReport.cancellationRate}%
               </p>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+              <p className="text-xs text-slate-600 dark:text-slate-400 font-medium">
                 {appointmentsReport.countByStatus.CANCELLED} cancelados,{" "}
                 {appointmentsReport.countByStatus.NO_SHOW} faltas
               </p>
@@ -734,10 +734,10 @@ export default async function ClinicReportPage({
                 <span className="text-xs font-medium">Receita do Período</span>
                 <DollarSign className="w-5 h-5 text-emerald-600" />
               </div>
-              <p className="text-2xl font-semibold font-mono">
+              <p className="text-2xl font-semibold tabular-nums">
                 {formatCurrency(appointmentsReport.revenue)}
               </p>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+              <p className="text-xs text-slate-600 dark:text-slate-400 font-medium">
                 Consultas concluídas
               </p>
             </div>
