@@ -36,7 +36,7 @@ export function AvatarBadge({
         src={photoUrl!}
         alt={name}
         onError={() => setImageFailed(true)}
-        className={`shrink-0 rounded-full object-cover shadow-2xs select-none transition-transform hover:scale-105 ${className}`}
+        className={`shrink-0 rounded-full object-cover shadow-2xs select-none ${className}`}
         style={{ width: size, height: size }}
       />
     );
@@ -44,7 +44,7 @@ export function AvatarBadge({
 
   return (
     <div
-      className={`flex shrink-0 items-center justify-center rounded-full bg-emerald-700 font-bold tracking-tight text-white shadow-2xs select-none transition-transform hover:scale-105 ${className}`}
+      className={`flex shrink-0 items-center justify-center rounded-full bg-emerald-700 font-bold tracking-tight text-white shadow-2xs select-none ${className}`}
       style={{ width: size, height: size, fontSize: Math.max(10, size * 0.38) }}
     >
       {avatarInitials(name) || <User style={{ width: size * 0.5, height: size * 0.5 }} aria-hidden />}
