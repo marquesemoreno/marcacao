@@ -467,7 +467,7 @@ const ContactListItem = React.memo(function ContactListItem({
           </span>
           {c.unreadCount > 0 && (
             <span
-              className="shrink-0 min-w-[20px] h-5 px-1.5 rounded-full bg-emerald-700 text-white text-xs font-bold tabular-nums flex items-center justify-center"
+              className="shrink-0 min-w-[20px] h-5 px-1.5 rounded-md bg-emerald-700 text-white text-xs font-bold tabular-nums flex items-center justify-center"
               title={`${c.unreadCount} mensagem(ns) não lida(s)`}
               aria-label={`${c.unreadCount} não lida(s)`}
             >
@@ -1273,7 +1273,6 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
         <div className="p-3.5 sm:p-4 border-b border-slate-100 dark:border-slate-800 space-y-3 bg-white dark:bg-slate-900">
           <div className="flex items-center justify-between gap-1">
             <h2 className="font-bold text-slate-900 dark:text-slate-100 text-base tracking-tight flex items-center gap-2 whitespace-nowrap">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
               Fila de Atendimento
             </h2>
             <div className="flex flex-wrap items-center justify-end gap-1.5">
@@ -1324,7 +1323,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
               placeholder="Buscar paciente, telefone ou mensagem..."
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 focus:bg-white dark:focus:bg-slate-900 transition-all text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500"
+              className="w-full pl-9 pr-3 py-2 text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 focus:bg-white dark:focus:bg-slate-900 transition-all text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500"
             />
           </div>
 
@@ -1393,7 +1392,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                   {tab.label}
                   {!!count && (
                     <span
-                      className={`min-w-[18px] px-1 rounded-full text-xs font-bold tabular-nums leading-[18px] ${
+                      className={`min-w-[18px] px-1 rounded-md text-xs font-bold tabular-nums leading-[18px] ${
                         isUnassignedAlert || tab.id === 'pendentes'
                           ? 'bg-rose-700 text-white'
                           : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200'
@@ -1424,7 +1423,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
             </button>
 
             {isTagFilterOpen && (
-              <div className="absolute right-0 w-56 mt-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-lg py-1.5 z-30 animate-in fade-in zoom-in-95 duration-100 max-h-56 overflow-y-auto">
+              <div className="absolute right-0 w-56 mt-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg shadow-lg py-1.5 z-30 animate-in fade-in zoom-in-95 duration-100 max-h-56 overflow-y-auto">
                 <button
                   onClick={() => {
                     setSelectedTagFilter(null);
@@ -1464,7 +1463,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
               <Settings2 className="w-3.5 h-3.5" />
             </button>
             {isTabSettingsOpen && (
-              <div className="absolute right-0 mt-1 w-48 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-lg py-1.5 z-30 animate-in fade-in zoom-in-95 duration-100">
+              <div className="absolute right-0 mt-1 w-48 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg shadow-lg py-1.5 z-30 animate-in fade-in zoom-in-95 duration-100">
                 <p className="px-3 py-1 text-xs font-bold text-slate-600 dark:text-slate-300">
                   Abas visíveis
                 </p>
@@ -1628,7 +1627,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
       >
         {isDraggingFile && (
           <div className="absolute inset-0 z-50 flex items-center justify-center bg-emerald-600/10 dark:bg-emerald-950/40 border-2 border-dashed border-emerald-500 rounded-2xl m-2 pointer-events-none">
-            <p className="px-4 py-2 rounded-xl bg-white dark:bg-slate-900 shadow-lg text-sm font-bold text-emerald-700 dark:text-emerald-400">
+            <p className="px-4 py-2 rounded-lg bg-white dark:bg-slate-900 shadow-lg text-sm font-bold text-emerald-700 dark:text-emerald-400">
               Solte para enviar
             </p>
           </div>
@@ -1659,7 +1658,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
             <FeedbackWidget
               admin={Boolean(onClinicFilterChange)}
               trigger={
-                <span className="inline-flex items-center gap-1.5 text-xs font-bold text-violet-700 dark:text-violet-300 bg-violet-50 dark:bg-violet-950/60 border border-violet-200 dark:border-violet-800 px-3 py-2 rounded-xl hover:bg-violet-100 dark:hover:bg-violet-900 transition-colors cursor-pointer">
+                <span className="inline-flex items-center gap-1.5 text-xs font-bold text-violet-700 dark:text-violet-300 bg-violet-50 dark:bg-violet-950/60 border border-violet-200 dark:border-violet-800 px-3 py-2 rounded-lg hover:bg-violet-100 dark:hover:bg-violet-900 transition-colors cursor-pointer">
                   <MessageSquarePlus className="w-3.5 h-3.5" /> Relatar bug ou sugestão
                 </span>
               }
@@ -1694,9 +1693,9 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                     </button>
                     <span
                       className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 text-xs font-medium shrink-0"
-                      title="WhatsApp Conectado"
+                      title="Conversa pelo WhatsApp"
                     >
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" aria-hidden></span>
                       WhatsApp
                     </span>
                     {selectedContact.clinicName && (
@@ -1711,7 +1710,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                             {selectedContact.clinicName}
                           </button>
                           {isClinicMenuOpen && (
-                            <div className="absolute left-0 mt-1 w-56 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-lg py-2 z-50 animate-in fade-in zoom-in-95 text-xs font-medium max-h-64 overflow-y-auto">
+                            <div className="absolute left-0 mt-1 w-56 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg shadow-lg py-2 z-50 animate-in fade-in zoom-in-95 text-xs font-medium max-h-64 overflow-y-auto">
                               <div className="px-3 py-1 text-xs font-bold text-slate-600 dark:text-slate-300 border-b border-slate-100 dark:border-slate-800 mb-1">
                                 Corrigir Clínica Desta Conversa
                               </div>
@@ -1854,7 +1853,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                   </button>
 
                   {isMoreMenuOpen && (
-                    <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-lg py-1.5 z-50 animate-in fade-in zoom-in-95 text-xs font-medium">
+                    <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg shadow-lg py-1.5 z-50 animate-in fade-in zoom-in-95 text-xs font-medium">
                       <button
                         onClick={() => handleOpenScheduleWithProcedure(undefined)}
                         className="sm:hidden w-full px-3 py-2 text-left hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center gap-2 text-slate-700 dark:text-slate-200"
@@ -2078,7 +2077,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
             <footer className="p-2.5 sm:p-3.5 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 shrink-0">
               <form ref={quickReplyRef} onSubmit={handleSendMessage} className="relative">
                 {isQuickReplyOpen && (
-                  <div className="absolute bottom-full left-0 mb-2 w-full max-w-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-lg py-2 z-30 max-h-64 overflow-y-auto animate-in fade-in slide-in-from-bottom-2 duration-150">
+                  <div className="absolute bottom-full left-0 mb-2 w-full max-w-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg shadow-lg py-2 z-30 max-h-64 overflow-y-auto animate-in fade-in slide-in-from-bottom-2 duration-150">
                     <div className="flex items-center justify-between px-3 py-1.5 border-b border-slate-100 dark:border-slate-800">
                       <span className="text-xs font-bold text-slate-600 dark:text-slate-300">
                         Respostas Rápidas
@@ -2117,7 +2116,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                 )}
 
                 <div
-                  className={`rounded-xl border overflow-hidden transition-colors ${
+                  className={`rounded-lg border overflow-hidden transition-colors ${
                     composerMode === 'internal_note'
                       ? 'bg-amber-50 dark:bg-amber-950/40 border-amber-400 dark:border-amber-700 focus-within:ring-2 focus-within:ring-amber-200 dark:focus-within:ring-amber-900'
                       : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-100'
@@ -2481,7 +2480,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
           <div className="p-4 space-y-4">
             {/* Card 0: Copilot de sugestões de resposta */}
             {onGenerateCopilotSuggestions && (
-              <div className="bg-white dark:bg-slate-800/40 border border-emerald-200/80 dark:border-emerald-800/60 rounded-xl p-4 space-y-3 shadow-sm">
+              <div className="bg-white dark:bg-slate-800/40 border border-emerald-200/80 dark:border-emerald-800/60 rounded-lg p-4 space-y-3 shadow-sm">
                 <div className="flex items-center justify-between gap-2">
                   <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
                     <Sparkles className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
@@ -2544,7 +2543,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
             )}
 
             {/* Card 1: Perfil do Contato */}
-            <div className="bg-white dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-700/80 rounded-xl p-4 space-y-3 shadow-sm">
+            <div className="bg-white dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-700/80 rounded-lg p-4 space-y-3 shadow-sm">
               <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-700/60 pb-3">
                 <div className="flex items-center gap-3 min-w-0">
                   <AvatarBadge name={displayName(selectedContact)} photoUrl={selectedContact.avatar} size={44} className="ring-2 ring-white dark:ring-slate-900 shadow-sm shrink-0" />
@@ -2704,7 +2703,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
               const past = selectedContact.consultationHistory.filter((c) => !c.isUpcoming);
 
               return (
-                <div className="bg-white dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-700/80 rounded-xl p-4 shadow-sm space-y-3">
+                <div className="bg-white dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-700/80 rounded-lg p-4 shadow-sm space-y-3">
                   {upcoming.length > 0 && (
                     <div className="space-y-1.5">
                       <label className="text-xs font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
@@ -2726,7 +2725,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
             })()}
 
             {/* Card 2: Tags & Observações */}
-            <div className="bg-white dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-700/80 rounded-xl p-4 shadow-sm space-y-2">
+            <div className="bg-white dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-700/80 rounded-lg p-4 shadow-sm space-y-2">
               <div className="flex items-center justify-between">
                 <label className="text-sm font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
                   <Tag className="w-3.5 h-3.5 text-slate-400" /> Tags do Paciente
@@ -2781,7 +2780,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
             {/* Card 3: Transferir Atendimento — combobox pesquisável em vez da lista
                 aberta de botões (que, com muitos atendentes, empurrava o resto do
                 CRM pra fora da tela) + confirmação em modal rápido. */}
-            <div className="bg-white dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-700/80 rounded-xl p-4 shadow-sm space-y-2">
+            <div className="bg-white dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-700/80 rounded-lg p-4 shadow-sm space-y-2">
               <label className="text-sm font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
                 <UserPlus className="w-3.5 h-3.5 text-slate-400" /> Transferir Atendimento Para
               </label>
@@ -2836,7 +2835,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
 
 
             {/* Card 4: Etapa do Atendimento (seleção única — só a etapa atual fica em destaque) */}
-            <div className="bg-white dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-700/80 rounded-xl p-4 shadow-sm space-y-2.5">
+            <div className="bg-white dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-700/80 rounded-lg p-4 shadow-sm space-y-2.5">
               <label className="text-sm font-semibold text-slate-700 dark:text-slate-200">
                 Etapa do Atendimento
               </label>
@@ -3237,7 +3236,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                           role="radio"
                           aria-checked={selectedReason === option.id}
                           onClick={() => setSelectedReason(option.id)}
-                          className={`p-3 rounded-xl text-left text-xs font-semibold transition-all border flex items-center gap-2 ${
+                          className={`p-3 rounded-lg text-left text-xs font-semibold transition-all border flex items-center gap-2 ${
                             selectedReason === option.id
                               ? "bg-emerald-50 dark:bg-emerald-950/60 border-emerald-500 text-emerald-800 dark:text-emerald-200"
                               : "bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700"
