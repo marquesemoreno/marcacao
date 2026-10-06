@@ -19,6 +19,7 @@ import {
   claimConversation,
   takeOverConversation,
   reactivateAiForConversation,
+  undoReactivateAiForConversation,
   transferConversation,
   getAttendantCapacity,
   resolveConversation,
@@ -76,6 +77,7 @@ import {
   assignConversationToUserAdmin,
   claimConversationAdmin,
   reactivateAiForConversationAdmin,
+  undoReactivateAiForConversationAdmin,
   transferConversationAdmin,
   getAttendantCapacityAdmin,
   resolveConversationAdmin,
@@ -995,6 +997,15 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
     return result;
   }
 
+  async function handleUndoReactivateAi(conversationId: string) {
+    const undoFn = scope === "admin" ? undoReactivateAiForConversationAdmin : undoReactivateAiForConversation;
+    const result = await undoFn(conversationId);
+    if (!result.success) toast.error(result.message || "Não foi possível desfazer.");
+    else toast.success("Desfeito: o atendimento continua com a equipe.");
+    await refreshContacts();
+    if (selectedContactIdRef.current === conversationId) await refreshMessages();
+  }
+
   async function handleMarkUnread() {
     if (!selectedContactId) return;
     await actions.markConversationUnread(selectedContactId);
@@ -1052,6 +1063,19 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
 
   async function handleProcessDocument(messageId: string) {
     return actions.processMessageDocument(messageId);
+  }
+
+  async function handleBulkAssign(conversationIds: string[], agentId: string) {
+    const transferFn = scope === "admin" ? transferConversationAdmin : transferConversation;
+    let ok = 0;
+    for (const id of conversationIds) {
+      const result = await transferFn(id, agentId).catch(() => ({ success: false }));
+      if (result.success) ok++;
+    }
+    const agentName = agents.find((a) => a.id === agentId)?.name ?? "atendente";
+    if (ok === conversationIds.length) toast.success(`${ok} conversa(s) atribuída(s) a ${agentName}.`);
+    else toast.error(`${ok} de ${conversationIds.length} atribuídas — algumas falharam (ex: limite de conversas da atendente).`);
+    await refreshContacts();
   }
 
   async function handleTransferAgent(agentId: string) {
@@ -1118,9 +1142,11 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
           onUpdatePatient={handleUpdatePatient}
           onUpdateFunnelStage={handleUpdateFunnelStage}
           onClaimConversation={handleClaimConversation}
+          onBulkAssign={handleBulkAssign}
           onTakeOverConversation={scope === "clinic" ? handleTakeOverConversation : undefined}
           onLoadContactMedia={actions.listContactMedia}
           onReactivateAi={handleReactivateAi}
+          onUndoReactivateAi={handleUndoReactivateAi}
           onMarkUnread={handleMarkUnread}
           onTogglePin={handleTogglePin}
           onMuteConversation={handleMuteConversation}
