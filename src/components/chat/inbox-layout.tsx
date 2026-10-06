@@ -17,14 +17,13 @@ import {
   InboxFilter,
   FunnelStage,
   Agent,
-  ConversationQueueState,
   UpdatePatientData,
 } from '@/types/chat-crm';
 import { MessageBubble } from './message-bubble';
 import { ScheduleModal } from './schedule-modal';
 import { AvatarBadge } from './avatar-badge';
 import { PatientRecordSheet, type MediaItem } from './patient-record-sheet';
-import { SLABadge } from './sla-badge';
+import { compareQueue } from "@/lib/queue-order";
 import { tagClasses, renderConsultationRow, PRESET_TAGS } from './patient-record-shared';
 import { FeedbackWidget } from '@/components/feedback-widget';
 import type { PlainClinicProcedureItem } from '@/lib/serialize';
@@ -91,15 +90,6 @@ const COMPOSER_EMOJIS = [
 /** Prioridade da fila (menor primeiro) — só urgência e "sem dono" furam a ordem
  * cronológica normal; humano/IA/aguardando paciente ficam no mesmo nível, mantendo a
  * ordem por `lastMessageAt` que já vem do banco (sort é estável). */
-const QUEUE_STATE_PRIORITY: Record<ConversationQueueState, number> = {
-  URGENCIA_CLINICA: 0,
-  REMARCACAO_PENDENTE: 1,
-  SEM_DONO: 2,
-  HUMANO_ATENDENDO: 3,
-  IA_ATENDENDO: 3,
-  AGUARDANDO_PACIENTE: 3,
-};
-
 /** A partir de quantos minutos parado em "Não Atribuídas" a aba pisca pra alertar o atendente. */
 const UNASSIGNED_ALERT_THRESHOLD_MINUTES = 10;
 
@@ -309,16 +299,27 @@ const ContactListItem = React.memo(function ContactListItem({
   // chat-crm-adapters.ts).
   const rowColorClasses =
     c.queueState === 'URGENCIA_CLINICA'
-      ? 'bg-rose-50 dark:bg-rose-950/30 border-rose-600 hover:bg-rose-100/70 dark:hover:bg-rose-950/50'
+      ? 'bg-rose-50 dark:bg-rose-950/30 hover:bg-rose-100/70 dark:hover:bg-rose-950/50'
       : c.queueState === 'SEM_DONO'
-      ? 'bg-amber-50/60 dark:bg-amber-950/20 border-amber-400 hover:bg-amber-100/60 dark:hover:bg-amber-950/40'
+      ? 'bg-amber-50/60 dark:bg-amber-950/20 hover:bg-amber-100/60 dark:hover:bg-amber-950/40'
       : isSelected
-      ? 'bg-white dark:bg-slate-800/70 border-emerald-600 shadow-sm'
-      : 'hover:bg-slate-200/50 dark:hover:bg-slate-800/40 border-transparent';
+      ? 'bg-white dark:bg-slate-800/70'
+      : 'hover:bg-slate-200/50 dark:hover:bg-slate-800/40';
+  // A espera é o número mais forte da linha: no lugar do horário, na cor da faixa do SLA.
+  const waitClass =
+    c.sla.variant === 'critical'
+      ? 'text-rose-700 dark:text-rose-400'
+      : c.sla.variant === 'warning'
+      ? 'text-amber-700 dark:text-amber-400'
+      : 'text-slate-700 dark:text-slate-200';
+  const showWait = c.sla.shouldDisplay && !c.hasUnseenAssignment && c.queueState !== 'REMARCACAO_PENDENTE';
   return (
     <div
       onClick={() => onSelect(c.id)}
-      className={`group px-3 py-2 transition-colors cursor-pointer relative flex gap-2.5 items-start border-l-4 ${rowColorClasses}`}
+      aria-current={isSelected ? 'true' : undefined}
+      className={`group px-3 py-2 transition-colors cursor-pointer relative flex gap-2.5 items-start ${rowColorClasses} ${
+        isSelected ? 'ring-2 ring-inset ring-emerald-600/70' : ''
+      }`}
       data-od-id={`contact-card-${c.id}`}
     >
       <Popover open={isCardMenuOpen} onOpenChange={(open) => { setIsCardMenuOpen(open); if (!open) setIsMuteSubmenuOpen(false); }}>
@@ -396,7 +397,18 @@ const ContactListItem = React.memo(function ContactListItem({
             {c.isMuted && <BellOff className="w-3 h-3 shrink-0 text-slate-400" aria-label="Silenciada" />}
             <span className="truncate">{displayName(c)}</span>
           </h4>
-          <span className="shrink-0 text-xs text-slate-500 dark:text-slate-400">{c.lastMessageTime}</span>
+          {showWait ? (
+            <span
+              className={`shrink-0 inline-flex items-center gap-1 text-xs font-bold tabular-nums ${waitClass}`}
+              title={`Paciente aguardando resposta há ${c.sla.formattedTime} · última mensagem ${c.lastMessageTime}`}
+            >
+              <Clock className="w-3 h-3" aria-hidden />
+              {c.sla.formattedTime}
+              <span className="sr-only"> aguardando resposta</span>
+            </span>
+          ) : (
+            <span className="shrink-0 text-xs text-slate-500 dark:text-slate-400">{c.lastMessageTime}</span>
+          )}
         </div>
 
         {c.clinicName && <p className="text-xs font-medium text-sky-700 dark:text-sky-400 truncate">{c.clinicName}</p>}
@@ -413,9 +425,7 @@ const ContactListItem = React.memo(function ContactListItem({
               <span className="inline-flex items-center gap-1 font-semibold text-amber-700 dark:text-amber-400">
                 <CalendarClock className="w-3 h-3" /> Remarcação pendente
               </span>
-            ) : (
-              <SLABadge sla={c.sla} />
-            )}
+            ) : null}
             <span className="inline-flex items-center gap-1 truncate text-slate-500 dark:text-slate-400" title={c.queueState === 'IA_ATENDENDO' ? 'Atendida pela IA' : `Responsável: ${ownerLabel(c)}`}>
               {c.queueState === 'IA_ATENDENDO' ? <Bot className="w-3 h-3 shrink-0" /> : <User className="w-3 h-3 shrink-0" />}
               <span className="truncate">{c.queueState === 'IA_ATENDENDO' ? 'IA' : ownerLabel(c)}</span>
@@ -839,14 +849,9 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
           }
           return true;
         })
-        // Estável: reordena por prioridade (urgência > sem dono > resto) e, dentro do
-        // mesmo nível, fixadas primeiro — preserva a ordem por lastMessageAt que já
-        // vem do banco dentro de cada grupo. Fixar nunca passa por cima de urgência/sem dono.
-        .sort((a, b) => {
-          const priorityDiff = QUEUE_STATE_PRIORITY[a.queueState] - QUEUE_STATE_PRIORITY[b.queueState];
-          if (priorityDiff !== 0) return priorityDiff;
-          return Number(b.pinned) - Number(a.pinned);
-        }),
+        // Quem espera resposta há mais tempo primeiro (ver compareQueue) — sort estável,
+        // então dentro de cada grupo vale a ordem por última mensagem que vem do banco.
+        .sort(compareQueue),
     [contacts, selectedDept, selectedTagFilter, searchQuery]
   );
 

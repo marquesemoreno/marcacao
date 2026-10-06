@@ -5,6 +5,8 @@ export type SlaVariant = "normal" | "warning" | "critical";
 export interface SlaInfo {
   shouldDisplay: boolean;
   waitingMinutes: number;
+  /** Espera em tempo real (não só expediente) — ordena a fila (ver queue-order.ts). */
+  realWaitingMinutes: number;
   formattedTime: string;
   variant: SlaVariant;
 }
@@ -124,7 +126,7 @@ export function getSlaInfo(input: {
   const now = input.now ?? new Date();
   const real = input.recentMessages.filter((m) => m.type !== "INTERNAL_NOTE");
   if (input.conversationStatus === "RESOLVED" || real.length === 0 || real[0].direction !== "INBOUND") {
-    return { shouldDisplay: false, waitingMinutes: 0, formattedTime: "", variant: "normal" };
+    return { shouldDisplay: false, waitingMinutes: 0, realWaitingMinutes: 0, formattedTime: "", variant: "normal" };
   }
   let firstUnanswered = real[0];
   for (const m of real) {
@@ -136,6 +138,7 @@ export function getSlaInfo(input: {
   return {
     shouldDisplay: true,
     waitingMinutes,
+    realWaitingMinutes: Math.round(realMinutes),
     formattedTime: formatDurationHuman(realMinutes),
     variant: variantFor(waitingMinutes),
   };
