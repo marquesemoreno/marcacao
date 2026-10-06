@@ -23,7 +23,7 @@ import { MessageBubble } from './message-bubble';
 import { ScheduleModal } from './schedule-modal';
 import { AvatarBadge } from './avatar-badge';
 import { PatientRecordSheet, type MediaItem } from './patient-record-sheet';
-import { compareQueue, queueGroup, QUEUE_GROUP_LABEL, type QueueGroup } from "@/lib/queue-order";
+import { compareQueue, queueGroup, QUEUE_GROUP_LABEL, STALE_WAIT_MINUTES, type QueueGroup } from "@/lib/queue-order";
 import { tagClasses, renderConsultationRow, PRESET_TAGS } from './patient-record-shared';
 import { FeedbackWidget } from '@/components/feedback-widget';
 import type { PlainClinicProcedureItem } from '@/lib/serialize';
@@ -326,6 +326,10 @@ const ContactListItem = React.memo(function ContactListItem({
       ? 'text-amber-700 dark:text-amber-400'
       : 'text-slate-700 dark:text-slate-200';
   const showWait = c.sla.shouldDisplay && !c.hasUnseenAssignment && c.queueState !== 'REMARCACAO_PENDENTE';
+  // Alerta cheio só pra quem ainda dá pra salvar: no grupo "Sem resposta há +48 h" a
+  // espera fica discreta (senão quase toda a fila fica vermelha e o alarme vira ruído).
+  const isStaleWait = c.sla.realWaitingMinutes > STALE_WAIT_MINUTES;
+  const isCriticalChip = c.sla.variant === 'critical' && !isStaleWait;
   return (
     <div
       onClick={() => onSelect(c.id)}
@@ -421,14 +425,14 @@ const ContactListItem = React.memo(function ContactListItem({
           {showWait ? (
             <span
               className={`shrink-0 inline-flex items-center gap-1 text-xs font-bold tabular-nums ${
-                c.sla.variant === 'critical' ? 'rounded-md bg-rose-700 px-1.5 py-0.5 text-white' : waitClass
+                isCriticalChip ? 'rounded-md bg-rose-700 px-1.5 py-0.5 text-white' : isStaleWait ? 'font-semibold text-slate-500 dark:text-slate-400' : waitClass
               }`}
               title={`Paciente aguardando resposta há ${c.sla.formattedTime} · última mensagem ${c.lastMessageTime}`}
             >
-              {c.sla.variant === 'critical' ? <AlertTriangle className="w-3 h-3" aria-hidden /> : <Clock className="w-3 h-3" aria-hidden />}
+              {isCriticalChip ? <AlertTriangle className="w-3 h-3" aria-hidden /> : <Clock className="w-3 h-3" aria-hidden />}
               {c.sla.formattedTime}
               <span className="sr-only">
-                {c.sla.variant === 'critical' ? ' aguardando resposta, atrasada' : ' aguardando resposta'}
+                {isCriticalChip ? ' aguardando resposta, atrasada' : ' aguardando resposta'}
               </span>
             </span>
           ) : (
