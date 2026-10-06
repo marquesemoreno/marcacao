@@ -60,10 +60,10 @@ import {
   Loader2,
   User,
   Clock,
+  SlidersHorizontal,
   Info,
   AlertTriangle,
   Trash2,
-  Settings2,
   Smartphone,
   MessageSquarePlus,
   ChevronsUpDown,
@@ -620,9 +620,8 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
   const [selectedTagFilter, setSelectedTagFilter] = useState<string | null>(null);
   const [isTagFilterOpen, setIsTagFilterOpen] = useState(false);
   const tagFilterRef = useClickOutside<HTMLDivElement>(isTagFilterOpen, () => setIsTagFilterOpen(false));
+  const activeFilterCount = (selectedTagFilter ? 1 : 0) + (agentFilter ? 1 : 0);
   const [visibleTabIds, setVisibleTabIds] = useState<InboxFilter[]>(DEFAULT_VISIBLE_TAB_IDS);
-  const [isTabSettingsOpen, setIsTabSettingsOpen] = useState(false);
-  const tabSettingsRef = useClickOutside<HTMLDivElement>(isTabSettingsOpen, () => setIsTabSettingsOpen(false));
 
   // Preferência pessoal de quais abas ficam visíveis — salva só no navegador, não no banco.
   useEffect(() => {
@@ -1442,107 +1441,95 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
             })}
           </div>
 
-          {/* Filtro por Tag — ícone na linha das abas; a tag ativa aparece como chip abaixo. */}
+          {/* Um botão "Filtros" (crítica #3): tag, atendente e abas visíveis num painel só,
+              com a contagem de filtros ativos. As abas continuam à vista na linha. */}
           <div className="relative shrink-0" ref={tagFilterRef}>
             <button
               type="button"
               onClick={() => setIsTagFilterOpen((open) => !open)}
-              aria-label={selectedTagFilter ? `Filtrar por tag (ativo: ${selectedTagFilter})` : 'Filtrar por tag'}
-              title="Filtrar por tag"
               aria-expanded={isTagFilterOpen}
-              className={`relative flex items-center justify-center w-7 h-7 rounded-lg transition-colors hover:bg-slate-100 dark:hover:bg-slate-800 ${
-                selectedTagFilter ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+              aria-label={activeFilterCount > 0 ? `Filtros (${activeFilterCount} ativo${activeFilterCount > 1 ? 's' : ''})` : 'Filtros'}
+              className={`relative flex items-center gap-1 h-7 px-2 rounded-lg text-xs font-medium transition-colors hover:bg-slate-100 dark:hover:bg-slate-800 ${
+                activeFilterCount > 0 ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
               }`}
             >
-              <Filter className="w-3.5 h-3.5" />
-              {selectedTagFilter && <span className="absolute top-1 right-1 size-1.5 rounded-full bg-emerald-600" aria-hidden />}
+              <SlidersHorizontal className="w-3.5 h-3.5" aria-hidden />
+              {activeFilterCount > 0 && (
+                <span className="min-w-4 h-4 px-1 rounded-md bg-emerald-700 text-white text-xs font-bold leading-4 tabular-nums">{activeFilterCount}</span>
+              )}
             </button>
 
             {isTagFilterOpen && (
-              <div className="absolute right-0 w-56 mt-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg shadow-lg py-1.5 z-30 animate-in fade-in zoom-in-95 duration-100 max-h-56 overflow-y-auto">
-                <button
-                  onClick={() => {
-                    setSelectedTagFilter(null);
-                    setIsTagFilterOpen(false);
-                  }}
-                  className={`w-full px-3 py-1.5 text-left text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 ${
-                    selectedTagFilter === null ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-600 dark:text-slate-300'
-                  }`}
-                >
-                  Todas as Tags
-                </button>
-                {availableTagFilters.map((preset) => (
+              <div className="absolute right-0 w-64 mt-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg shadow-lg z-30 max-h-[70vh] overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800">
+                {onAgentFilterChange && ['todas', 'finalizadas', 'arquivadas'].includes(filterTab) && (
+                  <div className="p-3 space-y-1.5">
+                    <p className="text-xs font-semibold text-slate-600 dark:text-slate-300">Atendente</p>
+                    {/* <select> nativo, não o Select do base-ui: o controlado resetava o valor
+                        ao reabrir e as ferramentas de browser não clicavam nele de forma confiável. */}
+                    <select
+                      value={agentFilter ?? ''}
+                      onChange={(e) => onAgentFilterChange(e.target.value)}
+                      aria-label="Filtrar por atendente"
+                      className="w-full h-8 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2 text-xs font-medium text-slate-700 dark:text-slate-200"
+                    >
+                      <option value="">Todos os atendentes</option>
+                      {agents
+                        .filter((agent) => agent.name !== 'Não Atribuídas')
+                        .map((agent) => (
+                          <option key={agent.id} value={agent.id}>
+                            {agent.name}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+                )}
+                <div className="py-1.5">
+                  <p className="px-3 py-1 text-xs font-semibold text-slate-600 dark:text-slate-300">Tag</p>
                   <button
-                    key={preset.label}
-                    onClick={() => {
-                      setSelectedTagFilter(selectedTagFilter === preset.label ? null : preset.label);
-                      setIsTagFilterOpen(false);
-                    }}
-                    className="w-full px-3 py-1.5 text-left hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center"
+                    type="button"
+                    onClick={() => setSelectedTagFilter(null)}
+                    className={`w-full px-3 py-1.5 text-left text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 ${
+                      selectedTagFilter === null ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-600 dark:text-slate-300'
+                    }`}
                   >
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold border ${preset.classes} ${selectedTagFilter === preset.label ? 'ring-2 ring-emerald-500/30' : ''}`}>
-                      {preset.label}
-                    </span>
+                    Todas as tags
                   </button>
-                ))}
-              </div>
-            )}
-          </div>
-          <div className="relative shrink-0" ref={tabSettingsRef}>
-            <button
-              type="button"
-              onClick={() => setIsTabSettingsOpen((open) => !open)}
-              title="Escolher quais abas mostrar"
-              aria-label="Escolher quais abas mostrar"
-              className="flex items-center justify-center w-7 h-7 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-800 dark:hover:text-slate-200 transition-colors"
-            >
-              <Settings2 className="w-3.5 h-3.5" />
-            </button>
-            {isTabSettingsOpen && (
-              <div className="absolute right-0 mt-1 w-48 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg shadow-lg py-1.5 z-30 animate-in fade-in zoom-in-95 duration-100">
-                <p className="px-3 py-1 text-xs font-bold text-slate-600 dark:text-slate-300">
-                  Abas visíveis
-                </p>
-                {ALL_INBOX_TABS.map((tab) => (
-                  <label
-                    key={tab.id}
-                    className="flex items-center gap-2 px-3 py-1.5 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={visibleTabIds.includes(tab.id)}
-                      onChange={() => toggleTabVisibility(tab.id)}
-                      className="accent-emerald-600"
-                    />
-                    {tab.label}
-                  </label>
-                ))}
+                  {availableTagFilters.map((preset) => (
+                    <button
+                      type="button"
+                      key={preset.label}
+                      onClick={() => setSelectedTagFilter(selectedTagFilter === preset.label ? null : preset.label)}
+                      aria-pressed={selectedTagFilter === preset.label}
+                      className="w-full px-3 py-1.5 text-left hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center"
+                    >
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold border ${preset.classes} ${selectedTagFilter === preset.label ? 'ring-2 ring-emerald-500/30' : ''}`}>
+                        {preset.label}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+                <div className="py-1.5">
+                  <p className="px-3 py-1 text-xs font-semibold text-slate-600 dark:text-slate-300">Abas visíveis</p>
+                  {ALL_INBOX_TABS.map((tab) => (
+                    <label
+                      key={tab.id}
+                      className="flex items-center gap-2 px-3 py-1.5 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={visibleTabIds.includes(tab.id)}
+                        onChange={() => toggleTabVisibility(tab.id)}
+                        className="accent-emerald-600"
+                      />
+                      {tab.label}
+                    </label>
+                  ))}
+                </div>
               </div>
             )}
           </div>
           </div>
 
-          {/* Filtro rápido por atendente — só faz sentido em "todas"/"finalizadas"/"arquivadas"
-             (em "minhas" já sou eu, em "não atribuídas" não tem dono nenhum). <select> nativo,
-             não o Select do base-ui: em teste anterior nesta fila, o Select controlado resetava
-             o valor ao reabrir e as ferramentas de browser não clicavam nele de forma confiável. */}
-          {onAgentFilterChange && ['todas', 'finalizadas', 'arquivadas'].includes(filterTab) && (
-            <select
-              value={agentFilter ?? ''}
-              onChange={(e) => onAgentFilterChange(e.target.value)}
-              aria-label="Filtrar por Atendente"
-              className="w-full h-8 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2 text-xs font-medium text-slate-600 dark:text-slate-300"
-            >
-              <option value="">Todos os atendentes</option>
-              {agents
-                .filter((agent) => agent.name !== 'Não Atribuídas')
-                .map((agent) => (
-                  <option key={agent.id} value={agent.id}>
-                    {agent.name}
-                  </option>
-                ))}
-            </select>
-          )}
 
           {selectedTagFilter && (
             <button
