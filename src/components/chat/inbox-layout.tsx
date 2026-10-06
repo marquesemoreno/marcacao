@@ -142,6 +142,10 @@ interface InboxLayoutProps {
   messages: Message[];
   hasMoreMessages?: boolean;
   isLoadingOlderMessages?: boolean;
+  /** Primeira carga da fila — sem isso a lista mostrava "Nenhuma conversa" enquanto buscava. */
+  isLoadingContacts?: boolean;
+  /** Primeira carga das mensagens da conversa aberta. */
+  isLoadingMessages?: boolean;
   onLoadOlderMessages?: () => void;
   attendantCapacity?: { activeCount: number; maxLimit: number } | null;
   /** Minutos desde a última mensagem da conversa mais antiga em "Não Atribuídas" — pisca a
@@ -438,6 +442,8 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
   messages,
   hasMoreMessages,
   isLoadingOlderMessages,
+  isLoadingContacts = false,
+  isLoadingMessages = false,
   onLoadOlderMessages,
   attendantCapacity,
   unassignedWaitMinutes,
@@ -532,8 +538,12 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
   useEffect(() => {
     if (selectedContact && isCrmPanelOpen) document.body.dataset.crmPanelOpen = '1';
     else delete document.body.dataset.crmPanelOpen;
+    // Conversa aberta: o Copiloto sobe acima da caixa de resposta (cobria o "Enviar").
+    if (selectedContact) document.body.dataset.chatOpen = '1';
+    else delete document.body.dataset.chatOpen;
     return () => {
       delete document.body.dataset.crmPanelOpen;
+      delete document.body.dataset.chatOpen;
     };
   }, [selectedContact, isCrmPanelOpen]);
   /** Sheet amplo com a ficha completa do paciente (Resumo/Histórico/Tags) — aberto ao
@@ -1136,11 +1146,11 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
         {/* Header & Busca */}
         <div className="p-3.5 sm:p-4 border-b border-slate-100 dark:border-slate-800 space-y-3 bg-white dark:bg-slate-900">
           <div className="flex items-center justify-between gap-1">
-            <h2 className="font-bold text-slate-900 dark:text-slate-100 text-sm tracking-tight flex items-center gap-2">
+            <h2 className="font-bold text-slate-900 dark:text-slate-100 text-sm tracking-tight flex items-center gap-2 whitespace-nowrap">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
               Fila de Atendimento
             </h2>
-            <div className="flex items-center gap-1.5">
+            <div className="flex flex-wrap items-center justify-end gap-1.5">
               {onCreateContact && (
                 <button
                   type="button"
@@ -1153,7 +1163,8 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
               )}
               {attendantCapacity && (
                 <span
-                  className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-md border ${
+                  aria-label={`Em atendimento: ${attendantCapacity.activeCount} de ${attendantCapacity.maxLimit}`}
+                  className={`inline-flex items-center gap-1 whitespace-nowrap tabular-nums text-xs font-semibold px-2 py-0.5 rounded-md border ${
                     attendantCapacity.activeCount >= attendantCapacity.maxLimit
                       ? "bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800"
                       : attendantCapacity.activeCount >= attendantCapacity.maxLimit - 1
@@ -1167,12 +1178,14 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                   }
                 >
                   <Zap className="w-3 h-3" />
-                  Em atendimento: {attendantCapacity.activeCount}/{attendantCapacity.maxLimit}
+                  <span className="hidden 2xl:inline">Em atendimento:</span> {attendantCapacity.activeCount}/{attendantCapacity.maxLimit}
                 </span>
               )}
-              <span title="Quantidade de conversas na aba e com os filtros atuais" className="text-xs font-semibold text-slate-500 dark:text-slate-300 bg-slate-50 dark:bg-slate-800 px-2 py-0.5 rounded-md border border-slate-200/70 dark:border-slate-700">
+              {!(isLoadingContacts && contacts.length === 0) && (
+              <span title="Quantidade de conversas na aba e com os filtros atuais" className="whitespace-nowrap tabular-nums text-xs font-semibold text-slate-500 dark:text-slate-300 bg-slate-50 dark:bg-slate-800 px-2 py-0.5 rounded-md border border-slate-200/70 dark:border-slate-700">
                 {filteredContacts.length} {filteredContacts.length === 1 ? "conversa" : "conversas"}
               </span>
+              )}
             </div>
           </div>
 
@@ -1371,7 +1384,20 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
 
         {/* Lista de Conversas */}
         <div className="flex-1 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800/80">
-          {filteredContacts.length === 0 ? (
+          {filteredContacts.length === 0 && isLoadingContacts ? (
+            <div aria-busy="true" aria-label="Carregando conversas">
+              {Array.from({ length: 7 }).map((_, i) => (
+                <div key={i} className="flex items-start gap-3 px-4 py-3.5 animate-pulse motion-reduce:animate-none">
+                  <div className="size-10 shrink-0 rounded-full bg-slate-200 dark:bg-slate-800" />
+                  <div className="flex-1 space-y-2 pt-0.5">
+                    <div className="h-3 w-2/3 rounded bg-slate-200 dark:bg-slate-800" />
+                    <div className="h-2.5 w-5/6 rounded bg-slate-100 dark:bg-slate-800/70" />
+                    <div className="h-2.5 w-1/3 rounded bg-slate-100 dark:bg-slate-800/70" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : filteredContacts.length === 0 ? (
             <div className="p-8 text-center text-xs text-slate-500 dark:text-slate-400 flex flex-col items-center justify-center gap-3">
               <MessageSquare className="w-8 h-8 text-slate-300 dark:text-slate-700" />
               <span>Nenhuma conversa encontrada nesta lista.</span>
@@ -1418,7 +1444,9 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
               <MessageSquare className="w-8 h-8" />
             </div>
 
-            {contacts.length === 0 ? (
+            {contacts.length === 0 && isLoadingContacts ? (
+              <p className="text-sm font-medium text-slate-500 dark:text-slate-400" role="status">Carregando conversas…</p>
+            ) : contacts.length === 0 ? (
               <div className="max-w-md space-y-1.5 bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
                 <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
                   Nenhuma conversa aberta nesta caixa de entrada
@@ -1561,7 +1589,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                       }
                     >
                       <UserPlus className="w-3.5 h-3.5" />
-                      <span>
+                      <span className="whitespace-nowrap">
                         {attendantCapacity && attendantCapacity.activeCount >= attendantCapacity.maxLimit
                           ? "Limite Atingido"
                           : "Atribuir pra Mim"}
@@ -1607,7 +1635,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                   title="Criar novo agendamento de consulta ou exame"
                 >
                   <Calendar className="w-3.5 h-3.5" />
-                  <span>Novo Agendamento</span>
+                  <span className="whitespace-nowrap">Novo Agendamento</span>
                 </button>
 
                 {/* Menu de Ações da Conversa (...) */}
@@ -1757,7 +1785,13 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
               className="flex-1 overflow-y-auto overflow-x-hidden min-w-0 p-3 sm:p-6 space-y-3 bg-[#F1F5F9] dark:bg-slate-950/60"
               data-od-id="chat-messages-area"
             >
-              {displayedMessages.length === 0 ? (
+              {displayedMessages.length === 0 && isLoadingMessages && !showOnlyStarred ? (
+                <div aria-busy="true" aria-label="Carregando mensagens" className="space-y-3 animate-pulse motion-reduce:animate-none">
+                  {["w-2/5", "w-1/2 ml-auto", "w-1/3", "w-3/5 ml-auto", "w-2/5"].map((w, i) => (
+                    <div key={i} className={`h-12 rounded-2xl bg-white dark:bg-slate-800/70 ${w}`} />
+                  ))}
+                </div>
+              ) : displayedMessages.length === 0 ? (
                 <p className="text-center text-xs text-slate-500 dark:text-slate-400 mt-8">
                   {showOnlyStarred ? 'Nenhuma mensagem favorita nesta conversa.' : 'Nenhuma mensagem ainda nesta conversa.'}
                 </p>
@@ -1980,8 +2014,8 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                     className="w-full p-3 bg-transparent text-xs sm:text-sm text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none resize-none"
                   />
 
-                  <div className="flex items-center justify-between px-3 py-2 border-t border-slate-200/60 dark:border-slate-800">
-                    <div className="flex items-center gap-1.5">
+                  <div className="flex items-center justify-between gap-2 px-3 py-2 border-t border-slate-200/60 dark:border-slate-800">
+                    <div className="flex min-w-0 items-center gap-1.5 overflow-x-auto [scrollbar-width:none]">
                       {composerMode === 'whatsapp' && selectedContact?.channel !== 'instagram' && (
                         <>
                           <input
@@ -2109,11 +2143,12 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                       <button
                         type="button"
                         onClick={() => setIsQuickReplyOpen(!isQuickReplyOpen)}
-                        className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-slate-600 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors"
+                        className="flex shrink-0 items-center gap-1 px-2.5 py-1 text-xs font-semibold text-slate-600 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors"
                         title="Abrir menu de respostas rápidas"
+                        aria-label="Respostas rápidas"
                       >
                         <Zap className="w-3.5 h-3.5 text-amber-500" />
-                        /respostas
+                        <span className="hidden sm:inline">/respostas</span>
                       </button>
 
                       <button
@@ -2122,16 +2157,17 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                         disabled={isGeneratingIa}
                         className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold text-slate-500 dark:text-slate-300 hover:text-emerald-700 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 rounded-lg transition-all"
                         title="Sugerir resposta com IA baseada no contexto do paciente"
+                        aria-label="Melhorar com IA"
                       >
                         <Sparkles className={`w-3.5 h-3.5 ${isGeneratingIa ? 'animate-spin text-emerald-600' : ''}`} />
-                        <span>{isGeneratingIa ? 'Gerando...' : 'Melhorar com IA'}</span>
+                        <span className="hidden sm:inline whitespace-nowrap">{isGeneratingIa ? 'Gerando...' : 'Melhorar com IA'}</span>
                       </button>
                     </div>
 
                     <button
                       type="submit"
                       disabled={!inputText.trim()}
-                      className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-semibold shadow-sm transition-all active:scale-95 ${
+                      className={`flex shrink-0 items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-semibold shadow-sm transition-all active:scale-95 ${
                         !inputText.trim()
                           ? 'bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-600 cursor-not-allowed'
                           : composerMode === 'internal_note'

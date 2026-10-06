@@ -266,6 +266,7 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
   const [messages, setMessages] = useState<Message[]>([]);
   const [hasMoreMessages, setHasMoreMessages] = useState(false);
   const [isLoadingOlderMessages, setIsLoadingOlderMessages] = useState(false);
+  const [isLoadingMessages, setIsLoadingMessages] = useState(false);
 
   const totalUnreadRef = useRef(0);
   const isFirstLoadRef = useRef(true);
@@ -594,6 +595,7 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
       actions.getChatContactHistory(requestedContactId),
     ]);
     if (selectedContactIdRef.current !== requestedContactId) return;
+    setIsLoadingMessages(false);
     setMessages((prev) => {
       // O polling só traz a página mais recente (MESSAGE_PAGE_SIZE mensagens) —
       // preserva quaisquer mensagens mais antigas já carregadas via "Carregar
@@ -628,6 +630,7 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
   useEffect(() => {
     setMessages([]);
     setHasMoreMessages(false);
+    setIsLoadingMessages(Boolean(selectedContactId));
   }, [selectedContactId]);
 
   useEffect(() => {
@@ -1073,6 +1076,8 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
           contacts={contacts}
           agents={agents}
           messages={messages}
+          isLoadingContacts={isLoadingContacts}
+          isLoadingMessages={isLoadingMessages}
           hasMoreMessages={hasMoreMessages}
           isLoadingOlderMessages={isLoadingOlderMessages}
           onLoadOlderMessages={handleLoadOlderMessages}
