@@ -2083,3 +2083,25 @@ export async function suggestIaReply(conversationId: string, quotedMessageConten
   const suggestions = await getReplySuggestions(conversationId, quotedMessageContent);
   return suggestions[0] || "";
 }
+
+/** Desfaz "Devolver pra IA" (aviso com "Desfazer" no Chat): IA desligada de novo. */
+export async function undoReactivateAiForConversation(conversationId: string) {
+  const { clinicId } = await requireClinicSession();
+  const conversation = await prisma.conversation.findUnique({ where: { id: conversationId } });
+  if (!conversation || conversation.clinicId !== clinicId) {
+    return { success: false, message: "Conversa não encontrada." };
+  }
+  await prisma.conversation.update({ where: { id: conversationId }, data: { aiEnabled: false } });
+  await prisma.message.create({
+    data: {
+      conversationId,
+      direction: "OUTBOUND",
+      type: "INTERNAL_NOTE",
+      content: "↩️ Devolução pra IA desfeita — atendimento continua com a equipe.",
+      status: "SENT",
+    },
+  });
+  revalidatePath("/clinic/inbox");
+  notifyInboxRealtime(clinicId).catch(() => {});
+  return { success: true };
+}

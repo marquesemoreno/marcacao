@@ -19,6 +19,7 @@ import {
   claimConversation,
   takeOverConversation,
   reactivateAiForConversation,
+  undoReactivateAiForConversation,
   transferConversation,
   getAttendantCapacity,
   resolveConversation,
@@ -76,6 +77,7 @@ import {
   assignConversationToUserAdmin,
   claimConversationAdmin,
   reactivateAiForConversationAdmin,
+  undoReactivateAiForConversationAdmin,
   transferConversationAdmin,
   getAttendantCapacityAdmin,
   resolveConversationAdmin,
@@ -995,6 +997,15 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
     return result;
   }
 
+  async function handleUndoReactivateAi(conversationId: string) {
+    const undoFn = scope === "admin" ? undoReactivateAiForConversationAdmin : undoReactivateAiForConversation;
+    const result = await undoFn(conversationId);
+    if (!result.success) toast.error(result.message || "Não foi possível desfazer.");
+    else toast.success("Desfeito: o atendimento continua com a equipe.");
+    await refreshContacts();
+    if (selectedContactIdRef.current === conversationId) await refreshMessages();
+  }
+
   async function handleMarkUnread() {
     if (!selectedContactId) return;
     await actions.markConversationUnread(selectedContactId);
@@ -1135,6 +1146,7 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
           onTakeOverConversation={scope === "clinic" ? handleTakeOverConversation : undefined}
           onLoadContactMedia={actions.listContactMedia}
           onReactivateAi={handleReactivateAi}
+          onUndoReactivateAi={handleUndoReactivateAi}
           onMarkUnread={handleMarkUnread}
           onTogglePin={handleTogglePin}
           onMuteConversation={handleMuteConversation}
