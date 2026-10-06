@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { compareQueue, type QueueSortable } from "./queue-order";
+import { compareQueue, queueGroup, type QueueSortable } from "./queue-order";
 
 const row = (id: string, over: Partial<QueueSortable> = {}): QueueSortable & { id: string } => ({
   id,
@@ -43,5 +43,15 @@ describe("compareQueue", () => {
   });
   it("esquecidas ficam antes de quem não está esperando, na ordem original", () => {
     expect(order([row("resto"), row("esq-a", { sla: waiting(5000) }), row("esq-b", { sla: waiting(9000) })])).toEqual(["esq-a", "esq-b", "resto"]);
+  });
+});
+
+describe("queueGroup", () => {
+  it("separa prioridade, aguardando, esquecidas e o resto", () => {
+    expect(queueGroup(row("u", { queueState: "URGENCIA_CLINICA" }))).toBe("prioridade");
+    expect(queueGroup(row("r", { queueState: "REMARCACAO_PENDENTE" }))).toBe("prioridade");
+    expect(queueGroup(row("w", { sla: waiting(30) }))).toBe("aguardando");
+    expect(queueGroup(row("s", { sla: waiting(3000) }))).toBe("esquecidas");
+    expect(queueGroup(row("x", { queueState: "SEM_DONO" }))).toBe("resto");
   });
 });

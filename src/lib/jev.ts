@@ -60,3 +60,27 @@ export async function classifyReplyWithJev(resposta: string, lembrete?: string |
     return null;
   }
 }
+
+/** Pergunta de escolha genérica ao Jev. `undefined` = indisponível (sem chave, erro,
+ * timeout). Nunca lança. */
+export async function askJevChoice(state: unknown, question: object): Promise<JevChoiceAnswer | undefined> {
+  const apiKey = process.env.JEVAI_API_KEY;
+  if (!apiKey) return undefined;
+  try {
+    const res = await fetch(JEV_URL, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ model: "jev-latest", state, questions: { q: question } }),
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!res.ok) {
+      console.error("Jev respondeu", res.status);
+      return undefined;
+    }
+    const json = (await res.json()) as { answers?: Record<string, JevChoiceAnswer> };
+    return json.answers?.q;
+  } catch (error) {
+    console.error("Falha ao consultar o Jev:", error);
+    return undefined;
+  }
+}

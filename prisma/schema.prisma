@@ -165,7 +165,7 @@ model User {
 
   clinic Clinic? @relation(fields: [clinicId], references: [id])
 
-  assignedConversations Conversation[] @relation("ConversationAssignee")
+  assignedConversations Conversation[]            @relation("ConversationAssignee")
   stageChanges          ConversationStageChange[]
   sentMessages          Message[]
 
@@ -173,40 +173,40 @@ model User {
 }
 
 model Clinic {
-  id                    String   @id @default(cuid())
-  name                  String
-  tradeName             String   @map("trade_name")
-  cnpj                  String   @unique
-  phone                 String?
-  whatsapp              String?
-  address               String
-  neighborhood          String
-  city                  String
-  active                Boolean  @default(true)
+  id                         String   @id @default(cuid())
+  name                       String
+  tradeName                  String   @map("trade_name")
+  cnpj                       String   @unique
+  phone                      String?
+  whatsapp                   String?
+  address                    String
+  neighborhood               String
+  city                       String
+  active                     Boolean  @default(true)
   /// Clínicas parceiras que usam só o CRM/WhatsApp (ex: modelo "ferramenta
   /// grátis + comissão por agendamento concluído") mas não têm vitrine no
   /// marketplace público — não aparecem em busca, home ou /clinicas.
-  listedInMarketplace   Boolean  @default(true) @map("listed_in_marketplace")
+  listedInMarketplace        Boolean  @default(true) @map("listed_in_marketplace")
   /// Mensagem automática enviada uma única vez, no primeiro contato de um
   /// cliente novo (primeira Conversation dele com essa clínica). Cada clínica
   /// liga/desliga e escreve a sua — não dispara em conversas já existentes,
   /// mesmo resolvidas, pra não parecer robótico com quem já é conhecido.
-  welcomeMessageEnabled Boolean  @default(false) @map("welcome_message_enabled")
-  welcomeMessageText    String?  @map("welcome_message_text")
-  commissionRate        Decimal  @map("commission_rate") @db.Decimal(5, 2)
-  rating                Float    @default(0)
-  reviewCount           Int      @default(0) @map("review_count")
-  businessHours         Json?    @map("business_hours")
+  welcomeMessageEnabled      Boolean  @default(false) @map("welcome_message_enabled")
+  welcomeMessageText         String?  @map("welcome_message_text")
+  commissionRate             Decimal  @map("commission_rate") @db.Decimal(5, 2)
+  rating                     Float    @default(0)
+  reviewCount                Int      @default(0) @map("review_count")
+  businessHours              Json?    @map("business_hours")
   /// Ticket médio de consulta particular — usado no Faturamento Estimado / Receita
   /// Protegida do /clinic/relatorio quando o procedimento não tem preço (ex: agendamentos
   /// do Firebird, que caem num procedimento genérico). Null = sem estimativa.
-  defaultTicket         Decimal? @map("default_ticket") @db.Decimal(10, 2)
+  defaultTicket              Decimal? @map("default_ticket") @db.Decimal(10, 2)
   /// Códigos de paciente do sistema da clínica (PACIENTE.CODIGOPAC no Firebird) que nunca
   /// entram em campanha pelo público "Pacientes do sistema da clínica" — ex: cadastro com
   /// sexo errado. Ver buildCampaignAudience em src/lib/campaign-audience.ts.
-  campaignExcludedPatientIds Int[] @default([]) @map("campaign_excluded_patient_ids")
-  createdAt             DateTime @default(now()) @map("created_at")
-  updatedAt             DateTime @updatedAt @map("updated_at")
+  campaignExcludedPatientIds Int[]    @default([]) @map("campaign_excluded_patient_ids")
+  createdAt                  DateTime @default(now()) @map("created_at")
+  updatedAt                  DateTime @updatedAt @map("updated_at")
 
   users               User[]
   clinicProcedures    ClinicProcedure[]
@@ -256,21 +256,21 @@ model WhatsappInstance {
 /// Presença + `active: true` é o sinal de "essa clínica usa o bridge, não o catálogo
 /// do marketplace" (ver hasHospitalBridgeIntegration em src/lib/hospital-bridge.ts).
 model HospitalIntegration {
-  id            String    @id @default(cuid())
-  clinicId      String    @unique @map("clinic_id")
-  apiUrl        String    @map("api_url")
-  apiToken      String    @map("api_token")
-  active        Boolean   @default(true)
+  id                   String    @id @default(cuid())
+  clinicId             String    @unique @map("clinic_id")
+  apiUrl               String    @map("api_url")
+  apiToken             String    @map("api_token")
+  active               Boolean   @default(true)
   /// Quando true, o lembrete D-1 pula sábado/domingo como dia-alvo e joga pro
   /// próximo dia útil (ex: sexta manda lembrete de segunda, não de sábado) — pra
   /// clínicas que não atendem fim de semana. Ver nextReminderTargetDate em
   /// bridge-reminder.ts. Default false: não muda o comportamento de clínica nenhuma
   /// só por existir a coluna.
   skipWeekendReminders Boolean   @default(false) @map("skip_weekend_reminders")
-  lastCheckedAt DateTime? @map("last_checked_at")
-  lastCheckOk   Boolean?  @map("last_check_ok")
-  createdAt     DateTime  @default(now()) @map("created_at")
-  updatedAt     DateTime  @updatedAt @map("updated_at")
+  lastCheckedAt        DateTime? @map("last_checked_at")
+  lastCheckOk          Boolean?  @map("last_check_ok")
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
 
   clinic Clinic @relation(fields: [clinicId], references: [id])
 
@@ -282,10 +282,10 @@ model HospitalIntegration {
 /// rodar mais de uma vez no mesmo dia. bridgeNumero é o MARCACAO.NUMERO real da
 /// clínica, não um id nosso.
 model BridgeReminderLog {
-  id           String   @id @default(cuid())
-  clinicId     String   @map("clinic_id")
-  bridgeNumero Int      @map("bridge_numero")
-  sentAt       DateTime @default(now()) @map("sent_at")
+  id           String    @id @default(cuid())
+  clinicId     String    @map("clinic_id")
+  bridgeNumero Int       @map("bridge_numero")
+  sentAt       DateTime  @default(now()) @map("sent_at")
   /// Resposta do paciente ao lembrete ("CONFIRMED" | "CANCELLED" | "RESCHEDULE") —
   /// gravada pelo webhook. Null = sem resposta. Base da seção de Confirmações e da
   /// Receita Protegida do /clinic/relatorio.
@@ -308,17 +308,17 @@ model BridgeReminderLog {
 /// humano) definido em src/lib/ai-attendant.ts. Consentimento e escalação são controlados
 /// por conversa (ver Conversation.aiConsentStatus/aiEnabled), não por aqui.
 model AiAttendantConfig {
-  id           String   @id @default(cuid())
-  clinicId     String   @unique @map("clinic_id")
-  active       Boolean  @default(false)
-  instructions String   @db.Text
+  id            String   @id @default(cuid())
+  clinicId      String   @unique @map("clinic_id")
+  active        Boolean  @default(false)
+  instructions  String   @db.Text
   /// Nome de exibição do atendente (ex: "Lara", "TI") — usado na mensagem de
   /// consentimento LGPD (ver buildAiDisclosureMessage) pra soar como uma
   /// apresentação, não um aviso legal seco. Sem isso, cai no texto genérico
   /// "Assistente Virtual da {clínica}".
-  assistantName String? @map("assistant_name")
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
+  assistantName String?  @map("assistant_name")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
 
   clinic Clinic @relation(fields: [clinicId], references: [id])
 
@@ -470,48 +470,48 @@ model AffiliatePayment {
 }
 
 model Contact {
-  id             String    @id @default(cuid())
-  name           String
+  id                     String         @id @default(cuid())
+  name                   String
   /// Opcional desde a integração com Instagram Direct — lead que chega por DM não tem
   /// telefone. Continua único quando preenchido. Todo fluxo de WhatsApp (disparo,
   /// lembrete, bridge) precisa tratar null.
-  phone          String?   @unique
+  phone                  String?        @unique
   /// Canal em que o contato nasceu — não impede ter conversa em outro canal.
-  channel        ContactChannel @default(WHATSAPP)
+  channel                ContactChannel @default(WHATSAPP)
   /// IGSID (Instagram-scoped ID) — muda por conta de Instagram, por isso único junto
   /// com o canal. Null pra contato de WhatsApp.
-  externalId     String?   @map("external_id")
-  instagramUsername String? @map("instagram_username")
-  cpf            String?
+  externalId             String?        @map("external_id")
+  instagramUsername      String?        @map("instagram_username")
+  cpf                    String?
   /// Texto livre, sem cadastro/FK — mesmo padrão de Appointment.doctorName (não existe
   /// tabela de convênios/médicos por paciente no sistema, de propósito). Editável na
   /// aba "Resumo" da ficha do paciente (ver patient-record-sheet.tsx).
-  convenio       String?
-  preferredDoctor String?  @map("preferred_doctor")
+  convenio               String?
+  preferredDoctor        String?        @map("preferred_doctor")
   /// Todos texto livre/data simples, sem validação de formato — cadastro rápido pela
   /// recepção, não um cadastro civil completo. Editáveis na aba "Resumo Cadastral" da
   /// ficha do paciente (ver patient-record-sheet.tsx).
-  rg                  String?
-  birthDate           DateTime? @map("birth_date") @db.Date
-  address             String?
-  insuranceCardNumber String?   @map("insurance_card_number")
+  rg                     String?
+  birthDate              DateTime?      @map("birth_date") @db.Date
+  address                String?
+  insuranceCardNumber    String?        @map("insurance_card_number")
   /// Observação permanente de texto livre (ex: "paciente idoso, precisa de ajuda pra
   /// locomoção") — diferente de Conversation.tags (rótulos curtos, por atendimento);
   /// isso é por PACIENTE, atravessa qualquer conversa/clínica.
-  notes               String?
-  photoUrl       String?   @map("photo_url")
-  photoUpdatedAt DateTime? @map("photo_updated_at")
+  notes                  String?
+  photoUrl               String?        @map("photo_url")
+  photoUpdatedAt         DateTime?      @map("photo_updated_at")
   /// Preenchido quando a pessoa responde "sair"/"parar"/"cancelar" (ver route.ts do
   /// webhook) — permanente e vale pra qualquer clínica, nunca mais entra em disparo
   /// em massa (ver src/lib/broadcast.ts) enquanto isso estiver preenchido.
-  optedOutOfBroadcastsAt DateTime? @map("opted_out_of_broadcasts_at")
+  optedOutOfBroadcastsAt DateTime?      @map("opted_out_of_broadcasts_at")
   /// Entidade (empresa cliente) do GLPI vinculada a este contato — só usado pelo TIVDC,
   /// que atende várias empresas clientes de TI (ver abrirChamadoSuporte em ai-tools.ts).
   /// Sem isso, todo chamado aberto pela IA caía na Entidade raiz do GLPI, sem separar
   /// por empresa. Cadastrado uma vez pelo atendente, reaproveitado em todo chamado futuro.
-  glpiEntityId   Int?      @map("glpi_entity_id")
-  createdAt      DateTime  @default(now()) @map("created_at")
-  updatedAt      DateTime  @updatedAt @map("updated_at")
+  glpiEntityId           Int?           @map("glpi_entity_id")
+  createdAt              DateTime       @default(now()) @map("created_at")
+  updatedAt              DateTime       @updatedAt @map("updated_at")
 
   conversations Conversation[]
 
@@ -520,60 +520,65 @@ model Contact {
 }
 
 model Conversation {
-  id               String                  @id @default(cuid())
-  clinicId         String                  @map("clinic_id")
-  contactId        String                  @map("contact_id")
-  assignedUserId   String?                 @map("assigned_user_id")
-  status           ConversationStatus      @default(OPEN)
-  tags             String[]                @default([])
-  channel          ConversationChannel     @default(WHATSAPP)
-  department       ConversationDepartment  @default(RECEPCAO)
-  funnelStage      ConversationFunnelStage @default(NOVOS) @map("funnel_stage")
-  estimatedValue   Decimal?                @map("estimated_value") @db.Decimal(10, 2)
-  resolutionReason String?                 @map("resolution_reason")
-  resolutionNotes  String?                 @map("resolution_notes")
-  resolvedAt       DateTime?               @map("resolved_at")
-  resolvedByUserId String?                 @map("resolved_by_user_id")
-  lastMessageAt    DateTime?               @map("last_message_at")
+  id                      String                  @id @default(cuid())
+  clinicId                String                  @map("clinic_id")
+  contactId               String                  @map("contact_id")
+  assignedUserId          String?                 @map("assigned_user_id")
+  status                  ConversationStatus      @default(OPEN)
+  tags                    String[]                @default([])
+  channel                 ConversationChannel     @default(WHATSAPP)
+  department              ConversationDepartment  @default(RECEPCAO)
+  funnelStage             ConversationFunnelStage @default(NOVOS) @map("funnel_stage")
+  estimatedValue          Decimal?                @map("estimated_value") @db.Decimal(10, 2)
+  resolutionReason        String?                 @map("resolution_reason")
+  resolutionNotes         String?                 @map("resolution_notes")
+  resolvedAt              DateTime?               @map("resolved_at")
+  resolvedByUserId        String?                 @map("resolved_by_user_id")
+  lastMessageAt           DateTime?               @map("last_message_at")
   /// `null` = atribuição "não vista" pelo atendente (transferência ou atribuição manual
   /// do admin) — dispara selo/notificação até ele abrir a conversa. Preenchido na hora
   /// quando o próprio atendente se atribui (já está olhando). Ver src/lib/conversation-assignment.ts.
-  assignmentSeenAt DateTime?               @map("assignment_seen_at")
+  assignmentSeenAt        DateTime?               @map("assignment_seen_at")
   /// Estado do consentimento LGPD pra atendimento automatizado por IA (ver
   /// src/lib/ai-attendant.ts). Por conversa, não por Contact — o mesmo paciente pode
   /// falar com clínicas diferentes e o consentimento é específico daquele atendimento.
-  aiConsentStatus  AiConsentStatus         @default(NOT_ASKED) @map("ai_consent_status")
+  aiConsentStatus         AiConsentStatus         @default(NOT_ASKED) @map("ai_consent_status")
   /// true só depois do consentimento aceito; volta a false automaticamente se o paciente
   /// pedir humano, bater gatilho de escalação, ou um atendente responder manualmente.
-  aiEnabled        Boolean                 @default(false) @map("ai_enabled")
+  aiEnabled               Boolean                 @default(false) @map("ai_enabled")
   /// Fixada no topo da fila pelo atendente (menu do card) — só reordena dentro do
   /// mesmo nível de QUEUE_STATE_PRIORITY (ver inbox-layout.tsx), nunca por cima de
   /// urgência clínica ou "sem dono".
-  pinned           Boolean                 @default(false)
+  pinned                  Boolean                 @default(false)
   /// Suprime som/notificação desktop de mensagem nova (ver chat-crm-app.tsx) — não
   /// esconde o badge de não lida. Null = não silenciada. "Sempre" grava uma data bem
   /// no futuro em vez de precisar de mais um campo boolean.
-  mutedUntil       DateTime?               @map("muted_until")
+  mutedUntil              DateTime?               @map("muted_until")
   /// Tirada da fila ativa (não aparece em Todas/Minhas/Não Atribuídas/Finalizadas, só
   /// na aba "Arquivadas") sem depender do status de atendimento. Zerada automaticamente
   /// quando chega mensagem nova do paciente (ver webhook) — nunca deixa uma mensagem
   /// de verdade escondida numa conversa arquivada e esquecida.
-  archivedAt       DateTime?               @map("archived_at")
+  archivedAt              DateTime?               @map("archived_at")
   /// Canal de aquisição detectado na 1ª mensagem (ver detectAcquisition em
   /// src/lib/acquisition.ts) — fica na conversa, não no Contact, porque o contato é
   /// compartilhado entre clínicas e a origem é por clínica. Null = conversa anterior
   /// ao rastreamento. Editável manualmente pelo Inbox.
-  acquisitionChannel String?             @map("acquisition_channel")
+  acquisitionChannel      String?                 @map("acquisition_channel")
+  /// Intenção do paciente classificada pelo Jev a cada mensagem recebida (ver
+  /// src/lib/patient-intent.ts) — a fila do Chat mostra só com confiança alta.
+  patientIntent           String?                 @map("patient_intent")
+  patientIntentConfidence Float?                  @map("patient_intent_confidence")
+  patientIntentAt         DateTime?               @map("patient_intent_at")
   /// Título do anúncio ou texto-chave que casou
-  acquisitionDetail  String?             @map("acquisition_detail")
+  acquisitionDetail       String?                 @map("acquisition_detail")
   /// ID do anúncio do Meta (externalAdReply.sourceId), pra agrupar por campanha
-  acquisitionAdId    String?             @map("acquisition_ad_id")
-  createdAt        DateTime                @default(now()) @map("created_at")
-  updatedAt        DateTime                @updatedAt @map("updated_at")
+  acquisitionAdId         String?                 @map("acquisition_ad_id")
+  createdAt               DateTime                @default(now()) @map("created_at")
+  updatedAt               DateTime                @updatedAt @map("updated_at")
 
-  clinic       Clinic             @relation(fields: [clinicId], references: [id])
-  contact      Contact            @relation(fields: [contactId], references: [id])
-  assignedUser User?              @relation("ConversationAssignee", fields: [assignedUserId], references: [id])
+  clinic       Clinic                    @relation(fields: [clinicId], references: [id])
+  contact      Contact                   @relation(fields: [contactId], references: [id])
+  assignedUser User?                     @relation("ConversationAssignee", fields: [assignedUserId], references: [id])
   messages     Message[]
   aiLogs       AiInteractionLog[]
   triages      MessageTriage[]
@@ -586,64 +591,64 @@ model Conversation {
 }
 
 model Message {
-  id             String           @id @default(cuid())
-  conversationId String           @map("conversation_id")
-  direction      MessageDirection
-  content        String
-  status         MessageStatus    @default(PENDING)
-  type           MessageType      @default(TEXT)
-  senderUserId   String?          @map("sender_user_id")
-  attachmentName String?          @map("attachment_name")
-  attachmentSize String?          @map("attachment_size")
-  audioDuration  String?          @map("audio_duration")
+  id                    String           @id @default(cuid())
+  conversationId        String           @map("conversation_id")
+  direction             MessageDirection
+  content               String
+  status                MessageStatus    @default(PENDING)
+  type                  MessageType      @default(TEXT)
+  senderUserId          String?          @map("sender_user_id")
+  attachmentName        String?          @map("attachment_name")
+  attachmentSize        String?          @map("attachment_size")
+  audioDuration         String?          @map("audio_duration")
   /// Caminho no bucket privado do Supabase Storage (não é URL pública) — ver src/lib/whatsapp-media.ts
-  mediaPath      String?          @map("media_path")
-  mimeType       String?          @map("mime_type")
-  readAt         DateTime?        @map("read_at")
+  mediaPath             String?          @map("media_path")
+  mimeType              String?          @map("mime_type")
+  readAt                DateTime?        @map("read_at")
   /// ID da mensagem no WhatsApp (Baileys key.id, ex: "3EB0305D...") — usado pra
   /// casar os acks de entrega/leitura (webhook "messages.update") com esta linha.
-  whatsappKeyId  String?          @unique @map("whatsapp_key_id")
+  whatsappKeyId         String?          @unique @map("whatsapp_key_id")
   /// Preenchido quando o WhatsApp avisa (evento messages.delete) que essa mensagem
   /// foi apagada — mantém o conteúdo original no banco, só marca pra exibição.
-  deletedAt      DateTime?        @map("deleted_at")
+  deletedAt             DateTime?        @map("deleted_at")
   /// Preenchido quando um atendente edita o texto já enviado (ver canEditMessage
   /// em src/lib/message-edit.ts) — `content` já reflete o texto novo, isso só
   /// serve pra exibir o selo "editada" (mesma UX do WhatsApp).
-  editedAt       DateTime?        @map("edited_at")
+  editedAt              DateTime?        @map("edited_at")
   /// Transcrição gerada sob demanda (botão "Transcrever" no balão de áudio, ver
   /// transcribeMessageAudio em src/actions/inbox.ts) — null até a atendente pedir.
   /// Guardado pra não pagar de novo pela mesma transcrição toda vez que reabre a conversa.
-  transcription  String?          @db.Text
+  transcription         String?          @db.Text
   /// Dados de nota fiscal (cpf/endereco/dependentes/valor) extraídos sob demanda de uma
   /// mensagem de texto do paciente (botão "Extrair dados", ver extractInvoiceData em
   /// src/lib/invoice-extraction.ts) — null até a atendente pedir. Mesmo motivo de cache
   /// de `transcription`: não pagar de novo pela mesma extração ao reabrir a conversa.
-  extractedInvoiceData Json?       @map("extracted_invoice_data")
+  extractedInvoiceData  Json?            @map("extracted_invoice_data")
   /// Documento médico (pedido de exame/receita/carteirinha) extraído e validado sob
   /// demanda (botão "Analisar Documento", ver processMessageDocument em
   /// src/actions/inbox.ts) — guarda { extracted, validation } (ver DocumentReviewData
   /// em src/lib/documents/document-validator.ts). Null até a atendente pedir. Mesmo
   /// motivo de cache de extractedInvoiceData: não pagar de novo pela mesma extração.
-  extractedDocumentData Json?      @map("extracted_document_data")
+  extractedDocumentData Json?            @map("extracted_document_data")
   /// Mensagem que esta responde/cita (botão "Responder" no balão, ou resposta citada
   /// no WhatsApp de verdade — ver contextInfo.stanzaId no webhook). Null quando a
   /// mensagem citada nunca existiu no nosso banco (ex: de antes da conversa) — nunca
   /// bloqueia o recebimento/envio por causa disso.
-  quotedMessageId String?         @map("quoted_message_id")
+  quotedMessageId       String?          @map("quoted_message_id")
   /// Emoji com que o paciente reagiu via WhatsApp (webhook reactionMessage) — null
   /// tanto "nunca reagiu" quanto "reagiu e removeu a reação" (mesmo emoji de novo remove).
-  contactReaction String?         @map("contact_reaction")
+  contactReaction       String?          @map("contact_reaction")
   /// Emoji com que o atendente reagiu — sincroniza de verdade pro WhatsApp do paciente
   /// via sendWhatsAppReaction, não é só uma marcação interna (ver Message.starredAt).
-  agentReaction  String?          @map("agent_reaction")
+  agentReaction         String?          @map("agent_reaction")
   /// Marcação pessoal do atendente pra achar mensagens importantes depois — não existe
   /// conceito equivalente no WhatsApp, então isso nunca sincroniza com a Evolution API.
-  starredAt      DateTime?        @map("starred_at")
+  starredAt             DateTime?        @map("starred_at")
   /// Enviada pela clínica direto do WhatsApp do celular/WhatsApp Web (webhook com
   /// key.fromMe), não pelo painel — senderUserId fica null (não dá pra saber qual
   /// atendente), a UI mostra "Enviada pelo celular".
-  sentFromDevice Boolean          @default(false) @map("sent_from_device")
-  createdAt      DateTime         @default(now()) @map("created_at")
+  sentFromDevice        Boolean          @default(false) @map("sent_from_device")
+  createdAt             DateTime         @default(now()) @map("created_at")
 
   conversation  Conversation @relation(fields: [conversationId], references: [id])
   senderUser    User?        @relation(fields: [senderUserId], references: [id])
@@ -761,8 +766,8 @@ model WebhookLog {
 model AiInteractionLog {
   id               String   @id @default(cuid())
   conversationId   String   @map("conversation_id")
-  userMessage      String   @db.Text @map("user_message")
-  aiResponse       String?  @db.Text @map("ai_response")
+  userMessage      String   @map("user_message") @db.Text
+  aiResponse       String?  @map("ai_response") @db.Text
   escalated        Boolean  @default(false)
   escalationReason String?  @map("escalation_reason")
   createdAt        DateTime @default(now()) @map("created_at")
@@ -782,7 +787,7 @@ model AiInteractionLog {
 model MessageTriage {
   id             String   @id @default(cuid())
   conversationId String   @map("conversation_id")
-  messageContent String   @db.Text @map("message_content")
+  messageContent String   @map("message_content") @db.Text
   redFlags       String[] @map("red_flags")
   createdAt      DateTime @default(now()) @map("created_at")
 
@@ -802,7 +807,7 @@ model ConversationQualityAudit {
   /// "POSITIVO" | "NEUTRO" | "NEGATIVO"
   sentiment        String?
   summary          String?  @db.Text
-  complianceNotes  String?  @db.Text @map("compliance_notes")
+  complianceNotes  String?  @map("compliance_notes") @db.Text
   firstResponseSec Int?     @map("first_response_sec")
   resolutionSec    Int?     @map("resolution_sec")
   createdAt        DateTime @default(now()) @map("created_at")
@@ -839,7 +844,7 @@ model BroadcastCampaign {
   id              String                  @id @default(cuid())
   clinicId        String                  @map("clinic_id")
   name            String
-  messageTemplate String                  @db.Text @map("message_template")
+  messageTemplate String                  @map("message_template") @db.Text
   /// Caminho no bucket privado do Supabase Storage (mesmo bucket do inbox, ver
   /// src/lib/whatsapp-media.ts) — null quando a campanha é só texto.
   imagePath       String?                 @map("image_path")

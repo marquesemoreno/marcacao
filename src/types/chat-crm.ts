@@ -140,6 +140,9 @@ export interface Contact {
    * e src/lib/sla-calculator.ts). */
   sla: SlaInfo;
   lastMessage: string;
+  /** Intenção do paciente (Jev) — só preenchida com confiança alta e categoria útil
+   * (ver visibleIntent em src/lib/patient-intent.ts). */
+  patientIntent?: string;
   lastMessageTime: string;
   statusTag: {
     label: string;

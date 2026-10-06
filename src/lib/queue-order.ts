@@ -30,3 +30,19 @@ export function compareQueue(a: QueueSortable, b: QueueSortable): number {
   if (tier(a) === 2) return b.sla.realWaitingMinutes - a.sla.realWaitingMinutes;
   return Number(b.pinned) - Number(a.pinned);
 }
+
+export type QueueGroup = "prioridade" | "aguardando" | "esquecidas" | "resto";
+
+/** Grupo da linha na fila — vira divisória na lista ("Esquecidas há mais de 48 h" etc.),
+ * pra o passivo antigo não ficar invisível no meio de quem espera hoje. */
+export function queueGroup(r: QueueSortable): QueueGroup {
+  const t = tier(r);
+  return t <= 1 ? "prioridade" : t === 2 ? "aguardando" : t === 3 ? "esquecidas" : "resto";
+}
+
+export const QUEUE_GROUP_LABEL: Record<QueueGroup, string> = {
+  prioridade: "Prioridade",
+  aguardando: "Aguardando resposta",
+  esquecidas: "Esquecidas há mais de 48 h",
+  resto: "Sem resposta pendente",
+};
