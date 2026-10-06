@@ -436,12 +436,16 @@ const ContactListItem = React.memo(function ContactListItem({
           )}
         </div>
 
-        {c.clinicName && <p className="text-xs font-medium text-sky-700 dark:text-sky-400 truncate">{c.clinicName}</p>}
 
-        {/* Intenção (Jev, confiança alta) no lugar da prévia crua — a prévia fica no title. */}
+        {/* Intenção sugerida pela IA (Jev, confiança alta) — neutra: só o SLA tem cor na linha. */}
         {c.patientIntent ? (
-          <p className="mt-0.5 flex items-center gap-1.5 min-w-0 text-sm leading-snug" title={c.lastMessage}>
-            <span className="shrink-0 rounded-md border border-sky-200 dark:border-sky-800 bg-sky-50 dark:bg-sky-950/50 px-1.5 py-px text-xs font-semibold text-sky-800 dark:text-sky-200">
+          <p
+            className="mt-0.5 flex items-center gap-1.5 min-w-0 text-sm leading-snug"
+            title={`Sugestão da IA a partir da mensagem: "${c.lastMessage}"`}
+          >
+            <span className="shrink-0 inline-flex items-center gap-1 rounded-md border border-slate-300 dark:border-slate-600 px-1.5 py-px text-xs font-semibold text-slate-700 dark:text-slate-200">
+              <Sparkles className="w-3 h-3 text-slate-500 dark:text-slate-400" aria-hidden />
+              <span className="sr-only">Sugestão da IA: </span>
               {c.patientIntent}
             </span>
             <span className="truncate text-slate-500 dark:text-slate-400">{c.lastMessage}</span>
@@ -452,6 +456,7 @@ const ContactListItem = React.memo(function ContactListItem({
 
         <div className="flex items-center justify-between gap-2 mt-1">
           <span className="inline-flex items-center gap-2 min-w-0 text-xs">
+            {c.clinicName && <span className="truncate font-medium text-slate-600 dark:text-slate-300">{c.clinicName}</span>}
             {c.hasUnseenAssignment ? (
               <span className="inline-flex items-center gap-1 font-semibold text-amber-700 dark:text-amber-400">
                 <Zap className="w-3 h-3" /> Transferida pra você
@@ -911,7 +916,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
     // Contadores chegam depois e alargam as abas — reavalia quando mudam.
   }, [filterTab, visibleTabIds, pendingCount, unassignedCount]);
 
-  // Divisórias da fila (Prioridade / Aguardando / Esquecidas há mais de 48 h / resto).
+  // Divisórias da fila (Prioridade / Aguardando / Sem resposta há +48 h / resto).
   const groupCounts = useMemo(() => {
     const counts: Record<QueueGroup, number> = { prioridade: 0, aguardando: 0, esquecidas: 0, resto: 0 };
     for (const c of filteredContacts) counts[queueGroup(c)]++;
@@ -1585,7 +1590,9 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                   role="presentation"
                   className="sticky top-0 z-[5] flex items-center justify-between bg-slate-100/95 dark:bg-slate-900/95 backdrop-blur-sm px-4 py-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300"
                 >
-                  <span>{QUEUE_GROUP_LABEL[group]}</span>
+                  <span title={group === 'esquecidas' ? 'Pacientes que escreveram há mais de 48 h e ainda esperam resposta — ficam depois de quem escreveu nas últimas 48 h, para não esconder quem acabou de chegar.' : undefined}>
+                    {QUEUE_GROUP_LABEL[group]}
+                  </span>
                   <span className="tabular-nums text-slate-500 dark:text-slate-400">{groupCounts[group]}</span>
                 </div>
               )}
@@ -1803,7 +1810,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                       <Popover>
                         <PopoverTrigger className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700">
                           <UserPlus className="w-3.5 h-3.5" aria-hidden />
-                          <span className="whitespace-nowrap">Limite Atingido</span>
+                          <span className="whitespace-nowrap">Limite atingido</span>
                           <Info className="w-3.5 h-3.5" aria-hidden />
                         </PopoverTrigger>
                         <PopoverContent align="end" className="w-72 p-3 text-xs text-slate-700 dark:text-slate-200">
