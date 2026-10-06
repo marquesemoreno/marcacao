@@ -957,6 +957,16 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
       } else if (e.key === 'r' && selectedIdRef.current) {
         e.preventDefault();
         document.querySelector<HTMLTextAreaElement>('[data-od-id="chat-composer-input"]')?.focus();
+      } else if (e.key === 'n') {
+        const next = list.find((c) => c.id !== selectedIdRef.current);
+        if (!next) return;
+        e.preventDefault();
+        handleSelectContactMobile(next.id);
+        document.querySelector(`[data-od-id="contact-card-${next.id}"]`)?.scrollIntoView({ block: 'nearest' });
+      } else if (e.key === 'i' && selectedIdRef.current) {
+        e.preventDefault();
+        setComposerMode('internal_note');
+        requestAnimationFrame(() => document.querySelector<HTMLTextAreaElement>('[data-od-id="chat-composer-input"]')?.focus());
       } else if (e.key === '?') {
         e.preventDefault();
         setIsShortcutsOpen(true);
@@ -1513,42 +1523,6 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
           )}
         </div>
 
-        {bulkSelected.size > 0 && onBulkAssign && (
-          <div className="flex items-center gap-2 border-b border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/50 px-3 py-2 text-xs">
-            <span className="font-semibold text-emerald-900 dark:text-emerald-200 tabular-nums">{bulkSelected.size} selecionada(s)</span>
-            <select
-              defaultValue=""
-              disabled={isBulkAssigning}
-              aria-label="Atribuir conversas selecionadas a"
-              onChange={async (e) => {
-                const agentId = e.target.value;
-                e.target.value = '';
-                if (!agentId) return;
-                setIsBulkAssigning(true);
-                try {
-                  await onBulkAssign([...bulkSelected], agentId);
-                  setBulkSelected(new Set());
-                } finally {
-                  setIsBulkAssigning(false);
-                }
-              }}
-              className="h-7 min-w-0 flex-1 rounded-md border border-emerald-300 dark:border-emerald-800 bg-white dark:bg-slate-900 px-2 text-xs text-slate-800 dark:text-slate-100"
-            >
-              <option value="" disabled>{isBulkAssigning ? 'Atribuindo…' : 'Atribuir a…'}</option>
-              {agents.map((agent) => (
-                <option key={agent.id} value={agent.id}>{agent.name}</option>
-              ))}
-            </select>
-            <button
-              type="button"
-              onClick={() => setBulkSelected(new Set())}
-              className="shrink-0 rounded-md px-2 py-1 font-semibold text-emerald-900 dark:text-emerald-200 hover:bg-emerald-100 dark:hover:bg-emerald-900/50"
-            >
-              Limpar
-            </button>
-          </div>
-        )}
-
         {/* Lista de Conversas */}
         <div className="flex-1 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800/80">
           {filteredContacts.length === 0 && isLoadingContacts ? (
@@ -1601,6 +1575,42 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
             })
           )}
         </div>
+        {bulkSelected.size > 0 && onBulkAssign && (
+          <div className="flex items-center gap-2 border-t border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/80 px-3 py-2 text-xs shadow-[0_-4px_12px_-6px_rgba(0,0,0,0.25)]" role="region" aria-label="Ações com as conversas selecionadas">
+            <span className="font-semibold text-emerald-900 dark:text-emerald-200 tabular-nums">{bulkSelected.size} selecionada(s)</span>
+            <select
+              defaultValue=""
+              disabled={isBulkAssigning}
+              aria-label="Atribuir conversas selecionadas a"
+              onChange={async (e) => {
+                const agentId = e.target.value;
+                e.target.value = '';
+                if (!agentId) return;
+                setIsBulkAssigning(true);
+                try {
+                  await onBulkAssign([...bulkSelected], agentId);
+                  setBulkSelected(new Set());
+                } finally {
+                  setIsBulkAssigning(false);
+                }
+              }}
+              className="h-7 min-w-0 flex-1 rounded-md border border-emerald-300 dark:border-emerald-800 bg-white dark:bg-slate-900 px-2 text-xs text-slate-800 dark:text-slate-100"
+            >
+              <option value="" disabled>{isBulkAssigning ? 'Atribuindo…' : 'Atribuir a…'}</option>
+              {agents.map((agent) => (
+                <option key={agent.id} value={agent.id}>{agent.name}</option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={() => setBulkSelected(new Set())}
+              className="shrink-0 rounded-md px-2 py-1 font-semibold text-emerald-900 dark:text-emerald-200 hover:bg-emerald-100 dark:hover:bg-emerald-900/50"
+            >
+              Limpar
+            </button>
+          </div>
+        )}
+
       </aside>
 
       {/* =========================================================================
@@ -3149,8 +3159,10 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
             {[
               ['↑ ↓', 'Conversa anterior / próxima da fila'],
               ['r', 'Responder (vai para a caixa de texto)'],
+              ['n', 'Ir para a conversa mais urgente da fila'],
+              ['i', 'Escrever nota interna (o paciente não vê)'],
               ['a', 'Atribuir a conversa a mim'],
-              ['e', 'Finalizar atendimento'],
+              ['e', 'Finalizar atendimento (abre a próxima da fila)'],
               ['/', 'Buscar paciente, telefone ou conversa'],
               ['?', 'Mostrar estes atalhos'],
             ].map(([key, label]) => (
@@ -3273,9 +3285,12 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                 onClick={async () => {
                   if (!selectedReason || isFinishingAttendance) return;
                   setIsFinishingAttendance(true);
+                  // Próximo da fila (a de cima que não é esta) — abre sozinho ao finalizar.
+                  const nextInQueue = filteredContacts.find((c) => c.id !== selectedContact?.id);
                   try {
                     await onFinishAttendance({ reason: selectedReason, notes: finishNotes });
                     setIsFinishModalOpen(false);
+                    if (nextInQueue) handleSelectContactMobile(nextInQueue.id);
                     setSelectedReason(null);
                     setFinishNotes("");
                     setInputText("");
