@@ -1,4 +1,5 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
+import { classifyAndStorePatientIntent } from "@/lib/patient-intent-server";
 import type { AppointmentStatus, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { sendAppointmentConfirmation, sendWhatsAppMessage, formatToWhatsAppNumber, getEvolutionConfig, toggleNinthDigit } from "@/lib/whatsapp";
@@ -717,6 +718,11 @@ export async function POST(request: Request) {
         ...(mediaData ?? {}),
       },
     });
+    // Intenção do paciente pro Chat (Jev) — roda depois da resposta, nunca atrasa o webhook.
+    if (!mediaData && !failedMediaNotice && incoming.text.trim()) {
+      const conversationId = conversation.id;
+      after(() => classifyAndStorePatientIntent(conversationId));
+    }
     await prisma.conversation.update({
       where: { id: conversation.id },
       // archivedAt: null sempre — mensagem de verdade do paciente nunca pode ficar

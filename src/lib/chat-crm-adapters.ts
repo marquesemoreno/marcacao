@@ -14,6 +14,7 @@ import type { DocumentReviewData } from "@/lib/documents/document-validator";
 import { canEditMessage } from "@/lib/message-edit";
 import { RESCHEDULE_PENDING_TAG } from "@/lib/conversation-tags";
 import { getSlaInfo } from "@/lib/sla-calculator";
+import { PATIENT_INTENTS, visibleIntent } from "@/lib/patient-intent";
 import type { BusinessHours } from "@/lib/schemas/clinic";
 import type {
   Channel,
@@ -209,6 +210,10 @@ export function toChatContact(conversation: ConversationWithRelations, viewerUse
     // — só true quando tem dono E não sou eu, pra não aparecer na minha própria conversa.
     assignedToOther: Boolean(conversation.assignedUser && conversation.assignedUser.id !== viewerUserId),
     sla: computeSla(conversation),
+    patientIntent: (() => {
+      const intent = visibleIntent(conversation.patientIntent, conversation.patientIntentConfidence);
+      return intent ? PATIENT_INTENTS[intent] : undefined;
+    })(),
     lastMessage: previewMessage
       ? previewMessage.type === "INTERNAL_NOTE"
         ? `🔒 Nota: ${previewMessage.content}`

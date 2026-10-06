@@ -437,7 +437,17 @@ const ContactListItem = React.memo(function ContactListItem({
 
         {c.clinicName && <p className="text-xs font-medium text-sky-700 dark:text-sky-400 truncate">{c.clinicName}</p>}
 
-        <p className="text-sm text-slate-600 dark:text-slate-300 truncate leading-snug mt-0.5">{c.lastMessage}</p>
+        {/* Intenção (Jev, confiança alta) no lugar da prévia crua — a prévia fica no title. */}
+        {c.patientIntent ? (
+          <p className="mt-0.5 flex items-center gap-1.5 min-w-0 text-sm leading-snug" title={c.lastMessage}>
+            <span className="shrink-0 rounded-md border border-sky-200 dark:border-sky-800 bg-sky-50 dark:bg-sky-950/50 px-1.5 py-px text-xs font-semibold text-sky-800 dark:text-sky-200">
+              {c.patientIntent}
+            </span>
+            <span className="truncate text-slate-500 dark:text-slate-400">{c.lastMessage}</span>
+          </p>
+        ) : (
+          <p className="text-sm text-slate-600 dark:text-slate-300 truncate leading-snug mt-0.5">{c.lastMessage}</p>
+        )}
 
         <div className="flex items-center justify-between gap-2 mt-1">
           <span className="inline-flex items-center gap-2 min-w-0 text-xs">
