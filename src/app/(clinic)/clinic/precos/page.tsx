@@ -5,6 +5,7 @@ import {
   listAcquisitionRules,
 } from "@/actions/clinic";
 import { PageHeader } from "@/components/clinic/page-header";
+import { SettingsSectionNav } from "@/components/clinic/settings-section-nav";
 import { PrecosPageTabs } from "@/components/clinic/precos-page-tabs";
 import { toPlainClinicProcedureItem } from "@/lib/serialize";
 import { buildWhatsAppLink } from "@/lib/format";
@@ -35,8 +36,12 @@ export default async function ClinicSettingsPage() {
     : [];
 
   return (
-    <div className="space-y-6">
-      <PageHeader title="Configurações" subtitle={`Preços, horários e parâmetros · ${clinicProcedures.length} procedimento(s)`} />
+    // O <main> do layout é overflow-hidden (por causa do chat): esta tela precisa do
+    // próprio contêiner de rolagem, senão o foco na aba rola o <main> escondido.
+    <div className="h-full overflow-y-auto">
+      <div className="space-y-6 p-4 sm:p-6 max-w-7xl mx-auto w-full">
+        <PageHeader title="Configurações" subtitle={`Preços, horários e parâmetros · ${clinicProcedures.length} procedimento(s)`} />
+        <SettingsSectionNav active="precos" />
 
       <PrecosPageTabs
         businessHours={businessHours}
@@ -45,7 +50,8 @@ export default async function ClinicSettingsPage() {
         defaultTicket={clinic.defaultTicket?.toString() ?? null}
         acquisitionRules={acquisitionRules}
         trackedLinks={trackedLinks}
-      />
+        />
+      </div>
     </div>
   );
 }
