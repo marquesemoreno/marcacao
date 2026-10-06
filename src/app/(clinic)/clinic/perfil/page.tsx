@@ -1,15 +1,17 @@
 import { PageHeader } from "@/components/clinic/page-header";
+import { SettingsSectionNav } from "@/components/clinic/settings-section-nav";
 import { ChangePasswordForm } from "@/components/account/change-password-form";
 
 export const metadata = { title: "Minha conta" };
 
 export default function ClinicPerfilPage() {
   return (
-    <div className="flex-1 overflow-y-auto p-4 sm:p-6">
-      <div className="mb-6">
-        <PageHeader title="Minha conta" subtitle="Troca de senha" />
+    <div className="h-full overflow-y-auto">
+      <div className="space-y-6 p-4 sm:p-6 max-w-7xl mx-auto w-full">
+        <PageHeader title="Configurações" subtitle="Minha conta · troca de senha" />
+        <SettingsSectionNav active="perfil" />
+        <ChangePasswordForm />
       </div>
-      <ChangePasswordForm />
     </div>
   );
 }

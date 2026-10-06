@@ -55,7 +55,7 @@ function ProcedureRow({ item }: { item: PlainClinicProcedureItem }) {
 
   return (
     <TableRow>
-      <TableCell className="font-medium text-slate-800 dark:text-slate-100 max-w-[260px] truncate" title={displayName}>
+      <TableCell className="font-medium text-slate-800 dark:text-slate-100 min-w-[180px] whitespace-normal break-words" title={displayName}>
         {displayName}
       </TableCell>
       <TableCell>
@@ -140,7 +140,7 @@ export function ProceduresTable({
     <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-2">
-          <div className="relative w-64">
+          <div className="relative w-full sm:w-64">
             <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
             <Input
               value={search}
@@ -169,8 +169,8 @@ export function ProceduresTable({
         <AddProcedureDialog availableProcedures={availableProcedures} />
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs">
-        <Table>
+      <div className="w-full overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs">
+        <Table className="w-full">
           <TableHeader>
             <TableRow className="bg-slate-50/70 dark:bg-slate-800/70">
               <TableHead scope="col" className="text-slate-600 dark:text-slate-300">Procedimento</TableHead>

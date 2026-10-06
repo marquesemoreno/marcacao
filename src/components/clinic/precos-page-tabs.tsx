@@ -29,22 +29,23 @@ export function PrecosPageTabs({
   trackedLinks: { channel: string; url: string }[];
 }) {
   return (
-    <Tabs defaultValue="horarios" className="gap-4">
-      <TabsList>
+    <Tabs defaultValue="horarios" className="gap-4 min-w-0">
+      {/* Fixa no topo do contêiner de rolagem da página (lista de procedimentos é longa). */}
+      <TabsList className="sticky top-0 z-10 h-auto! w-full sm:w-fit flex-wrap justify-start bg-muted shadow-xs">
         <TabsTrigger value="horarios">Horários de Atendimento</TabsTrigger>
         <TabsTrigger value="precos">Procedimentos e Preços</TabsTrigger>
         <TabsTrigger value="parametros">Parâmetros e Links Rastreados</TabsTrigger>
       </TabsList>
 
-      <TabsContent value="horarios">
+      <TabsContent value="horarios" className="min-w-0">
         <BusinessHoursForm businessHours={businessHours} />
       </TabsContent>
 
-      <TabsContent value="precos">
+      <TabsContent value="precos" className="min-w-0">
         <ProceduresTable clinicProcedures={clinicProcedures} availableProcedures={availableProcedures} />
       </TabsContent>
 
-      <TabsContent value="parametros" className="space-y-3">
+      <TabsContent value="parametros" className="min-w-0 space-y-3">
         <ReportSettingsForm defaultTicket={defaultTicket} rules={acquisitionRules} />
         {trackedLinks.length > 0 && <TrackedLinksCard links={trackedLinks} />}
       </TabsContent>

@@ -40,7 +40,8 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { href: "/clinic/disparos", label: "Disparos", icon: Megaphone },
       { href: "/clinic/relatorio", label: "Relatórios", icon: BarChart3 },
-      { href: "/clinic/precos", label: "Configurações", icon: Settings, onlyFull: true },
+      // Visível também pras clínicas só-WhatsApp (horários e ticket médio valem pra elas).
+      { href: "/clinic/precos", label: "Configurações", icon: Settings },
     ],
   },
 ];
@@ -77,7 +78,10 @@ export function ClinicNav({
   );
 
   const renderItem = (item: NavItem) => {
-    const isActive = pathname?.startsWith(item.href) || (item.href === "/clinic/contatos" && pathname?.startsWith("/clinic/pacientes"));
+    const isActive =
+      pathname?.startsWith(item.href) ||
+      (item.href === "/clinic/contatos" && pathname?.startsWith("/clinic/pacientes")) ||
+      (item.href === "/clinic/precos" && pathname?.startsWith("/clinic/perfil"));
     const Icon = item.icon;
     const count = item.badge === "unread" ? unread : 0;
     const badgeText = count > 99 ? "99+" : String(count);
