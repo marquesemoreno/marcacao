@@ -1376,6 +1376,52 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
             })}
           </div>
 
+          {/* Filtro por Tag — ícone na linha das abas; a tag ativa aparece como chip abaixo. */}
+          <div className="relative" ref={tagFilterRef}>
+            <button
+              type="button"
+              onClick={() => setIsTagFilterOpen((open) => !open)}
+              aria-label={selectedTagFilter ? `Filtrar por tag (ativo: ${selectedTagFilter})` : 'Filtrar por tag'}
+              title="Filtrar por tag"
+              aria-expanded={isTagFilterOpen}
+              className={`relative flex items-center justify-center w-7 h-7 rounded-lg transition-colors hover:bg-slate-100 dark:hover:bg-slate-800 ${
+                selectedTagFilter ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+              }`}
+            >
+              <Filter className="w-3.5 h-3.5" />
+              {selectedTagFilter && <span className="absolute top-1 right-1 size-1.5 rounded-full bg-emerald-600" aria-hidden />}
+            </button>
+
+            {isTagFilterOpen && (
+              <div className="absolute right-0 w-56 mt-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-lg py-1.5 z-30 animate-in fade-in zoom-in-95 duration-100 max-h-56 overflow-y-auto">
+                <button
+                  onClick={() => {
+                    setSelectedTagFilter(null);
+                    setIsTagFilterOpen(false);
+                  }}
+                  className={`w-full px-3 py-1.5 text-left text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 ${
+                    selectedTagFilter === null ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-600 dark:text-slate-300'
+                  }`}
+                >
+                  Todas as Tags
+                </button>
+                {availableTagFilters.map((preset) => (
+                  <button
+                    key={preset.label}
+                    onClick={() => {
+                      setSelectedTagFilter(selectedTagFilter === preset.label ? null : preset.label);
+                      setIsTagFilterOpen(false);
+                    }}
+                    className="w-full px-3 py-1.5 text-left hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center"
+                  >
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold border ${preset.classes} ${selectedTagFilter === preset.label ? 'ring-2 ring-emerald-500/30' : ''}`}>
+                      {preset.label}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
           <div className="relative" ref={tabSettingsRef}>
             <button
               type="button"
@@ -1432,50 +1478,18 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
             </select>
           )}
 
-          {/* Filtro por Tag: Dropdown Compacto */}
-          <div className="relative" ref={tagFilterRef}>
+          {selectedTagFilter && (
             <button
               type="button"
-              onClick={() => setIsTagFilterOpen((open) => !open)}
-              className="w-full flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+              onClick={() => setSelectedTagFilter(null)}
+              className="inline-flex max-w-full items-center gap-1.5 self-start rounded-md border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/50 px-2 py-1 text-xs font-medium text-emerald-800 dark:text-emerald-200 hover:bg-emerald-100 dark:hover:bg-emerald-900/60"
+              aria-label={`Remover filtro de tag ${selectedTagFilter}`}
             >
-              <span className="flex items-center gap-1.5 truncate">
-                <Filter className="w-3 h-3 text-slate-400 shrink-0" />
-                <span className="truncate">{selectedTagFilter ?? 'Filtrar por Tag'}</span>
-              </span>
-              <ChevronDown className={`w-3 h-3 text-slate-400 shrink-0 transition-transform ${isTagFilterOpen ? 'rotate-180' : ''}`} />
+              <Filter className="w-3 h-3 shrink-0" aria-hidden />
+              <span className="truncate">{selectedTagFilter}</span>
+              <X className="w-3 h-3 shrink-0" aria-hidden />
             </button>
-
-            {isTagFilterOpen && (
-              <div className="absolute left-0 right-0 mt-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-lg py-1.5 z-30 animate-in fade-in zoom-in-95 duration-100 max-h-56 overflow-y-auto">
-                <button
-                  onClick={() => {
-                    setSelectedTagFilter(null);
-                    setIsTagFilterOpen(false);
-                  }}
-                  className={`w-full px-3 py-1.5 text-left text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 ${
-                    selectedTagFilter === null ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-600 dark:text-slate-300'
-                  }`}
-                >
-                  Todas as Tags
-                </button>
-                {availableTagFilters.map((preset) => (
-                  <button
-                    key={preset.label}
-                    onClick={() => {
-                      setSelectedTagFilter(selectedTagFilter === preset.label ? null : preset.label);
-                      setIsTagFilterOpen(false);
-                    }}
-                    className="w-full px-3 py-1.5 text-left hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center"
-                  >
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold border ${preset.classes} ${selectedTagFilter === preset.label ? 'ring-2 ring-emerald-500/30' : ''}`}>
-                      {preset.label}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+          )}
         </div>
 
         {bulkSelected.size > 0 && onBulkAssign && (
@@ -1769,33 +1783,6 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                   </Popover>
                 )}
 
-                {onReactivateAi && (selectedContact.queueState === 'HUMANO_ATENDENDO' || selectedContact.queueState === 'AGUARDANDO_PACIENTE') && selectedContact.responsibleAgent !== 'Não Atribuído' && (
-                  <button
-                    onClick={async () => {
-                      setIsReactivatingAi(true);
-                      const conversationId = selectedContact.id;
-                      try {
-                        const result = await onReactivateAi();
-                        if (!result.success) toast.error(result.message || "Não foi possível devolver o atendimento pra IA.");
-                        else
-                          toast.success("Atendimento devolvido pra IA.", {
-                            duration: 8000,
-                            action: onUndoReactivateAi
-                              ? { label: "Desfazer", onClick: () => onUndoReactivateAi(conversationId) }
-                              : undefined,
-                          });
-                      } finally {
-                        setIsReactivatingAi(false);
-                      }
-                    }}
-                    disabled={isReactivatingAi}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-violet-700 dark:text-violet-300 bg-violet-50 dark:bg-violet-950/60 hover:bg-violet-100 dark:hover:bg-violet-900 border border-violet-200 dark:border-violet-800 rounded-lg transition-all disabled:opacity-50"
-                    title="Devolver este atendimento pra IA responder"
-                  >
-                    <Bot className="w-3.5 h-3.5" />
-                    <span>{isReactivatingAi ? "Devolvendo..." : "Devolver pra IA"}</span>
-                  </button>
-                )}
 
                 <button
                   onClick={() => handleOpenScheduleWithProcedure(undefined)}
@@ -1893,6 +1880,34 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                         </button>
                       )}
 
+                      {onReactivateAi && (selectedContact.queueState === 'HUMANO_ATENDENDO' || selectedContact.queueState === 'AGUARDANDO_PACIENTE') && selectedContact.responsibleAgent !== 'Não Atribuído' && (
+                        <button
+                          onClick={async () => {
+                            setIsMoreMenuOpen(false);
+                            setIsReactivatingAi(true);
+                            const conversationId = selectedContact.id;
+                            try {
+                              const result = await onReactivateAi();
+                              if (!result.success) toast.error(result.message || "Não foi possível devolver o atendimento pra IA.");
+                              else
+                                toast.success("Atendimento devolvido pra IA.", {
+                                  duration: 8000,
+                                  action: onUndoReactivateAi
+                                    ? { label: "Desfazer", onClick: () => onUndoReactivateAi(conversationId) }
+                                    : undefined,
+                                });
+                            } finally {
+                              setIsReactivatingAi(false);
+                            }
+                          }}
+                          disabled={isReactivatingAi}
+                          className="w-full px-3 py-2 text-left hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center gap-2 text-violet-700 dark:text-violet-300 disabled:opacity-50"
+                          title="Devolver este atendimento pra IA responder"
+                        >
+                          <Bot className="w-3.5 h-3.5" />
+                          <span>{isReactivatingAi ? "Devolvendo..." : "Devolver pra IA"}</span>
+                        </button>
+                      )}
                       <button
                         onClick={() => {
                           setIsFinishModalOpen(true);
