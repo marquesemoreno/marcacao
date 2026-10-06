@@ -29,7 +29,9 @@ import {
 } from "@/actions/clinic";
 import Link from "next/link";
 import { isProcedureAgenda } from "@/lib/doctor-names";
-import { formatDurationHuman, SLA_WARNING_MINUTES } from "@/lib/sla-calculator";
+import { formatDurationHuman, SLA_CRITICAL_MINUTES, SLA_WARNING_MINUTES } from "@/lib/sla-calculator";
+import { ReportDelta } from "@/components/clinic/report-delta";
+import { UNIDENTIFIED_CHANNEL } from "@/lib/report-metrics";
 import { formatCurrency, appointmentStatusLabels } from "@/lib/format";
 import {
   MessageSquare,
@@ -56,6 +58,9 @@ const STATUS_COLOR_CLASS = {
   CANCELLED: "bg-rose-500",
   NO_SHOW: "bg-slate-500",
 } as const;
+
+/** Percentual no formato brasileiro (64,1%). */
+const pctBR = (n: number) => `${n.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%`;
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -88,6 +93,8 @@ export default async function ClinicReportPage({
     management,
     channelOptions,
     campaigns,
+    prevChat,
+    prevManagement,
   ] = await Promise.all([
     getClinicChatReport(days, params.tag ? [params.tag] : undefined, params.channel),
     isExclusive
@@ -99,8 +106,24 @@ export default async function ClinicReportPage({
     getClinicManagementReport(days, params.channel),
     getDistinctAcquisitionChannels(days),
     getClinicCampaignReport(days),
+    // Mesma janela imediatamente antes — comparação ("↑ 8 pts vs 30 dias anteriores").
+    getClinicChatReport(days, params.tag ? [params.tag] : undefined, params.channel, true),
+    getClinicManagementReport(days, params.channel, true),
   ]);
   const rs = chatReport.responseStats;
+  const prevRs = prevChat.responseStats;
+  // Resumo do período: as 3 perguntas do gestor, respondidas antes de qualquer detalhe.
+  const topChannel = management.channelConversion.find(
+    (c) => c.scheduled > 0 && c.channel !== UNIDENTIFIED_CHANNEL,
+  );
+  const slaTone = (min: number | null) =>
+    min === null
+      ? "text-slate-900 dark:text-slate-100"
+      : min <= SLA_WARNING_MINUTES
+        ? "text-emerald-700 dark:text-emerald-400"
+        : min <= SLA_CRITICAL_MINUTES
+          ? "text-amber-700 dark:text-amber-400"
+          : "text-rose-700 dark:text-rose-400";
   const topAttendantId = management.attendants.find(
     (a) => a.scheduled > 0,
   )?.userId;
@@ -137,6 +160,13 @@ export default async function ClinicReportPage({
           />
           <PeriodFilter basePath="/clinic/relatorio" />
           <ReportExportButton
+            clinic={clinic.tradeName}
+            days={days}
+            filters={[
+              ...(params.tag ? [`Tag: ${params.tag}`] : []),
+              ...(params.channel ? [`Canal: ${params.channel}`] : []),
+              ...(params.doctor ? [`Médico: ${params.doctor}`] : []),
+            ]}
             rows={[
               ["Conversas no período", chatReport.totalConversations],
               ["Conversas resolvidas", chatReport.totalResolved],
@@ -150,8 +180,13 @@ export default async function ClinicReportPage({
               ["Sentimento positivo (%)", chatReport.sentimentPositivePct],
               ["Sentimento neutro (%)", chatReport.sentimentNeutroPct],
               ["Sentimento negativo (%)", chatReport.sentimentNegativoPct],
-              ["Faturamento estimado (R$)", management.estimatedRevenue ?? "—"],
-              ["Receita protegida (R$)", management.protectedRevenue ?? "—"],
+              ["Lembretes enviados", management.confirmations.totalSent],
+              ["Confirmaram (%)", management.confirmations.confirmedPct],
+              ["Cancelaram (%)", management.confirmations.cancelledPct],
+              ["Pediram para remarcar (%)", management.confirmations.rescheduledPct],
+              ["Sem retorno (%)", management.confirmations.noReplyPct],
+              ["Faturamento estimado (R$) — estimativa", management.estimatedRevenue ?? "—"],
+              ["Valor das consultas confirmadas (R$) — estimativa", management.protectedRevenue ?? "—"],
               ...management.channelConversion.map(
                 (c) =>
                   [`Agendamentos via ${c.channel}`, c.scheduled] as [string, string | number],
@@ -175,62 +210,60 @@ export default async function ClinicReportPage({
       </div>
 
       {/* =========================================================================
-          ECONOMICS — faturamento estimado e receita protegida
+          RESUMO DO PERÍODO — as 3 perguntas do gestor, com comparação
          ========================================================================= */}
-      <div className="space-y-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="bg-white dark:bg-slate-900 p-5 rounded-lg border border-slate-200 dark:border-slate-800 shadow-xs space-y-1.5">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-slate-600 dark:text-slate-400">Faturamento Estimado</span>
-              <Wallet className="w-4 h-4 text-emerald-600" />
-            </div>
-            <p className="text-3xl font-bold font-mono text-slate-900 dark:text-slate-100">
-              {management.estimatedRevenue !== null ? formatCurrency(management.estimatedRevenue) : "—"}
-            </p>
-            <p className="text-xs text-slate-500 dark:text-slate-400">
-              {management.scheduledCount} conversa(s) do WhatsApp finalizadas como agendamento
-              {management.ticket !== null ? ` × ticket médio de ${formatCurrency(management.ticket)}` : ""}
-            </p>
-          </div>
-          <div className="bg-white dark:bg-slate-900 p-5 rounded-lg border border-slate-200 dark:border-slate-800 shadow-xs space-y-1.5">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-slate-600 dark:text-slate-400">Receita Protegida (Anti No-Show)</span>
-              <ShieldCheck className="w-4 h-4 text-sky-600" />
-            </div>
-            <p className="text-3xl font-bold font-mono text-slate-900 dark:text-slate-100">
-              {management.protectedRevenue !== null ? formatCurrency(management.protectedRevenue) : "—"}
-            </p>
-            <p className="text-xs text-slate-500 dark:text-slate-400">
-              {management.confirmations.confirmed} consulta(s) confirmada(s) pelos lembretes automáticos
-            </p>
-          </div>
-        </div>
-        {management.ticket === null && (
-          <p className="text-xs text-slate-500 dark:text-slate-400">
-            {/* "Preços e Horários" não aparece no menu de clínicas com WhatsApp exclusivo —
-                não mandar pra uma tela que o perfil não enxerga. */}
-            {isExclusive ? (
-              "Para estimar valores, peça à equipe do Conecta Saúde para cadastrar o ticket médio de consulta da clínica."
-            ) : (
-              <>
-                Para estimar valores, informe o ticket médio de consulta em{" "}
-                <Link href="/clinic/precos" className="font-medium text-sky-700 dark:text-sky-400 underline underline-offset-2">
-                  Preços e Horários
-                </Link>
-                .
-              </>
+      <section aria-labelledby="resumo-titulo" className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-xs">
+        <h2 id="resumo-titulo" className="text-base font-semibold text-slate-900 dark:text-slate-100">
+          Resumo dos últimos {days} dias
+        </h2>
+        <dl className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-5 sm:divide-x divide-slate-200 dark:divide-slate-800">
+          <div className="space-y-1 sm:pr-5">
+            <dt className="text-sm text-slate-600 dark:text-slate-400">Respondidas em até {SLA_WARNING_MINUTES} min</dt>
+            <dd className={`text-3xl font-bold tabular-nums ${rs.withinSlaPct === null ? "text-slate-900 dark:text-slate-100" : rs.withinSlaPct >= 80 ? "text-emerald-700 dark:text-emerald-400" : rs.withinSlaPct >= 50 ? "text-amber-700 dark:text-amber-400" : "text-rose-700 dark:text-rose-400"}`}>
+              {rs.withinSlaPct !== null ? pctBR(rs.withinSlaPct) : "—"}
+            </dd>
+            <dd>
+              <ReportDelta current={rs.withinSlaPct} previous={prevRs.withinSlaPct} unit="pts" better="up" days={days} />
+            </dd>
+            {rs.withinSlaPct === null && (
+              <dd className="text-xs text-slate-600 dark:text-slate-400">Nenhuma conversa respondida pela equipe no período.</dd>
             )}
-          </p>
-        )}
-      </div>
+          </div>
+          <div className="space-y-1 sm:px-5">
+            <dt className="text-sm text-slate-600 dark:text-slate-400">Pacientes que confirmaram o lembrete</dt>
+            <dd className="text-3xl font-bold tabular-nums text-slate-900 dark:text-slate-100">
+              {management.confirmations.totalSent > 0 ? pctBR(management.confirmations.confirmedPct) : "—"}
+            </dd>
+            <dd>
+              <ReportDelta
+                current={management.confirmations.totalSent > 0 ? management.confirmations.confirmedPct : null}
+                previous={prevManagement.confirmations.totalSent > 0 ? prevManagement.confirmations.confirmedPct : null}
+                unit="pts"
+                better="up"
+                days={days}
+              />
+            </dd>
+            {management.confirmations.totalSent === 0 && (
+              <dd className="text-xs text-slate-600 dark:text-slate-400">Nenhum lembrete enviado no período.</dd>
+            )}
+          </div>
+          <div className="space-y-1 sm:pl-5">
+            <dt className="text-sm text-slate-600 dark:text-slate-400">Canal que mais trouxe agendamentos</dt>
+            <dd className="text-xl font-bold text-slate-900 dark:text-slate-100 truncate">{topChannel ? topChannel.channel : "—"}</dd>
+            <dd className="text-xs text-slate-600 dark:text-slate-400">
+              {topChannel
+                ? `${topChannel.scheduled} agendamento(s) de ${topChannel.conversations} conversa(s)`
+                : "Nenhum agendamento com canal identificado no período."}
+            </dd>
+          </div>
+        </dl>
+      </section>
 
       {/* =========================================================================
           ATENDIMENTO / CHAT
          ========================================================================= */}
       <div className="space-y-4">
-        <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-200">
-          Atendimento / Chat
-        </h2>
+        <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">Atendimento</h2>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="bg-white dark:bg-slate-900 p-5 rounded-lg border border-slate-200 dark:border-slate-800 shadow-xs space-y-1.5">
             <div className="flex items-center justify-between">
@@ -245,6 +278,7 @@ export default async function ClinicReportPage({
             <p className="text-xs text-slate-500 dark:text-slate-400">
               {chatReport.totalResolved} resolvidas no período
             </p>
+            <ReportDelta current={chatReport.totalConversations} previous={prevChat.totalConversations} unit="%" better="up" days={days} />
           </div>
 
           <div className="bg-white dark:bg-slate-900 p-5 rounded-lg border border-slate-200 dark:border-slate-800 shadow-xs space-y-1.5">
@@ -255,12 +289,13 @@ export default async function ClinicReportPage({
               <TrendingUp className="w-4 h-4 text-slate-400" />
             </div>
             <p className="text-3xl font-bold text-slate-900 dark:text-slate-100">
-              {chatReport.conversionRate}%
+              {pctBR(chatReport.conversionRate)}
             </p>
             <p className="text-xs text-slate-500 dark:text-slate-400">
               {chatReport.totalAgendados} de {chatReport.totalResolved}{" "}
               resolvidos
             </p>
+            <ReportDelta current={chatReport.conversionRate} previous={prevChat.conversionRate} unit="pts" better="up" days={days} />
           </div>
 
           <div className="bg-white dark:bg-slate-900 p-5 rounded-lg border border-slate-200 dark:border-slate-800 shadow-xs space-y-2">
@@ -270,7 +305,7 @@ export default async function ClinicReportPage({
             </span>
             <div className="flex items-center justify-between">
               <span className="text-xs text-slate-500 dark:text-slate-400">1ª resposta</span>
-              <span className="text-sm font-bold text-slate-900 dark:text-slate-100">
+              <span className={`text-sm font-bold tabular-nums ${slaTone(rs.medianFirstResponseMin)}`}>
                 {rs.medianFirstResponseMin !== null ? formatDurationHuman(rs.medianFirstResponseMin) : "—"}
               </span>
             </div>
@@ -283,78 +318,39 @@ export default async function ClinicReportPage({
             <div className="flex items-center justify-between">
               <span className="text-xs text-slate-500 dark:text-slate-400">Respondidas em até {SLA_WARNING_MINUTES} min</span>
               <span className="text-sm font-bold text-slate-900 dark:text-slate-100">
-                {rs.withinSlaPct !== null ? `${rs.withinSlaPct}%` : "—"}
+                {rs.withinSlaPct !== null ? pctBR(rs.withinSlaPct) : "—"}
               </span>
             </div>
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              {rs.answered} conversa(s) com resposta da equipe
-              {rs.unanswered > 0 ? `; ${rs.unanswered} sem resposta ficaram de fora` : ""}.
+              {rs.answered > 0
+                ? `${rs.answered} conversa(s) com resposta da equipe${rs.unanswered > 0 ? `; ${rs.unanswered} sem resposta ficaram de fora` : ""}.`
+                : "Sem tempos: nenhuma conversa teve resposta da equipe no período."}
             </p>
           </div>
         </div>
 
-        <div className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 p-5 shadow-xs space-y-3">
-          <p className="text-xs font-medium text-slate-600 dark:text-slate-400">
-            Sentimento das Conversas Auditadas
-          </p>
+        {/* Sentimento: informação secundária — recolhido por padrão. */}
+        <details className="group bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 p-5 shadow-xs space-y-3">
+          <summary className="cursor-pointer text-sm font-medium text-slate-700 dark:text-slate-300">
+            Sentimento das conversas auditadas
+          </summary>
           <SentimentBar
             positivePct={chatReport.sentimentPositivePct}
             neutroPct={chatReport.sentimentNeutroPct}
             negativoPct={chatReport.sentimentNegativoPct}
           />
-          <p className="text-[11px] text-slate-400 dark:text-slate-500">
+          <p className="text-xs text-slate-600 dark:text-slate-400">
             {chatReport.sentimentAuditedCount} conversa(s) auditada(s) por IA /
             regras automáticas no período.
           </p>
-        </div>
-      </div>
-
-      {/* =========================================================================
-          CONVERSÃO POR CANAL DE AQUISIÇÃO
-         ========================================================================= */}
-      <div className="space-y-4">
-        <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-200">Conversão por Canal de Aquisição</h2>
-        <div className="bg-white dark:bg-slate-900 p-5 rounded-lg border border-slate-200 dark:border-slate-800 shadow-xs !p-0 overflow-hidden">
-          {management.channelConversion.length === 0 ? (
-            <p className="p-5 text-xs text-slate-500 dark:text-slate-400">Nenhuma conversa no período.</p>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-slate-50 dark:bg-slate-800/50">
-                  <TableHead className="pl-5 text-xs">Canal</TableHead>
-                  <TableHead className="text-right text-xs">Conversas</TableHead>
-                  <TableHead className="text-right text-xs">Agendamentos</TableHead>
-                  <TableHead className="text-right text-xs">Conversão</TableHead>
-                  <TableHead className="pr-5 text-right text-xs">Receita Estimada</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {management.channelConversion.map((c) => (
-                  <TableRow key={c.channel}>
-                    <TableCell className="pl-5 font-medium">{c.channel}</TableCell>
-                    <TableCell className="text-right font-mono">{c.conversations}</TableCell>
-                    <TableCell className="text-right font-mono">{c.scheduled}</TableCell>
-                    <TableCell className="text-right font-mono">{c.conversionRate}%</TableCell>
-                    <TableCell className="pr-5 text-right font-mono font-semibold">
-                      {c.estimatedRevenue !== null ? formatCurrency(c.estimatedRevenue) : "—"}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </div>
-        <p className="text-[11px] text-slate-400 dark:text-slate-500">
-          Canal detectado na 1ª mensagem do paciente (anúncio do Meta, UTM ou texto de campanha). “Não identificado” =
-          conversas anteriores ao rastreamento ou abertas por lembrete/disparo da clínica.
-        </p>
+        </details>
       </div>
 
       {/* =========================================================================
           DESEMPENHO DA EQUIPE
          ========================================================================= */}
       <div className="space-y-4">
-        <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-200">
+        <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">
           Desempenho da Equipe
         </h2>
         <div className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 p-5 shadow-xs !p-0 overflow-hidden">
@@ -397,17 +393,17 @@ export default async function ClinicReportPage({
                         )}
                       </span>
                     </TableCell>
-                    <TableCell className="text-right font-mono">
+                    <TableCell className="text-right tabular-nums">
                       {a.total}
                     </TableCell>
-                    <TableCell className="text-right font-mono">
+                    <TableCell className="text-right tabular-nums">
                       {a.avgFrtSec !== null ? formatDurationHuman(a.avgFrtSec / 60) : "—"}
                     </TableCell>
-                    <TableCell className="text-right font-mono">
+                    <TableCell className="text-right tabular-nums">
                       {a.scheduled}
                     </TableCell>
-                    <TableCell className="pr-5 text-right font-mono font-semibold">
-                      {a.conversionRate}%
+                    <TableCell className="pr-5 text-right tabular-nums font-semibold">
+                      {pctBR(a.conversionRate)}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -421,16 +417,14 @@ export default async function ClinicReportPage({
           EFICÁCIA DE CONFIRMAÇÕES (NO-SHOW)
          ========================================================================= */}
       <div className="space-y-4">
-        <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-200">
-          Eficácia de Confirmações
-        </h2>
+        <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">Confirmações dos lembretes</h2>
         <div className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 p-5 shadow-xs space-y-4">
           {management.confirmations.totalSent === 0 ? (
             <p className="text-xs text-slate-500 dark:text-slate-400">
               Nenhum lembrete com acompanhamento de resposta no período.
             </p>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:divide-x divide-slate-200 dark:divide-slate-800">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:divide-x divide-slate-200 dark:divide-slate-800">
               {[
                 {
                   label: "Confirmados",
@@ -441,12 +435,20 @@ export default async function ClinicReportPage({
                   iconClass: "text-emerald-600",
                 },
                 {
-                  label: "Cancelados / Liberados",
+                  label: "Cancelaram",
                   value: management.confirmations.cancelled,
                   pctValue: management.confirmations.cancelledPct,
-                  hint: "Horários liberados para encaixe",
-                  Icon: RotateCcw,
+                  hint: "Horário liberado para encaixe",
+                  Icon: XCircle,
                   iconClass: "text-amber-600",
+                },
+                {
+                  label: "Pediram para remarcar",
+                  value: management.confirmations.rescheduled,
+                  pctValue: management.confirmations.rescheduledPct,
+                  hint: "A recepção precisa remarcar",
+                  Icon: RotateCcw,
+                  iconClass: "text-sky-600",
                 },
                 {
                   label: "Sem Retorno",
@@ -459,7 +461,7 @@ export default async function ClinicReportPage({
               ].map((m) => (
                 <div
                   key={m.label}
-                  className="space-y-1.5 sm:px-4 sm:first:pl-0"
+                  className="space-y-1.5 lg:px-4 lg:first:pl-0"
                 >
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-medium text-slate-600 dark:text-slate-400">
@@ -467,31 +469,143 @@ export default async function ClinicReportPage({
                     </span>
                     <m.Icon className={`w-4 h-4 ${m.iconClass}`} />
                   </div>
-                  <p className="text-2xl font-semibold font-mono">
+                  <p className="text-2xl font-semibold tabular-nums">
                     {m.value}{" "}
                     <span className="text-sm text-slate-500 dark:text-slate-400">
-                      ({m.pctValue}%)
+                      ({pctBR(m.pctValue)})
                     </span>
                   </p>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                  <p className="text-xs text-slate-600 dark:text-slate-400">
                     {m.hint}
                   </p>
                 </div>
               ))}
             </div>
           )}
-          <p className="text-[11px] text-slate-400 dark:text-slate-500">
-            Base: {management.confirmations.totalSent} lembrete(s) automático(s)
-            enviado(s) no período.
-          </p>
+          {management.confirmations.totalSent > 0 && (
+            <p className="text-xs text-slate-600 dark:text-slate-400">
+              Base: {management.confirmations.totalSent} lembrete(s) automático(s) enviado(s) no período. Lembretes
+              enviados há menos de 1 dia ainda não contam como sem retorno.
+            </p>
+          )}
         </div>
       </div>
+
+      {/* =========================================================================
+          CONVERSÃO POR CANAL DE AQUISIÇÃO
+         ========================================================================= */}
+      <div className="space-y-4">
+        <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">Conversão por Canal de Aquisição</h2>
+        <div className="bg-white dark:bg-slate-900 p-5 rounded-lg border border-slate-200 dark:border-slate-800 shadow-xs !p-0 overflow-hidden">
+          {management.channelConversion.length === 0 ? (
+            <p className="p-5 text-xs text-slate-500 dark:text-slate-400">Nenhuma conversa no período.</p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-slate-50 dark:bg-slate-800/50">
+                  <TableHead className="pl-5 text-xs">Canal</TableHead>
+                  <TableHead className="text-right text-xs">Conversas</TableHead>
+                  <TableHead className="text-right text-xs">Agendamentos</TableHead>
+                  <TableHead className="text-right text-xs">Conversão</TableHead>
+                  <TableHead className="pr-5 text-right text-xs">Receita Estimada</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {management.channelConversion.map((c) => (
+                  <TableRow key={c.channel}>
+                    <TableCell className="pl-5 font-medium">{c.channel}</TableCell>
+                    <TableCell className="text-right tabular-nums">{c.conversations}</TableCell>
+                    <TableCell className="text-right tabular-nums">{c.scheduled}</TableCell>
+                    <TableCell className="text-right tabular-nums">{pctBR(c.conversionRate)}</TableCell>
+                    <TableCell className="pr-5 text-right tabular-nums font-semibold">
+                      {c.estimatedRevenue !== null ? formatCurrency(c.estimatedRevenue) : "—"}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </div>
+        <p className="text-xs text-slate-600 dark:text-slate-400">
+          Canal detectado na 1ª mensagem do paciente (anúncio do Meta, UTM ou texto de campanha). “Não identificado” =
+          conversas anteriores ao rastreamento ou abertas por lembrete/disparo da clínica.
+        </p>
+      </div>
+
+      {/* =========================================================================
+          CAMPANHAS DE DISPARO — progresso e retorno (em andamento ou do período)
+         ========================================================================= */}
+      {campaigns.length > 0 && (
+        <div className="space-y-4">
+          <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">Campanhas de Disparo</h2>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {campaigns.map((c) => {
+              const s = c.stats;
+              const progress = s.total > 0 ? Math.round(((s.sent + s.failed + s.optedOut) / s.total) * 100) : 0;
+              return (
+                <div key={c.id} className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 p-5 shadow-xs space-y-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="font-semibold text-sm truncate">{c.name}</p>
+                      <p className="text-xs text-slate-600 dark:text-slate-400">
+                        Criada em {new Date(c.createdAt).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })}
+                        {c.tag && <> · tag <span className="font-medium text-slate-700 dark:text-slate-300">{c.tag}</span></>}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <Badge variant="outline">
+                        {c.status === "RUNNING" ? "Enviando" : c.status === "PAUSED" ? "Pausada" : "Concluída"}
+                      </Badge>
+                      <Megaphone className="w-5 h-5 text-pink-600" />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between text-xs text-slate-600 dark:text-slate-400">
+                      <span>{s.sent} de {s.total} enviadas</span>
+                      <span>{s.pending} na fila</span>
+                    </div>
+                    <div className="h-2 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden" role="progressbar" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100} aria-label="Progresso do envio">
+                      <div className="h-full bg-pink-500" style={{ width: `${progress}%` }} />
+                    </div>
+                  </div>
+
+                  <dl className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div>
+                      <dt className="text-xs text-slate-600 dark:text-slate-400">Responderam</dt>
+                      <dd className="text-lg font-semibold tabular-nums">{s.replied}</dd>
+                      <dd className="text-xs text-slate-600 dark:text-slate-400">{pctBR(s.replyRate)} das enviadas</dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs text-slate-600 dark:text-slate-400">Agendados</dt>
+                      <dd className="text-lg font-semibold tabular-nums">{s.scheduled}</dd>
+                      <dd className="text-xs text-slate-600 dark:text-slate-400">etapa Agendado no CRM</dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs text-slate-600 dark:text-slate-400">Pediram pra sair</dt>
+                      <dd className="text-lg font-semibold tabular-nums">{s.optedOut}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs text-slate-600 dark:text-slate-400">Falharam</dt>
+                      <dd className="text-lg font-semibold tabular-nums">{s.failed}</dd>
+                      <dd className="text-xs text-slate-600 dark:text-slate-400">número sem WhatsApp</dd>
+                    </div>
+                  </dl>
+                  <p className="text-xs text-slate-600 dark:text-slate-400">
+                    Resposta = mensagem da paciente em até 7 dias depois de receber.
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* =========================================================================
           DEMANDA POR MÉDICO E PROCEDIMENTO
          ========================================================================= */}
       <div className="space-y-4">
-        <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-200">
+        <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">
           Demanda por Médico e Procedimento
         </h2>
         {/* D2: base diferente do "Faturamento Estimado" (que conta conversas finalizadas
@@ -537,7 +651,7 @@ export default async function ClinicReportPage({
               ]}
             />
             {kindTotal > 0 && (
-              <p className="text-[11px] text-slate-400 dark:text-slate-500">
+              <p className="text-xs text-slate-600 dark:text-slate-400">
                 {kindTotal} agendamento(s) registrado(s) no Conecta Saúde no período.
               </p>
             )}
@@ -546,79 +660,10 @@ export default async function ClinicReportPage({
       </div>
 
       {/* =========================================================================
-          CAMPANHAS DE DISPARO — progresso e retorno (em andamento ou do período)
-         ========================================================================= */}
-      {campaigns.length > 0 && (
-        <div className="space-y-4">
-          <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-200">Campanhas de Disparo</h2>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {campaigns.map((c) => {
-              const s = c.stats;
-              const progress = s.total > 0 ? Math.round(((s.sent + s.failed + s.optedOut) / s.total) * 100) : 0;
-              return (
-                <div key={c.id} className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 p-5 shadow-xs space-y-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="font-semibold text-sm truncate">{c.name}</p>
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                        Criada em {new Date(c.createdAt).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })}
-                        {c.tag && <> · tag <span className="font-medium text-slate-700 dark:text-slate-300">{c.tag}</span></>}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      <Badge variant="outline">
-                        {c.status === "RUNNING" ? "Enviando" : c.status === "PAUSED" ? "Pausada" : "Concluída"}
-                      </Badge>
-                      <Megaphone className="w-5 h-5 text-pink-600" />
-                    </div>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <div className="flex justify-between text-xs text-slate-600 dark:text-slate-400">
-                      <span>{s.sent} de {s.total} enviadas</span>
-                      <span>{s.pending} na fila</span>
-                    </div>
-                    <div className="h-2 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden" role="progressbar" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100} aria-label="Progresso do envio">
-                      <div className="h-full bg-pink-500" style={{ width: `${progress}%` }} />
-                    </div>
-                  </div>
-
-                  <dl className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    <div>
-                      <dt className="text-[11px] text-slate-500 dark:text-slate-400">Responderam</dt>
-                      <dd className="text-lg font-semibold font-mono">{s.replied}</dd>
-                      <dd className="text-[11px] text-slate-500 dark:text-slate-400">{s.replyRate}% das enviadas</dd>
-                    </div>
-                    <div>
-                      <dt className="text-[11px] text-slate-500 dark:text-slate-400">Agendados</dt>
-                      <dd className="text-lg font-semibold font-mono">{s.scheduled}</dd>
-                      <dd className="text-[11px] text-slate-500 dark:text-slate-400">etapa Agendado no CRM</dd>
-                    </div>
-                    <div>
-                      <dt className="text-[11px] text-slate-500 dark:text-slate-400">Pediram pra sair</dt>
-                      <dd className="text-lg font-semibold font-mono">{s.optedOut}</dd>
-                    </div>
-                    <div>
-                      <dt className="text-[11px] text-slate-500 dark:text-slate-400">Falharam</dt>
-                      <dd className="text-lg font-semibold font-mono">{s.failed}</dd>
-                      <dd className="text-[11px] text-slate-500 dark:text-slate-400">número sem WhatsApp</dd>
-                    </div>
-                  </dl>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                    Resposta = mensagem da paciente em até 7 dias depois de receber.
-                  </p>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* =========================================================================
           FLUXO / HORÁRIOS DE PICO
          ========================================================================= */}
       <div className="space-y-4">
-        <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-200">
+        <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">
           Fluxo de Mensagens / Horários de Pico
         </h2>
         <div className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 p-5 shadow-xs space-y-3">
@@ -640,7 +685,7 @@ export default async function ClinicReportPage({
       {appointmentsReport && (
         <div className="space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-200">
+            <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">
               Agendamentos
             </h2>
             <div className="flex flex-wrap items-center gap-2">
@@ -675,10 +720,10 @@ export default async function ClinicReportPage({
                 </span>
                 <CalendarCheck className="w-5 h-5 text-sky-600" />
               </div>
-              <p className="text-2xl font-semibold font-mono">
+              <p className="text-2xl font-semibold tabular-nums">
                 {appointmentsReport.totalAppointments}
               </p>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+              <p className="text-xs text-slate-600 dark:text-slate-400 font-medium">
                 {appointmentsReport.countByStatus.COMPLETED} concluídos
               </p>
             </div>
@@ -690,10 +735,10 @@ export default async function ClinicReportPage({
                 </span>
                 <XCircle className="w-5 h-5 text-rose-600" />
               </div>
-              <p className="text-2xl font-semibold font-mono">
-                {appointmentsReport.cancellationRate}%
+              <p className="text-2xl font-semibold tabular-nums">
+                {pctBR(appointmentsReport.cancellationRate)}
               </p>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+              <p className="text-xs text-slate-600 dark:text-slate-400 font-medium">
                 {appointmentsReport.countByStatus.CANCELLED} cancelados,{" "}
                 {appointmentsReport.countByStatus.NO_SHOW} faltas
               </p>
@@ -704,10 +749,10 @@ export default async function ClinicReportPage({
                 <span className="text-xs font-medium">Receita do Período</span>
                 <DollarSign className="w-5 h-5 text-emerald-600" />
               </div>
-              <p className="text-2xl font-semibold font-mono">
+              <p className="text-2xl font-semibold tabular-nums">
                 {formatCurrency(appointmentsReport.revenue)}
               </p>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+              <p className="text-xs text-slate-600 dark:text-slate-400 font-medium">
                 Consultas concluídas
               </p>
             </div>
@@ -744,6 +789,67 @@ export default async function ClinicReportPage({
           </div>
         </div>
       )}
+      {/* =========================================================================
+          VALORES ESTIMADOS — por último e marcados como estimativa (crítica de Relatórios:
+          estimativas apareciam no topo com peso de fato)
+         ========================================================================= */}
+      <div className="space-y-4">
+        <h2 className="flex items-center gap-2 text-base font-semibold text-slate-900 dark:text-slate-100">
+          Valores estimados
+          <span className="rounded-md border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/40 px-1.5 py-px text-xs font-semibold text-amber-800 dark:text-amber-300">
+            Estimativa
+          </span>
+        </h2>
+        <p className="-mt-2 text-xs text-slate-600 dark:text-slate-400">
+          Calculados com o ticket médio de consulta — não são valores recebidos.
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="bg-white dark:bg-slate-900 p-5 rounded-lg border border-slate-200 dark:border-slate-800 shadow-xs space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium text-slate-600 dark:text-slate-400">Faturamento estimado</span>
+              <Wallet className="w-4 h-4 text-slate-400" aria-hidden />
+            </div>
+            <p className="text-2xl font-semibold tabular-nums text-slate-700 dark:text-slate-200">
+              {management.estimatedRevenue !== null ? formatCurrency(management.estimatedRevenue) : "—"}
+            </p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              {management.scheduledCount} conversa(s) do WhatsApp finalizadas como agendamento
+              {management.ticket !== null ? ` × ticket médio de ${formatCurrency(management.ticket)}` : " — sem ticket médio cadastrado"}
+            </p>
+          </div>
+          <div className="bg-white dark:bg-slate-900 p-5 rounded-lg border border-slate-200 dark:border-slate-800 shadow-xs space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium text-slate-600 dark:text-slate-400">Valor das consultas confirmadas</span>
+              <ShieldCheck className="w-4 h-4 text-slate-400" aria-hidden />
+            </div>
+            <p className="text-2xl font-semibold tabular-nums text-slate-700 dark:text-slate-200">
+              {management.protectedRevenue !== null ? formatCurrency(management.protectedRevenue) : "—"}
+            </p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              {management.confirmations.confirmed} consulta(s) confirmada(s) pelos lembretes automáticos
+              {management.ticket !== null ? ` × ticket médio de ${formatCurrency(management.ticket)}` : " — sem ticket médio cadastrado"}
+            </p>
+          </div>
+        </div>
+        {management.ticket === null && (
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            {/* "Preços e Horários" não aparece no menu de clínicas com WhatsApp exclusivo —
+                não mandar pra uma tela que o perfil não enxerga. */}
+            {isExclusive ? (
+              "Para estimar valores, peça à equipe do Conecta Saúde para cadastrar o ticket médio de consulta da clínica."
+            ) : (
+              <>
+                Para estimar valores, informe o ticket médio de consulta em{" "}
+                <Link href="/clinic/precos" className="font-medium text-sky-700 dark:text-sky-400 underline underline-offset-2">
+                  Preços e Horários
+                </Link>
+                .
+              </>
+            )}
+          </p>
+        )}
+      </div>
+
     </div>
   );
 }

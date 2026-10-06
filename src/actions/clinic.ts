@@ -5,6 +5,7 @@ import type { AppointmentStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireClinicSession } from "@/lib/session";
 import { startOfUTCDay, addUTCDays } from "@/lib/date";
+import { reportWindow } from "@/lib/report-period";
 import { computeCampaignStats, phoneKey, type CampaignStats } from "@/lib/campaign-report";
 import { RESCHEDULE_PENDING_TAG as CAMPAIGN_RESCHEDULE_TAG } from "@/lib/conversation-tags";
 import {
@@ -93,14 +94,16 @@ function channelWhere(channel?: string) {
   return { acquisitionChannel: channel === UNIDENTIFIED_CHANNEL ? null : channel };
 }
 
-export async function getClinicChatReport(days: number = 30, tags?: string[], channel?: string) {
+export async function getClinicChatReport(days: number = 30, tags?: string[], channel?: string, previous = false) {
   const { clinicId } = await requireClinicSession();
-  const since = addUTCDays(startOfUTCDay(new Date()), -days);
+  // `previous` = mesma janela imediatamente antes (comparação no relatório).
+  const { since, until } = reportWindow(days, previous);
+  const inWindow = { gte: since, ...(until ? { lt: until } : {}) };
   const tagsFilter = { ...(tags && tags.length > 0 ? { tags: { hasSome: tags } } : {}), ...channelWhere(channel) };
 
   const [conversations, audits] = await Promise.all([
     prisma.conversation.findMany({
-      where: { clinicId, createdAt: { gte: since }, ...tagsFilter },
+      where: { clinicId, createdAt: inWindow, ...tagsFilter },
       select: { id: true, status: true, resolutionReason: true, createdAt: true, resolvedAt: true },
     }),
     // Filtra pela data da CONVERSA, não do audit — um audit é criado só quando a conversa
@@ -108,7 +111,7 @@ export async function getClinicChatReport(days: number = 30, tags?: string[], ch
     // abertas há semanas e resolvidas só agora, distorcendo a média de resolução pra
     // muito acima da realidade (bug real: média de 118h só por causa de 1 conversa velha).
     prisma.conversationQualityAudit.findMany({
-      where: { conversation: { clinicId, createdAt: { gte: since }, ...tagsFilter } },
+      where: { conversation: { clinicId, createdAt: inWindow, ...tagsFilter } },
       select: { sentiment: true, firstResponseSec: true, resolutionSec: true },
     }),
   ]);
@@ -235,13 +238,15 @@ export async function getClinicAppointmentsReport(days: number = 30, doctorName?
 /** Métricas de gestão do /clinic/relatorio (equipe, confirmações, médicos, tipo de
  * atendimento, horário de pico). Agregação em src/lib/report-metrics.ts. O atendente de
  * uma conversa é quem a resolveu (resolvedByUserId), senão quem está atribuído. */
-export async function getClinicManagementReport(days: number = 30, channel?: string) {
+export async function getClinicManagementReport(days: number = 30, channel?: string, previous = false) {
   const { clinicId } = await requireClinicSession();
-  const since = addUTCDays(startOfUTCDay(new Date()), -days);
+  // `previous` = mesma janela imediatamente antes (comparação no relatório).
+  const { since, until } = reportWindow(days, previous);
+  const inWindow = { gte: since, ...(until ? { lt: until } : {}) };
 
   const [allConversations, appointments, inbound, bridgeLogs, clinic] = await Promise.all([
     prisma.conversation.findMany({
-      where: { clinicId, createdAt: { gte: since } },
+      where: { clinicId, createdAt: inWindow },
       select: {
         acquisitionChannel: true,
         status: true,
@@ -252,7 +257,7 @@ export async function getClinicManagementReport(days: number = 30, channel?: str
       },
     }),
     prisma.appointment.findMany({
-      where: { clinicProcedure: { clinicId }, createdAt: { gte: since } },
+      where: { clinicProcedure: { clinicId }, createdAt: inWindow },
       select: {
         doctorName: true,
         status: true,
@@ -265,11 +270,11 @@ export async function getClinicManagementReport(days: number = 30, channel?: str
       },
     }),
     prisma.message.findMany({
-      where: { direction: "INBOUND", createdAt: { gte: since }, conversation: { clinicId } },
+      where: { direction: "INBOUND", createdAt: inWindow, conversation: { clinicId } },
       select: { createdAt: true },
     }),
     prisma.bridgeReminderLog.findMany({
-      where: { clinicId, sentAt: { gte: since } },
+      where: { clinicId, sentAt: inWindow },
       select: { response: true, sentAt: true },
     }),
     prisma.clinic.findUniqueOrThrow({ where: { id: clinicId }, select: { defaultTicket: true } }),
@@ -307,7 +312,7 @@ export async function getClinicManagementReport(days: number = 30, channel?: str
   // vínculo Conversation↔Appointment pra saber o procedimento). Receita Protegida:
   // lembretes confirmados × preço do procedimento (agendamento nosso) ou ticket (bridge).
   const scheduledCount = conversations.filter((c) => c.resolutionReason === "AGENDAMENTO_CONCLUIDO").length;
-  const bridgeConfirmations = computeBridgeConfirmationStats(bridgeLogs);
+  const bridgeConfirmations = computeBridgeConfirmationStats(bridgeLogs, until ?? new Date());
   const ownConfirmedValue = appointments
     .filter((a) => a.reminderStatus === "CONFIRMED")
     .reduce((sum, a) => {
