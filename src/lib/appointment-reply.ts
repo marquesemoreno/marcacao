@@ -10,6 +10,9 @@ function normalizeReply(text: string): string {
     .toLowerCase()
     .normalize("NFD")
     .replace(/[̀-ͯ]/g, "")
+    // "1️⃣" (número em emoji) vira "1"; emoji no fim ("Sim ❤️", "Confirmado 👍🏽") sai.
+    .replace(/[️⃣]/g, "")
+    .replace(/[\p{Extended_Pictographic}\p{Emoji_Modifier}‍\s]+$/u, "")
     .replace(/[!.,;]+$/, "")
     .trim();
 }

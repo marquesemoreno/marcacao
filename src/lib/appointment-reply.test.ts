@@ -7,6 +7,14 @@ describe("resolveStatusFromReply", () => {
     expect(resolveStatusFromReply("3")).toBe("CANCELLED");
   });
 
+  it("aceita o número em emoji e emoji no fim da resposta", () => {
+    expect(resolveStatusFromReply("1️⃣")).toBe("CONFIRMED");
+    expect(resolveStatusFromReply("3️⃣")).toBe("CANCELLED");
+    expect(resolveStatusFromReply("Sim ❤️")).toBe("CONFIRMED");
+    expect(resolveStatusFromReply("Confirmado 👍🏽")).toBe("CONFIRMED");
+    expect(isRescheduleReply("2️⃣")).toBe(true);
+  });
+
   it("reconhece variações de texto livre pra confirmar, não só o número 1", () => {
     // Bug real: paciente respondia "Confirmado" em vez de "1" e a confirmação era ignorada.
     expect(resolveStatusFromReply("Confirmado")).toBe("CONFIRMED");

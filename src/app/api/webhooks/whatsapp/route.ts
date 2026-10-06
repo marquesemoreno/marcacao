@@ -1080,6 +1080,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, status: "chat_message_received" }, { status: 200 });
   }
 
+  // Grava no lembrete D-1 do bridge ANTES de procurar Appointment nosso — bug real
+  // (out/2026): paciente com agendamento antigo no painel caía no ramo de baixo e a
+  // resposta nunca era gravada, inflando "Sem Retorno" no relatório. Só casa lembrete
+  // do bridge sem resposta dos últimos 4 dias, então é inofensivo pro marketplace.
+  if (conversation) {
+    await recordBridgeReminderResponse(conversation.clinicId, incoming.phone, newStatus === "CONFIRMED" ? "CONFIRMED" : "CANCELLED");
+  }
+
   const phoneDigits = formatToWhatsAppNumber(incoming.phone);
   const phoneSuffix = phoneDigits.slice(-11);
 
@@ -1099,7 +1107,6 @@ export async function POST(request: Request) {
     // a resposta na conversa pra atendente ver e agir manualmente — não dá pra
     // atualizar de volta o Firebird, o bridge hoje só insere, nunca atualiza.
     if (conversation) {
-      await recordBridgeReminderResponse(conversation.clinicId, incoming.phone, newStatus === "CONFIRMED" ? "CONFIRMED" : "CANCELLED");
       await prisma.conversation.update({
         where: { id: conversation.id },
         data: { tags: nextTagsForOutcome(conversation.tags, newStatus === "CONFIRMED" ? CONFIRMED_TAG : CANCELLED_TAG) },
