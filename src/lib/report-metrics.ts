@@ -71,6 +71,9 @@ export function computeConfirmationStats(appointments: ReminderAppointment[], no
     confirmedPct: pct(confirmed, sent.length),
     cancelled,
     cancelledPct: pct(cancelled, sent.length),
+    // Agendamentos do painel não têm "quer remarcar" (só o lembrete do bridge tem).
+    rescheduled: 0,
+    rescheduledPct: 0,
     noReply,
     noReplyPct: pct(noReply, sent.length),
   };
@@ -127,11 +130,11 @@ export function computeHourlyInbound(timestamps: Date[]) {
 }
 
 export type ConfirmationStats = ReturnType<typeof computeConfirmationStats>;
-export type BridgeConfirmationCounts = { sent: number; confirmed: number; cancelled: number; noReply: number };
+export type BridgeConfirmationCounts = { sent: number; confirmed: number; cancelled: number; rescheduled: number; noReply: number };
 
 /** Lembretes D-1 do bridge (BridgeReminderLog) — o agendamento não existe no nosso banco,
- * então a resposta fica no próprio log (gravada pelo webhook). "Remarcar" conta como
- * liberado (o horário vaga). Sem resposta só conta depois de 1 dia (a consulta já passou). */
+ * então a resposta fica no próprio log (gravada pelo webhook). "Remarcar" tem contagem
+ * própria (crítica de Relatórios: somado em "cancelados" não fechava à vista). Sem resposta só conta depois de 1 dia (a consulta já passou). */
 export function computeBridgeConfirmationStats(
   logs: { response: string | null; sentAt: Date }[],
   now: Date = new Date()
@@ -140,7 +143,8 @@ export function computeBridgeConfirmationStats(
   return {
     sent: logs.length,
     confirmed: logs.filter((l) => l.response === "CONFIRMED").length,
-    cancelled: logs.filter((l) => l.response === "CANCELLED" || l.response === "RESCHEDULE").length,
+    cancelled: logs.filter((l) => l.response === "CANCELLED").length,
+    rescheduled: logs.filter((l) => l.response === "RESCHEDULE").length,
     noReply: logs.filter((l) => l.response === null && l.sentAt.getTime() < dayAgo).length,
   };
 }
@@ -149,6 +153,7 @@ export function mergeConfirmationStats(a: ConfirmationStats, b: BridgeConfirmati
   const totalSent = a.totalSent + b.sent;
   const confirmed = a.confirmed + b.confirmed;
   const cancelled = a.cancelled + b.cancelled;
+  const rescheduled = a.rescheduled + b.rescheduled;
   const noReply = a.noReply + b.noReply;
   return {
     totalSent,
@@ -156,6 +161,8 @@ export function mergeConfirmationStats(a: ConfirmationStats, b: BridgeConfirmati
     confirmedPct: pct(confirmed, totalSent),
     cancelled,
     cancelledPct: pct(cancelled, totalSent),
+    rescheduled,
+    rescheduledPct: pct(rescheduled, totalSent),
     noReply,
     noReplyPct: pct(noReply, totalSent),
   };

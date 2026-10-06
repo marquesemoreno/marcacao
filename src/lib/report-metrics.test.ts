@@ -47,6 +47,8 @@ describe("computeConfirmationStats", () => {
       confirmedPct: 25,
       cancelled: 1,
       cancelledPct: 25,
+      rescheduled: 0,
+      rescheduledPct: 0,
       noReply: 1,
       noReplyPct: 25,
     });
@@ -111,15 +113,17 @@ describe("computeBridgeConfirmationStats", () => {
         ],
         now
       )
-    ).toEqual({ sent: 5, confirmed: 1, cancelled: 2, noReply: 1 });
+    ).toEqual({ sent: 5, confirmed: 1, cancelled: 1, rescheduled: 1, noReply: 1 });
   });
 
   it("mergeConfirmationStats soma as duas fontes e recalcula %", () => {
     const merged = mergeConfirmationStats(
-      { totalSent: 2, confirmed: 1, confirmedPct: 50, cancelled: 0, cancelledPct: 0, noReply: 1, noReplyPct: 50 },
-      { sent: 2, confirmed: 2, cancelled: 0, noReply: 0 }
+      { totalSent: 2, confirmed: 1, confirmedPct: 50, cancelled: 0, cancelledPct: 0, rescheduled: 0, rescheduledPct: 0, noReply: 1, noReplyPct: 50 },
+      { sent: 2, confirmed: 1, cancelled: 0, rescheduled: 1, noReply: 0 }
     );
-    expect(merged).toEqual({ totalSent: 4, confirmed: 3, confirmedPct: 75, cancelled: 0, cancelledPct: 0, noReply: 1, noReplyPct: 25 });
+    expect(merged).toEqual({
+      totalSent: 4, confirmed: 2, confirmedPct: 50, cancelled: 0, cancelledPct: 0, rescheduled: 1, rescheduledPct: 25, noReply: 1, noReplyPct: 25,
+    });
   });
 });
 
