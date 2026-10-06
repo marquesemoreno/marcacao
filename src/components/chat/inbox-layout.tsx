@@ -60,10 +60,10 @@ import {
   Loader2,
   User,
   Clock,
+  SlidersHorizontal,
   Info,
   AlertTriangle,
   Trash2,
-  Settings2,
   Smartphone,
   MessageSquarePlus,
   ChevronsUpDown,
@@ -96,6 +96,7 @@ const COMPOSER_EMOJIS = [
 const UNASSIGNED_ALERT_THRESHOLD_MINUTES = 10;
 
 const CRM_PANEL_STORAGE_KEY = 'inbox-crm-panel';
+const AUTO_ADVANCE_STORAGE_KEY = 'inbox-auto-advance';
 
 /** Todas as abas possíveis da fila — o atendente escolhe quais ficam visíveis (persiste no navegador). */
 const ALL_INBOX_TABS: { id: InboxFilter; label: string }[] = [
@@ -400,10 +401,10 @@ const ContactListItem = React.memo(function ContactListItem({
         <AvatarBadge name={c.name} photoUrl={c.avatar} size={34} className="ring-2 ring-white dark:ring-slate-900 shadow-sm" />
         {c.channel === 'instagram' && (
           <span
-            className="absolute -bottom-1 -right-1 w-3.5 h-3.5 bg-gradient-to-tr from-amber-500 via-pink-500 to-purple-600 border-2 border-white dark:border-slate-900 rounded-full flex items-center justify-center text-white"
+            className="absolute -bottom-1 -right-1 size-4 bg-pink-700 border-2 border-white dark:border-slate-900 rounded-md flex items-center justify-center text-white"
             title="Canal: Instagram Direct"
           >
-            <InstagramGlyph className="w-2 h-2" />
+            <InstagramGlyph className="w-2.5 h-2.5" />
           </span>
         )}
       </div>
@@ -435,12 +436,16 @@ const ContactListItem = React.memo(function ContactListItem({
           )}
         </div>
 
-        {c.clinicName && <p className="text-xs font-medium text-sky-700 dark:text-sky-400 truncate">{c.clinicName}</p>}
 
-        {/* Intenção (Jev, confiança alta) no lugar da prévia crua — a prévia fica no title. */}
+        {/* Intenção sugerida pela IA (Jev, confiança alta) — neutra: só o SLA tem cor na linha. */}
         {c.patientIntent ? (
-          <p className="mt-0.5 flex items-center gap-1.5 min-w-0 text-sm leading-snug" title={c.lastMessage}>
-            <span className="shrink-0 rounded-md border border-sky-200 dark:border-sky-800 bg-sky-50 dark:bg-sky-950/50 px-1.5 py-px text-xs font-semibold text-sky-800 dark:text-sky-200">
+          <p
+            className="mt-0.5 flex items-center gap-1.5 min-w-0 text-sm leading-snug"
+            title={`Sugestão da IA a partir da mensagem: "${c.lastMessage}"`}
+          >
+            <span className="shrink-0 inline-flex items-center gap-1 rounded-md border border-slate-300 dark:border-slate-600 px-1.5 py-px text-xs font-semibold text-slate-700 dark:text-slate-200">
+              <Sparkles className="w-3 h-3 text-slate-500 dark:text-slate-400" aria-hidden />
+              <span className="sr-only">Sugestão da IA: </span>
               {c.patientIntent}
             </span>
             <span className="truncate text-slate-500 dark:text-slate-400">{c.lastMessage}</span>
@@ -451,6 +456,7 @@ const ContactListItem = React.memo(function ContactListItem({
 
         <div className="flex items-center justify-between gap-2 mt-1">
           <span className="inline-flex items-center gap-2 min-w-0 text-xs">
+            {c.clinicName && <span className="truncate font-medium text-slate-600 dark:text-slate-300">{c.clinicName}</span>}
             {c.hasUnseenAssignment ? (
               <span className="inline-flex items-center gap-1 font-semibold text-amber-700 dark:text-amber-400">
                 <Zap className="w-3 h-3" /> Transferida pra você
@@ -614,9 +620,8 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
   const [selectedTagFilter, setSelectedTagFilter] = useState<string | null>(null);
   const [isTagFilterOpen, setIsTagFilterOpen] = useState(false);
   const tagFilterRef = useClickOutside<HTMLDivElement>(isTagFilterOpen, () => setIsTagFilterOpen(false));
+  const activeFilterCount = (selectedTagFilter ? 1 : 0) + (agentFilter ? 1 : 0);
   const [visibleTabIds, setVisibleTabIds] = useState<InboxFilter[]>(DEFAULT_VISIBLE_TAB_IDS);
-  const [isTabSettingsOpen, setIsTabSettingsOpen] = useState(false);
-  const tabSettingsRef = useClickOutside<HTMLDivElement>(isTabSettingsOpen, () => setIsTabSettingsOpen(false));
 
   // Preferência pessoal de quais abas ficam visíveis — salva só no navegador, não no banco.
   useEffect(() => {
@@ -910,7 +915,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
     // Contadores chegam depois e alargam as abas — reavalia quando mudam.
   }, [filterTab, visibleTabIds, pendingCount, unassignedCount]);
 
-  // Divisórias da fila (Prioridade / Aguardando / Esquecidas há mais de 48 h / resto).
+  // Divisórias da fila (Prioridade / Aguardando / Sem resposta há +48 h / resto).
   const groupCounts = useMemo(() => {
     const counts: Record<QueueGroup, number> = { prioridade: 0, aguardando: 0, esquecidas: 0, resto: 0 };
     for (const c of filteredContacts) counts[queueGroup(c)]++;
@@ -940,6 +945,20 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
   // Atalhos de teclado da fila (crítica de design, out/2026). Não disparam digitando
   // num campo, com Ctrl/Alt/Cmd ou com algum diálogo aberto. "/" é a busca global.
   const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
+  // Abrir a próxima conversa ao finalizar — liga/desliga no diálogo de atalhos; fica
+  // guardado neste navegador (não na conta).
+  const [autoAdvance, setAutoAdvance] = useState(true);
+  useEffect(() => {
+    try {
+      if (localStorage.getItem(AUTO_ADVANCE_STORAGE_KEY) === '0') setAutoAdvance(false);
+    } catch {}
+  }, []);
+  function toggleAutoAdvance(next: boolean) {
+    setAutoAdvance(next);
+    try {
+      localStorage.setItem(AUTO_ADVANCE_STORAGE_KEY, next ? '1' : '0');
+    } catch {}
+  }
   const selectedIdRef = useRef<string | undefined>(undefined);
   selectedIdRef.current = selectedContact?.id;
   useEffect(() => {
@@ -1422,107 +1441,95 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
             })}
           </div>
 
-          {/* Filtro por Tag — ícone na linha das abas; a tag ativa aparece como chip abaixo. */}
+          {/* Um botão "Filtros" (crítica #3): tag, atendente e abas visíveis num painel só,
+              com a contagem de filtros ativos. As abas continuam à vista na linha. */}
           <div className="relative shrink-0" ref={tagFilterRef}>
             <button
               type="button"
               onClick={() => setIsTagFilterOpen((open) => !open)}
-              aria-label={selectedTagFilter ? `Filtrar por tag (ativo: ${selectedTagFilter})` : 'Filtrar por tag'}
-              title="Filtrar por tag"
               aria-expanded={isTagFilterOpen}
-              className={`relative flex items-center justify-center w-7 h-7 rounded-lg transition-colors hover:bg-slate-100 dark:hover:bg-slate-800 ${
-                selectedTagFilter ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+              aria-label={activeFilterCount > 0 ? `Filtros (${activeFilterCount} ativo${activeFilterCount > 1 ? 's' : ''})` : 'Filtros'}
+              className={`relative flex items-center gap-1 h-7 px-2 rounded-lg text-xs font-medium transition-colors hover:bg-slate-100 dark:hover:bg-slate-800 ${
+                activeFilterCount > 0 ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
               }`}
             >
-              <Filter className="w-3.5 h-3.5" />
-              {selectedTagFilter && <span className="absolute top-1 right-1 size-1.5 rounded-full bg-emerald-600" aria-hidden />}
+              <SlidersHorizontal className="w-3.5 h-3.5" aria-hidden />
+              {activeFilterCount > 0 && (
+                <span className="min-w-4 h-4 px-1 rounded-md bg-emerald-700 text-white text-xs font-bold leading-4 tabular-nums">{activeFilterCount}</span>
+              )}
             </button>
 
             {isTagFilterOpen && (
-              <div className="absolute right-0 w-56 mt-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg shadow-lg py-1.5 z-30 animate-in fade-in zoom-in-95 duration-100 max-h-56 overflow-y-auto">
-                <button
-                  onClick={() => {
-                    setSelectedTagFilter(null);
-                    setIsTagFilterOpen(false);
-                  }}
-                  className={`w-full px-3 py-1.5 text-left text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 ${
-                    selectedTagFilter === null ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-600 dark:text-slate-300'
-                  }`}
-                >
-                  Todas as Tags
-                </button>
-                {availableTagFilters.map((preset) => (
+              <div className="absolute right-0 w-64 mt-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg shadow-lg z-30 max-h-[70vh] overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800">
+                {onAgentFilterChange && ['todas', 'finalizadas', 'arquivadas'].includes(filterTab) && (
+                  <div className="p-3 space-y-1.5">
+                    <p className="text-xs font-semibold text-slate-600 dark:text-slate-300">Atendente</p>
+                    {/* <select> nativo, não o Select do base-ui: o controlado resetava o valor
+                        ao reabrir e as ferramentas de browser não clicavam nele de forma confiável. */}
+                    <select
+                      value={agentFilter ?? ''}
+                      onChange={(e) => onAgentFilterChange(e.target.value)}
+                      aria-label="Filtrar por atendente"
+                      className="w-full h-8 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2 text-xs font-medium text-slate-700 dark:text-slate-200"
+                    >
+                      <option value="">Todos os atendentes</option>
+                      {agents
+                        .filter((agent) => agent.name !== 'Não Atribuídas')
+                        .map((agent) => (
+                          <option key={agent.id} value={agent.id}>
+                            {agent.name}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+                )}
+                <div className="py-1.5">
+                  <p className="px-3 py-1 text-xs font-semibold text-slate-600 dark:text-slate-300">Tag</p>
                   <button
-                    key={preset.label}
-                    onClick={() => {
-                      setSelectedTagFilter(selectedTagFilter === preset.label ? null : preset.label);
-                      setIsTagFilterOpen(false);
-                    }}
-                    className="w-full px-3 py-1.5 text-left hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center"
+                    type="button"
+                    onClick={() => setSelectedTagFilter(null)}
+                    className={`w-full px-3 py-1.5 text-left text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 ${
+                      selectedTagFilter === null ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-600 dark:text-slate-300'
+                    }`}
                   >
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold border ${preset.classes} ${selectedTagFilter === preset.label ? 'ring-2 ring-emerald-500/30' : ''}`}>
-                      {preset.label}
-                    </span>
+                    Todas as tags
                   </button>
-                ))}
-              </div>
-            )}
-          </div>
-          <div className="relative shrink-0" ref={tabSettingsRef}>
-            <button
-              type="button"
-              onClick={() => setIsTabSettingsOpen((open) => !open)}
-              title="Escolher quais abas mostrar"
-              aria-label="Escolher quais abas mostrar"
-              className="flex items-center justify-center w-7 h-7 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-800 dark:hover:text-slate-200 transition-colors"
-            >
-              <Settings2 className="w-3.5 h-3.5" />
-            </button>
-            {isTabSettingsOpen && (
-              <div className="absolute right-0 mt-1 w-48 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg shadow-lg py-1.5 z-30 animate-in fade-in zoom-in-95 duration-100">
-                <p className="px-3 py-1 text-xs font-bold text-slate-600 dark:text-slate-300">
-                  Abas visíveis
-                </p>
-                {ALL_INBOX_TABS.map((tab) => (
-                  <label
-                    key={tab.id}
-                    className="flex items-center gap-2 px-3 py-1.5 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={visibleTabIds.includes(tab.id)}
-                      onChange={() => toggleTabVisibility(tab.id)}
-                      className="accent-emerald-600"
-                    />
-                    {tab.label}
-                  </label>
-                ))}
+                  {availableTagFilters.map((preset) => (
+                    <button
+                      type="button"
+                      key={preset.label}
+                      onClick={() => setSelectedTagFilter(selectedTagFilter === preset.label ? null : preset.label)}
+                      aria-pressed={selectedTagFilter === preset.label}
+                      className="w-full px-3 py-1.5 text-left hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center"
+                    >
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold border ${preset.classes} ${selectedTagFilter === preset.label ? 'ring-2 ring-emerald-500/30' : ''}`}>
+                        {preset.label}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+                <div className="py-1.5">
+                  <p className="px-3 py-1 text-xs font-semibold text-slate-600 dark:text-slate-300">Abas visíveis</p>
+                  {ALL_INBOX_TABS.map((tab) => (
+                    <label
+                      key={tab.id}
+                      className="flex items-center gap-2 px-3 py-1.5 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={visibleTabIds.includes(tab.id)}
+                        onChange={() => toggleTabVisibility(tab.id)}
+                        className="accent-emerald-600"
+                      />
+                      {tab.label}
+                    </label>
+                  ))}
+                </div>
               </div>
             )}
           </div>
           </div>
 
-          {/* Filtro rápido por atendente — só faz sentido em "todas"/"finalizadas"/"arquivadas"
-             (em "minhas" já sou eu, em "não atribuídas" não tem dono nenhum). <select> nativo,
-             não o Select do base-ui: em teste anterior nesta fila, o Select controlado resetava
-             o valor ao reabrir e as ferramentas de browser não clicavam nele de forma confiável. */}
-          {onAgentFilterChange && ['todas', 'finalizadas', 'arquivadas'].includes(filterTab) && (
-            <select
-              value={agentFilter ?? ''}
-              onChange={(e) => onAgentFilterChange(e.target.value)}
-              aria-label="Filtrar por Atendente"
-              className="w-full h-8 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2 text-xs font-medium text-slate-600 dark:text-slate-300"
-            >
-              <option value="">Todos os atendentes</option>
-              {agents
-                .filter((agent) => agent.name !== 'Não Atribuídas')
-                .map((agent) => (
-                  <option key={agent.id} value={agent.id}>
-                    {agent.name}
-                  </option>
-                ))}
-            </select>
-          )}
 
           {selectedTagFilter && (
             <button
@@ -1567,10 +1574,13 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
               <React.Fragment key={c.id}>
               {showDivider && (
                 <div
-                  role="presentation"
+                  role="heading"
+                  aria-level={3}
                   className="sticky top-0 z-[5] flex items-center justify-between bg-slate-100/95 dark:bg-slate-900/95 backdrop-blur-sm px-4 py-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300"
                 >
-                  <span>{QUEUE_GROUP_LABEL[group]}</span>
+                  <span title={group === 'esquecidas' ? 'Pacientes que escreveram há mais de 48 h e ainda esperam resposta — ficam depois de quem escreveu nas últimas 48 h, para não esconder quem acabou de chegar.' : undefined}>
+                    {QUEUE_GROUP_LABEL[group]}
+                  </span>
                   <span className="tabular-nums text-slate-500 dark:text-slate-400">{groupCounts[group]}</span>
                 </div>
               )}
@@ -1788,7 +1798,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                       <Popover>
                         <PopoverTrigger className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700">
                           <UserPlus className="w-3.5 h-3.5" aria-hidden />
-                          <span className="whitespace-nowrap">Limite Atingido</span>
+                          <span className="whitespace-nowrap">Limite atingido</span>
                           <Info className="w-3.5 h-3.5" aria-hidden />
                         </PopoverTrigger>
                         <PopoverContent align="end" className="w-72 p-3 text-xs text-slate-700 dark:text-slate-200">
@@ -3177,7 +3187,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
               ['n', 'Ir para a conversa mais urgente da fila'],
               ['i', 'Escrever nota interna (o paciente não vê)'],
               ['a', 'Atribuir a conversa a mim'],
-              ['e', 'Finalizar atendimento (abre a próxima da fila)'],
+              ['e', 'Finalizar atendimento'],
               ['/', 'Buscar paciente, telefone ou conversa'],
               ['?', 'Mostrar estes atalhos'],
             ].map(([key, label]) => (
@@ -3190,6 +3200,15 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
             ))}
           </dl>
           <p className="text-xs text-slate-500 dark:text-slate-400">Os atalhos não funcionam enquanto você digita numa caixa de texto.</p>
+          <label className="flex items-center gap-2 border-t border-slate-200 dark:border-slate-800 pt-3 text-sm text-slate-700 dark:text-slate-200">
+            <input
+              type="checkbox"
+              checked={autoAdvance}
+              onChange={(e) => toggleAutoAdvance(e.target.checked)}
+              className="size-4 accent-emerald-600"
+            />
+            Ao finalizar, abrir a próxima conversa da fila
+          </label>
         </DialogContent>
       </Dialog>
 
@@ -3300,8 +3319,9 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                 onClick={async () => {
                   if (!selectedReason || isFinishingAttendance) return;
                   setIsFinishingAttendance(true);
-                  // Próximo da fila (a de cima que não é esta) — abre sozinho ao finalizar.
-                  const nextInQueue = filteredContacts.find((c) => c.id !== selectedContact?.id);
+                  // Próximo da fila (a de cima que não é esta) — abre sozinho ao finalizar,
+                  // a menos que a atendente tenha desligado (preferência deste navegador).
+                  const nextInQueue = autoAdvance ? filteredContacts.find((c) => c.id !== selectedContact?.id) : undefined;
                   try {
                     await onFinishAttendance({ reason: selectedReason, notes: finishNotes });
                     setIsFinishModalOpen(false);

@@ -105,7 +105,7 @@ export function formatDurationHuman(minutes: number): string {
   if (m < 60) return `${m} min`;
   const hours = Math.round(m / 60);
   if (hours < 24) return `${hours} h`;
-  const days = Math.floor(m / 1440);
+  const days = Math.max(1, Math.floor(m / 1440));
   return days === 1 ? "1 dia" : `${days} dias`;
 }
 

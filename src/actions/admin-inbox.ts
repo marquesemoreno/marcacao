@@ -1698,3 +1698,28 @@ export async function undoReactivateAiForConversationAdmin(conversationId: strin
   revalidatePath("/admin/inbox");
   return { success: true };
 }
+
+/** Responsável atual de cada conversa (pra "Desfazer" da atribuição em massa). */
+export async function getConversationOwnersAdmin(conversationIds: string[]) {
+  await requireAdminSession();
+  return prisma.conversation.findMany({ where: { id: { in: conversationIds } }, select: { id: true, assignedUserId: true } });
+}
+
+/** Desfaz a atribuição em massa (admin). */
+export async function restoreConversationOwnersAdmin(owners: { id: string; assignedUserId: string | null }[]) {
+  await requireAdminSession();
+  for (const o of owners) {
+    await prisma.conversation.update({ where: { id: o.id }, data: { assignedUserId: o.assignedUserId } });
+    await prisma.message.create({
+      data: {
+        conversationId: o.id,
+        direction: "OUTBOUND",
+        type: "INTERNAL_NOTE",
+        content: "↩️ Atribuição em massa desfeita — conversa voltou para o responsável anterior.",
+        status: "SENT",
+      },
+    });
+  }
+  revalidatePath("/admin/inbox");
+  return { success: true, restored: owners.length };
+}
