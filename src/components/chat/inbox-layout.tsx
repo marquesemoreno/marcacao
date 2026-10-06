@@ -896,6 +896,20 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
     [contacts, selectedDept, selectedTagFilter, searchQuery]
   );
 
+  // Coluna estreita: as abas rolam de lado — a ativa sempre fica à vista.
+  const tabsScrollRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const box = tabsScrollRef.current;
+    const active = box?.querySelector<HTMLElement>('[aria-pressed="true"]');
+    if (!box || !active) return;
+    const ar = active.getBoundingClientRect();
+    const br = box.getBoundingClientRect();
+    if (ar.left < br.left || ar.right > br.right) {
+      box.scrollLeft += ar.left - br.left - (br.width - ar.width) / 2;
+    }
+    // Contadores chegam depois e alargam as abas — reavalia quando mudam.
+  }, [filterTab, visibleTabIds, pendingCount, unassignedCount]);
+
   // Divisórias da fila (Prioridade / Aguardando / Esquecidas há mais de 48 h / resto).
   const groupCounts = useMemo(() => {
     const counts: Record<QueueGroup, number> = { prioridade: 0, aguardando: 0, esquecidas: 0, resto: 0 };
@@ -1364,8 +1378,10 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
           )}
 
           {/* Abas de Filtros: Segmented Control Compacto + botão de escolher quais abas mostrar */}
-          <div className="flex items-center gap-1.5">
-          <div className="flex-1 flex items-center gap-0.5 p-0.5 bg-slate-100 dark:bg-slate-800/90 rounded-lg text-xs font-medium">
+          {/* min-w-0 + rolagem: as abas nunca passam da largura da fila (antes "Não
+              Atribuídas" e os ícones invadiam a coluna da conversa). */}
+          <div className="flex min-w-0 items-center gap-1.5">
+          <div ref={tabsScrollRef} className="flex-1 min-w-0 flex items-center gap-0.5 p-0.5 bg-slate-100 dark:bg-slate-800/90 rounded-lg text-xs font-medium overflow-x-auto [scrollbar-width:none]">
             {ALL_INBOX_TABS.filter((tab) => visibleTabIds.includes(tab.id)).map((tab) => {
               // C3: um único estilo de aba ativa. O alerta de espera sem responsável virou só
               // a cor do contador (vermelho passado o limiar) — antes a aba inteira ficava
@@ -1383,7 +1399,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                   onClick={() => onFilterTabChange(tab.id)}
                   aria-pressed={isActive}
                   title={isUnassignedAlert ? `Há paciente esperando há ${unassignedWaitMinutes} min sem responsável` : undefined}
-                  className={`flex-1 py-1.5 px-2 rounded-md text-xs transition-all whitespace-nowrap text-center inline-flex items-center justify-center gap-1 ${
+                  className={`shrink-0 whitespace-nowrap flex-1 py-1.5 px-2 rounded-md text-xs transition-all whitespace-nowrap text-center inline-flex items-center justify-center gap-1 ${
                     isActive
                       ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 font-semibold shadow-sm'
                       : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
@@ -1407,7 +1423,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
           </div>
 
           {/* Filtro por Tag — ícone na linha das abas; a tag ativa aparece como chip abaixo. */}
-          <div className="relative" ref={tagFilterRef}>
+          <div className="relative shrink-0" ref={tagFilterRef}>
             <button
               type="button"
               onClick={() => setIsTagFilterOpen((open) => !open)}
@@ -1452,7 +1468,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
               </div>
             )}
           </div>
-          <div className="relative" ref={tabSettingsRef}>
+          <div className="relative shrink-0" ref={tabSettingsRef}>
             <button
               type="button"
               onClick={() => setIsTabSettingsOpen((open) => !open)}
