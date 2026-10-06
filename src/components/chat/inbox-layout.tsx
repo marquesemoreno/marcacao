@@ -401,10 +401,10 @@ const ContactListItem = React.memo(function ContactListItem({
         <AvatarBadge name={c.name} photoUrl={c.avatar} size={34} className="ring-2 ring-white dark:ring-slate-900 shadow-sm" />
         {c.channel === 'instagram' && (
           <span
-            className="absolute -bottom-1 -right-1 w-3.5 h-3.5 bg-gradient-to-tr from-amber-500 via-pink-500 to-purple-600 border-2 border-white dark:border-slate-900 rounded-full flex items-center justify-center text-white"
+            className="absolute -bottom-1 -right-1 size-4 bg-pink-700 border-2 border-white dark:border-slate-900 rounded-md flex items-center justify-center text-white"
             title="Canal: Instagram Direct"
           >
-            <InstagramGlyph className="w-2 h-2" />
+            <InstagramGlyph className="w-2.5 h-2.5" />
           </span>
         )}
       </div>
@@ -1574,7 +1574,8 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
               <React.Fragment key={c.id}>
               {showDivider && (
                 <div
-                  role="presentation"
+                  role="heading"
+                  aria-level={3}
                   className="sticky top-0 z-[5] flex items-center justify-between bg-slate-100/95 dark:bg-slate-900/95 backdrop-blur-sm px-4 py-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300"
                 >
                   <span title={group === 'esquecidas' ? 'Pacientes que escreveram há mais de 48 h e ainda esperam resposta — ficam depois de quem escreveu nas últimas 48 h, para não esconder quem acabou de chegar.' : undefined}>
