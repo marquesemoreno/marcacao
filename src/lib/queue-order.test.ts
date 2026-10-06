@@ -34,4 +34,14 @@ describe("compareQueue", () => {
       "resto",
     ]);
   });
+  it("espera de mais de 48 h (conversa esquecida) vai depois de quem espera hoje", () => {
+    expect(order([row("30dias", { sla: waiting(30 * 24 * 60) }), row("10min", { sla: waiting(10) }), row("3h", { sla: waiting(180) })])).toEqual([
+      "3h",
+      "10min",
+      "30dias",
+    ]);
+  });
+  it("esquecidas ficam antes de quem não está esperando, na ordem original", () => {
+    expect(order([row("resto"), row("esq-a", { sla: waiting(5000) }), row("esq-b", { sla: waiting(9000) })])).toEqual(["esq-a", "esq-b", "resto"]);
+  });
 });
