@@ -339,11 +339,21 @@ const ContactListItem = React.memo(function ContactListItem({
       }`}
       data-od-id={`contact-card-${c.id}`}
     >
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onSelect(c.id);
+        }}
+        aria-label={`Abrir conversa com ${displayName(c)}${c.unreadCount > 0 ? `, ${c.unreadCount} não lida(s)` : ''}`}
+        aria-current={isSelected ? 'true' : undefined}
+        className="absolute inset-0 z-0 rounded-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-500"
+      />
       <Popover open={isCardMenuOpen} onOpenChange={(open) => { setIsCardMenuOpen(open); if (!open) setIsMuteSubmenuOpen(false); }}>
         <PopoverTrigger
           onClick={(e) => e.stopPropagation()}
           className={`absolute top-1.5 right-1.5 p-1 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-200/70 dark:hover:bg-slate-700/70 transition-opacity ${
-            isCardMenuOpen ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+            isCardMenuOpen ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus-visible:opacity-100'
           }`}
           title="Mais opções"
         >
@@ -967,10 +977,22 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
   selectedIdRef.current = selectedContact?.id;
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      if (e.ctrlKey || e.metaKey) return;
       const el = e.target as HTMLElement | null;
       if (el && (el.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName))) return;
       if (document.querySelector('[role="dialog"], [role="alertdialog"]')) return;
+      // Alt+A assume, Alt+E finaliza — teclas que mudam estado exigem Alt (recepção é
+      // interrompida o tempo todo; uma letra solta não pode agir na conversa aberta).
+      if (e.altKey) {
+        if (e.code === 'KeyA' && selectedIdRef.current && onClaimConversation) {
+          e.preventDefault();
+          onClaimConversation();
+        } else if (e.code === 'KeyE' && selectedIdRef.current) {
+          e.preventDefault();
+          setIsFinishModalOpen(true);
+        }
+        return;
+      }
       const list = filteredContacts;
       const idx = list.findIndex((c) => c.id === selectedIdRef.current);
       if (e.key === 'ArrowDown' || e.key === 'j') {
@@ -985,12 +1007,6 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
         const prev = list[Math.max(idx - 1, 0)] ?? list[0];
         handleSelectContactMobile(prev.id);
         document.querySelector(`[data-od-id="contact-card-${prev.id}"]`)?.scrollIntoView({ block: 'nearest' });
-      } else if (e.key === 'a' && selectedIdRef.current && onClaimConversation) {
-        e.preventDefault();
-        onClaimConversation();
-      } else if (e.key === 'e' && selectedIdRef.current) {
-        e.preventDefault();
-        setIsFinishModalOpen(true);
       } else if (e.key === 'r' && selectedIdRef.current) {
         e.preventDefault();
         document.querySelector<HTMLTextAreaElement>('[data-od-id="chat-composer-input"]')?.focus();
@@ -3190,8 +3206,8 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
               ['r', 'Responder (vai para a caixa de texto)'],
               ['n', 'Ir para a conversa mais urgente da fila'],
               ['i', 'Escrever nota interna (o paciente não vê)'],
-              ['a', 'Atribuir a conversa a mim'],
-              ['e', 'Finalizar atendimento'],
+              ['Alt + A', 'Atribuir a conversa a mim'],
+              ['Alt + E', 'Finalizar atendimento'],
               ['/', 'Buscar paciente, telefone ou conversa'],
               ['?', 'Mostrar estes atalhos'],
             ].map(([key, label]) => (

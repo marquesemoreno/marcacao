@@ -969,7 +969,22 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
     if (!result.success) {
       toast.error(result.message || "Não foi possível assumir a conversa.");
     } else {
-      toast.success("Atendimento assumido por você com sucesso!");
+      // Desfazer (crítica #4): assumir só funciona em conversa sem responsável, então
+      // desfazer = voltar pra "sem responsável".
+      const claimedId = selectedContactId;
+      const restoreFn = scope === "admin" ? restoreConversationOwnersAdmin : restoreConversationOwners;
+      toast.success("Atendimento assumido por você.", {
+        duration: 8000,
+        action: {
+          label: "Desfazer",
+          onClick: async () => {
+            const r = await restoreFn([{ id: claimedId, assignedUserId: null }]).catch(() => ({ success: false }));
+            if (r.success) toast.success("Desfeito: a conversa voltou para Não atribuídas.");
+            else toast.error("Não foi possível desfazer.");
+            await refreshContacts();
+          },
+        },
+      });
       await refreshContacts();
       await refreshMessages();
     }
