@@ -1,12 +1,8 @@
 "use client";
 
-import { useState } from "react";
-
-function initialsFor(name: string) {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  const initials = parts.slice(0, 2).map((part) => part[0]?.toUpperCase());
-  return initials.join("") || "?";
-}
+import { useCallback, useState } from "react";
+import { User } from "lucide-react";
+import { avatarInitials } from "@/lib/avatar-initials";
 
 /** Mostra a foto de perfil real do WhatsApp quando disponível (buscada via
  * Evolution API, já com custódia de tudo mais dessa conversa — não é um
@@ -24,12 +20,19 @@ export function AvatarBadge({
   className?: string;
 }) {
   const [imageFailed, setImageFailed] = useState(false);
+  // Foto do WhatsApp expirada falha ANTES da hidratação quando a página vem do servidor:
+  // o onError do React nunca dispara e o navegador mostra o texto alternativo. Confere o
+  // estado da imagem assim que ela é montada.
+  const imgRef = useCallback((img: HTMLImageElement | null) => {
+    if (img && img.complete && img.naturalWidth === 0) setImageFailed(true);
+  }, []);
   const showPhoto = Boolean(photoUrl) && !imageFailed;
 
   if (showPhoto) {
     return (
       // eslint-disable-next-line @next/next/no-img-element
       <img
+        ref={imgRef}
         src={photoUrl!}
         alt={name}
         onError={() => setImageFailed(true)}
@@ -44,7 +47,7 @@ export function AvatarBadge({
       className={`flex shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-emerald-500 via-teal-600 to-emerald-700 font-bold tracking-tight text-white shadow-2xs select-none transition-transform hover:scale-105 ${className}`}
       style={{ width: size, height: size, fontSize: Math.max(10, size * 0.38) }}
     >
-      {initialsFor(name)}
+      {avatarInitials(name) || <User style={{ width: size * 0.5, height: size * 0.5 }} aria-hidden />}
     </div>
   );
 }
