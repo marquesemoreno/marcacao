@@ -23,7 +23,7 @@ import { MessageBubble } from './message-bubble';
 import { ScheduleModal } from './schedule-modal';
 import { AvatarBadge } from './avatar-badge';
 import { PatientRecordSheet, type MediaItem } from './patient-record-sheet';
-import { compareQueue } from "@/lib/queue-order";
+import { compareQueue, queueGroup, QUEUE_GROUP_LABEL, type QueueGroup } from "@/lib/queue-order";
 import { tagClasses, renderConsultationRow, PRESET_TAGS } from './patient-record-shared';
 import { FeedbackWidget } from '@/components/feedback-widget';
 import type { PlainClinicProcedureItem } from '@/lib/serialize';
@@ -60,6 +60,8 @@ import {
   Loader2,
   User,
   Clock,
+  Info,
+  AlertTriangle,
   Trash2,
   Settings2,
   Smartphone,
@@ -425,12 +427,16 @@ const ContactListItem = React.memo(function ContactListItem({
           </h3>
           {showWait ? (
             <span
-              className={`shrink-0 inline-flex items-center gap-1 text-xs font-bold tabular-nums ${waitClass}`}
+              className={`shrink-0 inline-flex items-center gap-1 text-xs font-bold tabular-nums ${
+                c.sla.variant === 'critical' ? 'rounded-md bg-rose-700 px-1.5 py-0.5 text-white' : waitClass
+              }`}
               title={`Paciente aguardando resposta há ${c.sla.formattedTime} · última mensagem ${c.lastMessageTime}`}
             >
-              <Clock className="w-3 h-3" aria-hidden />
+              {c.sla.variant === 'critical' ? <AlertTriangle className="w-3 h-3" aria-hidden /> : <Clock className="w-3 h-3" aria-hidden />}
               {c.sla.formattedTime}
-              <span className="sr-only"> aguardando resposta</span>
+              <span className="sr-only">
+                {c.sla.variant === 'critical' ? ' aguardando resposta, atrasada' : ' aguardando resposta'}
+              </span>
             </span>
           ) : (
             <span className="shrink-0 text-xs text-slate-500 dark:text-slate-400">{c.lastMessageTime}</span>
@@ -884,6 +890,14 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
     [contacts, selectedDept, selectedTagFilter, searchQuery]
   );
 
+  // Divisórias da fila (Prioridade / Aguardando / Esquecidas há mais de 48 h / resto).
+  const groupCounts = useMemo(() => {
+    const counts: Record<QueueGroup, number> = { prioridade: 0, aguardando: 0, esquecidas: 0, resto: 0 };
+    for (const c of filteredContacts) counts[queueGroup(c)]++;
+    return counts;
+  }, [filteredContacts]);
+  const hasSeveralGroups = Object.values(groupCounts).filter((n) => n > 0).length > 1;
+
   // Seleção múltipla da fila (atribuir em massa) — vale pra lista que está na tela.
   const [bulkSelected, setBulkSelected] = useState<Set<string>>(new Set());
   const [isBulkAssigning, setIsBulkAssigning] = useState(false);
@@ -1253,6 +1267,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                   onClick={() => setIsNewContactModalOpen(true)}
                   className="flex items-center justify-center w-8 h-8 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white transition-colors"
                   title="Cadastrar novo contato e iniciar conversa"
+                  aria-label="Cadastrar novo contato e iniciar conversa"
                 >
                   <UserPlus className="w-4 h-4" />
                 </button>
@@ -1549,9 +1564,22 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
               <span>Nenhuma conversa encontrada nesta lista.</span>
             </div>
           ) : (
-            filteredContacts.map((c) => (
+            filteredContacts.map((c, i) => {
+              const group = queueGroup(c);
+              const showDivider =
+                hasSeveralGroups && (i === 0 || queueGroup(filteredContacts[i - 1]) !== group);
+              return (
+              <React.Fragment key={c.id}>
+              {showDivider && (
+                <div
+                  role="presentation"
+                  className="sticky top-0 z-[5] flex items-center justify-between bg-slate-100/95 dark:bg-slate-900/95 backdrop-blur-sm px-4 py-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300"
+                >
+                  <span>{QUEUE_GROUP_LABEL[group]}</span>
+                  <span className="tabular-nums text-slate-500 dark:text-slate-400">{groupCounts[group]}</span>
+                </div>
+              )}
               <ContactListItem
-                key={c.id}
                 contact={c}
                 isSelected={c.id === selectedContact?.id}
                 onSelect={handleSelectContactMobile}
@@ -1562,7 +1590,9 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                 onMuteConversation={onMuteConversation}
                 onArchiveConversation={onArchiveConversation}
               />
-            ))
+              </React.Fragment>
+              );
+            })
           )}
         </div>
       </aside>
@@ -1723,27 +1753,30 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                 </button>
                 {(!selectedContact.responsibleAgent || selectedContact.responsibleAgent.toLowerCase() === "não atribuído") ? (
                   onClaimConversation && (
-                    <button
-                      onClick={() => onClaimConversation()}
-                      disabled={attendantCapacity ? attendantCapacity.activeCount >= attendantCapacity.maxLimit : false}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
-                        attendantCapacity && attendantCapacity.activeCount >= attendantCapacity.maxLimit
-                          ? "bg-slate-100 dark:bg-slate-800 text-slate-400 cursor-not-allowed"
-                          : "bg-emerald-600 hover:bg-emerald-700 text-white active:scale-95"
-                      }`}
-                      title={
-                        attendantCapacity && attendantCapacity.activeCount >= attendantCapacity.maxLimit
-                          ? `Você está no seu limite de ${attendantCapacity.maxLimit} conversas em atendimento. Finalize ou transfira alguma para poder assumir esta.`
-                          : "Assumir esta conversa para o seu atendimento"
-                      }
-                    >
-                      <UserPlus className="w-3.5 h-3.5" />
-                      <span className="whitespace-nowrap">
-                        {attendantCapacity && attendantCapacity.activeCount >= attendantCapacity.maxLimit
-                          ? "Limite Atingido"
-                          : "Atribuir pra Mim"}
-                      </span>
-                    </button>
+                    attendantCapacity && attendantCapacity.activeCount >= attendantCapacity.maxLimit ? (
+                      <Popover>
+                        <PopoverTrigger className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700">
+                          <UserPlus className="w-3.5 h-3.5" aria-hidden />
+                          <span className="whitespace-nowrap">Limite Atingido</span>
+                          <Info className="w-3.5 h-3.5" aria-hidden />
+                        </PopoverTrigger>
+                        <PopoverContent align="end" className="w-72 p-3 text-xs text-slate-700 dark:text-slate-200">
+                          <p className="font-semibold text-slate-900 dark:text-slate-100">
+                            Você está com {attendantCapacity.activeCount} conversas em atendimento (seu limite é {attendantCapacity.maxLimit}).
+                          </p>
+                          <p className="mt-1.5">Para assumir esta, finalize ou transfira alguma das suas — veja em Minhas.</p>
+                        </PopoverContent>
+                      </Popover>
+                    ) : (
+                      <button
+                        onClick={() => onClaimConversation()}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all bg-emerald-600 hover:bg-emerald-700 text-white active:scale-95"
+                        title="Assumir esta conversa para o seu atendimento"
+                      >
+                        <UserPlus className="w-3.5 h-3.5" />
+                        <span className="whitespace-nowrap">Atribuir pra Mim</span>
+                      </button>
+                    )
                   )
                 ) : (
                   // Clicar no atendente abre a transferência aqui mesmo (antes ficava só na
