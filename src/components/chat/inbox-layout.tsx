@@ -398,14 +398,6 @@ const ContactListItem = React.memo(function ContactListItem({
       )}
       <div className="relative shrink-0">
         <AvatarBadge name={c.name} photoUrl={c.avatar} size={34} className="ring-2 ring-white dark:ring-slate-900 shadow-sm" />
-        {c.channel === 'whatsapp' && (
-          <span
-            className="absolute -bottom-1 -right-1 w-3.5 h-3.5 bg-emerald-500 border-2 border-white dark:border-slate-900 rounded-full flex items-center justify-center text-white"
-            title="Canal: WhatsApp"
-          >
-            <MessageSquare className="w-2 h-2 fill-current" />
-          </span>
-        )}
         {c.channel === 'instagram' && (
           <span
             className="absolute -bottom-1 -right-1 w-3.5 h-3.5 bg-gradient-to-tr from-amber-500 via-pink-500 to-purple-600 border-2 border-white dark:border-slate-900 rounded-full flex items-center justify-center text-white"
@@ -680,6 +672,10 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
   );
   // Compartilhar contato (vCard) — clínica em 1 clique, ou qualquer contato buscado na lista.
   const [isSharingContact, setIsSharingContact] = useState(false);
+  // Bandeja "+" da caixa de resposta (contato, áudio, emoji) — crítica de design: menos
+  // controles à vista; anexo, respostas rápidas, IA e Enviar continuam sempre visíveis.
+  const [isComposerTrayOpen, setIsComposerTrayOpen] = useState(false);
+  const hasComposerTray = composerMode === 'whatsapp' && selectedContact?.channel !== 'instagram';
   const [isContactPickerOpen, setIsContactPickerOpen] = useState(false);
   const [contactSearchQuery, setContactSearchQuery] = useState('');
   const [contactSearchResults, setContactSearchResults] = useState<{ name: string; phone: string }[]>([]);
@@ -2253,6 +2249,21 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                           >
                             <Paperclip className={`w-4 h-4 ${isSendingMedia ? 'animate-pulse' : ''}`} />
                           </button>
+                          <button
+                            type="button"
+                            onClick={() => setIsComposerTrayOpen((open) => !open)}
+                            aria-expanded={isComposerTrayOpen}
+                            aria-label={isComposerTrayOpen ? 'Esconder mais opções' : 'Mais opções: contato, áudio e emoji'}
+                            title={isComposerTrayOpen ? 'Esconder' : 'Contato, áudio e emoji'}
+                            className={`flex shrink-0 items-center justify-center w-9 h-9 rounded-lg transition-colors ${
+                              isComposerTrayOpen
+                                ? 'bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-100'
+                                : 'text-slate-500 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700'
+                            }`}
+                          >
+                            <Plus className={`w-4 h-4 transition-transform ${isComposerTrayOpen ? 'rotate-45' : ''}`} />
+                          </button>
+                          <span className={isComposerTrayOpen ? 'contents' : 'hidden'}>
                           {onShareContact && (
                             <Popover open={isContactPickerOpen} onOpenChange={setIsContactPickerOpen}>
                               <PopoverTrigger
@@ -2322,9 +2333,11 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                               <Mic className="w-4 h-4" />
                             </button>
                           )}
+                          </span>
                         </>
                       )}
 
+                      <span className={hasComposerTray && !isComposerTrayOpen ? 'hidden' : 'contents'}>
                       <Popover open={isEmojiPickerOpen} onOpenChange={setIsEmojiPickerOpen}>
                         <PopoverTrigger
                           render={
@@ -2356,6 +2369,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                           </div>
                         </PopoverContent>
                       </Popover>
+                      </span>
 
                       <button
                         type="button"
