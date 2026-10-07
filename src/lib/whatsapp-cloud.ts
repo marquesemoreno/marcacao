@@ -5,7 +5,9 @@ import "server-only";
  * pelos testes da análise do app. Env: META_APP_ID, META_APP_SECRET (troca do código do
  * Embedded Signup e assinatura do webhook). */
 
-const GRAPH = "https://graph.facebook.com/v23.0";
+import { META_GRAPH_VERSION } from "@/lib/meta-config";
+
+const GRAPH = `https://graph.facebook.com/${META_GRAPH_VERSION}`;
 
 export type CloudResult<T = unknown> = { success: true; data: T } | { success: false; error: string; code?: number };
 
@@ -111,5 +113,15 @@ export function getPhoneNumberInfo(phoneNumberId: string, token: string) {
   return graph<{ display_phone_number?: string; verified_name?: string }>(phoneNumberId, {
     token,
     query: { fields: "display_phone_number,verified_name" },
+  });
+}
+
+/** Coexistência: pede à Meta pra sincronizar contatos e o histórico (últimos 6 meses) do app
+ * WhatsApp Business. Precisa ser chamado em até 24 h depois da conexão — senão o número
+ * tem que ser desconectado e conectado de novo. Cada tipo só pode rodar uma vez. */
+export function requestCoexistenceSync(phoneNumberId: string, token: string, syncType: "smb_app_state_sync" | "history") {
+  return graph<{ request_id?: string }>(`${phoneNumberId}/smb_app_data`, {
+    token,
+    body: { messaging_product: "whatsapp", sync_type: syncType },
   });
 }
