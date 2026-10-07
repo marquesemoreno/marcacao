@@ -10,6 +10,7 @@ import { parseCloudWebhook, type CloudEvent } from "@/lib/whatsapp-cloud-webhook
  * mesmo formato de Conversation/Message da Evolution, então o Chat não muda.
  * Env: WHATSAPP_CLOUD_VERIFY_TOKEN (escolhido por nós, informado no painel da Meta) e
  * META_APP_SECRET (assinatura do POST).
+ * Só grava no Chat se a conta estiver `active`; desligada = só WebhookLog (teste).
  * Entrega 1 da migração: grava recebidas, as enviadas pelo app do celular (coexistência)
  * e status. Automação do webhook da Evolution (IA, respostas a lembrete, tags…) entra
  * na entrega 3. */
@@ -83,9 +84,11 @@ export async function POST(request: Request) {
   const events = parseCloudWebhook(body);
   const accounts = await prisma.whatsappCloudAccount.findMany({
     where: { phoneNumberId: { in: [...new Set(events.map((e) => e.phoneNumberId))] } },
-    select: { phoneNumberId: true, clinicId: true },
+    select: { phoneNumberId: true, clinicId: true, active: true },
   });
-  const clinicByPhone = new Map(accounts.map((a) => [a.phoneNumberId, a.clinicId]));
+  // Conta desligada (active=false): só fica no log, não grava no Chat — durante o teste a
+  // Evolution continua ligada no mesmo número e cada mensagem apareceria duas vezes.
+  const clinicByPhone = new Map(accounts.filter((a) => a.active).map((a) => [a.phoneNumberId, a.clinicId]));
   const touched = new Set<string>();
   for (const event of events) {
     const clinicId = clinicByPhone.get(event.phoneNumberId);
