@@ -208,18 +208,19 @@ model Clinic {
   createdAt                  DateTime @default(now()) @map("created_at")
   updatedAt                  DateTime @updatedAt @map("updated_at")
 
-  users               User[]
-  clinicProcedures    ClinicProcedure[]
-  conversations       Conversation[]
-  cannedResponses     CannedResponse[]
-  whatsappInstance    WhatsappInstance?
-  hospitalIntegration HospitalIntegration?
-  aiAttendantConfig   AiAttendantConfig?
-  broadcastCampaigns  BroadcastCampaign[]
-  bridgeReminderLogs  BridgeReminderLog[]
-  knowledgeEntries    ClinicKnowledgeEntry[]
-  acquisitionRules    AcquisitionRule[]
-  instagramAccount    InstagramAccount?
+  users                User[]
+  clinicProcedures     ClinicProcedure[]
+  conversations        Conversation[]
+  cannedResponses      CannedResponse[]
+  whatsappInstance     WhatsappInstance?
+  whatsappCloudAccount WhatsappCloudAccount?
+  hospitalIntegration  HospitalIntegration?
+  aiAttendantConfig    AiAttendantConfig?
+  broadcastCampaigns   BroadcastCampaign[]
+  bridgeReminderLogs   BridgeReminderLog[]
+  knowledgeEntries     ClinicKnowledgeEntry[]
+  acquisitionRules     AcquisitionRule[]
+  instagramAccount     InstagramAccount?
 
   @@map("clinics")
 }
@@ -249,6 +250,27 @@ model WhatsappInstance {
   clinic Clinic @relation(fields: [clinicId], references: [id])
 
   @@map("whatsapp_instances")
+}
+
+/// Número da clínica conectado à API oficial do WhatsApp (Cloud API) via Embedded
+/// Signup / coexistência — separado da WhatsappInstance (Evolution) pra migração ser
+/// gradual. `active` só liga depois de testado; enquanto false, a clínica segue na Evolution.
+model WhatsappCloudAccount {
+  id                 String   @id @default(cuid())
+  clinicId           String   @unique @map("clinic_id")
+  wabaId             String   @map("waba_id")
+  phoneNumberId      String   @unique @map("phone_number_id")
+  displayPhoneNumber String?  @map("display_phone_number")
+  /// Token de integração do negócio (troca do código do Embedded Signup) — só servidor.
+  accessToken        String   @map("access_token")
+  coexistence        Boolean  @default(false)
+  active             Boolean  @default(false)
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  clinic Clinic @relation(fields: [clinicId], references: [id])
+
+  @@map("whatsapp_cloud_accounts")
 }
 
 /// Config da integração com o sistema hospitalar da clínica (bridge Node.js que fala
