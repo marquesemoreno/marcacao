@@ -25,8 +25,8 @@ export default function DataDeletionPage() {
           <ol className="mt-2 list-decimal space-y-1.5 pl-5">
             <li>
               Envie um e-mail para{" "}
-              <a href="mailto:contato@conectasaudevc.com.br" className="underline">
-                contato@conectasaudevc.com.br
+              <a href="mailto:suporte.tivdc@gmail.com" className="underline">
+                suporte.tivdc@gmail.com
               </a>{" "}
               com o assunto <strong>&quot;Exclusão de dados&quot;</strong>.
             </li>
