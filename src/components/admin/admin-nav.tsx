@@ -14,6 +14,7 @@ import {
   BarChart3,
   Megaphone,
   Wrench,
+  PlugZap,
   type LucideIcon,
 } from "lucide-react";
 
@@ -25,6 +26,7 @@ const navItems: { href: string; label: string; icon: LucideIcon; exact?: boolean
   { href: "/admin/disparos", label: "Disparos", icon: Megaphone },
   { href: "/admin/crm", label: "CRM", icon: KanbanSquare },
   { href: "/admin/clinicas", label: "Clínicas", icon: Building2 },
+  { href: "/admin/whatsapp", label: "WhatsApp oficial", icon: PlugZap },
   { href: "/admin/leads", label: "Leads B2B", icon: TrendingUp },
   { href: "/admin/leads-msp", label: "Leads MSP", icon: Wrench },
   { href: "/admin/afiliados", label: "Marcadores", icon: Share2 },
