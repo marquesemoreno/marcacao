@@ -1,9 +1,15 @@
 {
-  "regions": ["gru1"],
+  "regions": [
+    "gru1"
+  ],
   "crons": [
     {
       "path": "/api/cron/no-response-tagging",
       "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/conversation-auto-close",
+      "schedule": "15 * * * *"
     },
     {
       "path": "/api/cron/broadcast-dispatch",

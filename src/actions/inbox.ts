@@ -1456,6 +1456,7 @@ const REASON_LABELS: Record<string, string> = {
   CANCELAMENTO: "❌ Cancelamento / Desistência",
   ENCAMINHADO: "🔄 Encaminhado para Outro Setor",
   ATENDIDO_NO_CELULAR: "📱 Atendido pelo Celular (fora da plataforma)",
+  INATIVIDADE: "⌛ Finalizado por inatividade (automático)",
 };
 
 export async function resolveConversation(

@@ -163,6 +163,7 @@ const REASON_SHORT_LABELS: Record<string, string> = {
   AGENDAMENTO_CANCELADO: "🚫 Agendamento Cancelado",
   CANCELAMENTO: "❌ Cancelado",
   ENCAMINHADO: "🔄 Encaminhado",
+  INATIVIDADE: "⌛ Inatividade",
 };
 
 /**

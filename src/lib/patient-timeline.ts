@@ -22,6 +22,7 @@ export const RESOLUTION_LABELS: Record<string, string> = {
   DUVIDA_ESCLARECIDA: "Dúvida esclarecida",
   SEM_RETORNO: "Sem retorno do paciente",
   ATENDIDO_NO_CELULAR: "Atendido pelo celular",
+  INATIVIDADE: "Finalizado por inatividade",
 };
 
 export function buildPatientTimeline(input: {
