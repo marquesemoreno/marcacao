@@ -1,0 +1,1 @@
+ALTER TABLE "users" ADD COLUMN "is_attendant" BOOLEAN NOT NULL DEFAULT true;

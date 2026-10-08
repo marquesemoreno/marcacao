@@ -159,6 +159,8 @@ model User {
   passwordHash       String   @map("password_hash")
   clinicId           String?  @map("clinic_id")
   maxConcurrentChats Int      @default(5) @map("max_concurrent_chats")
+  /// false = login só de gerência: não aparece pra atribuir/transferir, não recebe conversa automática nem entra no desempenho da equipe.
+  isAttendant        Boolean  @default(true) @map("is_attendant")
   active             Boolean  @default(true)
   createdAt          DateTime @default(now()) @map("created_at")
   updatedAt          DateTime @updatedAt @map("updated_at")

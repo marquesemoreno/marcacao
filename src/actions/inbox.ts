@@ -1856,7 +1856,7 @@ export async function getOlderChatMessages(conversationId: string, beforeMessage
 export async function listChatAgents() {
   const { clinicId } = await requireClinicSession();
   const users = await prisma.user.findMany({
-    where: { clinicId, role: "CLINIC", active: true },
+    where: { clinicId, role: "CLINIC", active: true, isAttendant: true },
     select: { id: true, name: true },
     orderBy: { name: "asc" },
   });

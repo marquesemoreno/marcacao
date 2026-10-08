@@ -291,7 +291,7 @@ export async function getClinicManagementReport(days: number = 30, channel?: str
   ];
   // Só usuários da própria clínica — existe conversa da Santa Clara atribuída a uma
   // atendente da Urolaser no banco, e ela não pode aparecer no relatório de outra clínica.
-  const users = await prisma.user.findMany({ where: { id: { in: userIds }, clinicId }, select: { id: true, name: true } });
+  const users = await prisma.user.findMany({ where: { id: { in: userIds }, clinicId, isAttendant: true }, select: { id: true, name: true } });
   const userNames = new Map(users.map((u) => [u.id, u.name]));
 
   const attendants = computeAttendantPerformance(

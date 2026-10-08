@@ -337,7 +337,7 @@ export async function updateConversationClinicAdmin(conversationId: string, clin
 export async function listChatAgentsAdmin() {
   await requireAdminSession();
   const users = await prisma.user.findMany({
-    where: { role: { in: ["ADMIN", "CLINIC"] }, active: true },
+    where: { role: { in: ["ADMIN", "CLINIC"] }, active: true, isAttendant: true },
     select: { id: true, name: true, role: true, clinic: { select: { tradeName: true } } },
     orderBy: { name: "asc" },
   });

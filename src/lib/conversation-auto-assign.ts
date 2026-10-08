@@ -22,7 +22,7 @@ async function getAutoAssignClinicId(tx: Prisma.TransactionClient): Promise<stri
  * verdade, ver isTeamQueueUser). `null` se não houver nenhum atendente ativo. */
 export async function pickLeastBusyAttendant(tx: Prisma.TransactionClient, clinicId: string): Promise<string | null> {
   const activeUsers = await tx.user.findMany({
-    where: { clinicId, role: "CLINIC", active: true },
+    where: { clinicId, role: "CLINIC", active: true, isAttendant: true },
     select: { id: true, name: true, clinic: { select: { tradeName: true } } },
     orderBy: { name: "asc" },
   });
