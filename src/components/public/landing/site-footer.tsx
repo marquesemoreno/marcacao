@@ -98,11 +98,11 @@ export function SiteFooter() {
             {/* Contact Badges */}
             <div className="mt-2 flex flex-col gap-2.5 text-xs text-slate-300">
               <a
-                href="mailto:suporte.tivdc@gmail.com"
+                href="mailto:suporte@tivdc.com.br"
                 className="inline-flex items-center gap-2 text-slate-400 hover:text-white transition-colors"
               >
                 <Mail className="size-4 text-teal-400 shrink-0" />
-                <span>suporte.tivdc@gmail.com</span>
+                <span>suporte@tivdc.com.br</span>
               </a>
               <a
                 href="mailto:parcerias@conectasaudevc.com.br"
