@@ -23,6 +23,7 @@ export const RESOLUTION_LABELS: Record<string, string> = {
   SEM_RETORNO: "Sem retorno do paciente",
   ATENDIDO_NO_CELULAR: "Atendido pelo celular",
   INATIVIDADE: "Finalizado por inatividade",
+  ATENDIMENTO_CONCLUIDO: "Concluído (conversa já tinha terminado)",
 };
 
 export function buildPatientTimeline(input: {

@@ -3,19 +3,30 @@ import { prisma } from "@/lib/prisma";
 import { notifyInboxRealtime } from "@/lib/supabase-server";
 import { sendWhatsAppMessage } from "@/lib/whatsapp";
 import { isWithinReminderWindow } from "@/lib/automated-pacing";
+import { askJevChoice } from "@/lib/jev";
+import { NO_RESPONSE_TAG } from "@/lib/conversation-tags";
 import {
+  AUTO_CLOSE_CONCLUDED_REASON,
   AUTO_CLOSE_HOURS,
   AUTO_CLOSE_NOTICE,
   AUTO_CLOSE_REASON,
+  CONVERSATION_ENDING_QUESTION,
   decideAutoClose,
+  endingFromJevAnswer,
+  type ConversationEnding,
 } from "@/lib/conversation-auto-close";
+
+export const maxDuration = 300;
 
 /** Avisos por clínica por rodada (de hora em hora) — nada de rajada pro número da clínica. */
 const MAX_NOTICES_PER_CLINIC = 5;
+/** Leituras do Jev por rodada — o acumulado antigo vai sendo fechado ao longo das horas. */
+const MAX_CLASSIFICATIONS = 60;
 
-/** Finaliza conversas paradas há mais de 24h em que a última mensagem foi nossa, avisando
- * o paciente antes (ver decideAutoClose). Se ele responder depois, o webhook reabre a
- * conversa normalmente (reopenIfResolved). De hora em hora pelo Vercel Cron (vercel.json). */
+/** Finaliza conversas paradas há mais de 24h em que a última mensagem foi nossa. O Jev lê
+ * o fim da conversa pra decidir se ela terminou (fecha como concluída, sem aviso) ou ficou
+ * esperando o paciente (avisa e fecha como inatividade) — ver decideAutoClose. Se o
+ * paciente responder depois, o webhook reabre (reopenIfResolved). De hora em hora. */
 export async function GET(request: Request) {
   const authHeader = request.headers.get("authorization");
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
@@ -26,40 +37,58 @@ export async function GET(request: Request) {
   const inWindow = isWithinReminderWindow(now);
   const cutoff = new Date(now.getTime() - AUTO_CLOSE_HOURS * 60 * 60 * 1000);
 
-  const candidates = await prisma.conversation.findMany({
-    where: { status: { in: ["OPEN", "PENDING"] }, channel: "WHATSAPP", lastMessageAt: { lt: cutoff } },
+  const all = await prisma.conversation.findMany({
+    where: { status: { in: ["OPEN", "PENDING"] }, channel: "WHATSAPP", pinned: false, lastMessageAt: { lt: cutoff } },
+    orderBy: { lastMessageAt: "desc" },
     select: {
       id: true,
       clinicId: true,
       pinned: true,
+      tags: true,
       lastMessageAt: true,
       contact: { select: { phone: true } },
       clinic: { select: { hospitalIntegration: { select: { remindersPausedUntil: true } } } },
-      // Nota interna não conta — o que importa é quem falou por último com o paciente.
+      // Nota interna não conta — o que importa é a conversa com o paciente.
       messages: {
-        where: { type: { not: "INTERNAL_NOTE" } },
+        where: { type: { not: "INTERNAL_NOTE" }, deletedAt: null },
         orderBy: { createdAt: "desc" },
-        take: 1,
-        select: { direction: true },
+        take: 8,
+        select: { direction: true, content: true },
       },
     },
   });
+  // Paciente falou por último = está esperando a gente; nem chega a ler.
+  const candidates = all.filter((c) => c.messages[0]?.direction === "OUTBOUND").slice(0, MAX_CLASSIFICATIONS);
+
+  const endings = new Map<string, ConversationEnding>();
+  for (let i = 0; i < candidates.length; i += 10) {
+    await Promise.all(
+      candidates.slice(i, i + 10).map(async (c) => {
+        const mensagens = [...c.messages]
+          .reverse()
+          .map((m) => ({ de: m.direction === "INBOUND" ? "paciente" : "clínica", texto: (m.content || "[mídia]").slice(0, 400) }));
+        endings.set(c.id, endingFromJevAnswer(await askJevChoice({ mensagens }, CONVERSATION_ENDING_QUESTION)));
+      })
+    );
+  }
 
   const noticesByClinic = new Map<string, number>();
   const affectedClinics = new Set<string>();
   let notified = 0;
-  let closed = 0;
+  let concluded = 0;
+  let inactive = 0;
 
   for (const c of candidates) {
     if (!c.lastMessageAt) continue;
     const pausedUntil = c.clinic.hospitalIntegration?.remindersPausedUntil;
-    let decision = decideAutoClose({
+    const decision = decideAutoClose({
       now,
       lastMessageAt: c.lastMessageAt,
       lastDirection: c.messages[0]?.direction ?? null,
       pinned: c.pinned,
       inWindow,
       paused: !!pausedUntil && pausedUntil > now,
+      ending: endings.get(c.id) ?? "UNSURE",
     });
     if (decision === "skip") continue;
 
@@ -70,32 +99,35 @@ export async function GET(request: Request) {
       if (!result.success) continue; // não fecha sem conseguir avisar — tenta na próxima rodada
       noticesByClinic.set(c.clinicId, sentHere + 1);
       await prisma.message.create({
-        data: {
-          conversationId: c.id,
-          direction: "OUTBOUND",
-          content: AUTO_CLOSE_NOTICE,
-          status: "SENT",
-          whatsappKeyId: result.keyId,
-        },
+        data: { conversationId: c.id, direction: "OUTBOUND", content: AUTO_CLOSE_NOTICE, status: "SENT", whatsappKeyId: result.keyId },
       });
       notified++;
-      decision = "close_silent";
     }
 
+    const isConcluded = decision === "close_concluded";
     await prisma.conversation.update({
       where: { id: c.id },
-      data: { status: "RESOLVED", resolutionReason: AUTO_CLOSE_REASON, resolvedAt: now },
+      data: {
+        status: "RESOLVED",
+        resolutionReason: isConcluded ? AUTO_CLOSE_CONCLUDED_REASON : AUTO_CLOSE_REASON,
+        resolvedAt: now,
+        // Terminou bem — não é "sem retorno" do paciente.
+        ...(isConcluded ? { tags: c.tags.filter((t) => t !== NO_RESPONSE_TAG) } : {}),
+      },
     });
     await prisma.message.create({
       data: {
         conversationId: c.id,
         direction: "OUTBOUND",
         type: "INTERNAL_NOTE",
-        content: `🏁 Atendimento finalizado automaticamente • Motivo: ⌛ Inatividade (sem mensagens há mais de ${AUTO_CLOSE_HOURS}h)`,
+        content: isConcluded
+          ? "🏁 Atendimento finalizado automaticamente • Motivo: ✅ Conversa já tinha terminado (sem pendência para o paciente)"
+          : `🏁 Atendimento finalizado automaticamente • Motivo: ⌛ Inatividade (sem resposta do paciente há mais de ${AUTO_CLOSE_HOURS}h)`,
         status: "SENT",
       },
     });
-    closed++;
+    if (isConcluded) concluded++;
+    else inactive++;
     affectedClinics.add(c.clinicId);
   }
 
@@ -103,5 +135,5 @@ export async function GET(request: Request) {
     notifyInboxRealtime(clinicId).catch(() => {});
   }
 
-  return NextResponse.json({ ok: true, closed, notified });
+  return NextResponse.json({ ok: true, classified: candidates.length, concluded, inactive, notified });
 }

@@ -164,6 +164,7 @@ const REASON_SHORT_LABELS: Record<string, string> = {
   CANCELAMENTO: "❌ Cancelado",
   ENCAMINHADO: "🔄 Encaminhado",
   INATIVIDADE: "⌛ Inatividade",
+  ATENDIMENTO_CONCLUIDO: "✅ Concluído",
 };
 
 /**
