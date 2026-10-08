@@ -175,4 +175,18 @@ describe("nextReminderTargetDate", () => {
     const result = nextReminderTargetDate(atBahia(2026, 8, 15), true);
     expect(result.iso).toBe("2026-09-16");
   });
+
+  it("com skipWeekends, pula feriado nacional: sexta 09/10/2026 manda pra terça 13/10 (12/10 é feriado)", () => {
+    const result = nextReminderTargetDate(atBahia(2026, 9, 9), true);
+    expect(result.iso).toBe("2026-10-13");
+  });
+
+  it("com skipWeekends, feriado móvel também (Sexta-feira Santa 2027 = 26/03)", () => {
+    // 2027-03-25 é quinta-feira.
+    expect(nextReminderTargetDate(atBahia(2027, 2, 25), true).iso).toBe("2027-03-29");
+  });
+
+  it("sem skipWeekends, feriado não muda nada", () => {
+    expect(nextReminderTargetDate(atBahia(2026, 9, 11), false).iso).toBe("2026-10-12");
+  });
 });

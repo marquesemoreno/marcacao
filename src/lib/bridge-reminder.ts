@@ -17,12 +17,44 @@ export type BridgeReminderInput = {
  * Urolaser (18/09/2026) depois de uma sexta sem nenhum lembrete pra mandar porque
  * "amanhã" caía num sábado sem agenda — rodando de segunda em vez de sábado, as
  * atendentes conseguem responder reagendamento/desistência a tempo. */
+/** Feriados nacionais fixos (MM-DD). */
+const FIXED_HOLIDAYS = ["01-01", "04-21", "05-01", "09-07", "10-12", "11-02", "11-15", "11-20", "12-25"];
+
+/** Domingo de Páscoa (algoritmo de Meeus/Butcher) — base da Sexta-feira Santa. */
+function easterSunday(year: number): Date {
+  const a = year % 19;
+  const b = Math.floor(year / 100);
+  const c = year % 100;
+  const d = Math.floor(b / 4);
+  const e = b % 4;
+  const f = Math.floor((b + 8) / 25);
+  const g = Math.floor((b - f + 1) / 3);
+  const h = (19 * a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4);
+  const k = c % 4;
+  const l = (32 + 2 * e + 2 * i - h - k) % 7;
+  const m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const month = Math.floor((h + l - 7 * m + 114) / 31);
+  const day = ((h + l - 7 * m + 114) % 31) + 1;
+  return new Date(year, month - 1, day);
+}
+
+function isNationalHoliday(date: Date): boolean {
+  const mmdd = `${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+  if (FIXED_HOLIDAYS.includes(mmdd)) return true;
+  const goodFriday = easterSunday(date.getFullYear());
+  goodFriday.setDate(goodFriday.getDate() - 2);
+  return goodFriday.getMonth() === date.getMonth() && goodFriday.getDate() === date.getDate();
+}
+
+/** `skipWeekends` também pula feriados nacionais — clínica que não abre no fim de semana
+ * também não abre no feriado (ex: sexta 09/10/2026 manda a agenda de terça 13/10). */
 export function nextReminderTargetDate(now: Date, skipWeekends: boolean): { iso: string; formatted: string } {
   const nowInBahia = new Date(now.toLocaleString("en-US", { timeZone: "America/Bahia" }));
   const target = new Date(nowInBahia);
   target.setDate(target.getDate() + 1);
   if (skipWeekends) {
-    while (target.getDay() === 0 || target.getDay() === 6) {
+    while (target.getDay() === 0 || target.getDay() === 6 || isNationalHoliday(target)) {
       target.setDate(target.getDate() + 1);
     }
   }
