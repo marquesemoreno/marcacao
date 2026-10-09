@@ -1,5 +1,7 @@
 "use server";
 
+import { CHAT_LIMIT_ENABLED } from "@/lib/chat-limit";
+
 import { parseNewContactExtra, type NewContactExtra } from "@/lib/new-contact-extra";
 import { revalidatePath } from "next/cache";
 import { ConversationStatus, Prisma } from "@prisma/client";
@@ -1155,6 +1157,7 @@ export async function getReplySuggestions(conversationId: string, quotedMessageC
 
 export async function getAttendantCapacity() {
   const { userId } = await requireClinicSession();
+  if (!CHAT_LIMIT_ENABLED) return null;
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: { maxConcurrentChats: true },
@@ -1276,7 +1279,7 @@ export async function claimConversation(conversationId: string) {
     },
   });
 
-  if (activeCount >= maxLimit && currentUser?.role !== "ADMIN") {
+  if (CHAT_LIMIT_ENABLED && activeCount >= maxLimit && currentUser?.role !== "ADMIN") {
     return {
       success: false,
       message: `Limite de atendimentos atingido: você já possui ${activeCount}/${maxLimit} conversas abertas. Finalize um atendimento antes de assumir novos pacientes.`,
@@ -1390,7 +1393,7 @@ export async function transferConversation(
       },
     });
 
-    if (activeCount >= maxLimit && targetUser.role !== "ADMIN") {
+    if (CHAT_LIMIT_ENABLED && activeCount >= maxLimit && targetUser.role !== "ADMIN") {
       return {
         success: false,
         message: `Limite atingido: ${targetUser.name} já possui ${activeCount}/${maxLimit} conversas abertas.`,

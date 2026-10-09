@@ -10,6 +10,11 @@ import { isTeamQueueUser } from "@/lib/team-queue";
  * agora; as já paradas continuam sem dono de propósito (decisão do usuário, não
  * redistribuir retroativamente um volume grande de uma vez só).
  */
+/** Desligada em 09/10/2026 a pedido do usuário: na Urolaser as atendentes voltam a
+ * pegar as conversas manualmente ("Atribuir pra Mim" / responder assume). Conversa nova
+ * cai em "Não Atribuídas". Religar = true. */
+const AUTO_ASSIGN_ENABLED = false;
+
 const AUTO_ASSIGN_CLINIC_TRADE_NAME = "Urolaser - Clínica de Urologia e Diagnóstico";
 
 async function getAutoAssignClinicId(tx: Prisma.TransactionClient): Promise<string | null> {
@@ -59,6 +64,7 @@ export async function autoAssignNewConversation(
   tx: Prisma.TransactionClient,
   clinicId: string
 ): Promise<{ assignedUserId: string; assignmentSeenAt: null } | Record<string, never>> {
+  if (!AUTO_ASSIGN_ENABLED) return {};
   const autoAssignClinicId = await getAutoAssignClinicId(tx);
   if (!autoAssignClinicId || clinicId !== autoAssignClinicId) return {};
 

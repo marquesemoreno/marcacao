@@ -1,5 +1,7 @@
 "use server";
 
+import { CHAT_LIMIT_ENABLED } from "@/lib/chat-limit";
+
 import { parseNewContactExtra, type NewContactExtra } from "@/lib/new-contact-extra";
 import { revalidatePath } from "next/cache";
 import { ConversationStatus, Prisma } from "@prisma/client";
@@ -1144,6 +1146,7 @@ export async function updateContactGlpiEntity(conversationId: string, glpiEntity
 
 export async function getAttendantCapacityAdmin() {
   const { userId } = await requireAdminSession();
+  if (!CHAT_LIMIT_ENABLED) return null;
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: { maxConcurrentChats: true },
