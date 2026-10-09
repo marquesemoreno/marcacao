@@ -23,7 +23,7 @@ import { formatFileSize, formatCurrency } from "@/lib/format";
 import { notifyInboxRealtime } from "@/lib/supabase-server";
 import { APPOINTMENT_CONFIRMED_TEMPLATE, mentionsInvoiceRequest } from "@/lib/chat-messages";
 import { isTeamQueueUser, formatAgentDisplayName } from "@/lib/team-queue";
-import { assignmentSeenAtFor } from "@/lib/conversation-assignment";
+import { assignmentSeenAtFor, assignOnReply } from "@/lib/conversation-assignment";
 import { getAiAttendantConfig } from "@/lib/ai-attendant";
 import { analyzeConversationQuality } from "@/lib/conversation-quality";
 import { extractInvoiceData, type InvoiceData } from "@/lib/invoice-extraction";
@@ -44,13 +44,6 @@ import {
 
 const ACTIVE_STATUSES: ConversationStatus[] = [ConversationStatus.OPEN, ConversationStatus.PENDING];
 
-/** Atribui a conversa a quem está respondendo, se ainda não tiver ninguém assumido —
- * sem isso, dava pra responder uma conversa de "Não Atribuídas" sem nunca clicar em
- * "Atribuir pra Mim", e ela sumia da aba "Minhas" e não contava pro limite de
- * atendimentos simultâneos do atendente. Espalhar no "data" de um conversation.update. */
-function autoAssignOnReply(conversation: { assignedUserId: string | null }, userId: string) {
-  return conversation.assignedUserId ? {} : { assignedUserId: userId, assignmentSeenAt: new Date() };
-}
 
 /** Cadastra um contato novo (ou reaproveita um já existente pelo telefone) e garante
  * uma conversa aberta dessa clínica com ele — pra atendente iniciar contato proativo,
@@ -544,7 +537,7 @@ export async function sendMessage(
     });
     await prisma.conversation.update({
       where: { id: data.conversationId },
-      data: { lastMessageAt: new Date(), ...autoAssignOnReply(conversation, userId) },
+      data: { lastMessageAt: new Date(), ...assignOnReply(conversation, userId, { internalNote: true }) },
     });
     revalidatePath("/clinic/inbox");
     notifyInboxRealtime(clinicId).catch(() => {});
@@ -570,7 +563,7 @@ export async function sendMessage(
 
   await prisma.conversation.update({
     where: { id: data.conversationId },
-    data: { lastMessageAt: new Date(), status: "OPEN", aiEnabled: false, ...autoAssignOnReply(conversation, userId) },
+    data: { lastMessageAt: new Date(), status: "OPEN", aiEnabled: false, ...assignOnReply(conversation, userId) },
   });
 
   // Precisa esperar o envio de verdade (não fire-and-forget): numa função serverless
@@ -640,7 +633,7 @@ export async function sendMediaMessage(conversationId: string, formData: FormDat
 
   await prisma.conversation.update({
     where: { id: conversationId },
-    data: { lastMessageAt: new Date(), status: "OPEN", aiEnabled: false, ...autoAssignOnReply(conversation, userId) },
+    data: { lastMessageAt: new Date(), status: "OPEN", aiEnabled: false, ...assignOnReply(conversation, userId) },
   });
 
   // Mesma URL assinada que a UI usa pra exibir — a Evolution API busca o arquivo nela.
@@ -710,7 +703,7 @@ export async function sendAudioMessage(conversationId: string, formData: FormDat
 
   await prisma.conversation.update({
     where: { id: conversationId },
-    data: { lastMessageAt: new Date(), status: "OPEN", aiEnabled: false, ...autoAssignOnReply(conversation, userId) },
+    data: { lastMessageAt: new Date(), status: "OPEN", aiEnabled: false, ...assignOnReply(conversation, userId) },
   });
 
   const signedUrl = await getSignedMediaUrl(uploaded.path);
@@ -768,7 +761,7 @@ export async function shareContact(conversationId: string, target?: { name: stri
 
   await prisma.conversation.update({
     where: { id: conversationId },
-    data: { lastMessageAt: new Date(), status: "OPEN", aiEnabled: false, ...autoAssignOnReply(conversation, userId) },
+    data: { lastMessageAt: new Date(), status: "OPEN", aiEnabled: false, ...assignOnReply(conversation, userId) },
   });
 
   try {
@@ -1490,6 +1483,8 @@ export async function resolveConversation(
       resolutionNotes: resolutionData?.notes || null,
       resolvedAt: new Date(),
       resolvedByUserId: userId,
+      // Quem finaliza fica como dona — senão a conversa reabre com quem nem atendeu.
+      assignedUserId: userId,
     },
   });
 
