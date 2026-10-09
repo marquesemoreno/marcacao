@@ -10,6 +10,7 @@ import {
   AUTO_CLOSE_HOURS,
   AUTO_CLOSE_NOTICE,
   AUTO_CLOSE_REASON,
+  businessHoursBetween,
   CONVERSATION_ENDING_QUESTION,
   decideAutoClose,
   endingFromJevAnswer,
@@ -23,7 +24,7 @@ const MAX_NOTICES_PER_CLINIC = 5;
 /** Leituras do Jev por rodada — o acumulado antigo vai sendo fechado ao longo das horas. */
 const MAX_CLASSIFICATIONS = 60;
 
-/** Finaliza conversas paradas há mais de 24h em que a última mensagem foi nossa. O Jev lê
+/** Finaliza conversas paradas há mais de 4h úteis em que a última mensagem foi nossa. O Jev lê
  * o fim da conversa pra decidir se ela terminou (fecha como concluída, sem aviso) ou ficou
  * esperando o paciente (avisa e fecha como inatividade) — ver decideAutoClose. Se o
  * paciente responder depois, o webhook reabre (reopenIfResolved). De hora em hora. */
@@ -58,7 +59,11 @@ export async function GET(request: Request) {
     },
   });
   // Paciente falou por último = está esperando a gente; nem chega a ler.
-  const candidates = all.filter((c) => c.messages[0]?.direction === "OUTBOUND").slice(0, MAX_CLASSIFICATIONS);
+  // Só as que já passaram de 4h ÚTEIS (o filtro do banco é por horas corridas).
+  const idle = new Map(all.map((c) => [c.id, c.lastMessageAt ? businessHoursBetween(c.lastMessageAt, now) : 0]));
+  const candidates = all
+    .filter((c) => c.messages[0]?.direction === "OUTBOUND" && (idle.get(c.id) ?? 0) >= AUTO_CLOSE_HOURS)
+    .slice(0, MAX_CLASSIFICATIONS);
 
   const endings = new Map<string, ConversationEnding>();
   for (let i = 0; i < candidates.length; i += 10) {
@@ -82,8 +87,7 @@ export async function GET(request: Request) {
     if (!c.lastMessageAt) continue;
     const pausedUntil = c.clinic.hospitalIntegration?.remindersPausedUntil;
     const decision = decideAutoClose({
-      now,
-      lastMessageAt: c.lastMessageAt,
+      idleBusinessHours: idle.get(c.id) ?? 0,
       lastDirection: c.messages[0]?.direction ?? null,
       pinned: c.pinned,
       inWindow,
@@ -122,7 +126,7 @@ export async function GET(request: Request) {
         type: "INTERNAL_NOTE",
         content: isConcluded
           ? "🏁 Atendimento finalizado automaticamente • Motivo: ✅ Conversa já tinha terminado (sem pendência para o paciente)"
-          : `🏁 Atendimento finalizado automaticamente • Motivo: ⌛ Inatividade (sem resposta do paciente há mais de ${AUTO_CLOSE_HOURS}h)`,
+          : `🏁 Atendimento finalizado automaticamente • Motivo: ⌛ Inatividade (sem resposta do paciente há mais de ${AUTO_CLOSE_HOURS}h úteis)`,
         status: "SENT",
       },
     });

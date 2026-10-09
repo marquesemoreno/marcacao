@@ -21,4 +21,26 @@ describe("reopenIfResolved", () => {
     expect(reopenIfResolved({ status: "OPEN" })).toEqual({ status: "OPEN" });
     expect(reopenIfResolved({ status: "PENDING" })).toEqual({ status: "PENDING" });
   });
+
+  it("finalizada automaticamente há menos de 48h: volta pra mesma atendente", () => {
+    const now = new Date("2026-10-09T15:00:00Z");
+    const result = reopenIfResolved(
+      { status: "RESOLVED", resolutionReason: "INATIVIDADE", resolvedAt: new Date("2026-10-08T18:00:00Z") },
+      now
+    );
+    expect(result).toEqual({ status: "OPEN", resolvedAt: null, resolutionReason: null, resolutionNotes: null });
+    expect(
+      reopenIfResolved({ status: "RESOLVED", resolutionReason: "ATENDIMENTO_CONCLUIDO", resolvedAt: new Date("2026-10-09T10:00:00Z") }, now)
+    ).not.toHaveProperty("assignedUserId");
+  });
+
+  it("finalizada automaticamente há mais de 48h, ou à mão: libera o atendente como antes", () => {
+    const now = new Date("2026-10-09T15:00:00Z");
+    expect(
+      reopenIfResolved({ status: "RESOLVED", resolutionReason: "INATIVIDADE", resolvedAt: new Date("2026-10-07T10:00:00Z") }, now)
+    ).toHaveProperty("assignedUserId", null);
+    expect(
+      reopenIfResolved({ status: "RESOLVED", resolutionReason: "DUVIDA_ESCLARECIDA", resolvedAt: new Date("2026-10-09T14:00:00Z") }, now)
+    ).toHaveProperty("assignedUserId", null);
+  });
 });
