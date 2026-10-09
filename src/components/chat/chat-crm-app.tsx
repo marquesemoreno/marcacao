@@ -296,7 +296,7 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
    * ou troca de aba/clínica (aí sim é esperado mostrar a primeira do contexto novo). */
   const suppressAutoSelectRef = useRef(true);
 
-  const [attendantCapacity, setAttendantCapacity] = useState<{ activeCount: number; maxLimit: number } | null>(null);
+  const [attendantCapacity, setAttendantCapacity] = useState<{ awaiting: number; level: "ok" | "busy" | "high" } | null>(null);
   const [availableClinics, setAvailableClinics] = useState<{ id: string; tradeName: string }[]>([]);
   /** GLPI (help desk interno) só faz sentido pras conversas da própria TIVDC, não
    * das clínicas médicas — acha o id dela na mesma lista já usada pro filtro de

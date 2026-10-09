@@ -61,7 +61,6 @@ import {
   User,
   Clock,
   SlidersHorizontal,
-  Info,
   AlertTriangle,
   Trash2,
   Smartphone,
@@ -140,7 +139,7 @@ interface InboxLayoutProps {
   /** Primeira carga das mensagens da conversa aberta. */
   isLoadingMessages?: boolean;
   onLoadOlderMessages?: () => void;
-  attendantCapacity?: { activeCount: number; maxLimit: number } | null;
+  attendantCapacity?: { awaiting: number; level: "ok" | "busy" | "high" } | null;
   /** Minutos desde a última mensagem da conversa mais antiga em "Não Atribuídas" — pisca a
    * aba quando passa do limiar, mesmo se o atendente estiver vendo outra aba no momento. */
   unassignedWaitMinutes?: number | null;
@@ -1342,22 +1341,22 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
               )}
               {attendantCapacity && (
                 <span
-                  aria-label={`Em atendimento: ${attendantCapacity.activeCount} de ${attendantCapacity.maxLimit}`}
+                  aria-label={`${attendantCapacity.awaiting} ${attendantCapacity.awaiting === 1 ? "paciente aguardando" : "pacientes aguardando"} sua resposta`}
                   className={`inline-flex items-center gap-1 whitespace-nowrap tabular-nums text-xs font-semibold px-2 py-0.5 rounded-md border ${
-                    attendantCapacity.activeCount >= attendantCapacity.maxLimit
+                    attendantCapacity.level === "high"
                       ? "bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800"
-                      : attendantCapacity.activeCount >= attendantCapacity.maxLimit - 1
+                      : attendantCapacity.level === "busy"
                       ? "bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800"
                       : "bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800"
                   }`}
                   title={
-                    attendantCapacity.activeCount >= attendantCapacity.maxLimit
-                      ? `Você está com ${attendantCapacity.activeCount} conversas em atendimento e seu limite é ${attendantCapacity.maxLimit}. Enquanto estiver no limite, não dá para assumir conversas novas — finalize ou transfira alguma.`
-                      : `Você está com ${attendantCapacity.activeCount} de ${attendantCapacity.maxLimit} conversas em atendimento ao mesmo tempo. Ao chegar no limite, não dá para assumir novas.`
+                    attendantCapacity.level === "high"
+                      ? `${attendantCapacity.awaiting} pacientes estão esperando sua resposta. Responda os mais antigos antes de pegar conversas novas, ou peça ajuda a uma colega.`
+                      : `Pacientes nas suas conversas esperando sua resposta agora. Conversas em que você já respondeu não contam.`
                   }
                 >
                   <Zap className="w-3 h-3" />
-                  <span className="hidden 2xl:inline">Em atendimento:</span> {attendantCapacity.activeCount}/{attendantCapacity.maxLimit}
+                  <span className="hidden 2xl:inline">Aguardando você:</span> {attendantCapacity.awaiting}
                 </span>
               )}
               {!(isLoadingContacts && contacts.length === 0) && (
@@ -1814,30 +1813,18 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                 </button>
                 {(!selectedContact.responsibleAgent || selectedContact.responsibleAgent.toLowerCase() === "não atribuído") ? (
                   onClaimConversation && (
-                    attendantCapacity && attendantCapacity.activeCount >= attendantCapacity.maxLimit ? (
-                      <Popover>
-                        <PopoverTrigger className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700">
-                          <UserPlus className="w-3.5 h-3.5" aria-hidden />
-                          <span className="whitespace-nowrap">Limite atingido</span>
-                          <Info className="w-3.5 h-3.5" aria-hidden />
-                        </PopoverTrigger>
-                        <PopoverContent align="end" className="w-72 p-3 text-xs text-slate-700 dark:text-slate-200">
-                          <p className="font-semibold text-slate-900 dark:text-slate-100">
-                            Você está com {attendantCapacity.activeCount} conversas em atendimento (seu limite é {attendantCapacity.maxLimit}).
-                          </p>
-                          <p className="mt-1.5">Para assumir esta, finalize ou transfira alguma das suas — veja em Minhas.</p>
-                        </PopoverContent>
-                      </Popover>
-                    ) : (
                       <button
                         onClick={() => onClaimConversation()}
                         className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all bg-emerald-600 hover:bg-emerald-700 text-white active:scale-95"
-                        title="Assumir esta conversa para o seu atendimento"
+                        title={
+                          attendantCapacity?.level === "high"
+                            ? `Atenção: ${attendantCapacity.awaiting} pacientes já esperam sua resposta. Dá para assumir, mas veja se uma colega está mais livre.`
+                            : "Assumir esta conversa para o seu atendimento"
+                        }
                       >
                         <UserPlus className="w-3.5 h-3.5" />
                         <span className="whitespace-nowrap">Atribuir pra Mim</span>
                       </button>
-                    )
                   )
                 ) : (
                   // Clicar no atendente abre a transferência aqui mesmo (antes ficava só na

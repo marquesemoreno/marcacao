@@ -1,6 +1,7 @@
 "use server";
 
 import { CHAT_LIMIT_ENABLED } from "@/lib/chat-limit";
+import { getAttendantLoad } from "@/lib/attendant-load-server";
 
 import { parseNewContactExtra, type NewContactExtra } from "@/lib/new-contact-extra";
 import { revalidatePath } from "next/cache";
@@ -1155,23 +1156,10 @@ export async function getReplySuggestions(conversationId: string, quotedMessageC
   );
 }
 
+/** Carga do atendente (conversas esperando resposta dele) — só aviso, ver attendant-load.ts. */
 export async function getAttendantCapacity() {
   const { userId } = await requireClinicSession();
-  if (!CHAT_LIMIT_ENABLED) return null;
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { maxConcurrentChats: true },
-  });
-  const maxLimit = user?.maxConcurrentChats ?? 5;
-
-  const activeCount = await prisma.conversation.count({
-    where: {
-      assignedUserId: userId,
-      status: "OPEN",
-    },
-  });
-
-  return { activeCount, maxLimit };
+  return getAttendantLoad(userId);
 }
 
 /** Minutos desde a última mensagem da conversa mais antiga parada em "Não Atribuídas" —
