@@ -210,6 +210,28 @@ export async function fetchBridgeDailyAgenda(clinicId: string, date: string): Pr
   }
 }
 
+/** Igual a fetchBridgeDailyAgenda, mas distingue "dia vazio" ([]) de "não deu pra ler a
+ * ponte" (null) — a Agenda precisa avisar quando o computador da clínica está fora, em
+ * vez de mostrar um dia vazio enganoso. `null` também se a clínica não tem ponte. */
+export async function fetchBridgeDailyAgendaOrNull(clinicId: string, date: string): Promise<BridgeDailyAppointment[] | null> {
+  const config = await getBridgeConfig(clinicId);
+  if (!config) return null;
+  try {
+    const url = new URL(`${config.apiUrl}/api/agenda-do-dia`);
+    url.searchParams.set("data", date);
+    const response = await fetch(url, {
+      headers: { "x-api-token": config.apiToken },
+      signal: AbortSignal.timeout(15000),
+      cache: "no-store",
+    });
+    if (!response.ok) return null;
+    const data = await response.json();
+    return Array.isArray(data?.agendamentos) ? data.agendamentos : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Confere se um NUMERO continua de pé na agenda do Firebird pro dia dele — usado
  * depois de criar/confirmar um agendamento pra pegar o caso em que o bridge
  * respondeu sucesso mas o registro não sobrevive de verdade (visto na prática na

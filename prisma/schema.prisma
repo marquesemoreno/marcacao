@@ -970,3 +970,23 @@ model ConversationStageChange {
   @@index([conversationId, createdAt])
   @@map("conversation_stage_changes")
 }
+
+/// Status marcado à mão pela recepção na Agenda (/clinic/agenda): presente, atendido,
+/// falta, confirmado, cancelado. Vale pras marcações da ponte (sistema da clínica, não
+/// gravamos lá) e pros agendamentos do Conecta. source = "BRIDGE" (externalId = NUMERO)
+/// ou "LOCAL" (externalId = Appointment.id).
+model AgendaMark {
+  id              String   @id @default(cuid())
+  clinicId        String   @map("clinic_id")
+  source          String
+  externalId      String   @map("external_id")
+  date            DateTime @db.Date
+  status          String
+  updatedByUserId String?  @map("updated_by_user_id")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@unique([clinicId, source, externalId])
+  @@index([clinicId, date])
+  @@map("agenda_marks")
+}

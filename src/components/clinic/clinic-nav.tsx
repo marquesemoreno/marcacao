@@ -8,6 +8,7 @@ import {
   KanbanSquare,
   Users,
   CalendarCheck,
+  CalendarDays,
   Settings,
   BarChart3,
   Megaphone,
@@ -28,7 +29,8 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { href: "/clinic/inbox", label: "Chat", icon: MessageCircle, badge: "unread" },
       { href: "/clinic/crm", label: "CRM", icon: KanbanSquare },
-      { href: "/clinic/agendamentos", label: "Agenda", icon: CalendarCheck, onlyFull: true },
+      { href: "/clinic/agenda", label: "Agenda", icon: CalendarDays },
+      { href: "/clinic/agendamentos", label: "Agendamentos", icon: CalendarCheck, onlyFull: true },
     ],
   },
   {

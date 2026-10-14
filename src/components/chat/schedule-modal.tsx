@@ -45,6 +45,11 @@ interface ScheduleModalProps {
    * handleOpenScheduleWithProcedure em inbox-layout.tsx) — só tem efeito se o id
    * estiver na lista retornada por fetchProcedures(); undefined abre vazio normalmente. */
   initialProcedureId?: string;
+  /** Pré-preenchimento vindo da grade da Agenda (/clinic/agenda): clique num horário
+   * vazio abre já com data, hora e médico. Médico casa pelo nome (a ponte só devolve nome). */
+  initialDate?: string;
+  initialTime?: string;
+  initialDoctorName?: string;
   onConfirmSchedule: (scheduleData: {
     appointmentId: string;
     specialty: string;
@@ -65,8 +70,13 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
   fetchAgenda,
   fetchPatients,
   initialProcedureId,
+  initialDate,
+  initialTime,
+  initialDoctorName,
   onConfirmSchedule,
 }) => {
+  // Sem telefone no contato (ex: novo agendamento pela Agenda) o modal pede o número.
+  const [phone, setPhone] = useState(contact.phone || '');
   const [procedures, setProcedures] = useState<PlainClinicProcedureItem[]>([]);
   const [loadingProcedures, setLoadingProcedures] = useState(false);
   const [procedureId, setProcedureId] = useState('');
@@ -106,8 +116,9 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
     setProcedureId('');
     setDoctorId('');
     setConvenioId('');
-    setDate('');
-    setTime('');
+    setPhone(contact.phone || '');
+    setDate(initialDate ?? '');
+    setTime(initialTime ?? '');
     setNotes('');
     setTimeMode('scheduled');
     setIsSuccess(false);
@@ -130,7 +141,16 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
         }
       })
       .finally(() => setLoadingProcedures(false));
-    fetchDoctors?.().then(setDoctors).catch(() => setDoctors([]));
+    fetchDoctors?.()
+      .then((items) => {
+        setDoctors(items);
+        if (initialDoctorName) {
+          const wanted = initialDoctorName.trim().toLowerCase();
+          const match = items.find((d) => d.nome.trim().toLowerCase() === wanted);
+          if (match) setDoctorId(String(match.id));
+        }
+      })
+      .catch(() => setDoctors([]));
     fetchConvenios?.()
       .then((items) => {
         setConvenios(items);
@@ -243,6 +263,7 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
     !hasFullName && "nome completo",
     !procedureId && "procedimento",
     !date && "data",
+    phone.replace(/\D/g, '').length < 10 && "telefone",
     requiresDoctor && !doctorId && "médico",
   ].filter((field): field is string => Boolean(field));
 
@@ -275,7 +296,7 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
       const appointment = await createAppointment({
         patientName,
         patientCpf: cpf || undefined,
-        patientPhone: contact.phone,
+        patientPhone: phone,
         clinicProcedureId: procedureId,
         date,
         timeSlot: time || undefined,
@@ -564,6 +585,20 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
                   </p>
                 )}
               </div>
+
+              {!contact.phone && (
+                <div>
+                  <label className={labelClass}>Telefone (WhatsApp)</label>
+                  <input
+                    type="tel"
+                    inputMode="tel"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    placeholder="(77) 99999-9999"
+                    className={inputClass(hasAttemptedSubmit && phone.replace(/\D/g, '').length < 10)}
+                  />
+                </div>
+              )}
 
               <div>
                 <label className={labelClass}>CPF (opcional)</label>
