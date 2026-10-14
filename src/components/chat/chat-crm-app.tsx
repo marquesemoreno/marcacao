@@ -24,6 +24,7 @@ import {
   restoreConversationOwners,
   transferConversation,
   getAttendantCapacity,
+  getWhatsappChannelStatus,
   resolveConversation,
   reopenConversation,
   listCannedResponses,
@@ -297,6 +298,19 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
   const suppressAutoSelectRef = useRef(true);
 
   const [attendantCapacity, setAttendantCapacity] = useState<{ awaiting: number; level: "ok" | "busy" | "high" } | null>(null);
+  // Só no painel da clínica (o admin já tem o status das instâncias na tela dele).
+  const [channelStatus, setChannelStatus] = useState<"open" | "down" | "unknown">("unknown");
+  useEffect(() => {
+    if (scope === "admin") return;
+    let alive = true;
+    const check = () => getWhatsappChannelStatus().then((s) => alive && setChannelStatus(s)).catch(() => {});
+    check();
+    const t = setInterval(check, 60_000);
+    return () => {
+      alive = false;
+      clearInterval(t);
+    };
+  }, [scope]);
   const [availableClinics, setAvailableClinics] = useState<{ id: string; tradeName: string }[]>([]);
   /** GLPI (help desk interno) só faz sentido pras conversas da própria TIVDC, não
    * das clínicas médicas — acha o id dela na mesma lista já usada pro filtro de
@@ -979,7 +993,7 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
           label: "Desfazer",
           onClick: async () => {
             const r = await restoreFn([{ id: claimedId, assignedUserId: null }]).catch(() => ({ success: false }));
-            if (r.success) toast.success("Desfeito: a conversa voltou para Não atribuídas.");
+            if (r.success) toast.success("Desfeito: a conversa voltou para Sem dono.");
             else toast.error("Não foi possível desfazer.");
             await refreshContacts();
           },
@@ -1145,6 +1159,7 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
           isLoadingOlderMessages={isLoadingOlderMessages}
           onLoadOlderMessages={handleLoadOlderMessages}
           attendantCapacity={attendantCapacity}
+          whatsappDown={channelStatus === "down"}
           unassignedWaitMinutes={unassignedWaitMinutes}
           unassignedCount={unassignedCount}
           pendingCount={pendingCount}

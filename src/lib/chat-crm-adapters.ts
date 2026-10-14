@@ -1,3 +1,4 @@
+import { autoCloseHint } from "@/lib/conversation-auto-close";
 import type {
   Contact as PrismaContact,
   Conversation,
@@ -229,6 +230,13 @@ export function toChatContact(conversation: ConversationWithRelations, viewerUse
               : previewMessage.content)
       : "Sem mensagens ainda.",
     lastMessageTime: lastMessage ? formatMessageTimestamp(lastMessage.createdAt) : "",
+    autoCloseHint: isResolved
+      ? undefined
+      : (autoCloseHint({
+          lastDirection: previewMessage?.type === "INTERNAL_NOTE" ? null : previewMessage?.direction,
+          lastAt: previewMessage?.createdAt,
+          pinned: Boolean(conversation.pinned),
+        }) ?? undefined),
     statusTag: isResolved
       ? { label: conversation.resolutionReason ? (REASON_SHORT_LABELS[conversation.resolutionReason] || conversation.resolutionReason) : "Finalizado", variant: "slate" }
       : { label: funnelStageLabels[funnelStageFromDb[conversation.funnelStage]], variant: funnelStageBadgeVariant[funnelStageFromDb[conversation.funnelStage]] },

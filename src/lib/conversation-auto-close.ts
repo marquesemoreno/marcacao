@@ -82,3 +82,18 @@ export function decideAutoClose(input: {
   if (input.ending === "UNSURE" || hours >= AUTO_CLOSE_NOTIFY_MAX_HOURS || input.paused) return "close_inactive";
   return input.inWindow ? "notify_and_close" : "skip";
 }
+
+/** Aviso na fila do Chat de que a conversa vai ser finalizada sozinha (crítica do Chat
+ * 14/10/2026: conversa sumia sem explicação). Só quando a clínica falou por último e
+ * falta ≤ 1h útil pro prazo. */
+export function autoCloseHint(input: {
+  lastDirection: "INBOUND" | "OUTBOUND" | null | undefined;
+  lastAt: Date | null | undefined;
+  pinned: boolean;
+  now?: Date;
+}): string | null {
+  if (input.pinned || input.lastDirection !== "OUTBOUND" || !input.lastAt) return null;
+  const remaining = AUTO_CLOSE_HOURS - businessHoursBetween(input.lastAt, input.now ?? new Date());
+  if (remaining > 1) return null;
+  return remaining <= 0 ? "fecha em instantes" : "fecha em ~1h";
+}

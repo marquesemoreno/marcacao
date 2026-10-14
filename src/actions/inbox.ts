@@ -13,7 +13,7 @@ import { whatsappService, formatToWhatsAppNumber, isValidWhatsAppNumber, fetchWh
 import { toPlainClinicProcedureItem } from "@/lib/serialize";
 import { toChatContact, toChatMessage, departmentToDb, funnelStageToDb } from "@/lib/chat-crm-adapters";
 import { attachSignedUrls, uploadWhatsAppMedia, getSignedMediaUrl, downloadWhatsAppMedia, formatDuration } from "@/lib/whatsapp-media";
-import { sendWhatsAppMedia, sendWhatsAppAudio, sendWhatsAppContact, sendWhatsAppReaction, editWhatsAppMessage } from "@/lib/whatsapp";
+import { sendWhatsAppMedia, sendWhatsAppAudio, sendWhatsAppContact, sendWhatsAppReaction, editWhatsAppMessage, getEvolutionConfig } from "@/lib/whatsapp";
 import { BUDGET_SENT_TAG, SCHEDULED_TAG } from "@/lib/conversation-tags";
 import { canEditMessage } from "@/lib/message-edit";
 import { transcribeAudio } from "@/lib/ai-transcription";
@@ -2128,4 +2128,29 @@ export async function restoreConversationOwners(owners: { id: string; assignedUs
   revalidatePath("/clinic/inbox");
   notifyInboxRealtime(clinicId).catch(() => {});
   return { success: true, restored: owners.length };
+}
+
+/** Estado do WhatsApp da clínica (instância Evolution) pro aviso no topo do Chat —
+ * crítica 14/10/2026: com o número caído/restrito a atendente digitava sem saber que
+ * nada saía. "unknown" (sem instância própria ou falha na consulta) não mostra aviso:
+ * melhor não alarmar por falha de checagem. */
+export async function getWhatsappChannelStatus(): Promise<"open" | "down" | "unknown"> {
+  const { clinicId } = await requireClinicSession();
+  const { apiUrl, apiKey, instanceName } = await getEvolutionConfig(clinicId);
+  if (!apiUrl || !apiKey || !instanceName) return "unknown";
+  try {
+    const res = await fetch(`${apiUrl.replace(/\/$/, "")}/instance/connectionState/${instanceName}`, {
+      headers: { apikey: apiKey },
+      signal: AbortSignal.timeout(8000),
+      cache: "no-store",
+    });
+    if (!res.ok) return "unknown";
+    const data = (await res.json()) as { instance?: { state?: string } };
+    const state = data.instance?.state;
+    if (state === "open") return "open";
+    if (state === "close") return "down";
+    return "unknown"; // "connecting" etc. — transitório
+  } catch {
+    return "unknown";
+  }
 }

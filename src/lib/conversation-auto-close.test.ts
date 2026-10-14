@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { businessHoursBetween, decideAutoClose, endingFromJevAnswer } from "./conversation-auto-close";
+import { autoCloseHint, businessHoursBetween, decideAutoClose, endingFromJevAnswer } from "./conversation-auto-close";
 
 // America/Bahia = UTC-3 fixo. 2026-10-09 é sexta.
 const br = (iso: string) => new Date(`${iso}-03:00`);
@@ -59,5 +59,20 @@ describe("endingFromJevAnswer", () => {
   it("Jev indisponível ou resposta estranha = dúvida", () => {
     expect(endingFromJevAnswer(undefined)).toBe("UNSURE");
     expect(endingFromJevAnswer({ type: "choice", choice: "XYZ", confidence: 1 })).toBe("UNSURE");
+  });
+});
+
+describe("autoCloseHint", () => {
+  const now = br("2026-10-09T15:00:00");
+  it("clínica falou por último há 3h úteis: fecha em ~1h", () => {
+    expect(autoCloseHint({ lastDirection: "OUTBOUND", lastAt: br("2026-10-09T12:00:00"), pinned: false, now })).toBe("fecha em ~1h");
+  });
+  it("já passou do prazo: fecha na próxima rodada", () => {
+    expect(autoCloseHint({ lastDirection: "OUTBOUND", lastAt: br("2026-10-09T10:00:00"), pinned: false, now })).toBe("fecha em instantes");
+  });
+  it("ainda longe, paciente falou por último ou fixada: sem aviso", () => {
+    expect(autoCloseHint({ lastDirection: "OUTBOUND", lastAt: br("2026-10-09T14:00:00"), pinned: false, now })).toBeNull();
+    expect(autoCloseHint({ lastDirection: "INBOUND", lastAt: br("2026-10-09T10:00:00"), pinned: false, now })).toBeNull();
+    expect(autoCloseHint({ lastDirection: "OUTBOUND", lastAt: br("2026-10-09T10:00:00"), pinned: true, now })).toBeNull();
   });
 });

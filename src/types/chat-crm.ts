@@ -144,6 +144,8 @@ export interface Contact {
    * (ver visibleIntent em src/lib/patient-intent.ts). */
   patientIntent?: string;
   lastMessageTime: string;
+  /** "fecha em ~1h" quando a finalização automática está perto (ver autoCloseHint). */
+  autoCloseHint?: string;
   statusTag: {
     label: string;
     variant: 'emerald' | 'amber' | 'blue' | 'purple' | 'slate';
