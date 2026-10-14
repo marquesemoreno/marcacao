@@ -71,7 +71,14 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
   const [selectedDoctors, setSelectedDoctors] = useState<string[]>([]);
   const [selectedGroups, setSelectedGroups] = useState<string[]>([]);
   const [openItem, setOpenItem] = useState<AgendaItem | null>(null);
-  const [schedule, setSchedule] = useState<{ date: string; time?: string; doctor?: string } | null>(null);
+  const [schedule, setSchedule] = useState<{
+    date: string;
+    time?: string;
+    doctor?: string;
+    /** Remarcação: já abre com o paciente da marcação original. */
+    patient?: { name: string; phone: string; from: AgendaItem };
+  } | null>(null);
+  const [updatedAt, setUpdatedAt] = useState<string | null>(null);
   const [nowTime, setNowTime] = useState(nowInBahia);
   const today = todayInBahia();
 
@@ -99,6 +106,7 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
         if (cancelled) return;
         setData(r);
         setLoadedKey(rangeKey);
+        setUpdatedAt(nowInBahia());
       })
       .catch(() => !cancelled && setLoadError(true))
       .finally(() => !cancelled && setLoading(false));
@@ -122,6 +130,15 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
   const summary = useMemo(() => daySummary(doctorItems), [doctorItems]);
 
   const reload = useCallback(() => setReloadKey((k) => k + 1), []);
+
+  // Respostas ao lembrete mudam o status ao longo da manhã: recarrega sozinho a cada 90 s
+  // (sem esqueleto — mesmo período), só com a aba visível e nada aberto por cima.
+  useEffect(() => {
+    const t = setInterval(() => {
+      if (document.visibilityState === "visible" && !schedule && !openItem) reload();
+    }, 90_000);
+    return () => clearInterval(t);
+  }, [reload, schedule, openItem]);
 
   const applyStatus = useCallback(
     async (item: AgendaItem, status: AgendaStatusChoice) => {
@@ -149,7 +166,10 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
         throw e;
       }
       const name = toTitleCase(item.patientName || "Paciente");
-      toast.success(status === "AUTO" ? `${name}: voltou ao status automático` : `${name} marcado como ${AGENDA_STATUS_META[status].label}`, {
+      const removesFromAgenda = item.source === "BRIDGE" && (status === "NO_SHOW" || status === "CANCELLED");
+      toast.success(status === "AUTO" ? `${name}: voltou ao status do lembrete` : `${name} marcado como ${AGENDA_STATUS_META[status].label}`, {
+        description: removesFromAgenda ? "Marcado só no Conecta — ajuste também no sistema da clínica." : undefined,
+        duration: removesFromAgenda ? 8000 : undefined,
         action: {
           label: "Desfazer",
           onClick: () => {
@@ -162,6 +182,15 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
     },
     [applyStatus]
   );
+
+  const handleReschedule = useCallback((item: AgendaItem) => {
+    setOpenItem(null);
+    setSchedule({
+      date: item.date < todayInBahia() ? todayInBahia() : item.date,
+      doctor: item.doctor ?? undefined,
+      patient: { name: toTitleCase(item.patientName || ""), phone: item.phone ?? "", from: item },
+    });
+  }, []);
 
   const move = useCallback(
     (dir: 1 | -1) => {
@@ -271,6 +300,20 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
           onRefresh={reload}
         />
 
+        {view === "mes" && selectedGroups.length > 0 && (
+          <p className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+            Contando só: {AGENDA_STATUS_GROUPS.filter((g) => selectedGroups.includes(g.id)).map((g) => g.label.toLowerCase()).join(", ")}.
+            <button type="button" onClick={() => setSelectedGroups([])} className="font-semibold text-emerald-700 dark:text-emerald-400 underline underline-offset-2">
+              Limpar filtro
+            </button>
+          </p>
+        )}
+        {updatedAt && current && (
+          <p className="text-xs text-slate-500 dark:text-slate-400 tabular-nums" aria-live="off">
+            Atualizado às {updatedAt} · atualiza sozinho a cada minuto e meio
+          </p>
+        )}
+
         {current && view !== "mes" && (
           <AgendaSummary
             summary={summary}
@@ -284,7 +327,11 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
             <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" aria-hidden />
             <span>
               Não foi possível ler a agenda do sistema da clínica
-              {failed.length === 1 ? ` de ${brDate(failed[0])}` : ` em ${failed.length} dias`}. O computador da clínica pode estar desligado — aparecem só
+              {failed.length === 1
+                ? ` de ${brDate(failed[0])}`
+                : failed.length <= 3
+                  ? ` de ${failed.map((d) => brDate(d).slice(0, 5)).join(", ")}`
+                  : ` em ${failed.length} dias`}. O computador da clínica pode estar desligado — aparecem só
               os agendamentos feitos pelo Conecta.{" "}
               <button type="button" onClick={reload} className="font-semibold underline underline-offset-2">
                 Tentar de novo
@@ -296,7 +343,7 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
         {loadError && !current ? (
           <div className={`${panel} p-10 text-center`} role="alert">
             <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">Não foi possível carregar a agenda.</p>
-            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Verifique a internet e tente de novo.</p>
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Pode ser a internet ou uma instabilidade no Conecta. Tente de novo em instantes.</p>
             <button
               type="button"
               onClick={reload}
@@ -345,17 +392,18 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
                 onSlotClick={(col, time) => setSchedule({ date: col.date, time, doctor: col.doctor ?? undefined })}
                 onOpen={setOpenItem}
                 onSetStatus={handleSetStatus}
+                onReschedule={handleReschedule}
               />
             )}
           </>
         )}
       </div>
 
-      <PatientSheet item={openItem} onClose={() => setOpenItem(null)} onSetStatus={handleSetStatus} />
+      <PatientSheet item={openItem} onClose={() => setOpenItem(null)} onSetStatus={handleSetStatus} onReschedule={handleReschedule} />
 
       {schedule && (
         <ScheduleModal
-          contact={{ name: "", cpf: "", phone: "" }}
+          contact={{ name: schedule.patient?.name ?? "", cpf: "", phone: schedule.patient?.phone ?? "" }}
           isOpen={!!schedule}
           onClose={() => setSchedule(null)}
           initialDate={schedule.date}
@@ -367,7 +415,12 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
           fetchAgenda={getClinicDoctorAgenda}
           fetchPatients={listClinicPatientsForAppointment}
           onConfirmSchedule={() => {
-            toast.success("Agendamento criado.");
+            if (schedule.patient) {
+              toast.success("Remarcado.", {
+                description: "Desmarque o horário antigo no sistema da clínica e marque-o como Cancelado aqui.",
+                duration: 9000,
+              });
+            } else toast.success("Agendamento criado.");
             reload();
           }}
         />

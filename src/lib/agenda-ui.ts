@@ -11,7 +11,7 @@ export const AGENDA_STATUS_META: Record<AgendaStatus, { label: string; badge: st
     dot: "bg-emerald-500",
   },
   PENDING: {
-    label: "Pendente",
+    label: "Sem lembrete",
     badge: "bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800",
     tint: "bg-white dark:bg-slate-900",
     dot: "bg-amber-400",

@@ -23,6 +23,7 @@ export function AgendaGrid({
   onSlotClick,
   onOpen,
   onSetStatus,
+  onReschedule,
 }: {
   columns: AgendaColumn[];
   compact?: boolean;
@@ -31,6 +32,7 @@ export function AgendaGrid({
   onSlotClick: (column: AgendaColumn, time?: string) => void;
   onOpen: (item: AgendaItem) => void;
   onSetStatus: (item: AgendaItem, status: AgendaStatusChoice) => Promise<void>;
+  onReschedule: (item: AgendaItem) => void;
 }) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const nowRef = useRef<HTMLDivElement>(null);
@@ -99,7 +101,7 @@ export function AgendaGrid({
             {byCell.map((c, i) => (
               <div key={columns[i].id} className="border-b border-l border-slate-200 dark:border-slate-800 p-1 space-y-1 bg-slate-50/70 dark:bg-slate-950/40">
                 {c.unscheduled.map((item) => (
-                  <AppointmentCard key={item.key} item={item} compact={compact} onOpen={onOpen} onSetStatus={onSetStatus} />
+                  <AppointmentCard key={item.key} item={item} compact={compact} onOpen={onOpen} onSetStatus={onSetStatus} onReschedule={onReschedule} />
                 ))}
               </div>
             ))}
@@ -123,7 +125,16 @@ export function AgendaGrid({
                   isNow ? "font-semibold text-emerald-700 dark:text-emerald-400" : "text-slate-400 dark:text-slate-500"
                 }`}
               >
-                {isNow ? "agora" : isHour ? time : ""}
+                {isNow ? (
+                  <>
+                    {time}
+                    <span className="block text-[10px]">agora</span>
+                  </>
+                ) : isHour ? (
+                  time
+                ) : (
+                  ""
+                )}
               </div>
               {byCell.map((c, i) => {
                 const col = columns[i];
@@ -135,7 +146,7 @@ export function AgendaGrid({
                 return (
                   <div key={col.id} className={`group/cell relative border-t border-l ${line} min-h-8 p-0.5 space-y-0.5`}>
                     {shown.map((item) => (
-                      <AppointmentCard key={item.key} item={item} compact={compact} onOpen={onOpen} onSetStatus={onSetStatus} />
+                      <AppointmentCard key={item.key} item={item} compact={compact} onOpen={onOpen} onSetStatus={onSetStatus} onReschedule={onReschedule} />
                     ))}
                     {hidden > 0 && (
                       <button
@@ -162,7 +173,7 @@ export function AgendaGrid({
                         type="button"
                         tabIndex={-1}
                         onClick={() => onSlotClick(col, time)}
-                        className="absolute right-1 top-1 z-10 hidden group-hover/cell:inline-flex size-6 items-center justify-center rounded-md bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-emerald-700 dark:text-emerald-400 shadow-xs"
+                        className="absolute right-1 top-1 z-10 hidden group-hover/cell:inline-flex [@media(hover:none)]:inline-flex size-6 items-center justify-center rounded-md bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-emerald-700 dark:text-emerald-400 shadow-xs"
                         aria-label={`Encaixar paciente às ${time}`}
                         title={`Encaixar às ${time}`}
                       >
