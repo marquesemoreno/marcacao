@@ -735,10 +735,32 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
       )
     );
 
+    // Responder conversa de colega passa a conversa pra mim (assignOnReply) — guarda o
+    // dono anterior pra oferecer "Desfazer" (crítica do Chat 14/10/2026).
+    const conversationId = selectedContactId;
+    const takingFrom =
+      mode === "whatsapp" && selectedContact?.assignedToOther ? selectedContact.responsibleAgent.split(" ")[0] : null;
+    const ownersFn = scope === "admin" ? getConversationOwnersAdmin : getConversationOwners;
+    const before = takingFrom ? await ownersFn([conversationId]).catch(() => []) : [];
+
     try {
-      await actions.sendMessage(selectedContactId, text, mode === "internal_note", replyToMessageId);
+      await actions.sendMessage(conversationId, text, mode === "internal_note", replyToMessageId);
       refreshMessages();
       refreshContacts();
+      if (takingFrom && before.length > 0) {
+        const restoreFn = scope === "admin" ? restoreConversationOwnersAdmin : restoreConversationOwners;
+        toast.success(`A conversa passou de ${takingFrom} para você.`, {
+          action: {
+            label: "Desfazer",
+            onClick: async () => {
+              const r = await restoreFn(before).catch(() => ({ success: false }));
+              if (r.success) toast.success(`A conversa voltou para ${takingFrom}.`);
+              else toast.error("Não foi possível desfazer.");
+              await refreshContacts();
+            },
+          },
+        });
+      }
     } catch {
       toast.error("Erro ao enviar mensagem.");
       setMessages((prev) => prev.filter((m) => m.id !== tempId));

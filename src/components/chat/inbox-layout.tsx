@@ -94,6 +94,19 @@ const COMPOSER_EMOJIS = [
 /** A partir de quantos minutos parado em "Não Atribuídas" a aba pisca pra alertar o atendente. */
 const UNASSIGNED_ALERT_THRESHOLD_MINUTES = 10;
 
+/** Motivos de finalização (mesmos ids de REASON_LABELS em actions/inbox.ts). */
+const FINISH_REASONS: { id: string; label: string; negative?: boolean }[] = [
+  { id: 'DUVIDA_ESCLARECIDA', label: 'Dúvida esclarecida' },
+  { id: 'AGENDAMENTO_CONCLUIDO', label: 'Agendou' },
+  { id: 'CONFIRMACAO_AGENDA', label: 'Confirmou a consulta' },
+  { id: 'AGENDAMENTO_REMARCADO', label: 'Remarcou' },
+  { id: 'ORCAMENTO_ENVIADO', label: 'Orçamento enviado' },
+  { id: 'SEM_RESPOSTA', label: 'Paciente não respondeu', negative: true },
+  { id: 'AGENDAMENTO_CANCELADO', label: 'Cancelou a consulta', negative: true },
+  { id: 'CANCELAMENTO', label: 'Desistiu', negative: true },
+  { id: 'ENCAMINHADO', label: 'Encaminhado a outro setor', negative: true },
+];
+
 const CRM_PANEL_STORAGE_KEY = 'inbox-crm-panel';
 const AUTO_ADVANCE_STORAGE_KEY = 'inbox-auto-advance';
 
@@ -356,9 +369,10 @@ const ContactListItem = React.memo(function ContactListItem({
         <PopoverTrigger
           onClick={(e) => e.stopPropagation()}
           className={`absolute top-1.5 right-1.5 p-1 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-200/70 dark:hover:bg-slate-700/70 transition-opacity ${
-            isCardMenuOpen ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus-visible:opacity-100'
+            isCardMenuOpen || isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus-visible:opacity-100'
           }`}
           title="Mais opções"
+          aria-label={`Mais opções para ${displayName(c)}`}
         >
           <MoreVertical className="w-3.5 h-3.5" />
         </PopoverTrigger>
@@ -489,6 +503,7 @@ const ContactListItem = React.memo(function ContactListItem({
                 title="A clínica falou por último e o paciente não respondeu — o sistema finaliza sozinho após 4h úteis. Se ele responder, a conversa volta."
               >
                 <Clock className="w-3 h-3" aria-hidden /> {c.autoCloseHint}
+                <span className="sr-only"> (finalização automática: o paciente não respondeu; se responder, a conversa volta)</span>
               </span>
             )}
             <span
@@ -737,10 +752,12 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
   // Modal de Motivo Obrigatório de Resolução
   const [isFinishModalOpen, setIsFinishModalOpen] = useState(false);
   const [selectedReason, setSelectedReason] = useState<string | null>(null);
+  const [showAllReasons, setShowAllReasons] = useState(false);
   // Finalizar rápido (crítica 14/10/2026): já abre com o motivo mais provável marcado
   // pela intenção do paciente (Jev) — a atendente só confirma ou troca.
   useEffect(() => {
     if (!isFinishModalOpen) return;
+    setShowAllReasons(false);
     const intent = selectedContact?.patientIntent;
     setSelectedReason(
       intent === 'Confirma presença'
@@ -998,10 +1015,11 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
   const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
   // Abrir a próxima conversa ao finalizar — liga/desliga no diálogo de atalhos; fica
   // guardado neste navegador (não na conta).
-  const [autoAdvance, setAutoAdvance] = useState(true);
+  // Desligado por padrão desde 14/10/2026 (atendentes vêm do WhatsApp Web, onde nada pula sozinho).
+  const [autoAdvance, setAutoAdvance] = useState(false);
   useEffect(() => {
     try {
-      if (localStorage.getItem(AUTO_ADVANCE_STORAGE_KEY) === '0') setAutoAdvance(false);
+      if (localStorage.getItem(AUTO_ADVANCE_STORAGE_KEY) === '1') setAutoAdvance(true);
     } catch {}
   }, []);
   function toggleAutoAdvance(next: boolean) {
@@ -1390,7 +1408,6 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
               )}
               {attendantCapacity && (
                 <span
-                  role="status"
                   aria-label={`${attendantCapacity.awaiting} ${attendantCapacity.awaiting === 1 ? "paciente aguardando" : "pacientes aguardando"} sua resposta`}
                   className={`inline-flex items-center gap-1 whitespace-nowrap tabular-nums text-xs font-semibold px-2 py-0.5 rounded-md border ${
                     attendantCapacity.level === "high"
@@ -1428,7 +1445,8 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
             <Search className="w-4 h-4 text-slate-400 dark:text-slate-500 absolute left-3 top-2.5" />
             <input
               type="text"
-              placeholder="Buscar paciente, telefone ou mensagem..."
+              aria-label="Buscar conversas"
+              placeholder="Buscar paciente, telefone ou mensagem…"
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
               className="w-full pl-9 pr-3 py-2 text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 focus:bg-white dark:focus:bg-slate-900 transition-all text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500"
@@ -1438,6 +1456,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
           {/* Filtro de clínica — só existe no scope admin, que vê a fila de todas juntas. */}
           {onClinicFilterChange && availableClinics && availableClinics.length > 0 && (
             <select
+              aria-label="Filtrar por clínica"
               value={clinicFilter ?? ""}
               onChange={(e) => onClinicFilterChange(e.target.value)}
               className="w-full px-2.5 py-1.5 text-xs font-semibold bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-slate-700 dark:text-slate-200"
@@ -1456,7 +1475,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
               então é bom sinalizar quando isso está acontecendo. */}
           {outboundFromDeviceStats && outboundFromDeviceStats.total > 0 && (
             <div
-              className="flex items-center gap-1.5 text-xs font-semibold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-800 px-2.5 py-1.5 rounded-lg"
+              className="flex items-center gap-1.5 text-xs font-medium text-amber-800 dark:text-amber-300"
               title={
                 outboundFromDeviceStats.byClinic.length > 0
                   ? outboundFromDeviceStats.byClinic.map((c) => `${c.clinicName}: ${c.count}`).join('\n') +
@@ -1466,7 +1485,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
             >
               <Smartphone className="w-3.5 h-3.5 shrink-0" />
               <span>
-                {outboundFromDeviceStats.total} resposta{outboundFromDeviceStats.total > 1 ? 's' : ''} hoje direto pelo celular (fora do painel)
+                {outboundFromDeviceStats.total} pelo celular hoje<span className="sr-only"> (respostas fora do painel)</span>
               </span>
             </div>
           )}
@@ -1638,7 +1657,16 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
           ) : filteredContacts.length === 0 ? (
             <div className="p-8 text-center text-xs text-slate-500 dark:text-slate-400 flex flex-col items-center justify-center gap-3">
               <MessageSquare className="w-8 h-8 text-slate-300 dark:text-slate-700" />
-              <span>Nenhuma conversa encontrada nesta lista.</span>
+              <span>{searchQuery ? `Nenhuma conversa encontrada para “${searchQuery}”.` : 'Nenhuma conversa nesta lista.'}</span>
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => onSearchChange('')}
+                  className="rounded-md border border-slate-200 dark:border-slate-700 px-2.5 py-1 font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800"
+                >
+                  Limpar busca
+                </button>
+              )}
             </div>
           ) : (
             filteredContacts.map((c, i) => {
@@ -1871,7 +1899,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                   onClaimConversation && (
                       <button
                         onClick={() => onClaimConversation()}
-                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all bg-emerald-600 hover:bg-emerald-700 text-white active:scale-95"
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all bg-emerald-600 hover:bg-emerald-700 text-white active:scale-95 motion-reduce:active:scale-100"
                         title={
                           attendantCapacity?.level === "high"
                             ? `Atenção: ${attendantCapacity.awaiting} pacientes já esperam sua resposta. Dá para assumir, mas veja se uma colega está mais livre.`
@@ -1970,8 +1998,16 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
 
                       <button
                         onClick={() => {
-                          setMobileView('crm');
                           setIsMoreMenuOpen(false);
+                          // Com dono: abre a mesma transferência do cabeçalho. Sem dono (ou no
+                          // celular, onde o cabeçalho é compacto): painel do paciente, seção Transferir.
+                          const hasOwner = selectedContact.responsibleAgent && selectedContact.responsibleAgent.toLowerCase() !== 'não atribuído';
+                          if (hasOwner && window.matchMedia('(min-width: 640px)').matches) {
+                            setIsHeaderTransferOpen(true);
+                          } else {
+                            setCrmPanelOpen(true);
+                            setMobileView('crm');
+                          }
                         }}
                         className="w-full px-3 py-2 text-left hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center gap-2 text-slate-700 dark:text-slate-200"
                       >
@@ -2164,6 +2200,17 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
 
             {/* Barra de Envio Inferior: toggle integrado no topo do input */}
             <footer className="p-2.5 sm:p-3.5 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 shrink-0">
+              {whatsappBlocked ? (
+                <p id="composer-notice" className="mb-2 flex items-center gap-1.5 text-xs font-medium text-rose-700 dark:text-rose-400">
+                  <AlertTriangle className="w-3.5 h-3.5 shrink-0" aria-hidden />
+                  WhatsApp desconectado: a mensagem não sairia. Use “Nota Interna” ou reconecte o WhatsApp.
+                </p>
+              ) : selectedContact.assignedToOther && composerMode === 'whatsapp' ? (
+                <p id="composer-notice" className="mb-2 flex items-center gap-1.5 text-xs font-medium text-amber-800 dark:text-amber-300">
+                  <UserPlus className="w-3.5 h-3.5 shrink-0" aria-hidden />
+                  Conversa de {selectedContact.responsibleAgent.split(' ')[0]} — ao responder, ela passa para você.
+                </p>
+              ) : null}
               <form ref={quickReplyRef} onSubmit={handleSendMessage} className="relative">
                 {isQuickReplyOpen && (
                   <div className="absolute bottom-full left-0 mb-2 w-full max-w-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg shadow-lg py-2 z-30 max-h-64 overflow-y-auto animate-in fade-in slide-in-from-bottom-2 duration-150">
@@ -2501,7 +2548,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                         aria-label="Melhorar com IA"
                       >
                         <Sparkles className={`w-3.5 h-3.5 ${isGeneratingIa ? 'animate-spin text-emerald-600' : ''}`} />
-                        <span className="hidden sm:inline whitespace-nowrap">{isGeneratingIa ? 'Gerando...' : 'Melhorar com IA'}</span>
+                        <span className="hidden sm:inline whitespace-nowrap">{isGeneratingIa ? 'Gerando…' : 'Melhorar com IA'}</span>
                       </button>
                     </div>
 
@@ -2509,7 +2556,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                       type="submit"
                       disabled={!inputText.trim() || whatsappBlocked}
                       title={whatsappBlocked ? 'WhatsApp desconectado — a mensagem não sairia. Use uma nota interna ou reconecte o WhatsApp.' : undefined}
-                      className={`flex shrink-0 items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-semibold shadow-sm transition-all active:scale-95 ${
+                      className={`flex shrink-0 items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-semibold shadow-sm transition-all active:scale-95 motion-reduce:active:scale-100 ${
                         !inputText.trim() || whatsappBlocked
                           ? 'bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-600 cursor-not-allowed'
                           : composerMode === 'internal_note'
@@ -2585,7 +2632,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                     className="shrink-0 text-xs font-semibold text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-300 disabled:opacity-50 flex items-center gap-1"
                   >
                     <Sparkles className={`w-3 h-3 ${isLoadingCopilot ? 'animate-spin' : ''}`} />
-                    {isLoadingCopilot ? 'Gerando...' : copilotSuggestions.length > 0 ? 'Gerar de novo' : 'Gerar sugestões'}
+                    {isLoadingCopilot ? 'Gerando…' : copilotSuggestions.length > 0 ? 'Gerar de novo' : 'Gerar sugestões'}
                   </button>
                 </div>
 
@@ -3303,58 +3350,68 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
               <label id="finish-reason-label" className="text-xs font-semibold text-slate-700 dark:text-slate-300 block">
                 Motivo do encerramento
               </label>
-              <div role="radiogroup" aria-labelledby="finish-reason-label" className="space-y-2.5">
-                {[
-                  {
-                    group: "Com retorno positivo",
-                    options: [
-                      { id: "AGENDAMENTO_CONCLUIDO", label: "Agendamento Concluído" },
-                      { id: "CONFIRMACAO_AGENDA", label: "Confirmação de Agenda" },
-                      { id: "AGENDAMENTO_REMARCADO", label: "Agendamento Remarcado" },
-                      { id: "ORCAMENTO_ENVIADO", label: "Orçamento Enviado" },
-                      { id: "DUVIDA_ESCLARECIDA", label: "Dúvida Esclarecida" },
-                    ],
-                  },
-                  {
-                    group: "Sem conversão",
-                    options: [
-                      { id: "SEM_RESPOSTA", label: "Paciente Não Respondeu" },
-                      { id: "AGENDAMENTO_CANCELADO", label: "Agendamento Cancelado" },
-                      { id: "CANCELAMENTO", label: "Cancelamento / Desistência" },
-                      { id: "ENCAMINHADO", label: "Encaminhado a Outro Setor" },
-                    ],
-                  },
-                ].map((section) => (
-                  <div key={section.group} className="space-y-1">
-                    <p className="text-xs font-semibold text-slate-600 dark:text-slate-300">
-                      {section.group}
-                    </p>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                      {section.options.map((option) => (
+              {(() => {
+                // 3 motivos à vista (o sugerido + os mais comuns), o resto em "Outros
+                // motivos…" — crítica 14/10/2026 (eram 9 opções de uma vez). Setas
+                // movem a escolha (radiogroup de verdade, uma parada de Tab só).
+                const common = [selectedReason, 'DUVIDA_ESCLARECIDA', 'AGENDAMENTO_CONCLUIDO', 'CONFIRMACAO_AGENDA'].filter(
+                  (id, i, arr): id is string => !!id && arr.indexOf(id) === i
+                ).slice(0, 3);
+                const visible = showAllReasons ? FINISH_REASONS : FINISH_REASONS.filter((r) => common.includes(r.id)).sort((x, y) => common.indexOf(x.id) - common.indexOf(y.id));
+                const focusId = selectedReason && visible.some((r) => r.id === selectedReason) ? selectedReason : visible[0]?.id;
+                return (
+                  <>
+                    <div
+                      role="radiogroup"
+                      aria-labelledby="finish-reason-label"
+                      className="grid grid-cols-1 sm:grid-cols-3 gap-2"
+                      onKeyDown={(e) => {
+                        const delta = e.key === 'ArrowDown' || e.key === 'ArrowRight' ? 1 : e.key === 'ArrowUp' || e.key === 'ArrowLeft' ? -1 : 0;
+                        if (!delta) return;
+                        e.preventDefault();
+                        const idx = visible.findIndex((r) => r.id === focusId);
+                        const next = visible[(idx + delta + visible.length) % visible.length];
+                        setSelectedReason(next.id);
+                        (e.currentTarget.querySelector(`[data-reason="${next.id}"]`) as HTMLElement | null)?.focus();
+                      }}
+                    >
+                      {visible.map((option) => (
                         <button
                           key={option.id}
                           type="button"
                           role="radio"
+                          data-reason={option.id}
                           aria-checked={selectedReason === option.id}
+                          tabIndex={option.id === focusId ? 0 : -1}
                           onClick={() => setSelectedReason(option.id)}
-                          className={`p-3 rounded-lg text-left text-xs font-semibold transition-all border flex items-center gap-2 ${
+                          className={`p-3 rounded-lg text-left text-sm font-semibold transition-colors border focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50 ${
                             selectedReason === option.id
                               ? "bg-emerald-50 dark:bg-emerald-950/60 border-emerald-500 text-emerald-800 dark:text-emerald-200"
                               : "bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700"
                           }`}
                         >
-                          <span>{option.label}</span>
+                          {option.label}
+                          {option.negative && <span className="block text-xs font-normal text-slate-500 dark:text-slate-400">sem conversão</span>}
                         </button>
                       ))}
                     </div>
-                  </div>
-                ))}
-              </div>
+                    {!showAllReasons && (
+                      <button
+                        type="button"
+                        onClick={() => setShowAllReasons(true)}
+                        className="text-sm font-semibold text-emerald-700 dark:text-emerald-400 underline underline-offset-2"
+                      >
+                        Outros motivos…
+                      </button>
+                    )}
+                  </>
+                );
+              })()}
             </div>
 
             <div>
               <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">
-                Observação Final da Equipe (Opcional):
+                Observação para a equipe (opcional)
               </label>
               <textarea
                 rows={2}
@@ -3413,10 +3470,10 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                 className={`px-5 py-2.5 font-semibold text-xs rounded-lg shadow-sm transition-all ${
                   !selectedReason || isFinishingAttendance
                     ? "bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-600 cursor-not-allowed"
-                    : "bg-emerald-600 hover:bg-emerald-700 text-white active:scale-95"
+                    : "bg-emerald-600 hover:bg-emerald-700 text-white active:scale-95 motion-reduce:active:scale-100"
                 }`}
               >
-                {isFinishingAttendance ? "Finalizando..." : "Confirmar e Finalizar Atendimento"}
+                {isFinishingAttendance ? "Finalizando…" : "Finalizar"}
               </button>
               </div>
             </div>
