@@ -5,7 +5,9 @@ import Link from "next/link";
 import { Loader2, MessageCircle, Phone, UserRound } from "lucide-react";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { getAgendaPatient, type AgendaPatient } from "@/actions/agenda";
-import { MANUAL_AGENDA_STATUSES, type AgendaItem, type ManualAgendaStatus } from "@/lib/agenda";
+import type { AgendaItem, AgendaStatusChoice } from "@/lib/agenda";
+import { StatusIcon } from "./status-icon";
+import { StatusMenu } from "./status-menu";
 import { AGENDA_STATUS_META, formatLongDate, toTitleCase } from "@/lib/agenda-ui";
 import { appointmentStatusLabels } from "@/lib/format";
 
@@ -24,11 +26,11 @@ export function PatientSheet({
 }: {
   item: AgendaItem | null;
   onClose: () => void;
-  onSetStatus: (item: AgendaItem, status: ManualAgendaStatus) => Promise<void>;
+  onSetStatus: (item: AgendaItem, status: AgendaStatusChoice) => Promise<void>;
 }) {
   const [patient, setPatient] = useState<AgendaPatient | null>(null);
   const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!item) return;
@@ -66,39 +68,29 @@ export function PatientSheet({
               </section>
 
               <section>
-                <h3 className="text-xs font-medium text-slate-600 dark:text-slate-400 mb-2">Status</h3>
-                <div className="flex flex-wrap gap-1.5">
-                  {MANUAL_AGENDA_STATUSES.map((s) => (
-                    <button
-                      key={s}
-                      type="button"
-                      disabled={!!saving}
-                      onClick={async () => {
-                        setSaving(s);
-                        try {
-                          await onSetStatus(item, s);
-                        } finally {
-                          setSaving(null);
-                        }
-                      }}
-                      className={`inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-semibold disabled:opacity-60 ${
-                        item.status === s
-                          ? AGENDA_STATUS_META[s].badge
-                          : "border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
-                      }`}
-                      aria-pressed={item.status === s}
-                    >
-                      {saving === s && <Loader2 className="w-3 h-3 animate-spin" aria-hidden />}
-                      {AGENDA_STATUS_META[s].label}
-                    </button>
-                  ))}
+                <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-800 dark:text-slate-100 mb-2">
+                  Status:
+                  <span className={`inline-flex h-6 items-center gap-1 rounded-md border px-1.5 text-xs font-semibold ${AGENDA_STATUS_META[item.status].badge}`}>
+                    <StatusIcon status={item.status} className="w-3 h-3" />
+                    {AGENDA_STATUS_META[item.status].label}
+                    {item.isManual ? " (marcado à mão)" : ""}
+                  </span>
+                </h3>
+                <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-1">
+                  <StatusMenu
+                    item={item}
+                    disabled={saving}
+                    onPick={async (s) => {
+                      setSaving(true);
+                      try {
+                        await onSetStatus(item, s);
+                      } finally {
+                        setSaving(false);
+                      }
+                    }}
+                  />
                 </div>
-                {!(MANUAL_AGENDA_STATUSES as readonly string[]).includes(item.status) && (
-                  <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-                    Agora: <span className="font-medium">{AGENDA_STATUS_META[item.status].label}</span>
-                  </p>
-                )}
-                <p className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">
+                <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
                   Fica salvo só no Conecta — o sistema da clínica não é alterado.
                 </p>
               </section>

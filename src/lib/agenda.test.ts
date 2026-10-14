@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   agendaDoctors,
+  daySummary,
+  visibleRowRange,
   mergeAgenda,
   monthGridDays,
   resolveAgendaStatus,
@@ -93,5 +95,32 @@ describe("agendaDoctors", () => {
       "Dra. Ana",
       "Sem médico",
     ].sort((a, b) => (a === "Sem médico" ? 1 : b === "Sem médico" ? -1 : a.localeCompare(b, "pt-BR"))));
+  });
+});
+
+describe("daySummary", () => {
+  it("conta por grupo; 'Quer remarcar' separado de aguardando", () => {
+    const s = daySummary([
+      item({ status: "CONFIRMED" }),
+      item({ status: "SENT" }),
+      item({ status: "PENDING" }),
+      item({ status: "RESCHEDULE" }),
+      item({ status: "IN_SERVICE" }),
+      item({ status: "NO_SHOW" }),
+      item({ status: "CANCELLED" }),
+    ]);
+    expect(s).toEqual({ total: 7, confirmado: 1, aguardando: 2, remarcar: 1, presente: 1, atendido: 0, falta: 2 });
+  });
+});
+
+describe("visibleRowRange", () => {
+  it("do primeiro ao último paciente, com folga de 1 linha", () => {
+    expect(visibleRowRange([item({ time: "08:30" }), item({ time: "10:00" })])).toEqual([5, 13]); // 08:15 .. 10:15
+  });
+  it("inclui a hora atual quando é hoje", () => {
+    expect(visibleRowRange([item({ time: "08:30" })], "11:05")).toEqual([5, 17]);
+  });
+  it("sem pacientes: horário comercial 08–18h", () => {
+    expect(visibleRowRange([])).toEqual([4, 43]);
   });
 });

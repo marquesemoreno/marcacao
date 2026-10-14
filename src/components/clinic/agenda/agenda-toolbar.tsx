@@ -4,14 +4,17 @@ import { ChevronLeft, ChevronRight, Loader2, RefreshCw } from "lucide-react";
 
 export type AgendaView = "dia" | "semana" | "mes" | "medico";
 
-const VIEWS: { id: AgendaView; label: string }[] = [
-  { id: "dia", label: "Dia" },
-  { id: "semana", label: "Semana" },
-  { id: "mes", label: "Mês" },
-  { id: "medico", label: "Por médico" },
+export const AGENDA_VIEWS: { id: AgendaView; label: string; key: string }[] = [
+  { id: "dia", label: "Dia", key: "D" },
+  { id: "semana", label: "Semana", key: "S" },
+  { id: "mes", label: "Mês", key: "M" },
+  { id: "medico", label: "Por médico", key: "P" },
 ];
 
-/** Barra de cima da Agenda: navegação de data e seletor de visão. */
+const focusRing = "focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50";
+
+/** Barra de cima da Agenda: navegação de data e seletor de visão. Atalhos (ver
+ * AgendaApp): ← → muda o período, H volta pra hoje, D/S/M/P troca a visão. */
 export function AgendaToolbar({
   label,
   view,
@@ -31,42 +34,41 @@ export function AgendaToolbar({
   onView: (v: AgendaView) => void;
   onRefresh: () => void;
 }) {
-  const navBtn =
-    "inline-flex items-center justify-center h-9 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800";
+  const navBtn = `inline-flex items-center justify-center h-9 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 ${focusRing}`;
   return (
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div className="flex items-center gap-2 min-w-0">
-        <button type="button" onClick={onPrev} className={`${navBtn} w-9`} aria-label="Anterior">
+        <button type="button" onClick={onPrev} className={`${navBtn} w-9`} aria-label="Período anterior" title="Anterior (←)">
           <ChevronLeft className="w-4 h-4" />
         </button>
-        <button type="button" onClick={onToday} className={`${navBtn} px-3 text-sm font-medium`}>
+        <button type="button" onClick={onToday} className={`${navBtn} px-3 text-sm font-medium`} title="Hoje (H)">
           Hoje
         </button>
-        <button type="button" onClick={onNext} className={`${navBtn} w-9`} aria-label="Próximo">
+        <button type="button" onClick={onNext} className={`${navBtn} w-9`} aria-label="Próximo período" title="Próximo (→)">
           <ChevronRight className="w-4 h-4" />
         </button>
-        <h1 className="ml-1 truncate text-base md:text-lg font-semibold tracking-tight text-slate-900 dark:text-slate-100 first-letter:uppercase">
+        <h1 className="ml-1 truncate text-lg md:text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100 first-letter:uppercase" aria-live="polite">
           {label}
         </h1>
         <button
           type="button"
           onClick={onRefresh}
-          className="ml-1 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
-          aria-label="Atualizar agenda"
+          className={`ml-1 inline-flex size-8 items-center justify-center rounded-md text-slate-500 hover:text-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 dark:hover:text-slate-200 ${focusRing}`}
+          aria-label={loading ? "Carregando agenda" : "Atualizar agenda"}
           title="Atualizar"
         >
           {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
         </button>
       </div>
-      <div role="tablist" aria-label="Visão" className="inline-flex rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 p-0.5">
-        {VIEWS.map((v) => (
+      <div role="group" aria-label="Visão da agenda" className="inline-flex rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 p-0.5">
+        {AGENDA_VIEWS.map((v) => (
           <button
             key={v.id}
-            role="tab"
             type="button"
-            aria-selected={view === v.id}
+            aria-pressed={view === v.id}
             onClick={() => onView(v.id)}
-            className={`px-3 py-1.5 text-xs font-semibold rounded-md ${
+            title={`${v.label} (${v.key})`}
+            className={`px-3 h-8 text-sm font-medium rounded-md ${focusRing} ${
               view === v.id
                 ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-xs"
                 : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"

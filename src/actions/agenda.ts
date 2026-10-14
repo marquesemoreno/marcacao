@@ -98,6 +98,7 @@ export async function getAgenda(from: string, to: string): Promise<AgendaResult>
         procedure: a.procedimento,
         doctor: a.medico,
         bridgeNumero: a.numero,
+        isManual: markOf.has(`BRIDGE:${a.numero}`),
         status: resolveAgendaStatus({
           manual: markOf.get(`BRIDGE:${a.numero}`),
           reminderResponse: reminder?.response,
@@ -118,6 +119,7 @@ export async function getAgenda(from: string, to: string): Promise<AgendaResult>
     procedure: a.clinicProcedure.procedure.name,
     doctor: a.doctorName,
     bridgeNumero: extractBridgeNumeroFromNotes(a.notes),
+    isManual: markOf.has(`LOCAL:${a.id}`),
     status: resolveAgendaStatus({
       manual: markOf.get(`LOCAL:${a.id}`),
       local: a.status,
@@ -136,10 +138,13 @@ export async function setAgendaStatus(input: {
   source: "BRIDGE" | "LOCAL";
   externalId: string;
   date: string;
-  status: ManualAgendaStatus;
+  /** "AUTO" apaga a marcação manual — volta a valer o status automático (lembrete). */
+  status: ManualAgendaStatus | "AUTO";
 }): Promise<{ success: true }> {
   const { clinicId, userId } = await requireClinicSession();
-  if (!(MANUAL_AGENDA_STATUSES as readonly string[]).includes(input.status)) throw new Error("Status inválido.");
+  if (input.status !== "AUTO" && !(MANUAL_AGENDA_STATUSES as readonly string[]).includes(input.status)) {
+    throw new Error("Status inválido.");
+  }
   if (input.source === "LOCAL") {
     const appt = await prisma.appointment.findFirst({
       where: { id: input.externalId, clinicProcedure: { clinicId } },
@@ -148,6 +153,11 @@ export async function setAgendaStatus(input: {
     if (!appt) throw new Error("Agendamento não encontrado.");
   }
   const date = new Date(`${input.date}T00:00:00Z`);
+  if (input.status === "AUTO") {
+    await prisma.agendaMark.deleteMany({ where: { clinicId, source: input.source, externalId: input.externalId } });
+    revalidatePath("/clinic/agenda");
+    return { success: true };
+  }
   await prisma.agendaMark.upsert({
     where: { clinicId_source_externalId: { clinicId, source: input.source, externalId: input.externalId } },
     update: { status: input.status, updatedByUserId: userId, date },

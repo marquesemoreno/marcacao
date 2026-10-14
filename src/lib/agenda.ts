@@ -29,7 +29,12 @@ export type AgendaItem = {
   status: AgendaStatus;
   /** NUMERO da marcação no sistema da clínica — liga com lembrete e evita duplicar. */
   bridgeNumero: number | null;
+  /** Status veio de marcação manual da recepção (dá pra "voltar ao automático"). */
+  isManual?: boolean;
 };
+
+/** O que a recepção pode escolher no card: um status manual ou voltar ao automático. */
+export type AgendaStatusChoice = ManualAgendaStatus | "AUTO";
 
 export function resolveAgendaStatus(input: {
   manual?: string | null;
@@ -115,4 +120,39 @@ export const NO_DOCTOR = "Sem médico";
 export function agendaDoctors(items: AgendaItem[]): string[] {
   const names = [...new Set(items.map((i) => i.doctor?.trim() || NO_DOCTOR))];
   return names.sort((a, b) => (a === NO_DOCTOR ? 1 : b === NO_DOCTOR ? -1 : a.localeCompare(b, "pt-BR")));
+}
+
+export type DaySummary = {
+  total: number;
+  confirmado: number;
+  aguardando: number;
+  remarcar: number;
+  presente: number;
+  atendido: number;
+  falta: number;
+};
+
+/** Contagem do dia pra faixa de resumo da Agenda. "Quer remarcar" fica separado de
+ * "aguardando" porque é o único status que pede ação da recepção. */
+export function daySummary(items: AgendaItem[]): DaySummary {
+  const s: DaySummary = { total: items.length, confirmado: 0, aguardando: 0, remarcar: 0, presente: 0, atendido: 0, falta: 0 };
+  for (const i of items) {
+    if (i.status === "CONFIRMED") s.confirmado++;
+    else if (i.status === "PENDING" || i.status === "SENT") s.aguardando++;
+    else if (i.status === "RESCHEDULE") s.remarcar++;
+    else if (i.status === "IN_SERVICE") s.presente++;
+    else if (i.status === "COMPLETED") s.atendido++;
+    else s.falta++;
+  }
+  return s;
+}
+
+/** Linhas da grade que valem mostrar: do primeiro ao último paciente (com 1 linha de
+ * folga), incluindo a hora atual se for hoje. Sem ninguém: horário comercial 08–18h. */
+export function visibleRowRange(items: AgendaItem[], nowTime?: string | null): [number, number] {
+  const rows = items.map((i) => slotRowFor(i.time)).filter((r): r is number => r != null);
+  const now = slotRowFor(nowTime ?? null);
+  if (now != null) rows.push(now);
+  if (rows.length === 0) return [slotRowFor("08:00")!, slotRowFor("17:45")!];
+  return [Math.max(0, Math.min(...rows) - 1), Math.min(AGENDA_ROWS - 1, Math.max(...rows) + 1)];
 }
