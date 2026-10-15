@@ -131,3 +131,21 @@ export function unknownTemplateVariables(template: string, sampleVars: Record<st
 export function unfilledPlaceholders(template: string): string[] {
   return [...new Set(template.match(/\[[A-ZÀ-Ú][A-ZÀ-Ú0-9 /-]{2,}\]/g) ?? [])];
 }
+
+/** Horário estimado de envio de cada destinatário de um aviso urgente (na ordem da fila):
+ * 1 a cada `gapMin` minutos (6 = o pior caso do intervalo de 4–6 min), só das 08h às 18h
+ * todo dia. Usado pra avisar quem não recebe antes da consulta e precisa de ligação. */
+export function urgentSendTimes(count: number, now: Date, gapMin = 6): Date[] {
+  const START = 8 * 60;
+  const END = 18 * 60;
+  const out: Date[] = [];
+  let t = new Date(Math.ceil(now.getTime() / 60_000) * 60_000);
+  for (let i = 0; i < count; i++) {
+    const { minutes } = brParts(t);
+    if (minutes < START) t = new Date(startOfBrazilDay(t).getTime() + START * 60_000);
+    else if (minutes >= END) t = new Date(startOfBrazilDay(t).getTime() + 86_400_000 + START * 60_000);
+    out.push(t);
+    t = new Date(t.getTime() + gapMin * 60_000);
+  }
+  return out;
+}

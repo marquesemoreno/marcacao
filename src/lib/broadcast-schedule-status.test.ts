@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { campaignSituation, estimateCampaignFinish, nextMarketingWindowLabel, unfilledPlaceholders, unknownTemplateVariables } from "./broadcast-schedule";
+import { campaignSituation, estimateCampaignFinish, nextMarketingWindowLabel, unfilledPlaceholders, unknownTemplateVariables, urgentSendTimes } from "./broadcast-schedule";
 
 const br = (iso: string) => new Date(`${iso}-03:00`);
 
@@ -86,5 +86,19 @@ describe("revezamento e feriados", () => {
     expect(campaignSituation({ status: "RUNNING", pending: 10, sentToday: 1, yielding: false, now: br("2026-10-15T10:00:00"), sharing: 2 }).text).toBe(
       "Enviando em revezamento com outro envio — ~1 mensagem a cada 10 min"
     );
+  });
+});
+
+describe("urgentSendTimes", () => {
+  it("1 a cada 6 min dentro das 8h–18h, pulando a noite", () => {
+    const t = urgentSendTimes(3, br("2026-10-15T17:50:00"));
+    expect(t.map((d) => d.toISOString())).toEqual([
+      br("2026-10-15T17:50:00").toISOString(),
+      br("2026-10-15T17:56:00").toISOString(),
+      br("2026-10-16T08:00:00").toISOString(),
+    ]);
+  });
+  it("antes das 8h começa às 8h", () => {
+    expect(urgentSendTimes(1, br("2026-10-15T06:00:00"))[0].toISOString()).toBe(br("2026-10-15T08:00:00").toISOString());
   });
 });

@@ -7,6 +7,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { getDistinctDoctorNames, getAppointmentsByDoctorAndDate } from "@/actions/clinic";
 import { createRescheduleBroadcast } from "@/actions/clinic-broadcast";
+import { urgentSendTimes } from "@/lib/broadcast-schedule";
+
+function formatSendTime(d: Date): string {
+  return d.toLocaleString("pt-BR", { weekday: "short", hour: "2-digit", minute: "2-digit", timeZone: "America/Bahia" });
+}
 
 const DEFAULT_TEMPLATE =
   "Olá {{nome}}, informamos que por motivo de força maior, o Dr(a). {{medico}} não poderá atender no dia {{data}}. Para sua comodidade, você tem prioridade para remarcação. Responda esta mensagem para escolhermos um novo horário.";
@@ -47,6 +52,18 @@ export function RescheduleBroadcastModal({ open, onOpenChange }: { open: boolean
       .catch(() => toast.error("Erro ao carregar pacientes afetados."))
       .finally(() => setLoadingPreview(false));
   }, [doctorName, date]);
+
+  // Quem recebe depois do horário da consulta (pior caso: 1 a cada 6 min, 08h–18h) —
+  // a recepção precisa ligar pra esses (decisão do usuário em 15/10/2026).
+  const schedule = (() => {
+    if (!date || preview.length === 0) return { lastAt: null as Date | null, late: [] as PreviewRow[] };
+    const times = urgentSendTimes(preview.length, new Date());
+    const late = preview.filter((p, i) => {
+      const deadline = new Date(`${date}T${p.timeSlot && /^\d{2}:\d{2}/.test(p.timeSlot) ? p.timeSlot.slice(0, 5) : "07:00"}:00-03:00`);
+      return times[i] > deadline;
+    });
+    return { lastAt: times[times.length - 1] ?? null, late };
+  })();
 
   function reset() {
     setDoctorName("");
@@ -186,18 +203,37 @@ export function RescheduleBroadcastModal({ open, onOpenChange }: { open: boolean
           {confirming ? (
             <div role="alertdialog" aria-labelledby="reschedule-confirm-title" className="rounded-lg border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/40 p-3 space-y-3">
               <p id="reschedule-confirm-title" className="text-sm font-semibold text-amber-900 dark:text-amber-200">
-                {`Enviar para ${preview.length} paciente(s)?`}
+                {`Enviar para ${preview.length} ${preview.length === 1 ? "paciente" : "pacientes"}?`}
               </p>
-              <p className="text-xs text-amber-900 dark:text-amber-200">
+              <p className="text-sm text-amber-900 dark:text-amber-200">
                 Avisa que {doctorName} não atenderá em{" "}
-                {date ? new Date(`${date}T12:00:00Z`).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : ""}.{" "}
-                {`Sai 1 mensagem a cada 4–6 min (das 8h às 18h, todo dia) para proteger o número da clínica — cerca de ${Math.max(1, Math.round((preview.length * 5) / 60))}h para todos. Não pode ser desfeito.`}
+                {date ? new Date(`${date}T12:00:00Z`).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : ""}. Sai 1 mensagem a cada 4–6 min (das 8h às
+                18h, todo dia) para proteger o número da clínica
+                {schedule.lastAt ? ` — o último deve receber por volta de ${formatSendTime(schedule.lastAt)}` : ""}. Se o médico voltar atrás, dá para
+                pausar o envio na lista de campanhas.
               </p>
+              {schedule.late.length > 0 && (
+                <div role="alert" className="rounded-md border border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-950/40 p-2 text-sm text-red-800 dark:text-red-300">
+                  <p className="font-semibold">
+                    {schedule.late.length === 1
+                      ? "1 paciente não deve receber antes da consulta — ligue para ele:"
+                      : `${schedule.late.length} pacientes não devem receber antes da consulta — ligue para eles:`}
+                  </p>
+                  <ul className="mt-1 space-y-0.5 tabular-nums">
+                    {schedule.late.map((p) => (
+                      <li key={p.id}>
+                        {p.timeSlot ?? "sem horário"} — {p.patientName} — {p.patientPhone}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
               <div className="flex items-center justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => setConfirming(false)}
                   disabled={sending}
+                  autoFocus
                   className="px-3 py-2 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-amber-100 dark:hover:bg-amber-900/50 rounded-lg"
                 >
                   Voltar

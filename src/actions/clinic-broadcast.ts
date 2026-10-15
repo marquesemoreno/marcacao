@@ -10,6 +10,7 @@ import { campaignSituation, estimateCampaignFinish, startOfBrazilDay, unfilledPl
 import { RESCHEDULE_PENDING_TAG } from "@/lib/conversation-tags";
 import { formatDate } from "@/lib/format";
 import { fetchBridgeCampaignPatients } from "@/lib/hospital-bridge";
+import { lastAutomatedSend } from "@/lib/automated-pacing-server";
 import { buildCampaignAudience } from "@/lib/campaign-audience";
 
 const ALLOWED_IMAGE_MIME_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
@@ -21,14 +22,17 @@ export async function listClinicBroadcastCampaigns() {
   const { clinicId } = await requireClinicSession();
   const now = new Date();
   const dayStart = startOfBrazilDay(now);
-  const campaigns = await prisma.broadcastCampaign.findMany({
+  const [campaigns, remindersOn] = await Promise.all([
+    prisma.broadcastCampaign.findMany({
     where: { clinicId },
     orderBy: { createdAt: "desc" },
     include: {
       _count: { select: { recipients: true } },
       recipients: { select: { status: true, sentAt: true, errorMessage: true, phone: true } },
     },
-  });
+    }),
+    clinicRemindersActive(clinicId, now),
+  ]);
   // Alguma campanha normal com gente na fila? (a de baixa prioridade cede a vez — ver
   // lowPriorityMustYield em automated-pacing.ts)
   const isActiveMarketing = (c: (typeof campaigns)[number]) =>
@@ -47,6 +51,11 @@ export async function listClinicBroadcastCampaigns() {
     // Campanhas normais ativas se revezam no mesmo ritmo da clínica (ver automated-pacing).
     const sharing = c.lowPriority ? 1 : Math.max(1, highPriorityActive);
     const estimate = isReschedule ? { businessDays: 0, finishIso: null } : estimateCampaignFinish({ pending, sentToday, now, sharing });
+    // Com lembretes de confirmação ativos, nas manhãs eles têm a vez — o fim real pode
+    // cair mais tarde: a tela mostra uma faixa ("entre X e Y") em vez de uma data só.
+    const late = !isReschedule && remindersOn && !c.lowPriority
+      ? estimateCampaignFinish({ pending, sentToday, now, sharing: sharing + 1 })
+      : null;
     return {
       id: c.id,
       name: c.name,
@@ -64,10 +73,27 @@ export async function listClinicBroadcastCampaigns() {
         ? { tone: "ok" as const, text: "Enviando aviso urgente — 1 a cada 4–6 min, das 8h às 18h" }
         : campaignSituation({ status: c.status, pending, sentToday, yielding, now, sharing }),
       finishIso: c.status === "COMPLETED" ? null : estimate.finishIso,
+      finishLateIso: c.status === "COMPLETED" || !late || late.finishIso === estimate.finishIso ? null : late.finishIso,
       businessDays: estimate.businessDays,
       createdAt: c.createdAt,
     };
   });
+}
+
+/** A clínica tem lembretes de confirmação rodando (ponte ativa e sem pausa)? Eles dividem
+ * o intervalo de 4–6 min com as campanhas. */
+async function clinicRemindersActive(clinicId: string, now: Date): Promise<boolean> {
+  const h = await prisma.hospitalIntegration.findUnique({ where: { clinicId }, select: { active: true, remindersPausedUntil: true } });
+  return !!h?.active && (!h.remindersPausedUntil || h.remindersPausedUntil < now);
+}
+
+/** Quando deve sair a próxima mensagem automática da clínica (lembrete, campanha ou aviso),
+ * pelo intervalo único de 4–6 min — explica na tela por que uma campanha "demora". */
+export async function getClinicNextAutomatedSend(): Promise<{ lastAt: string | null; nextAt: string | null }> {
+  const { clinicId } = await requireClinicSession();
+  const last = await lastAutomatedSend(clinicId);
+  if (!last.at) return { lastAt: null, nextAt: null };
+  return { lastAt: last.at.toISOString(), nextAt: new Date(last.at.getTime() + 5 * 60_000).toISOString() };
 }
 
 /** Prévia antes de iniciar: quantos vão receber, a mensagem como o 1º destinatário
@@ -104,6 +130,7 @@ export async function getClinicCampaignStartPreview(campaignId: string) {
     hasImage: Boolean(campaign?.imagePath),
     lowPriority: Boolean(campaign?.lowPriority),
     ...estimateCampaignFinish({ pending, sentToday, now: new Date(), sharing: campaign?.lowPriority ? 1 : 1 + otherActive }),
+    remindersOn: await clinicRemindersActive(clinicId, new Date()),
   };
 }
 

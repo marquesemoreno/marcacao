@@ -17,6 +17,7 @@ import {
   deleteClinicDraftCampaign,
   getClinicCampaignForDuplicate,
   retryClinicCampaignFailures,
+  getClinicNextAutomatedSend,
 } from "@/actions/clinic-broadcast";
 import { BridgeAudiencePicker } from "@/components/clinic/bridge-audience-picker";
 import { listMarcadoresAudience } from "@/actions/marcadores";
@@ -73,10 +74,13 @@ function brDate(iso: string | null): string {
   return d.toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit", month: "2-digit", timeZone: "UTC" });
 }
 
-function estimateText(businessDays: number, finishIso: string | null): string {
+function estimateText(businessDays: number, finishIso: string | null, lateIso?: string | null): string {
   if (!finishIso) return "";
+  if (lateIso) return `termina entre ${brDate(finishIso)} e ${brDate(lateIso)} (os lembretes de confirmação têm a vez)`;
   return businessDays <= 1 ? `termina ${brDate(finishIso)}` : `cerca de ${businessDays} dias úteis — termina ${brDate(finishIso)}`;
 }
+
+const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
 /** Tela de Disparos (crítica 15/10/2026): campanhas no topo com a situação de cada uma
  * (enviando / fora do horário / cedendo a vez / limite do dia) e previsão de término;
@@ -104,11 +108,14 @@ export function BroadcastManagement() {
   const templateRef = useRef<HTMLTextAreaElement>(null);
 
   const [confirming, setConfirming] = useState<{ campaign: Campaign; preview: StartPreview | null } | null>(null);
+  const [deleting, setDeleting] = useState<Campaign | null>(null);
+  const [nextSend, setNextSend] = useState<{ lastAt: string | null; nextAt: string | null } | null>(null);
 
   const loadCampaigns = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     try {
       setCampaigns(await listClinicBroadcastCampaigns());
+      getClinicNextAutomatedSend().then(setNextSend).catch(() => {});
     } catch {
       if (!silent) toast.error("Não foi possível carregar as campanhas. Recarregue a página.");
     } finally {
@@ -282,7 +289,7 @@ export function BroadcastManagement() {
   }
 
   async function removeDraft(campaign: Campaign) {
-    if (!window.confirm(`Excluir o rascunho “${campaign.name}”?`)) return;
+    setDeleting(null);
     setBusyId(campaign.id);
     try {
       await deleteClinicDraftCampaign(campaign.id);
@@ -333,7 +340,15 @@ export function BroadcastManagement() {
   async function toggleLowPriority(c: Campaign) {
     try {
       await setClinicCampaignLowPriority(c.id, !c.lowPriority);
-      toast.success(!c.lowPriority ? `“${c.name}” agora cede a vez a lembretes e outras campanhas.` : `“${c.name}” volta à prioridade normal.`);
+      toast.success(!c.lowPriority ? `“${c.name}” agora espera os lembretes e outras campanhas.` : `“${c.name}” volta à prioridade normal.`, {
+        action: {
+          label: "Desfazer",
+          onClick: async () => {
+            await setClinicCampaignLowPriority(c.id, c.lowPriority).catch(() => toast.error("Não foi possível desfazer."));
+            await loadCampaigns(true);
+          },
+        },
+      });
       await loadCampaigns(true);
     } catch {
       toast.error("Não foi possível salvar.");
@@ -367,7 +382,7 @@ export function BroadcastManagement() {
             : `${campaigns.filter((c) => c.status === "RUNNING").length} em andamento · ${campaigns.filter((c) => c.status === "DRAFT" || c.status === "PAUSED").length} rascunho(s) ou pausada(s)`
         }
         actions={
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap-reverse justify-end gap-2">
             <button
               type="button"
               onClick={() => setRescheduleModalOpen(true)}
@@ -623,7 +638,14 @@ export function BroadcastManagement() {
           <>
             {running.length > 0 && (
               <div className="space-y-3">
-                <h3 className="text-xs font-medium text-emerald-700 dark:text-emerald-400">Agora</h3>
+                <h3 className="text-xs font-medium text-emerald-700 dark:text-emerald-400">Enviando agora</h3>
+                {nextSend?.nextAt && (
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Próxima mensagem automática da clínica por volta de{" "}
+                    {new Date(Math.max(Date.parse(nextSend.nextAt), Date.now())).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Bahia" })} —
+                    lembretes, avisos e campanhas saem um de cada vez, a cada 4–6 min.
+                  </p>
+                )}
                 {running.map((c) => (
                   <CampaignCard
                     key={c.id}
@@ -631,7 +653,7 @@ export function BroadcastManagement() {
                     busy={busyId === c.id}
                     onStart={() => askStart(c)}
                     onPause={() => pause(c)}
-                    onDelete={() => removeDraft(c)}
+                    onDelete={() => setDeleting(c)}
                     onDuplicate={() => duplicate(c)}
                     onRetry={() => retryFailures(c)}
                     onToggleLowPriority={() => toggleLowPriority(c)}
@@ -647,7 +669,7 @@ export function BroadcastManagement() {
                 busy={busyId === c.id}
                 onStart={() => askStart(c)}
                 onPause={() => pause(c)}
-                onDelete={() => removeDraft(c)}
+                onDelete={() => setDeleting(c)}
                 onDuplicate={() => duplicate(c)}
                 onRetry={() => retryFailures(c)}
                 onToggleLowPriority={() => toggleLowPriority(c)}
@@ -685,15 +707,19 @@ export function BroadcastManagement() {
             <DialogTitle>Iniciar “{confirming?.campaign.name}”?</DialogTitle>
           </DialogHeader>
           {!confirming?.preview ? (
-            <p className="flex items-center gap-2 text-sm text-slate-500">
+            <p className="flex items-center gap-2 text-sm text-slate-500" role="status">
               <Loader2 className="w-4 h-4 animate-spin" aria-hidden /> Montando a prévia…
             </p>
           ) : (
             <div className="space-y-4">
               <p className="text-sm text-slate-700 dark:text-slate-200">
-                Vai para <strong>{confirming.preview.pending} pessoa(s)</strong>, uma a cada 4–6 min, de segunda a sexta das 9h às 17h, até 100 por dia —{" "}
+                Vai para <strong>{plural(confirming.preview.pending, "pessoa", "pessoas")}</strong>, uma a cada 4–6 min, de segunda a sexta das 9h às 17h, até 100 por dia —{" "}
                 {estimateText(confirming.preview.businessDays, confirming.preview.finishIso)}.
-                {confirming.preview.lowPriority && " Como é de baixa prioridade, espera os lembretes e outras campanhas e pode demorar mais."}
+                {confirming.preview.lowPriority
+                  ? " Como é de baixa prioridade, espera os lembretes e outras campanhas e pode demorar mais."
+                  : confirming.preview.remindersOn
+                    ? " Os lembretes de confirmação têm a vez nas manhãs, então pode terminar um pouco depois."
+                    : ""}
               </p>
               <div>
                 <p className={labelClass}>
@@ -751,6 +777,31 @@ export function BroadcastManagement() {
           )}
         </DialogContent>
       </Dialog>
+
+      <Dialog open={!!deleting} onOpenChange={(o) => !o && setDeleting(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Excluir o rascunho “{deleting?.name}”?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-slate-600 dark:text-slate-300">Nada foi enviado. A lista de destinatários e o texto deste rascunho serão apagados.</p>
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setDeleting(null)}
+              className="h-9 px-4 text-sm font-medium rounded-lg text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
+            >
+              Voltar
+            </button>
+            <button
+              type="button"
+              onClick={() => deleting && removeDraft(deleting)}
+              className="inline-flex h-9 items-center gap-1.5 px-4 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 rounded-lg"
+            >
+              <Trash2 className="w-4 h-4" aria-hidden /> Excluir rascunho
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -795,7 +846,7 @@ function CampaignCard({
           {c.status === "RUNNING" && (
           <p className={`mt-1 text-sm font-medium ${SITUATION_CLASS[c.situation.tone]}`}>
             {c.situation.text}
-            {c.finishIso && <span className="font-normal text-slate-500 dark:text-slate-400"> · {estimateText(c.businessDays, c.finishIso)}</span>}
+            {c.finishIso && <span className="font-normal text-slate-500 dark:text-slate-400"> · {estimateText(c.businessDays, c.finishIso, c.finishLateIso)}</span>}
           </p>
           )}
         </div>
@@ -828,14 +879,14 @@ function CampaignCard({
       </div>
 
       <div>
-        <div className="h-1.5 w-full rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden" role="progressbar" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100} aria-label="Progresso do envio">
+        <div className="h-1.5 w-full rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden" role="progressbar" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100} aria-label={`Progresso do envio de ${c.name}`}>
           <div className="h-full bg-emerald-500" style={{ width: `${progress}%` }} />
         </div>
         <p className="mt-1 text-xs text-slate-600 dark:text-slate-400 tabular-nums">
           {c.sent} de {c.total} enviadas
           {c.pending > 0 && c.status !== "DRAFT" && ` · ${c.pending} na fila`}
-          {c.skipped > 0 && ` · ${c.skipped} pediram para não receber`}
-          {c.failed > 0 && <span className="text-red-700 dark:text-red-400"> · {c.failed} falha(s)</span>}
+          {c.skipped > 0 && ` · ${c.skipped} ${c.skipped === 1 ? "pediu" : "pediram"} para não receber`}
+          {c.failed > 0 && <span className="text-red-700 dark:text-red-400"> · {plural(c.failed, "falha", "falhas")}</span>}
         </p>
         {c.failed > 0 && (
           <details className="mt-2 text-xs">
@@ -861,12 +912,16 @@ function CampaignCard({
       </div>
 
       {c.status !== "COMPLETED" && (
-        <label className="flex items-start gap-2 text-xs text-slate-600 dark:text-slate-300 cursor-pointer">
-          <input type="checkbox" checked={c.lowPriority} onChange={onToggleLowPriority} className="mt-0.5 size-4 accent-emerald-600" />
-          <span>
-            <span className="font-medium">Baixa prioridade</span> — espera os lembretes de confirmação e outras campanhas terminarem.
-          </span>
-        </label>
+        <p className="text-xs text-slate-500 dark:text-slate-400">
+          {c.lowPriority ? "Baixa prioridade: espera os lembretes e outras campanhas." : "Prioridade normal."}{" "}
+          <button
+            type="button"
+            onClick={onToggleLowPriority}
+            className="font-medium text-slate-700 dark:text-slate-200 underline underline-offset-2 hover:text-slate-900 dark:hover:text-white"
+          >
+            {c.lowPriority ? "Voltar ao normal" : "Mudar para baixa prioridade"}
+          </button>
+        </p>
       )}
     </article>
   );
