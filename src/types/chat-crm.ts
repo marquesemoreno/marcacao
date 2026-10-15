@@ -154,6 +154,12 @@ export interface Contact {
   tags: string[];
   consultationHistory: ConsultationRecord[];
   estimatedValue?: string;
+  /** Conversa finalizada (status RESOLVED) — coluna Finalizado do CRM, independente do motivo. */
+  isResolved?: boolean;
+  /** Valor estimado em número (soma por coluna no CRM). */
+  estimatedValueNumber?: number;
+  /** ISO da última mensagem (ou da criação) — filtros "frios" e "sem interação hoje" do CRM. */
+  lastMessageAt?: string;
   /** Canal de aquisição detectado na 1ª mensagem (ver src/lib/acquisition.ts) — ausente
    * em conversa anterior ao rastreamento ou aberta por lembrete/disparo nosso. */
   /** @username do lead de Instagram Direct — substitui o telefone no cabeçalho. */

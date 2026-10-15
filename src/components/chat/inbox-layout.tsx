@@ -108,6 +108,9 @@ const FINISH_REASONS: { id: string; label: string; negative?: boolean }[] = [
   // Conversa que não é de paciente (médico, equipe da clínica, fornecedor) — fica fora
   // dos números de atendimento/conversão do relatório.
   { id: 'ADMINISTRATIVO', label: 'Administrativo — médico ou equipe da clínica' },
+  { id: 'PERDA_PRECO', label: 'Não fechou — preço', negative: true },
+  { id: 'PERDA_CONVENIO', label: 'Não fechou — convênio', negative: true },
+  { id: 'PERDA_HORARIO', label: 'Não fechou — horário', negative: true },
 ];
 
 const CRM_PANEL_STORAGE_KEY = 'inbox-crm-panel';

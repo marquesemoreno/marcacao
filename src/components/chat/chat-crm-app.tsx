@@ -906,8 +906,8 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
     await refreshContacts();
   }
 
-  async function handleFinish(contactId: string) {
-    await actions.resolveConversation(contactId);
+  async function handleFinish(contactId: string, resolution?: { reason: string; notes?: string }) {
+    await actions.resolveConversation(contactId, resolution);
     await refreshContacts();
   }
 

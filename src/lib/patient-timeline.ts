@@ -24,6 +24,10 @@ export const RESOLUTION_LABELS: Record<string, string> = {
   ATENDIDO_NO_CELULAR: "Atendido pelo celular",
   INATIVIDADE: "Finalizado por inatividade",
   ADMINISTRATIVO: "Administrativo (médico ou equipe)",
+  PERDA_PRECO: "Perdido — preço",
+  PERDA_CONVENIO: "Perdido — convênio",
+  PERDA_HORARIO: "Perdido — horário",
+  PERDA_OUTRO: "Perdido — outro motivo",
   ATENDIMENTO_CONCLUIDO: "Concluído (conversa já tinha terminado)",
 };
 

@@ -2,42 +2,53 @@
 
 import { formatCurrency, formatPhone } from "@/lib/format";
 import { KanbanCardDialog } from "@/components/chat/kanban-card-dialog";
+import { LostReasonModal } from "@/components/chat/lost-reason-modal";
 import { displayName } from "@/lib/contact-display";
-import React, { useRef, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
+import { toast } from 'sonner';
 import { Agent, Contact, FunnelStage } from '@/types/chat-crm';
 import { AvatarBadge } from './avatar-badge';
 import {
+  columnValue,
+  crmAlert,
+  kanbanStageOf,
+  matchesQuickFilter,
+  sortColumn,
+  type CrmCardInput,
+  type CrmQuickFilter,
+  type KanbanStage,
+} from '@/lib/crm-board';
+import { NO_RESPONSE_TAG } from '@/lib/conversation-tags';
+import {
   Search,
-  Phone,
   ArrowRight,
   ArrowLeft,
-  Filter,
   UserCheck,
-  Building2,
-  ExternalLink,
+  MessageCircle,
   UserPlus,
   MessagesSquare,
   CircleDollarSign,
   CalendarCheck,
   Flag,
   KanbanSquare,
+  Clock,
+  AlertTriangle,
 } from 'lucide-react';
-
-type KanbanStage = FunnelStage | 'finalizado';
 
 interface CRMKanbanProps {
   contacts: Contact[];
   agents?: Agent[];
   onOpenContactChat?: (contactId: string) => void;
-  onMoveStage: (contactId: string, stage: FunnelStage) => void;
-  onFinish: (contactId: string) => void;
-  onReopen: (contactId: string) => void;
+  onMoveStage: (contactId: string, stage: FunnelStage) => void | Promise<void>;
+  /** Finaliza com o desfecho escolhido no LostReasonModal (motivo + observação). */
+  onFinish: (contactId: string, resolution?: { reason: string; notes?: string }) => void | Promise<void>;
+  onReopen: (contactId: string) => void | Promise<void>;
   /** D1: primeira carga em andamento — mostra "Carregando…" em vez de colunas zeradas. */
   isLoading?: boolean;
   /** D1: a carga falhou — aviso com "Tentar de novo" em vez de um quadro vazio silencioso. */
   loadError?: boolean;
   onRetry?: () => void;
-  /** N2: ticket médio da clínica — soma em R$ por coluna. null = não configurado. */
+  /** N2: ticket médio da clínica — usado no valor da coluna pra quem não tem estimado. */
   ticket?: number | null;
   onAssign?: (contactId: string, agentId: string) => void;
   /** N2: link da ficha do paciente (só no painel da clínica). */
@@ -46,15 +57,15 @@ interface CRMKanbanProps {
   onAddToStage?: (stage: FunnelStage) => void;
 }
 
-const STAGES: { id: KanbanStage; title: string; shortLabel: string; color: string; bgBadge: string }[] = [
-  { id: 'novos', title: 'Novos pacientes', shortLabel: 'Novos', color: 'border-amber-400', bgBadge: 'bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-800' },
-  { id: 'triagem', title: 'Em atendimento', shortLabel: 'Em atendimento', color: 'border-sky-400', bgBadge: 'bg-sky-100 dark:bg-sky-950/60 text-sky-800 dark:text-sky-300 border-sky-200 dark:border-sky-800' },
-  { id: 'orcamento', title: 'Orçamento / dúvidas', shortLabel: 'Orçamento', color: 'border-purple-400', bgBadge: 'bg-purple-100 dark:bg-purple-950/60 text-purple-800 dark:text-purple-300 border-purple-200 dark:border-purple-800' },
-  { id: 'agendado', title: 'Agendamento confirmado', shortLabel: 'Agendado', color: 'border-emerald-500', bgBadge: 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800' },
-  { id: 'finalizado', title: 'Finalizado / realizado', shortLabel: 'Finalizado', color: 'border-slate-400', bgBadge: 'bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-700' },
+const STAGES: { id: KanbanStage; title: string; accent: string }[] = [
+  { id: 'novos', title: 'Novos', accent: 'bg-amber-400' },
+  { id: 'triagem', title: 'Em atendimento', accent: 'bg-sky-400' },
+  { id: 'orcamento', title: 'Orçamento', accent: 'bg-violet-400' },
+  { id: 'agendado', title: 'Agendado', accent: 'bg-emerald-500' },
+  { id: 'finalizado', title: 'Finalizado', accent: 'bg-slate-400' },
 ];
+const STAGE_TITLE = Object.fromEntries(STAGES.map((s) => [s.id, s.title])) as Record<KanbanStage, string>;
 
-/** Ícones de linha no lugar dos emojis dos títulos (mesma família do menu lateral). */
 const STAGE_ICONS: Record<KanbanStage, React.ComponentType<{ className?: string }>> = {
   novos: UserPlus,
   triagem: MessagesSquare,
@@ -65,6 +76,31 @@ const STAGE_ICONS: Record<KanbanStage, React.ComponentType<{ className?: string 
 
 const STAGE_ORDER: KanbanStage[] = ['novos', 'triagem', 'orcamento', 'agendado', 'finalizado'];
 
+const QUICK_FILTERS: { id: CrmQuickFilter; label: string; hint: string }[] = [
+  { id: 'ativos', label: 'Ativos', hint: 'Sem os finalizados' },
+  { id: 'aguardando', label: 'Aguardando resposta (>15 min)', hint: 'Paciente escreveu e ninguém respondeu há mais de 15 minutos' },
+  { id: 'frios', label: 'Leads frios (>30 dias)', hint: 'Ativos sem conversa há mais de 30 dias' },
+  { id: 'todos', label: 'Todos', hint: 'Inclui os finalizados' },
+];
+
+const isUnassignedAgent = (name?: string) => !name || name === 'Não Atribuído' || name === 'Não atribuído';
+
+function toBoardInput(c: Contact): CrmCardInput {
+  return {
+    isResolved: !!c.isResolved,
+    funnelStage: c.funnelStage,
+    waitingMinutes: c.sla?.shouldDisplay ? c.sla.realWaitingMinutes : null,
+    lastMessageAt: c.lastMessageAt,
+    tags: c.tags,
+    estimatedValueNumber: c.estimatedValueNumber,
+  };
+}
+
+/** CRM em quadro (crítica + pedido de 15/10/2026): coluna pelo status real (finalizada
+ * vai pra Finalizado mesmo com motivo), cards compactos ordenados por quem espera há mais
+ * tempo, filtros rápidos (ativos / aguardando >15 min / frios >30 dias), valor estimado
+ * por coluna, alerta no card ("Sem retorno" / "sem interação hoje") e, ao finalizar,
+ * o desfecho com o motivo da perda. Mover tem aviso com Desfazer. */
 export const CRMKanban: React.FC<CRMKanbanProps> = ({
   contacts,
   isLoading = false,
@@ -82,106 +118,113 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
 }) => {
   const [search, setSearch] = useState('');
   const [selectedAgent, setSelectedAgent] = useState<string>('todos');
-  const [selectedDept, setSelectedDept] = useState<string>('todos');
-  const [mobileSelectedStage, setMobileSelectedStage] = useState<KanbanStage | 'todos'>('todos');
-  // N2: card aberto no modal + proteção "arrastou, não abre" (o click dispara logo
-  // depois do drop no mesmo elemento).
+  const [quick, setQuick] = useState<CrmQuickFilter>('ativos');
   const [openCardId, setOpenCardId] = useState<string | null>(null);
   const [dragOverStage, setDragOverStage] = useState<KanbanStage | null>(null);
+  const [finishing, setFinishing] = useState<Contact | null>(null);
   const draggingRef = useRef<string | null>(null);
-  const justDraggedRef = useRef(false);
+  const now = useMemo(() => new Date(), [contacts]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const moveStage = (contactId: string, targetStage: KanbanStage) => {
+  const stageOf = (c: Contact) => kanbanStageOf(toBoardInput(c));
+
+  async function moveTo(contactId: string, target: KanbanStage, withUndo = true) {
     const current = contacts.find((c) => c.id === contactId);
     if (!current) return;
-    const isCurrentFinalized = current.statusTag.label === 'Finalizado';
-
-    if (targetStage === 'finalizado') {
-      onFinish(contactId);
-    } else if (isCurrentFinalized) {
-      onReopen(contactId);
-      onMoveStage(contactId, targetStage as FunnelStage);
-    } else {
-      onMoveStage(contactId, targetStage as FunnelStage);
+    const from = stageOf(current);
+    if (from === target) return;
+    if (target === 'finalizado') {
+      setFinishing(current);
+      return;
     }
-  };
+    try {
+      if (from === 'finalizado') await onReopen(contactId);
+      await onMoveStage(contactId, target as FunnelStage);
+    } catch {
+      toast.error('Não foi possível mover. Tente de novo.');
+      return;
+    }
+    if (!withUndo) return;
+    toast.success(`${displayName(current)} → ${STAGE_TITLE[target]}`, {
+      action: {
+        label: 'Desfazer',
+        onClick: () => {
+          if (from === 'finalizado') toast.message('Para voltar a Finalizado, mova o card de novo e escolha o desfecho.');
+          else moveTo(contactId, from, false);
+        },
+      },
+    });
+  }
 
-  const moveStageDirection = (contactId: string, direction: 'forward' | 'backward') => {
+  function moveDirection(contactId: string, direction: 1 | -1) {
     const current = contacts.find((c) => c.id === contactId);
     if (!current) return;
-    const currentStage = current.statusTag.label === 'Finalizado' ? 'finalizado' : current.funnelStage;
-    const currentIndex = STAGE_ORDER.indexOf(currentStage);
-    let nextIndex = direction === 'forward' ? currentIndex + 1 : currentIndex - 1;
-    if (nextIndex < 0) nextIndex = 0;
-    if (nextIndex >= STAGE_ORDER.length) nextIndex = STAGE_ORDER.length - 1;
-    moveStage(contactId, STAGE_ORDER[nextIndex]);
-  };
+    const idx = STAGE_ORDER.indexOf(stageOf(current));
+    const next = STAGE_ORDER[Math.min(STAGE_ORDER.length - 1, Math.max(0, idx + direction))];
+    moveTo(contactId, next);
+  }
 
-  const filtered = contacts.filter((c) => {
-    const matchesSearch =
-      c.name.toLowerCase().includes(search.toLowerCase()) ||
-      c.phone.includes(search) ||
-      c.tags.some((t) => t.toLowerCase().includes(search.toLowerCase()));
+  const filtered = useMemo(
+    () =>
+      contacts.filter((c) => {
+        const q = search.trim().toLowerCase();
+        const matchesSearch =
+          !q || c.name.toLowerCase().includes(q) || c.phone.includes(search.trim()) || c.tags.some((t) => t.toLowerCase().includes(q));
+        const matchesAgent =
+          selectedAgent === 'todos' || (selectedAgent === 'unassigned' ? isUnassignedAgent(c.responsibleAgent) : c.responsibleAgent === selectedAgent);
+        return matchesSearch && matchesAgent && matchesQuickFilter(toBoardInput(c), quick, now);
+      }),
+    [contacts, search, selectedAgent, quick, now]
+  );
 
-    const matchesAgent =
-      selectedAgent === 'todos' ||
-      (selectedAgent === 'unassigned'
-        ? !c.responsibleAgent || c.responsibleAgent === 'Não Atribuído' || c.responsibleAgent === 'Não atribuído'
-        : c.responsibleAgent === selectedAgent);
+  const columns = useMemo(
+    () =>
+      STAGES.filter((s) => quick === 'todos' || s.id !== 'finalizado').map((stage) => {
+        const cards = sortColumn(filtered.filter((c) => stageOf(c) === stage.id).map((c) => Object.assign(toBoardInput(c), { contact: c })));
+        return { stage, cards, value: columnValue(cards, ticket) };
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [filtered, quick, ticket]
+  );
 
-    const matchesDept =
-      selectedDept === 'todos' || c.department === selectedDept;
-
-    return matchesSearch && matchesAgent && matchesDept;
-  });
-
-  const stageOf = (c: Contact) => (c.statusTag.label === 'Finalizado' ? 'finalizado' : c.funnelStage);
   const openCard = openCardId ? contacts.find((c) => c.id === openCardId) ?? null : null;
-  const openColumn = openCard ? filtered.filter((c) => stageOf(c) === stageOf(openCard)) : [];
+  const openColumn = openCard ? columns.find((col) => col.stage.id === stageOf(openCard))?.cards.map((x) => x.contact) ?? [] : [];
   const openIndex = openCard ? openColumn.findIndex((c) => c.id === openCard.id) : -1;
-
-  const hasActiveFilter =
-    search.trim() !== '' || selectedAgent !== 'todos' || selectedDept !== 'todos' || mobileSelectedStage !== 'todos';
-
-  const visibleStages = mobileSelectedStage === 'todos'
-    ? STAGES
-    : STAGES.filter((s) => s.id === mobileSelectedStage);
+  const hasActiveFilter = search.trim() !== '' || selectedAgent !== 'todos' || quick !== 'ativos';
+  const finalizedCount = contacts.filter((c) => c.isResolved).length;
 
   return (
-    <div
-      className="flex-1 flex flex-col h-full bg-slate-100/90 dark:bg-slate-950/90 overflow-hidden font-sans text-slate-900 dark:text-slate-100"
-      data-od-id="crm-kanban-view"
-    >
-      <div className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-4 sm:px-6 py-3 flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 shrink-0">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 flex-wrap">
-          <h2 className="text-sm sm:text-base font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-            <KanbanSquare className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-            <span>CRM</span>
-            <span className="text-xs font-mono font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-2.5 py-0.5 rounded-full border border-slate-200 dark:border-slate-700">
+    <div className="flex-1 flex flex-col h-full min-h-0 bg-slate-100/90 dark:bg-slate-950/90 overflow-hidden text-slate-900 dark:text-slate-100" data-od-id="crm-kanban-view">
+      {/* Barra superior */}
+      <div className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-4 sm:px-6 py-3 space-y-2.5 shrink-0">
+        <div className="flex flex-wrap items-center gap-3">
+          <h2 className="text-base font-semibold flex items-center gap-2">
+            <KanbanSquare className="w-4 h-4 text-emerald-600 dark:text-emerald-400" aria-hidden />
+            CRM
+            <span className="text-sm font-normal text-slate-500 dark:text-slate-400 tabular-nums">
               {filtered.length} paciente{filtered.length === 1 ? '' : 's'}
             </span>
           </h2>
-
-          <div className="relative w-full sm:w-56">
-            <Search className="w-4 h-4 text-slate-400 dark:text-slate-500 absolute left-3 top-2.5" />
+          <div className="relative w-full sm:w-60">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" aria-hidden />
             <input
               type="text"
-              placeholder="Buscar paciente, fone ou tag..."
+              aria-label="Buscar no CRM"
+              placeholder="Buscar paciente, telefone ou tag…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-9 pr-3 py-1.5 text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500"
+              className="w-full h-9 pl-9 pr-3 text-sm bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
             />
           </div>
-
-          <div className="relative w-full sm:w-44 flex items-center">
-            <UserCheck className="w-3.5 h-3.5 text-slate-400 absolute left-3 pointer-events-none" />
+          <div className="relative w-full sm:w-48 flex items-center">
+            <UserCheck className="w-4 h-4 text-slate-400 absolute left-3 pointer-events-none" aria-hidden />
             <select
+              aria-label="Filtrar por atendente"
               value={selectedAgent}
               onChange={(e) => setSelectedAgent(e.target.value)}
-              className="w-full pl-8 pr-3 py-1.5 text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-semibold text-slate-700 dark:text-slate-200 appearance-none cursor-pointer"
+              className="w-full h-9 pl-9 pr-3 text-sm bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
             >
-              <option value="todos">Todos os atendentes</option>
-              <option value="unassigned">Não atribuídos</option>
+              <option value="todos">Todas as atendentes</option>
+              <option value="unassigned">Sem dono</option>
               {agents.map((ag) => (
                 <option key={ag.id} value={ag.name}>
                   {ag.name}
@@ -189,40 +232,40 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
               ))}
             </select>
           </div>
-
-          <div className="relative w-full sm:w-44 flex items-center">
-            <Building2 className="w-3.5 h-3.5 text-slate-400 absolute left-3 pointer-events-none" />
-            <select
-              value={selectedDept}
-              onChange={(e) => setSelectedDept(e.target.value)}
-              className="w-full pl-8 pr-3 py-1.5 text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-semibold text-slate-700 dark:text-slate-200 appearance-none cursor-pointer"
-            >
-              <option value="todos">Todos os departamentos</option>
-              <option value="recepcao">Recepção</option>
-              <option value="agendamento">Agendamento</option>
-              <option value="financeiro">Financeiro</option>
-            </select>
-          </div>
-
           {hasActiveFilter && (
-            <span className="inline-flex items-center gap-2 text-xs font-medium text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-lg px-2.5 py-1">
-              Filtro ativo
-              <button
-                type="button"
-                onClick={() => {
-                  setSearch('');
-                  setSelectedAgent('todos');
-                  setSelectedDept('todos');
-                  setMobileSelectedStage('todos');
-                }}
-                className="font-semibold underline underline-offset-2"
-              >
-                Limpar
-              </button>
-            </span>
+            <button
+              type="button"
+              onClick={() => {
+                setSearch('');
+                setSelectedAgent('todos');
+                setQuick('ativos');
+              }}
+              className="text-sm font-medium text-slate-600 dark:text-slate-300 underline underline-offset-2"
+            >
+              Limpar filtros
+            </button>
           )}
         </div>
-
+        <div role="radiogroup" aria-label="Filtro rápido" className="flex flex-wrap gap-1.5">
+          {QUICK_FILTERS.map((f) => (
+            <button
+              key={f.id}
+              type="button"
+              role="radio"
+              aria-checked={quick === f.id}
+              title={f.hint}
+              onClick={() => setQuick(f.id)}
+              className={`h-8 px-3 rounded-md text-sm font-medium border focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50 ${
+                quick === f.id
+                  ? 'bg-slate-900 text-white border-slate-900 dark:bg-slate-100 dark:text-slate-900 dark:border-slate-100'
+                  : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800'
+              }`}
+            >
+              {f.label}
+              {f.id === 'todos' && finalizedCount > 0 && <span className="ml-1 text-xs opacity-70 tabular-nums">(+{finalizedCount} finalizados)</span>}
+            </button>
+          ))}
+        </div>
       </div>
 
       {(isLoading || loadError) && (
@@ -243,54 +286,18 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
         </div>
       )}
 
-      <div className="md:hidden bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-3 py-2 flex items-center gap-1.5 overflow-x-auto no-scrollbar shrink-0">
-        <span className="text-xs font-mono text-slate-400 dark:text-slate-500 font-medium flex items-center gap-1 shrink-0">
-          <Filter className="w-3 h-3" /> Etapa:
-        </span>
-        <button
-          onClick={() => setMobileSelectedStage('todos')}
-          className={`px-2.5 py-1 text-xs rounded-lg font-semibold transition-all shrink-0 ${
-            mobileSelectedStage === 'todos'
-              ? 'bg-slate-900 dark:bg-emerald-600 text-white shadow-xs'
-              : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
-          }`}
-        >
-          Todas ({filtered.length})
-        </button>
-        {STAGES.map((s) => {
-          const count = filtered.filter((c) => (c.statusTag.label === 'Finalizado' ? 'finalizado' : c.funnelStage) === s.id).length;
-          const isActive = mobileSelectedStage === s.id;
-          return (
-            <button
-              key={s.id}
-              onClick={() => setMobileSelectedStage(s.id)}
-              className={`px-2.5 py-1 text-xs rounded-lg font-semibold transition-all shrink-0 flex items-center gap-1 ${
-                isActive
-                  ? 'bg-emerald-600 text-white shadow-xs'
-                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
-              }`}
-            >
-              <span>{s.shortLabel}</span>
-              <span className="text-xs opacity-80 font-mono">({count})</span>
-            </button>
-          );
-        })}
-      </div>
-
-      <div className="flex-1 overflow-x-auto p-3 sm:p-5">
-        <div className={`flex gap-4 sm:gap-5 h-full ${mobileSelectedStage === 'todos' ? 'min-w-full sm:min-w-[1400px]' : 'w-full'}`}>
-          {visibleStages.map((stage) => {
-            const stageContacts = filtered.filter((c) => {
-              const currentStage = c.statusTag.label === 'Finalizado' ? 'finalizado' : c.funnelStage;
-              return currentStage === stage.id;
-            });
+      {/* Quadro: só ele rola na horizontal; cada coluna rola por dentro na vertical. */}
+      <div className="flex-1 min-h-0 overflow-x-auto overflow-y-hidden p-3 sm:p-4">
+        <div className="grid h-full min-h-0 grid-flow-col auto-cols-[minmax(260px,1fr)] gap-3">
+          {columns.map(({ stage, cards, value }) => {
+            const Icon = STAGE_ICONS[stage.id];
             return (
-              <div
+              <section
                 key={stage.id}
-                className={`flex-1 flex flex-col bg-slate-50/90 dark:bg-slate-900/60 rounded-lg border overflow-hidden shadow-xs min-w-[280px] sm:min-w-0 ${
-                  dragOverStage === stage.id ? 'border-emerald-400 ring-2 ring-emerald-400/40' : 'border-slate-200/90 dark:border-slate-800'
+                aria-label={`${stage.title}: ${cards.length} paciente${cards.length === 1 ? '' : 's'}`}
+                className={`flex h-full min-h-0 flex-col rounded-lg border bg-slate-50/90 dark:bg-slate-900/60 ${
+                  dragOverStage === stage.id ? 'border-emerald-400 ring-2 ring-emerald-400/40' : 'border-slate-200 dark:border-slate-800'
                 }`}
-                data-od-id={`kanban-column-${stage.id}`}
                 onDragOver={(e) => {
                   if (!draggingRef.current) return;
                   e.preventDefault();
@@ -301,50 +308,41 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
                   e.preventDefault();
                   const id = draggingRef.current;
                   setDragOverStage(null);
-                  if (!id) return;
-                  const current = contacts.find((c) => c.id === id);
-                  const currentStage = current ? (current.statusTag.label === 'Finalizado' ? 'finalizado' : current.funnelStage) : null;
-                  if (currentStage !== stage.id) moveStage(id, stage.id);
+                  if (id) moveTo(id, stage.id);
                 }}
               >
-                <div className={`p-3 bg-white dark:bg-slate-900 border-t-4 ${stage.color} border-b border-slate-200 dark:border-slate-800 flex items-center justify-between`}>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-semibold text-sm text-slate-900 dark:text-slate-100 inline-flex items-center gap-1.5">
-                        {(() => {
-                          const Icon = STAGE_ICONS[stage.id];
-                          return <Icon className="w-4 h-4 text-slate-500 dark:text-slate-400" />;
-                        })()}
-                        {stage.title}
-                      </h3>
-                      <span className={`text-xs font-medium px-2.5 py-0.5 rounded-full font-mono border ${stage.bgBadge}`}>
-                        {stageContacts.length}
-                      </span>
-                    </div>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                      {stageContacts.length} paciente{stageContacts.length === 1 ? '' : 's'}
-                      {ticket !== null && stageContacts.length > 0 && (
-                        <span title="Quantidade × ticket médio da clínica"> · {formatCurrency(stageContacts.length * ticket)}</span>
-                      )}
-                    </p>
+                <header className="shrink-0 rounded-t-lg border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 py-2.5">
+                  <div className="flex items-center gap-2">
+                    <span className={`size-2 rounded-full ${stage.accent}`} aria-hidden />
+                    <Icon className="w-4 h-4 text-slate-500 dark:text-slate-400" aria-hidden />
+                    <h3 className="text-sm font-semibold">{stage.title}</h3>
+                    <span className="ml-auto text-xs font-medium text-slate-500 dark:text-slate-400 tabular-nums">{cards.length}</span>
                   </div>
-                </div>
+                  {value.total > 0 && stage.id !== 'finalizado' && (
+                    <p
+                      className="mt-0.5 text-xs text-slate-500 dark:text-slate-400 tabular-nums"
+                      title={value.fromTicket ? `${value.fromTicket} sem valor estimado — contados pelo ticket médio da clínica` : 'Soma do valor estimado dos cards'}
+                    >
+                      {formatCurrency(value.total)} estimado{value.fromTicket ? ' *' : ''}
+                    </p>
+                  )}
+                </header>
 
-                <div className="flex-1 overflow-y-auto p-2.5 sm:p-3 space-y-3">
-                  {stageContacts.length === 0 ? (
-                    <div className="h-32 border-2 border-dashed border-slate-200/80 dark:border-slate-800 rounded-lg flex items-center justify-center text-xs text-slate-400 font-medium">
-                      Nenhum paciente nesta etapa
-                    </div>
+                <div className="flex-1 min-h-0 overflow-y-auto p-2 space-y-2">
+                  {cards.length === 0 ? (
+                    <p className="rounded-lg border border-dashed border-slate-200 dark:border-slate-800 py-6 text-center text-sm text-slate-500 dark:text-slate-400">
+                      Nenhum paciente aqui
+                    </p>
                   ) : (
-                    stageContacts.map((contact) => {
-                      const isUnassigned = !contact.responsibleAgent || contact.responsibleAgent === 'Não Atribuído' || contact.responsibleAgent === 'Não atribuído';
-
+                    cards.map(({ contact, waitingMinutes, estimatedValueNumber }) => {
+                      const name = displayName(contact);
+                      const alert = crmAlert(toBoardInput(contact), now);
+                      const unassigned = isUnassignedAgent(contact.responsibleAgent);
+                      const stageIdx = STAGE_ORDER.indexOf(stage.id);
+                      const extraTags = contact.tags.filter((t) => t !== NO_RESPONSE_TAG);
                       return (
-                        <div
+                        <article
                           key={contact.id}
-                          role="button"
-                          tabIndex={0}
-                          aria-label={`Abrir detalhes de ${displayName(contact)}`}
                           draggable
                           onDragStart={(e) => {
                             draggingRef.current = contact.id;
@@ -353,129 +351,109 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
                           onDragEnd={() => {
                             draggingRef.current = null;
                             setDragOverStage(null);
-                            justDraggedRef.current = true;
-                            setTimeout(() => (justDraggedRef.current = false), 250);
                           }}
-                          onClick={() => {
-                            if (justDraggedRef.current) return;
-                            setOpenCardId(contact.id);
-                          }}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' && e.target === e.currentTarget) setOpenCardId(contact.id);
-                          }}
-                          className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 p-3.5 shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 space-y-3 group relative cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
-                          data-od-id={`kanban-card-${contact.id}`}
+                          className={`group rounded-lg border bg-white dark:bg-slate-900 p-2.5 shadow-xs transition-colors ${
+                            alert === 'sem_retorno'
+                              ? 'border-amber-300 dark:border-amber-700 bg-amber-50/60 dark:bg-amber-950/20'
+                              : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
+                          }`}
                         >
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="flex items-center gap-2.5 min-w-0">
-                              <AvatarBadge name={displayName(contact)} photoUrl={contact.avatar} size={36} className="ring-2 ring-slate-100 dark:ring-slate-800 shrink-0" />
-                              <div className="min-w-0">
-                                <h4 className="font-semibold text-xs text-slate-900 dark:text-slate-100 truncate">
-                                  {displayName(contact)}
-                                </h4>
-                                <p className="text-xs text-slate-500 dark:text-slate-400 font-mono flex items-center gap-1 mt-0.5">
-                                  <Phone className="w-3 h-3 text-emerald-600 dark:text-emerald-400" /> {formatPhone(contact.phone)}
-                                </p>
-                              </div>
-                            </div>
-
-                            <span
-                              className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium border ${
-                                isUnassigned
-                                  ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800'
-                                  : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
-                              }`}
-                              title={isUnassigned ? "Nenhum atendente assumiu esta conversa" : `Atribuído a ${contact.responsibleAgent}`}
-                            >
-                              {isUnassigned ? "Não atribuída" : contact.responsibleAgent}
-                            </span>
-                          </div>
-
-                          <div className="bg-slate-50 dark:bg-slate-950 p-2.5 rounded-lg space-y-1 border border-slate-100 dark:border-slate-800">
-                            <p className="text-xs text-slate-600 dark:text-slate-300 line-clamp-2 leading-relaxed italic">
-                              &ldquo;{contact.lastMessage}&rdquo;
-                            </p>
-                            {contact.lastMessageTime && (
-                              <p className="text-xs text-slate-400 font-mono font-medium">{contact.lastMessageTime}</p>
-                            )}
-                          </div>
-
-                          <div className="space-y-1.5">
-                            <div className="flex flex-wrap gap-1">
-                              {contact.tags.map((tag) => (
-                                <span
-                                  key={tag}
-                                  className="text-xs font-semibold px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700"
-                                >
-                                  {tag}
-                                </span>
-                              ))}
-                              {contact.statusTag && (
-                                <span className="text-xs font-medium px-2.5 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
-                                  {contact.statusTag.label}
-                                </span>
-                              )}
-                            </div>
-
-                            <div className="flex items-center justify-between pt-1.5 border-t border-slate-100 dark:border-slate-800 text-xs">
-                              <span className="text-xs text-slate-400 font-medium">Estimado:</span>
-                              <span className="font-mono font-bold text-emerald-700 dark:text-emerald-400">
-                                {contact.estimatedValue || '—'}
-                              </span>
-                            </div>
-                          </div>
-
-                          <div
-                            className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800 gap-1.5"
-                            onClick={(e) => e.stopPropagation()}
-                            onKeyDown={(e) => e.stopPropagation()}
+                          <button
+                            type="button"
+                            onClick={() => setOpenCardId(contact.id)}
+                            className="flex w-full items-center gap-2 text-left rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
+                            aria-label={`Abrir ${name}`}
                           >
-                            <div className="flex items-center gap-1">
-                              {stage.id !== 'novos' && (
-                                <button
-                                  onClick={() => moveStageDirection(contact.id, 'backward')}
-                                  className="p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
-                                  title="Voltar etapa"
-                                >
-                                  <ArrowLeft className="w-3.5 h-3.5" />
-                                </button>
-                              )}
+                            <AvatarBadge name={name} photoUrl={contact.avatar} size={28} className="shrink-0" />
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate text-sm font-semibold" title={name}>
+                                {name}
+                              </span>
+                              <span className="block truncate text-xs text-slate-500 dark:text-slate-400">
+                                {contact.phone ? formatPhone(contact.phone) : 'Sem telefone'} ·{' '}
+                                <span className={unassigned ? 'text-amber-700 dark:text-amber-400 font-medium' : ''}>
+                                  {unassigned ? 'Sem dono' : contact.responsibleAgent.split(' ')[0]}
+                                </span>
+                              </span>
+                            </span>
+                            {estimatedValueNumber ? (
+                              <span className="shrink-0 text-xs font-semibold text-emerald-700 dark:text-emerald-400 tabular-nums">{formatCurrency(estimatedValueNumber)}</span>
+                            ) : null}
+                          </button>
 
-                              <select
-                                value={contact.statusTag.label === 'Finalizado' ? 'finalizado' : contact.funnelStage}
-                                onChange={(e) => moveStage(contact.id, e.target.value as KanbanStage)}
-                                className="text-xs font-medium bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg py-1 px-1.5 text-slate-700 dark:text-slate-200 cursor-pointer focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                          <div className="mt-1.5 flex flex-wrap items-center gap-1">
+                            {waitingMinutes !== null && waitingMinutes > 0 ? (
+                              <span
+                                className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-semibold ${
+                                  waitingMinutes > 60
+                                    ? 'bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300'
+                                    : waitingMinutes > 15
+                                      ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300'
+                                      : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
+                                }`}
                               >
-                                {STAGES.map((s) => (
-                                  <option key={s.id} value={s.id}>
-                                    {s.shortLabel}
-                                  </option>
-                                ))}
-                              </select>
+                                <Clock className="w-3 h-3" aria-hidden /> aguarda há {contact.sla.formattedTime}
+                              </span>
+                            ) : (
+                              <span className="truncate text-xs text-slate-500 dark:text-slate-400 max-w-full" title={contact.lastMessage}>
+                                {contact.lastMessageTime ? `${contact.lastMessageTime} · ` : ''}
+                                {contact.lastMessage}
+                              </span>
+                            )}
+                            {alert === 'sem_retorno' && (
+                              <span className="inline-flex items-center gap-1 rounded-md border border-amber-300 dark:border-amber-700 px-1.5 py-0.5 text-xs font-medium text-amber-800 dark:text-amber-300">
+                                <AlertTriangle className="w-3 h-3" aria-hidden /> Sem retorno
+                              </span>
+                            )}
+                            {alert === 'sem_interacao_hoje' && waitingMinutes === null && (
+                              <span className="rounded-md border border-slate-200 dark:border-slate-700 px-1.5 py-0.5 text-xs text-slate-500 dark:text-slate-400">sem interação hoje</span>
+                            )}
+                            {stage.id === 'finalizado' && (
+                              <span className="rounded-md bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 text-xs text-slate-600 dark:text-slate-300">{contact.statusTag.label}</span>
+                            )}
+                            {extraTags.slice(0, 2).map((tag) => (
+                              <span key={tag} className="rounded-md bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 text-xs text-slate-600 dark:text-slate-300">
+                                {tag}
+                              </span>
+                            ))}
+                            {extraTags.length > 2 && <span className="text-xs text-slate-500">+{extraTags.length - 2}</span>}
+                          </div>
 
-                              {stage.id !== 'finalizado' && (
-                                <button
-                                  onClick={() => moveStageDirection(contact.id, 'forward')}
-                                  className="p-1.5 text-slate-400 hover:text-emerald-700 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/60 rounded-lg transition-colors"
-                                  title="Avançar etapa"
-                                >
-                                  <ArrowRight className="w-3.5 h-3.5" />
-                                </button>
-                              )}
+                          <div className="mt-1.5 flex items-center justify-between gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 transition-opacity">
+                            <div className="flex items-center gap-0.5">
+                              <button
+                                type="button"
+                                disabled={stageIdx === 0}
+                                onClick={() => moveDirection(contact.id, -1)}
+                                aria-label={`Voltar ${name} para ${STAGE_TITLE[STAGE_ORDER[Math.max(0, stageIdx - 1)]]}`}
+                                title="Voltar etapa"
+                                className="inline-flex size-7 items-center justify-center rounded-md text-slate-500 hover:text-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 dark:hover:text-slate-200 disabled:opacity-30"
+                              >
+                                <ArrowLeft className="w-3.5 h-3.5" aria-hidden />
+                              </button>
+                              <button
+                                type="button"
+                                disabled={stageIdx === STAGE_ORDER.length - 1}
+                                onClick={() => moveDirection(contact.id, 1)}
+                                aria-label={`Avançar ${name} para ${STAGE_TITLE[STAGE_ORDER[Math.min(STAGE_ORDER.length - 1, stageIdx + 1)]]}`}
+                                title="Avançar etapa"
+                                className="inline-flex size-7 items-center justify-center rounded-md text-slate-500 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/50 dark:hover:text-emerald-400 disabled:opacity-30"
+                              >
+                                <ArrowRight className="w-3.5 h-3.5" aria-hidden />
+                              </button>
                             </div>
-
                             {onOpenContactChat && (
                               <button
+                                type="button"
                                 onClick={() => onOpenContactChat(contact.id)}
-                                className="text-xs font-medium text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 flex items-center gap-1 hover:underline py-1 px-2.5 bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100/80 rounded-lg transition-all border border-emerald-200/60 dark:border-emerald-800 shadow-xs"
-                                title="Abrir conversa na Caixa de Entrada"
+                                aria-label={`Abrir conversa com ${name}`}
+                                className="inline-flex h-7 items-center gap-1 rounded-md px-2 text-xs font-medium text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/50"
                               >
-                                <ExternalLink className="w-3 h-3" />
-                                <span>Chat</span>
+                                <MessageCircle className="w-3.5 h-3.5" aria-hidden /> Chat
                               </button>
                             )}
                           </div>
-                        </div>
+                        </article>
                       );
                     })
                   )}
@@ -483,17 +461,18 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
                     <button
                       type="button"
                       onClick={() => onAddToStage(stage.id as FunnelStage)}
-                      className="w-full rounded-lg border border-dashed border-slate-300 dark:border-slate-700 py-2 text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-900"
+                      className="w-full rounded-lg border border-dashed border-slate-300 dark:border-slate-700 py-1.5 text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-900"
                     >
                       + Adicionar
                     </button>
                   )}
                 </div>
-              </div>
+              </section>
             );
           })}
         </div>
       </div>
+
       {openCard && (
         <KanbanCardDialog
           contact={openCard}
@@ -505,12 +484,28 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
           onClose={() => setOpenCardId(null)}
           onPrev={openIndex > 0 ? () => setOpenCardId(openColumn[openIndex - 1].id) : undefined}
           onNext={openIndex >= 0 && openIndex < openColumn.length - 1 ? () => setOpenCardId(openColumn[openIndex + 1].id) : undefined}
-          onMove={(stage) => moveStage(openCard.id, stage as KanbanStage)}
+          onMove={(stage) => moveTo(openCard.id, stage as KanbanStage)}
           onAssign={onAssign ? (agentId) => onAssign(openCard.id, agentId) : undefined}
           onOpenChat={() => onOpenContactChat?.(openCard.id)}
           profileHref={profileHref?.(openCard.id)}
         />
       )}
+
+      <LostReasonModal
+        open={!!finishing}
+        patientName={finishing ? displayName(finishing) : ''}
+        onCancel={() => setFinishing(null)}
+        onConfirm={async (resolution) => {
+          if (!finishing) return;
+          try {
+            await onFinish(finishing.id, resolution);
+            toast.success(`${displayName(finishing)} finalizado.`);
+            setFinishing(null);
+          } catch {
+            toast.error('Não foi possível finalizar. Tente de novo.');
+          }
+        }}
+      />
     </div>
   );
 };
