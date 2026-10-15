@@ -9,6 +9,7 @@ import { formatFileSize } from "@/lib/format";
 import { notifyInboxRealtime } from "@/lib/supabase-server";
 import { MEDIA_DOWNLOAD_FAILED_PREFIX } from "@/lib/chat-messages";
 import { isBroadcastOptOutReply } from "@/lib/broadcast-csv";
+import { formatContactCardMessage } from "@/lib/whatsapp-vcard";
 import { reopenIfResolved } from "@/lib/conversation-reopen";
 import { deviceOutboundTargetPhone, findPanelTwin } from "@/lib/device-outbound";
 import { autoAssignNewConversation } from "@/lib/conversation-auto-assign";
@@ -101,6 +102,15 @@ function extractIncomingMessage(body: unknown): IncomingMessage | null {
   const text = message?.conversation ?? extended?.text;
   if (typeof text === "string") {
     return { phone, text, name, keyId, quotedWhatsappKeyId: extractStanzaId(extended) };
+  }
+
+  // Cartão(ões) de contato (vCard) — antes caíam no `return null` e eram descartados.
+  // Vira texto legível ("📇 Contato: Nome — +55 …"), um por linha. Vale também pro
+  // eco fromMe, que passa por esta mesma função em handleDeviceOutbound.
+  const contactCards = formatContactCardMessage(message);
+  if (contactCards) {
+    const part = (message?.contactMessage ?? message?.contactsArrayMessage) as Record<string, unknown> | undefined;
+    return { phone, text: contactCards, name, keyId, quotedWhatsappKeyId: extractStanzaId(part) };
   }
 
   const audioMessage = message?.audioMessage as Record<string, unknown> | undefined;

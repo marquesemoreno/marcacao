@@ -8,11 +8,15 @@
  * Outros incidentes: --from=ISO --to=ISO --clinic=<trecho do nome fantasia>
  * (ex: queda da Vercel em 06/10/2026: --from=2026-10-06T17:55:00Z --to=2026-10-06T19:36:00Z --clinic=Santa)
  *
+ * Cartões de contato (vCard) descartados pelo webhook até 14/10/2026 (TIVDC, 35 cartões ~01:59Z 15/10):
+ *   --from=<agora-48h ISO> --to=<agora ISO> --clinic=TIVDC   (só os que faltam são gravados)
+ *
  * Reimplementa o mínimo do webhook inline porque whatsapp-media.ts / supabase-server.ts
  * são "server-only" e não rodam fora do Next. Idempotente: pula whatsappKeyId que já existe.
  */
 import { PrismaClient } from "@prisma/client";
 import { createClient } from "@supabase/supabase-js";
+import { formatContactCardMessage } from "../src/lib/whatsapp-vcard";
 
 const APPLY = process.argv.includes("--apply");
 const arg = (name: string) => process.argv.find((a) => a.startsWith(`--${name}=`))?.slice(name.length + 3);
@@ -67,6 +71,8 @@ function parse(r: Rec): Parsed | null {
   const m = r.message ?? {};
   const text = m.conversation ?? m.extendedTextMessage?.text;
   if (typeof text === "string") return { kind: "text", text };
+  const cards = formatContactCardMessage(m);
+  if (cards) return { kind: "text", text: cards };
   if (m.reactionMessage) return { kind: "reaction", emoji: m.reactionMessage.text ?? "", targetKeyId: m.reactionMessage.key?.id };
   const media =
     (m.imageMessage && ["imageMessage", "📷 Imagem", "imagem.jpg", "a"]) ||
