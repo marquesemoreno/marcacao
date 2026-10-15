@@ -4,13 +4,14 @@ import { useState } from "react";
 import { Users, UserPlus, Loader2, Mail, KeyRound, Save, Pencil } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { listClinicUsers, createTeamMember, updateUserMaxConcurrentChats, updateAttendantName, resetAttendantPassword } from "@/actions/admin";
+import { listClinicUsers, createTeamMember, updateUserMaxConcurrentChats, updateAttendantName, resetAttendantPassword, updateUserIsAttendant } from "@/actions/admin";
 
 type Attendant = {
   id: string;
   name: string;
   email: string;
   maxConcurrentChats: number;
+  isAttendant: boolean;
   createdAt: Date | string;
 };
 
@@ -28,6 +29,25 @@ export function ClinicAttendantsModal({ clinicId, clinicName }: { clinicId: stri
   const [savingMaxChatsId, setSavingMaxChatsId] = useState<string | null>(null);
   const [resetPasswordForId, setResetPasswordForId] = useState<string | null>(null);
   const [resetPasswordValue, setResetPasswordValue] = useState("");
+  const [savingAttendantId, setSavingAttendantId] = useState<string | null>(null);
+
+  async function handleToggleAttendant(attendant: Attendant) {
+    const next = !attendant.isAttendant;
+    setSavingAttendantId(attendant.id);
+    try {
+      await updateUserIsAttendant(attendant.id, next);
+      setAttendants((prev) => prev.map((a) => (a.id === attendant.id ? { ...a, isAttendant: next } : a)));
+      toast.success(
+        next
+          ? `${attendant.name} volta a aparecer para atribuir e transferir conversas.`
+          : `${attendant.name} agora é só gerência: não recebe nem aparece para atribuir conversas. As conversas abertas com ela continuam com ela.`
+      );
+    } catch {
+      toast.error("Não foi possível salvar.");
+    } finally {
+      setSavingAttendantId(null);
+    }
+  }
   const [resettingPassword, setResettingPassword] = useState(false);
   const [editingNameForId, setEditingNameForId] = useState<string | null>(null);
   const [editingNameValue, setEditingNameValue] = useState("");
@@ -220,6 +240,17 @@ export function ClinicAttendantsModal({ clinicId, clinicName }: { clinicId: stri
                         <p className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1 truncate">
                           <Mail className="w-3 h-3 shrink-0" /> {attendant.email}
                         </p>
+                        <label className="mt-1 inline-flex items-center gap-1.5 text-[11px] font-medium text-slate-600 dark:text-slate-300 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={attendant.isAttendant}
+                            disabled={savingAttendantId === attendant.id}
+                            onChange={() => handleToggleAttendant(attendant)}
+                            className="size-3.5 accent-indigo-600"
+                          />
+                          Atende no chat
+                          {!attendant.isAttendant && <span className="text-slate-400 dark:text-slate-500">· só gerência</span>}
+                        </label>
                       </div>
                       {!isEditingNameThis && (
                         <button

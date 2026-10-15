@@ -31,7 +31,8 @@ export async function lastAutomatedSend(clinicId: string): Promise<{ at: Date | 
 export async function marketingCampaignReady(clinicId: string, now: Date): Promise<boolean> {
   if (!isWithinMarketingWindow(now)) return false;
   const campaigns = await prisma.broadcastCampaign.findMany({
-    where: { clinicId, status: "RUNNING", OR: [{ tagOnSend: null }, { tagOnSend: { not: RESCHEDULE_PENDING_TAG } }] },
+    // Campanha de baixa prioridade não disputa a vez com os lembretes (eles vêm antes).
+    where: { clinicId, status: "RUNNING", lowPriority: false, OR: [{ tagOnSend: null }, { tagOnSend: { not: RESCHEDULE_PENDING_TAG } }] },
     select: { id: true },
   });
   for (const c of campaigns) {

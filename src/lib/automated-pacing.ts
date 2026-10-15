@@ -28,3 +28,11 @@ export function shouldSendReminder(input: {
   if (input.lastKind === "reminder" && input.campaignReady) return false;
   return true;
 }
+
+/** Campanha de baixa prioridade (ex.: Outubro Rosa, longa e sem prazo) pausa sozinha
+ * enquanto a clínica tiver outro envio na fila — lembrete de confirmação de agenda ou
+ * outra campanha (ex.: aviso aos marcadores) — e volta quando a fila esvazia. Pedido do
+ * usuário em 15/10/2026. */
+export function lowPriorityMustYield(input: { lowPriority: boolean; otherCampaignPending: boolean; remindersPending: boolean }): boolean {
+  return input.lowPriority && (input.otherCampaignPending || input.remindersPending);
+}

@@ -887,6 +887,9 @@ model BroadcastCampaign {
   /// pra ela voltar a aparecer na fila — usado pelo aviso de remarcação em massa
   /// (ver RESCHEDULE_PENDING_TAG em conversation-tags.ts). Null pra campanhas comuns.
   tagOnSend       String?                 @map("tag_on_send")
+  /// Baixa prioridade (campanha longa, ex.: Outubro Rosa): pausa sozinha enquanto houver
+  /// lembrete de confirmação ou outra campanha da clínica na fila (lowPriorityMustYield).
+  lowPriority     Boolean                 @default(false) @map("low_priority")
   createdByUserId String                  @map("created_by_user_id")
   createdAt       DateTime                @default(now()) @map("created_at")
   updatedAt       DateTime                @updatedAt @map("updated_at")

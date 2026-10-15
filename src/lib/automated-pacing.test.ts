@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isWithinReminderWindow, shouldSendReminder } from "./automated-pacing";
+import { isWithinReminderWindow, lowPriorityMustYield, shouldSendReminder } from "./automated-pacing";
 
 const br = (iso: string) => new Date(`${iso}-03:00`);
 
@@ -26,5 +26,20 @@ describe("shouldSendReminder (intercalando com a campanha)", () => {
   });
   it("última foi campanha: a vez é do lembrete", () => {
     expect(shouldSendReminder({ ...base, lastKind: "campaign", campaignReady: true })).toBe(true);
+  });
+});
+
+describe("lowPriorityMustYield", () => {
+  it("campanha de baixa prioridade cede a vez a outra campanha ativa da clínica", () => {
+    expect(lowPriorityMustYield({ lowPriority: true, otherCampaignPending: true, remindersPending: false })).toBe(true);
+  });
+  it("cede a vez enquanto houver lembrete de confirmação pra sair", () => {
+    expect(lowPriorityMustYield({ lowPriority: true, otherCampaignPending: false, remindersPending: true })).toBe(true);
+  });
+  it("sem mais nada na fila, a campanha de baixa prioridade segue", () => {
+    expect(lowPriorityMustYield({ lowPriority: true, otherCampaignPending: false, remindersPending: false })).toBe(false);
+  });
+  it("campanha normal nunca cede por esse motivo", () => {
+    expect(lowPriorityMustYield({ lowPriority: false, otherCampaignPending: true, remindersPending: true })).toBe(false);
   });
 });

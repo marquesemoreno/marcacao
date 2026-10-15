@@ -36,6 +36,7 @@ export async function listClinicBroadcastCampaigns() {
       name: c.name,
       status: c.status,
       hasImage: Boolean(c.imagePath),
+      lowPriority: c.lowPriority,
       total: c._count.recipients,
       sent,
       failed,
@@ -43,6 +44,16 @@ export async function listClinicBroadcastCampaigns() {
       createdAt: c.createdAt,
     };
   });
+}
+
+/** Baixa prioridade: a campanha pausa sozinha enquanto houver lembrete de confirmação
+ * ou outra campanha da clínica na fila (ver lowPriorityMustYield). */
+export async function setClinicCampaignLowPriority(campaignId: string, lowPriority: boolean) {
+  const { clinicId } = await requireClinicSession();
+  await assertClinicOwnsCampaign(campaignId, clinicId);
+  await prisma.broadcastCampaign.update({ where: { id: campaignId }, data: { lowPriority } });
+  revalidatePath("/clinic/disparos");
+  return { success: true as const };
 }
 
 /** Mirror de createBroadcastCampaign (admin-broadcast.ts) — mesma lógica de

@@ -269,12 +269,24 @@ export async function updateAttendantName(userId: string, name: string) {
   return { success: true as const };
 }
 
+/** Liga/desliga "Atende no chat" (User.isAttendant). Desligado = login só de gerência:
+ * some das listas de atribuir/transferir, não recebe conversa automática e não entra no
+ * desempenho da equipe — continua entrando no painel normalmente. */
+export async function updateUserIsAttendant(userId: string, isAttendant: boolean) {
+  await requireAdminSession();
+  await prisma.user.update({ where: { id: userId }, data: { isAttendant } });
+  revalidatePath("/admin/clinicas");
+  revalidatePath("/admin/inbox");
+  revalidatePath("/clinic/inbox");
+  return { success: true as const };
+}
+
 /** Atendentes (role CLINIC) cadastrados numa clínica — pra exibir/gerenciar no painel admin. */
 export async function listClinicUsers(clinicId: string) {
   await requireAdminSession();
   return prisma.user.findMany({
     where: { clinicId, role: "CLINIC" },
-    select: { id: true, name: true, email: true, maxConcurrentChats: true, createdAt: true },
+    select: { id: true, name: true, email: true, maxConcurrentChats: true, isAttendant: true, createdAt: true },
     orderBy: { name: "asc" },
   });
 }

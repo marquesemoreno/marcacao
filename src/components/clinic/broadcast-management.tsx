@@ -8,6 +8,7 @@ import {
   listClinicBroadcastCampaigns,
   createClinicBroadcastCampaign,
   startClinicBroadcastCampaign,
+  setClinicCampaignLowPriority,
   pauseClinicBroadcastCampaign,
   clinicHasBridgeAudience,
 } from "@/actions/clinic-broadcast";
@@ -409,6 +410,24 @@ export function BroadcastManagement() {
                   </span>
                   {c.hasImage && <ImageIcon className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 shrink-0" />}
                 </div>
+                {c.status !== "COMPLETED" && (
+                  <label className="mt-1 inline-flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-300 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={c.lowPriority}
+                      onChange={async () => {
+                        try {
+                          await setClinicCampaignLowPriority(c.id, !c.lowPriority);
+                          setCampaigns((prev) => prev.map((x) => (x.id === c.id ? { ...x, lowPriority: !c.lowPriority } : x)));
+                        } catch {
+                          toast.error("Não foi possível salvar.");
+                        }
+                      }}
+                      className="size-3.5 accent-emerald-600"
+                    />
+                    Baixa prioridade — pausa sozinha enquanto houver lembretes de confirmação ou outra campanha enviando
+                  </label>
+                )}
                 <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
                   {c.sent}/{c.total} enviados
                   {c.failed > 0 && ` · ${c.failed} falha(s)`}

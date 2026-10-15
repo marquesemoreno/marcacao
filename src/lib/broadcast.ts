@@ -5,6 +5,7 @@ import { getSignedMediaUrl } from "@/lib/whatsapp-media";
 import { buildBroadcastMessage } from "@/lib/broadcast-csv";
 import { RESCHEDULE_PENDING_TAG } from "@/lib/conversation-tags";
 import { lastAutomatedSend } from "@/lib/automated-pacing-server";
+import { lowPriorityMustYield } from "@/lib/automated-pacing";
 import { isMarketingGapElapsed, isWithinMarketingWindow, MARKETING_DAILY_CAP, startOfBrazilDay } from "@/lib/broadcast-schedule";
 
 const BATCH_SIZE = Number(process.env.BROADCAST_BATCH_SIZE) || 3;
@@ -37,6 +38,18 @@ export async function dispatchNextBatch(): Promise<{ processed: number }> {
         where: { campaignId: campaign.id, status: "SENT", sentAt: { gte: startOfBrazilDay(now) } },
       });
       if (sentToday >= MARKETING_DAILY_CAP) continue;
+      // Baixa prioridade cede a vez a outra campanha da clínica com gente na fila. Os
+      // lembretes já têm a vez garantida: rodam antes neste mesmo minuto e não alternam
+      // com campanha de baixa prioridade (ver marketingCampaignReady).
+      if (campaign.lowPriority) {
+        const otherCampaignPending = await prisma.broadcastRecipient.count({
+          where: {
+            status: "PENDING",
+            campaign: { clinicId: campaign.clinicId, status: "RUNNING", lowPriority: false, id: { not: campaign.id } },
+          },
+        });
+        if (lowPriorityMustYield({ lowPriority: true, otherCampaignPending: otherCampaignPending > 0, remindersPending: false })) continue;
+      }
       // Intervalo único da clínica: conta desde a última mensagem automática de qualquer
       // tipo (lembrete D-1 ou campanha) — nunca saem juntos (ver automated-pacing.ts).
       const last = await lastAutomatedSend(campaign.clinicId);
