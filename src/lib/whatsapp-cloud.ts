@@ -64,7 +64,7 @@ export function sendCloudTemplate(
 export type CloudTemplate = { id: string; name: string; status: string; category: string; language: string };
 
 export function listCloudTemplates(wabaId: string, token: string) {
-  return graph<{ data: CloudTemplate[] }>(`${wabaId}/message_templates`, { token, query: { fields: "id,name,status,category,language", limit: "100" } });
+  return graph<{ data: CloudTemplate[] }>(`${wabaId}/message_templates`, { token, query: { fields: "id,name,status,category,language,components", limit: "100" } });
 }
 
 /** Cria modelo (vai pra análise da Meta). `body` com {{1}}, {{2}}…; `example` = valores de exemplo. */
@@ -123,5 +123,32 @@ export function requestCoexistenceSync(phoneNumberId: string, token: string, syn
   return graph<{ request_id?: string }>(`${phoneNumberId}/smb_app_data`, {
     token,
     body: { messaging_product: "whatsapp", sync_type: syncType },
+  });
+}
+
+/** Número novo (sem coexistência): registra na Cloud API com o PIN da verificação em
+ * duas etapas. Sem isso o número não envia. Coexistência NÃO chama isto. */
+export function registerPhoneNumber(phoneNumberId: string, token: string, pin: string) {
+  return graph<{ success: boolean }>(`${phoneNumberId}/register`, {
+    token,
+    body: { messaging_product: "whatsapp", pin },
+  });
+}
+
+/** Dados da WABA (nome, fuso, status da análise). */
+export function getWaba(wabaId: string, token: string) {
+  return graph<{ id: string; name?: string; timezone_id?: string; message_template_namespace?: string; account_review_status?: string }>(wabaId, {
+    token,
+    query: { fields: "id,name,timezone_id,message_template_namespace,account_review_status" },
+  });
+}
+
+export type CloudPhoneNumber = { id: string; display_phone_number: string; verified_name?: string; quality_rating?: string; code_verification_status?: string };
+
+/** Números da WABA (seletor da tela de envio quando a clínica tem mais de um). */
+export function listWabaPhoneNumbers(wabaId: string, token: string) {
+  return graph<{ data: CloudPhoneNumber[] }>(`${wabaId}/phone_numbers`, {
+    token,
+    query: { fields: "id,display_phone_number,verified_name,quality_rating,code_verification_status" },
   });
 }

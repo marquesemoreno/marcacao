@@ -9,4 +9,6 @@ export const META_APP_ID = process.env.NEXT_PUBLIC_META_APP_ID ?? "1854106501874
  * 07/10/2026. */
 export const META_ES_CONFIG_ID = process.env.NEXT_PUBLIC_META_ES_CONFIG_ID ?? "4592472154362883";
 
-export const META_GRAPH_VERSION = "v23.0";
+/** Versão da Graph API — META_GRAPH_VERSION no servidor; NEXT_PUBLIC_META_GRAPH_VERSION no
+ * navegador (SDK do Facebook). */
+export const META_GRAPH_VERSION = process.env.NEXT_PUBLIC_META_GRAPH_VERSION ?? process.env.META_GRAPH_VERSION ?? "v23.0";

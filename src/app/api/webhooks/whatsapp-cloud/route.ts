@@ -69,6 +69,15 @@ async function handle(event: CloudEvent, clinicId: string) {
   });
 }
 
+function templateStatusUpdates(body: unknown): { name?: string; language?: string; event?: string; reason?: string }[] {
+  const entries = (body as { entry?: { changes?: { field?: string; value?: Record<string, string> }[] }[] })?.entry ?? [];
+  return entries.flatMap((e) =>
+    (e.changes ?? [])
+      .filter((c) => c.field === "message_template_status_update" && c.value)
+      .map((c) => ({ name: c.value!.message_template_name, language: c.value!.message_template_language, event: c.value!.event, reason: c.value!.reason }))
+  );
+}
+
 export async function POST(request: Request) {
   const raw = await request.text();
   if (!verifyMetaSignature(raw, request.headers.get("x-hub-signature-256"), process.env.META_APP_SECRET)) {
@@ -82,6 +91,23 @@ export async function POST(request: Request) {
   }
 
   const events = parseCloudWebhook(body);
+
+  // Status dos envios das telas de teste (análise do app pela Meta) — vale mesmo com a
+  // conta desligada no Chat: é ali que a gravação mostra sent → delivered → read.
+  for (const event of events) {
+    if (event.kind !== "status") continue;
+    const status = STATUS_MAP[event.status];
+    if (status) await prisma.cloudTestMessage.updateMany({ where: { wamid: event.keyId }, data: { status } }).catch(() => {});
+  }
+  // Mudança de status de modelo (message_template_status_update) — a tela de modelos lê
+  // o status direto da Meta; aqui só registra no log com um evento próprio.
+  const templateUpdates = templateStatusUpdates(body);
+  if (templateUpdates.length) {
+    await prisma.webhookLog
+      .create({ data: { event: "whatsapp_cloud.template_status", payload: templateUpdates as unknown as Prisma.InputJsonValue, status: "SUCCESS", responseCode: null } })
+      .catch(() => {});
+  }
+
   const accounts = await prisma.whatsappCloudAccount.findMany({
     where: { phoneNumberId: { in: [...new Set(events.map((e) => e.phoneNumberId))] } },
     select: { phoneNumberId: true, clinicId: true, active: true },

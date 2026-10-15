@@ -263,8 +263,14 @@ model WhatsappCloudAccount {
   wabaId             String   @map("waba_id")
   phoneNumberId      String   @unique @map("phone_number_id")
   displayPhoneNumber String?  @map("display_phone_number")
-  /// Token de integração do negócio (troca do código do Embedded Signup) — só servidor.
+  /// Token de integração do negócio (troca do código do Embedded Signup) — só servidor,
+  /// criptografado em repouso ("enc:v1:…", ver src/lib/token-crypto.ts).
   accessToken        String   @map("access_token")
+  /// Nome verificado do número na Meta (verified_name).
+  verifiedName       String?  @map("verified_name")
+  /// PIN de 6 dígitos da verificação em duas etapas usado no /register (número novo,
+  /// sem coexistência) — criptografado, necessário pra registrar de novo.
+  twoStepPin         String?  @map("two_step_pin")
   coexistence        Boolean  @default(false)
   active             Boolean  @default(false)
   createdAt          DateTime @default(now()) @map("created_at")
@@ -1020,4 +1026,25 @@ model Marcador {
   @@unique([clinicId, code])
   @@unique([clinicId, phone])
   @@map("marcadores")
+}
+
+/// Mensagens enviadas pelas telas de teste da API oficial (/admin/whatsapp/enviar e
+/// /templates) — o status (sent/delivered/read/failed) é atualizado pelo webhook. Base da
+/// gravação da análise do app na Meta.
+model CloudTestMessage {
+  id            String   @id @default(cuid())
+  clinicId      String   @map("clinic_id")
+  phoneNumberId String   @map("phone_number_id")
+  to            String
+  kind          String
+  body          String   @db.Text
+  templateName  String?  @map("template_name")
+  wamid         String?  @unique
+  status        String   @default("SENDING")
+  error         String?
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@index([clinicId, createdAt])
+  @@map("cloud_test_messages")
 }
