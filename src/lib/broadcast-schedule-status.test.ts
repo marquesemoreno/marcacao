@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { campaignSituation, estimateCampaignFinish, nextMarketingWindowLabel, unfilledPlaceholders, unknownTemplateVariables, urgentSendTimes } from "./broadcast-schedule";
+import { campaignSituation, estimateCampaignFinish, nextMarketingWindowLabel, unfilledPlaceholders, patientsNeedingCall, unknownTemplateVariables, urgentSendTimes } from "./broadcast-schedule";
 
 const br = (iso: string) => new Date(`${iso}-03:00`);
 
@@ -100,5 +100,29 @@ describe("urgentSendTimes", () => {
   });
   it("antes das 8h começa às 8h", () => {
     expect(urgentSendTimes(1, br("2026-10-15T06:00:00"))[0].toISOString()).toBe(br("2026-10-15T08:00:00").toISOString());
+  });
+});
+
+describe("patientsNeedingCall", () => {
+  const now = br("2026-10-15T17:00:00");
+  const rows = [
+    { id: "a", status: "PENDING", dataIso: "2026-10-16", horario: "08:00", sentAt: null },
+    { id: "b", status: "PENDING", dataIso: "2026-10-16", horario: "14:00", sentAt: null },
+    { id: "c", status: "SENT", dataIso: "2026-10-15", horario: "16:00", sentAt: br("2026-10-15T16:30:00") },
+    { id: "d", status: "PENDING", dataIso: "2026-10-16", horario: "", sentAt: null },
+  ];
+  it("pendente que só recebe depois da consulta, enviado depois da hora e sem horário", () => {
+    // 17:00 a, 17:06 b, 17:12 d (todos antes das 18h): a às 17h do dia 15 é antes das 8h do dia 16 → ok
+    const r = patientsNeedingCall(rows, now);
+    expect(r).toEqual([
+      { id: "c", reason: "late" },
+      { id: "d", reason: "no_time" },
+    ]);
+  });
+  it("noite cheia: quem fica pra manhã depois do horário entra", () => {
+    const many = Array.from({ length: 12 }, (_, i) => ({ id: `p${i}`, status: "PENDING", dataIso: "2026-10-16", horario: "08:00", sentAt: null }));
+    const r = patientsNeedingCall(many, br("2026-10-15T17:00:00"));
+    // 17:00..17:54 = 10 envios antes das 18h; p10 e p11 vão às 08:00 e 08:06 do dia 16 → 08:06 > 08:00
+    expect(r.map((x) => x.id)).toEqual(["p11"]);
   });
 });

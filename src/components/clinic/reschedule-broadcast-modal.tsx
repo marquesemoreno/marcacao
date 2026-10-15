@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { getDistinctDoctorNames, getAppointmentsByDoctorAndDate } from "@/actions/clinic";
 import { createRescheduleBroadcast } from "@/actions/clinic-broadcast";
-import { urgentSendTimes } from "@/lib/broadcast-schedule";
+import { patientsNeedingCall, urgentSendTimes } from "@/lib/broadcast-schedule";
 
 function formatSendTime(d: Date): string {
   return d.toLocaleString("pt-BR", { weekday: "short", hour: "2-digit", minute: "2-digit", timeZone: "America/Bahia" });
@@ -55,13 +55,17 @@ export function RescheduleBroadcastModal({ open, onOpenChange }: { open: boolean
 
   // Quem recebe depois do horário da consulta (pior caso: 1 a cada 6 min, 08h–18h) —
   // a recepção precisa ligar pra esses (decisão do usuário em 15/10/2026).
+  // Mesma regra da lista que fica no card da campanha depois (patientsNeedingCall): sem
+  // horário de consulta também entra, pra recepção confirmar.
   const schedule = (() => {
-    if (!date || preview.length === 0) return { lastAt: null as Date | null, late: [] as PreviewRow[] };
+    if (!date || preview.length === 0) return { lastAt: null as Date | null, late: [] as (PreviewRow & { noTime: boolean })[] };
+    const ordered = [...preview].sort((a, b) => (a.timeSlot ?? "99").localeCompare(b.timeSlot ?? "99"));
+    const flagged = patientsNeedingCall(
+      ordered.map((p) => ({ id: p.id, status: "PENDING", sentAt: null, dataIso: date, horario: p.timeSlot ?? "" })),
+      new Date()
+    );
+    const late = flagged.map((f) => ({ ...ordered.find((p) => p.id === f.id)!, noTime: f.reason === "no_time" }));
     const times = urgentSendTimes(preview.length, new Date());
-    const late = preview.filter((p, i) => {
-      const deadline = new Date(`${date}T${p.timeSlot && /^\d{2}:\d{2}/.test(p.timeSlot) ? p.timeSlot.slice(0, 5) : "07:00"}:00-03:00`);
-      return times[i] > deadline;
-    });
     return { lastAt: times[times.length - 1] ?? null, late };
   })();
 
@@ -77,7 +81,12 @@ export function RescheduleBroadcastModal({ open, onOpenChange }: { open: boolean
     setSending(true);
     try {
       const result = await createRescheduleBroadcast(doctorName, new Date(`${date}T00:00:00Z`), template);
-      toast.success(`Aviso disparado para ${result.recipientCount} paciente(s).`);
+      toast.success(
+        `Aviso na fila para ${result.recipientCount} ${result.recipientCount === 1 ? "paciente" : "pacientes"}${
+          result.lastAt ? ` — o último recebe por volta de ${formatSendTime(new Date(result.lastAt))}` : ""
+        }. Acompanhe em “Enviando agora”${schedule.late.length ? "; a lista de quem precisa de ligação fica no card." : "."}`,
+        { duration: 9000 }
+      );
       onOpenChange(false);
       reset();
     } catch (error) {
@@ -98,7 +107,7 @@ export function RescheduleBroadcastModal({ open, onOpenChange }: { open: boolean
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <AlertTriangle className="w-4 h-4 text-amber-500" />
+            <AlertTriangle className="w-4 h-4 text-amber-500" aria-hidden />
             Aviso urgente de remarcação
           </DialogTitle>
         </DialogHeader>
@@ -116,7 +125,7 @@ export function RescheduleBroadcastModal({ open, onOpenChange }: { open: boolean
                 id="reschedule-doctor"
                 value={doctorName}
                 onChange={(e) => setDoctorName(e.target.value)}
-                className="w-full mt-1 h-9 px-3 text-xs font-medium rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500"
+                className="w-full mt-1 h-9 px-3 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
               >
                 <option value="">Selecione o médico</option>
                 {doctorNames.map((name) => (
@@ -141,7 +150,7 @@ export function RescheduleBroadcastModal({ open, onOpenChange }: { open: boolean
                 type="date"
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
-                className="w-full mt-1 h-9 px-3 text-xs font-medium rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500"
+                className="w-full mt-1 h-9 px-3 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
               />
             </div>
           </div>
@@ -151,7 +160,7 @@ export function RescheduleBroadcastModal({ open, onOpenChange }: { open: boolean
               <label className="text-xs font-medium text-slate-600 dark:text-slate-400">
                 Pacientes afetados
               </label>
-              <div className="mt-1 rounded-lg border border-slate-200 dark:border-slate-800 overflow-hidden max-h-40 overflow-y-auto">
+              <div className="mt-1 rounded-lg border border-slate-200 dark:border-slate-800 overflow-hidden max-h-56 overflow-y-auto">
                 {loadingPreview ? (
                   <div className="p-4 text-center text-xs text-slate-400 flex items-center justify-center gap-2">
                     <Loader2 className="w-3.5 h-3.5 animate-spin" /> Carregando...
@@ -193,7 +202,7 @@ export function RescheduleBroadcastModal({ open, onOpenChange }: { open: boolean
               rows={4}
               value={template}
               onChange={(e) => setTemplate(e.target.value)}
-              className="w-full mt-1 px-3 py-2 text-xs font-medium rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 resize-none"
+              className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 resize-none"
             />
             <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
               Variáveis disponíveis: {"{{nome}}"}, {"{{medico}}"}, {"{{data}}"}
@@ -201,7 +210,7 @@ export function RescheduleBroadcastModal({ open, onOpenChange }: { open: boolean
           </div>
 
           {confirming ? (
-            <div role="alertdialog" aria-labelledby="reschedule-confirm-title" className="rounded-lg border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/40 p-3 space-y-3">
+            <div aria-labelledby="reschedule-confirm-title" className="rounded-lg border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/40 p-3 space-y-3">
               <p id="reschedule-confirm-title" className="text-sm font-semibold text-amber-900 dark:text-amber-200">
                 {`Enviar para ${preview.length} ${preview.length === 1 ? "paciente" : "pacientes"}?`}
               </p>
@@ -216,13 +225,13 @@ export function RescheduleBroadcastModal({ open, onOpenChange }: { open: boolean
                 <div role="alert" className="rounded-md border border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-950/40 p-2 text-sm text-red-800 dark:text-red-300">
                   <p className="font-semibold">
                     {schedule.late.length === 1
-                      ? "1 paciente não deve receber antes da consulta — ligue para ele:"
-                      : `${schedule.late.length} pacientes não devem receber antes da consulta — ligue para eles:`}
+                      ? "1 paciente precisa de ligação (não recebe antes da consulta ou está sem horário):"
+                      : `${schedule.late.length} pacientes precisam de ligação (não recebem antes da consulta ou estão sem horário):`}
                   </p>
                   <ul className="mt-1 space-y-0.5 tabular-nums">
                     {schedule.late.map((p) => (
                       <li key={p.id}>
-                        {p.timeSlot ?? "sem horário"} — {p.patientName} — {p.patientPhone}
+                        {p.noTime ? "sem horário — confirme" : p.timeSlot} — {p.patientName} — {p.patientPhone}
                       </li>
                     ))}
                   </ul>

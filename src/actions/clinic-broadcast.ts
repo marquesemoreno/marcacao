@@ -6,7 +6,7 @@ import { requireClinicSession } from "@/lib/session";
 import { formatToWhatsAppNumber } from "@/lib/whatsapp";
 import { uploadWhatsAppMedia } from "@/lib/whatsapp-media";
 import { buildBroadcastMessage, type ParsedBroadcastRecipient } from "@/lib/broadcast-csv";
-import { campaignSituation, estimateCampaignFinish, startOfBrazilDay, unfilledPlaceholders, unknownTemplateVariables } from "@/lib/broadcast-schedule";
+import { campaignSituation, estimateCampaignFinish, patientsNeedingCall, startOfBrazilDay, unfilledPlaceholders, unknownTemplateVariables, urgentSendTimes } from "@/lib/broadcast-schedule";
 import { RESCHEDULE_PENDING_TAG } from "@/lib/conversation-tags";
 import { formatDate } from "@/lib/format";
 import { fetchBridgeCampaignPatients } from "@/lib/hospital-bridge";
@@ -28,7 +28,10 @@ export async function listClinicBroadcastCampaigns() {
     orderBy: { createdAt: "desc" },
     include: {
       _count: { select: { recipients: true } },
-      recipients: { select: { status: true, sentAt: true, errorMessage: true, phone: true } },
+      recipients: {
+        select: { id: true, status: true, sentAt: true, errorMessage: true, phone: true, variables: true, calledAt: true },
+        orderBy: { createdAt: "asc" },
+      },
     },
     }),
     clinicRemindersActive(clinicId, now),
@@ -72,10 +75,35 @@ export async function listClinicBroadcastCampaigns() {
       situation: isReschedule && c.status === "RUNNING" && pending > 0
         ? { tone: "ok" as const, text: "Enviando aviso urgente — 1 a cada 4–6 min, das 8h às 18h" }
         : campaignSituation({ status: c.status, pending, sentToday, yielding, now, sharing }),
+      isReschedule,
+      urgentLastAt: isReschedule && pending > 0 ? urgentSendTimes(pending, now).at(-1)?.toISOString() ?? null : null,
+      needsCall: isReschedule ? buildCallList(c.recipients, now) : [],
       finishIso: c.status === "COMPLETED" ? null : estimate.finishIso,
       finishLateIso: c.status === "COMPLETED" || !late || late.finishIso === estimate.finishIso ? null : late.finishIso,
       businessDays: estimate.businessDays,
       createdAt: c.createdAt,
+    };
+  });
+}
+
+type RecipientRow = { id: string; status: string; sentAt: Date | null; phone: string; variables: unknown; calledAt: Date | null };
+
+/** Lista "Precisam de ligação" do aviso urgente (ver patientsNeedingCall). */
+function buildCallList(recipients: RecipientRow[], now: Date) {
+  const vars = (r: RecipientRow) => (r.variables ?? {}) as Record<string, string>;
+  const flagged = patientsNeedingCall(
+    recipients.map((r) => ({ id: r.id, status: r.status, sentAt: r.sentAt, dataIso: vars(r).dataIso ?? "", horario: vars(r).horario ?? "" })),
+    now
+  );
+  return flagged.map((f) => {
+    const r = recipients.find((x) => x.id === f.id)!;
+    return {
+      id: r.id,
+      name: vars(r).nome ?? "",
+      phone: r.phone,
+      horario: vars(r).horario || null,
+      reason: f.reason,
+      called: !!r.calledAt,
     };
   });
 }
@@ -103,8 +131,9 @@ export async function getClinicCampaignStartPreview(campaignId: string) {
   await assertClinicOwnsCampaign(campaignId, clinicId);
   const campaign = await prisma.broadcastCampaign.findUnique({
     where: { id: campaignId },
-    select: { messageTemplate: true, imagePath: true, lowPriority: true },
+    select: { messageTemplate: true, imagePath: true, lowPriority: true, tagOnSend: true },
   });
+  const isReschedule = campaign?.tagOnSend === RESCHEDULE_PENDING_TAG;
   const otherActive = await prisma.broadcastCampaign.count({
     where: {
       clinicId,
@@ -131,6 +160,18 @@ export async function getClinicCampaignStartPreview(campaignId: string) {
     lowPriority: Boolean(campaign?.lowPriority),
     ...estimateCampaignFinish({ pending, sentToday, now: new Date(), sharing: campaign?.lowPriority ? 1 : 1 + otherActive }),
     remindersOn: await clinicRemindersActive(clinicId, new Date()),
+    isReschedule,
+    urgentLastAt: isReschedule && pending > 0 ? urgentSendTimes(pending, new Date()).at(-1)?.toISOString() ?? null : null,
+    needsCall: isReschedule
+      ? buildCallList(
+          await prisma.broadcastRecipient.findMany({
+            where: { campaignId },
+            orderBy: { createdAt: "asc" },
+            select: { id: true, status: true, sentAt: true, phone: true, variables: true, calledAt: true },
+          }),
+          new Date()
+        )
+      : [],
   };
 }
 
@@ -316,16 +357,22 @@ export async function createRescheduleBroadcast(doctorName: string, date: Date, 
       date,
       status: { in: ["PENDING", "CONFIRMED"] },
     },
-    select: { patientName: true, patientPhone: true },
+    select: { patientName: true, patientPhone: true, timeSlot: true },
+    orderBy: { timeSlot: "asc" },
   });
   if (appointments.length === 0) {
     throw new Error("Nenhum paciente agendado com esse médico nessa data.");
   }
+  const dataIso = date.toISOString().slice(0, 10);
 
   const dateLabel = formatDate(date);
   const seenPhones = new Set<string>();
   const normalized = appointments
-    .map((a) => ({ phone: formatToWhatsAppNumber(a.patientPhone), variables: { nome: a.patientName, medico: doctorName, data: dateLabel } }))
+    // horario/dataIso: base da lista "Precisam de ligação" (quem não recebe antes da consulta).
+    .map((a) => ({
+      phone: formatToWhatsAppNumber(a.patientPhone),
+      variables: { nome: a.patientName, medico: doctorName, data: dateLabel, horario: a.timeSlot ?? "", dataIso },
+    }))
     .filter((r) => {
       if (!r.phone || seenPhones.has(r.phone)) return false;
       seenPhones.add(r.phone);
@@ -359,7 +406,24 @@ export async function createRescheduleBroadcast(doctorName: string, date: Date, 
 
   revalidatePath("/clinic/disparos");
   revalidatePath("/clinic/inbox");
-  return { success: true as const, campaignId: campaign.id, recipientCount: normalized.length };
+  const pendingCount = normalized.filter((r) => !optedOutPhones.has(r.phone)).length;
+  const times = urgentSendTimes(pendingCount, new Date());
+  return {
+    success: true as const,
+    campaignId: campaign.id,
+    recipientCount: normalized.length,
+    lastAt: times.length ? times[times.length - 1].toISOString() : null,
+  };
+}
+
+/** Recepção marca que ligou (ou desmarca) pra um paciente da lista "Precisam de ligação". */
+export async function setRecipientCalled(recipientId: string, called: boolean) {
+  const { clinicId } = await requireClinicSession();
+  const r = await prisma.broadcastRecipient.findUnique({ where: { id: recipientId }, select: { campaign: { select: { clinicId: true } } } });
+  if (!r || r.campaign.clinicId !== clinicId) throw new Error("Paciente não encontrado.");
+  await prisma.broadcastRecipient.update({ where: { id: recipientId }, data: { calledAt: called ? new Date() : null } });
+  revalidatePath("/clinic/disparos");
+  return { success: true as const };
 }
 
 export type BridgeAudienceFilters = {

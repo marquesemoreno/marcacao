@@ -2,7 +2,8 @@
 
 import { PageHeader } from "@/components/clinic/page-header";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { CalendarClock, Copy, Image as ImageIcon, Loader2, Pause, Play, Plus, Trash2, Upload, X } from "lucide-react";
+import { CalendarClock, Copy, Image as ImageIcon, Loader2, MoreHorizontal, Pause, Phone, Play, Plus, Trash2, Upload, X } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -18,6 +19,7 @@ import {
   getClinicCampaignForDuplicate,
   retryClinicCampaignFailures,
   getClinicNextAutomatedSend,
+  setRecipientCalled,
 } from "@/actions/clinic-broadcast";
 import { BridgeAudiencePicker } from "@/components/clinic/bridge-audience-picker";
 import { listMarcadoresAudience } from "@/actions/marcadores";
@@ -379,7 +381,7 @@ export function BroadcastManagement() {
         subtitle={
           loading
             ? "Carregando…"
-            : `${campaigns.filter((c) => c.status === "RUNNING").length} em andamento · ${campaigns.filter((c) => c.status === "DRAFT" || c.status === "PAUSED").length} rascunho(s) ou pausada(s)`
+            : `${campaigns.filter((c) => c.status === "RUNNING").length} em andamento · ${plural(campaigns.filter((c) => c.status === "DRAFT" || c.status === "PAUSED").length, "rascunho ou pausada", "rascunhos ou pausadas")}`
         }
         actions={
           <div className="flex flex-wrap-reverse justify-end gap-2">
@@ -472,12 +474,12 @@ export function BroadcastManagement() {
 
             {audienceSource === "selecao" ? (
               <p className="rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 p-3 text-sm text-emerald-900 dark:text-emerald-200">
-                <strong>{recipients.length} paciente(s)</strong> selecionado(s) na lista de pacientes.
+                <strong>{plural(recipients.length, "paciente selecionado", "pacientes selecionados")}</strong> na lista de pacientes.
               </p>
             ) : audienceSource === "marcadores" ? (
               <div className="rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 p-3 text-sm space-y-1 text-emerald-900 dark:text-emerald-200">
                 <p>
-                  <strong>{recipients.length} marcador(es) ativo(s)</strong> — cadastro em Marcadores. Use {"{{link}}"} para o link pessoal de cada um: quem
+                  <strong>{plural(recipients.length, "marcador ativo", "marcadores ativos")}</strong> — cadastro em Marcadores. Use {"{{link}}"} para o link pessoal de cada um: quem
                   chegar por ele conta no relatório do marcador.
                 </p>
                 {!template.trim() && (
@@ -517,7 +519,7 @@ export function BroadcastManagement() {
                 </p>
                 {csvError && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{csvError}</p>}
                 {recipients.length > 0 && (
-                  <p className="mt-1 text-sm font-medium text-emerald-700 dark:text-emerald-400">{recipients.length} contato(s) na lista.</p>
+                  <p className="mt-1 text-sm font-medium text-emerald-700 dark:text-emerald-400">{plural(recipients.length, "contato", "contatos")} na lista.</p>
                 )}
               </div>
             )}
@@ -554,13 +556,13 @@ export function BroadcastManagement() {
               </div>
             )}
             {unknownVars.length > 0 && (
-              <p role="alert" className="text-sm text-red-600 dark:text-red-400">
+              <p aria-live="polite" className="text-sm text-red-600 dark:text-red-400">
                 {unknownVars.map((v) => `{{${v}}}`).join(", ")} não existe neste público — o paciente receberia o texto entre chaves. Corrija antes de
                 criar.
               </p>
             )}
             {unfilled.length > 0 && (
-              <p role="alert" className="text-sm text-red-600 dark:text-red-400">
+              <p aria-live="polite" className="text-sm text-red-600 dark:text-red-400">
                 Preencha antes de criar: {unfilled.join(", ")}.
               </p>
             )}
@@ -603,8 +605,12 @@ export function BroadcastManagement() {
 
           <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 dark:border-slate-800 pt-4">
             <p className="text-sm text-slate-600 dark:text-slate-300">
-              {formEstimate
-                ? `${recipients.length} destinatário(s) · envio seguro: 1 a cada 4–6 min, seg–sex 9h–17h, até 100/dia — ${estimateText(formEstimate.businessDays, formEstimate.finishIso)} se começar agora.`
+              {!name.trim()
+                ? "Falta dar um nome à campanha."
+                : !template.trim()
+                  ? "Falta escrever a mensagem."
+                  : formEstimate
+                ? `${plural(recipients.length, "destinatário", "destinatários")} · envio seguro: 1 a cada 4–6 min, seg–sex 9h–17h, até 100/dia — ${estimateText(formEstimate.businessDays, formEstimate.finishIso)} se começar agora.`
                 : "Escolha o público para ver a previsão de envio."}
             </p>
             <button
@@ -712,6 +718,24 @@ export function BroadcastManagement() {
             </p>
           ) : (
             <div className="space-y-4">
+              {confirming.preview.isReschedule ? (
+                <div className="space-y-2">
+                  <p className="text-sm text-slate-700 dark:text-slate-200">
+                    Aviso urgente para <strong>{plural(confirming.preview.pending, "paciente", "pacientes")}</strong>: 1 a cada 4–6 min, das 8h às 18h,
+                    todo dia
+                    {confirming.preview.urgentLastAt
+                      ? ` — o último recebe por volta de ${new Date(confirming.preview.urgentLastAt).toLocaleString("pt-BR", { weekday: "short", hour: "2-digit", minute: "2-digit", timeZone: "America/Bahia" })}`
+                      : ""}
+                    .
+                  </p>
+                  {confirming.preview.needsCall.filter((n) => !n.called).length > 0 && (
+                    <p className="rounded-md border border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-950/40 p-2 text-sm text-red-800 dark:text-red-300">
+                      {plural(confirming.preview.needsCall.filter((n) => !n.called).length, "paciente ainda precisa", "pacientes ainda precisam")} de ligação —
+                      a lista fica no card da campanha.
+                    </p>
+                  )}
+                </div>
+              ) : (
               <p className="text-sm text-slate-700 dark:text-slate-200">
                 Vai para <strong>{plural(confirming.preview.pending, "pessoa", "pessoas")}</strong>, uma a cada 4–6 min, de segunda a sexta das 9h às 17h, até 100 por dia —{" "}
                 {estimateText(confirming.preview.businessDays, confirming.preview.finishIso)}.
@@ -721,6 +745,7 @@ export function BroadcastManagement() {
                     ? " Os lembretes de confirmação têm a vez nas manhãs, então pode terminar um pouco depois."
                     : ""}
               </p>
+              )}
               <div>
                 <p className={labelClass}>
                   Como chega para o 1º destinatário{confirming.preview.samplePhone ? ` (${confirming.preview.samplePhone})` : ""}:
@@ -825,6 +850,19 @@ function CampaignCard({
   onRetry: () => void;
   onToggleLowPriority: () => void;
 }) {
+  const [calls, setCalls] = useState(c.needsCall);
+  useEffect(() => setCalls(c.needsCall), [c.needsCall]);
+  const [moreOpen, setMoreOpen] = useState(false);
+  async function toggleCalled(id: string, called: boolean) {
+    setCalls((prev) => prev.map((x) => (x.id === id ? { ...x, called } : x)));
+    try {
+      await setRecipientCalled(id, called);
+    } catch {
+      setCalls((prev) => prev.map((x) => (x.id === id ? { ...x, called: !called } : x)));
+      toast.error("Não foi possível salvar.");
+    }
+  }
+  const pendingCalls = calls.filter((x) => !x.called).length;
   // Falha não conta como progresso (não chegou ao paciente).
   const progress = c.total ? Math.round(((c.sent + c.skipped) / c.total) * 100) : 0;
   const actionBtn =
@@ -846,7 +884,15 @@ function CampaignCard({
           {c.status === "RUNNING" && (
           <p className={`mt-1 text-sm font-medium ${SITUATION_CLASS[c.situation.tone]}`}>
             {c.situation.text}
-            {c.finishIso && <span className="font-normal text-slate-500 dark:text-slate-400"> · {estimateText(c.businessDays, c.finishIso, c.finishLateIso)}</span>}
+            {c.isReschedule && c.urgentLastAt ? (
+              <span className="font-normal text-slate-500 dark:text-slate-400">
+                {" "}
+                · o último recebe por volta de{" "}
+                {new Date(c.urgentLastAt).toLocaleString("pt-BR", { weekday: "short", hour: "2-digit", minute: "2-digit", timeZone: "America/Bahia" })}
+              </span>
+            ) : (
+              c.finishIso && <span className="font-normal text-slate-500 dark:text-slate-400"> · {estimateText(c.businessDays, c.finishIso, c.finishLateIso)}</span>
+            )}
           </p>
           )}
         </div>
@@ -867,14 +913,50 @@ function CampaignCard({
               {c.status === "PAUSED" ? "Retomar" : "Iniciar"}
             </button>
           ) : null}
-          <button type="button" disabled={busy} onClick={onDuplicate} className={actionBtn} aria-label={`Duplicar ${c.name}`}>
-            <Copy className="w-3.5 h-3.5" aria-hidden /> Duplicar
-          </button>
-          {c.status === "DRAFT" && (
-            <button type="button" disabled={busy} onClick={onDelete} className={`${actionBtn} text-red-700 dark:text-red-400`} aria-label={`Excluir ${c.name}`}>
-              <Trash2 className="w-3.5 h-3.5" aria-hidden /> Excluir
-            </button>
-          )}
+          <Popover open={moreOpen} onOpenChange={setMoreOpen}>
+            <PopoverTrigger className={actionBtn} aria-label={`Mais ações de ${c.name}`}>
+              <MoreHorizontal className="w-4 h-4" aria-hidden /> Mais
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-60 p-1">
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => {
+                  setMoreOpen(false);
+                  onDuplicate();
+                }}
+                className="w-full flex items-center gap-2 rounded-md px-2 h-9 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
+              >
+                <Copy className="w-4 h-4" aria-hidden /> Duplicar
+              </button>
+              {c.status !== "COMPLETED" && !c.isReschedule && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMoreOpen(false);
+                    onToggleLowPriority();
+                  }}
+                  className="w-full flex items-center gap-2 rounded-md px-2 h-9 text-sm text-left text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
+                >
+                  <CalendarClock className="w-4 h-4" aria-hidden />
+                  {c.lowPriority ? "Voltar à prioridade normal" : "Mudar para baixa prioridade"}
+                </button>
+              )}
+              {c.status === "DRAFT" && (
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => {
+                    setMoreOpen(false);
+                    onDelete();
+                  }}
+                  className="w-full flex items-center gap-2 rounded-md px-2 h-9 text-sm text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40"
+                >
+                  <Trash2 className="w-4 h-4" aria-hidden /> Excluir rascunho
+                </button>
+              )}
+            </PopoverContent>
+          </Popover>
         </div>
       </div>
 
@@ -911,17 +993,38 @@ function CampaignCard({
         )}
       </div>
 
-      {c.status !== "COMPLETED" && (
-        <p className="text-xs text-slate-500 dark:text-slate-400">
-          {c.lowPriority ? "Baixa prioridade: espera os lembretes e outras campanhas." : "Prioridade normal."}{" "}
-          <button
-            type="button"
-            onClick={onToggleLowPriority}
-            className="font-medium text-slate-700 dark:text-slate-200 underline underline-offset-2 hover:text-slate-900 dark:hover:text-white"
-          >
-            {c.lowPriority ? "Voltar ao normal" : "Mudar para baixa prioridade"}
-          </button>
-        </p>
+      {c.status !== "COMPLETED" && c.lowPriority && (
+        <p className="text-xs text-slate-500 dark:text-slate-400">Baixa prioridade: espera os lembretes e outras campanhas.</p>
+      )}
+
+      {c.isReschedule && calls.length > 0 && (
+        <section
+          className={`rounded-md border p-3 text-sm ${
+            pendingCalls > 0
+              ? "border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-950/40 text-red-900 dark:text-red-200"
+              : "border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300"
+          }`}
+          aria-label="Pacientes que precisam de ligação"
+        >
+          <p className="flex items-center gap-1.5 font-semibold">
+            <Phone className="w-4 h-4" aria-hidden />
+            {pendingCalls > 0 ? `Precisam de ligação (${pendingCalls} de ${calls.length})` : `Ligações feitas (${calls.length})`}
+          </p>
+          <p className="mt-0.5 text-xs opacity-90">Não recebem a mensagem antes da consulta, ou estão sem horário. Marque quando ligar.</p>
+          <ul className="mt-2 space-y-1">
+            {calls.map((x) => (
+              <li key={x.id}>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={x.called} onChange={() => toggleCalled(x.id, !x.called)} className="size-4 accent-emerald-600" />
+                  <span className={`tabular-nums ${x.called ? "line-through opacity-60" : ""}`}>
+                    {x.reason === "no_time" ? "sem horário" : x.horario} — {x.name} — {x.phone}
+                  </span>
+                  <span className="sr-only">{x.called ? "ligação feita" : "precisa de ligação"}</span>
+                </label>
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
     </article>
   );

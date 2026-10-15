@@ -910,6 +910,9 @@ model BroadcastRecipient {
   status       BroadcastRecipientStatus @default(PENDING)
   sentAt       DateTime?                @map("sent_at")
   errorMessage String?                  @map("error_message")
+  /// Aviso urgente: a recepção marcou que ligou pro paciente (quem não receberia a
+  /// mensagem antes da consulta — ver "Precisam de ligação" em /clinic/disparos).
+  calledAt     DateTime?                @map("called_at")
   createdAt    DateTime                 @default(now()) @map("created_at")
 
   campaign BroadcastCampaign @relation(fields: [campaignId], references: [id])

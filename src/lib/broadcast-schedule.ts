@@ -2,7 +2,7 @@ import { isNationalHolidayYMD } from "./holidays";
 
 /** Regras de ritmo das campanhas de marketing (todo disparo em massa que não é o aviso de
  * remarcação) — pra não queimar o número da clínica no WhatsApp. Aviso de remarcação NÃO passa por
- * aqui: é urgente e sai a qualquer hora. Brasil sem horário de verão: offset fixo -3h. */
+ * aqui: tem janela própria (08–18h todo dia, ver broadcast.ts). Brasil sem horário de verão: offset fixo -3h. */
 const BRAZIL_OFFSET_MS = 3 * 3_600_000;
 
 export const MARKETING_START_HOUR = 9;
@@ -146,6 +146,30 @@ export function urgentSendTimes(count: number, now: Date, gapMin = 6): Date[] {
     else if (minutes >= END) t = new Date(startOfBrazilDay(t).getTime() + 86_400_000 + START * 60_000);
     out.push(t);
     t = new Date(t.getTime() + gapMin * 60_000);
+  }
+  return out;
+}
+
+/** Aviso urgente: quem precisa de ligação — pendente que só receberia depois do horário
+ * da consulta (pior caso, ver urgentSendTimes), já enviado depois desse horário, ou sem
+ * horário de consulta (não dá pra garantir; a recepção confirma). `rows` na ordem da fila. */
+export function patientsNeedingCall(
+  rows: { id: string; status: string; dataIso: string; horario: string; sentAt: Date | null }[],
+  now: Date
+): { id: string; reason: "late" | "no_time" }[] {
+  const pending = rows.filter((r) => r.status === "PENDING");
+  const times = urgentSendTimes(pending.length, now);
+  const sendOf = new Map(pending.map((r, i) => [r.id, times[i]]));
+  const out: { id: string; reason: "late" | "no_time" }[] = [];
+  for (const r of rows) {
+    if (r.status !== "PENDING" && r.status !== "SENT") continue;
+    if (!/^\d{2}:\d{2}/.test(r.horario)) {
+      if (r.status === "PENDING") out.push({ id: r.id, reason: "no_time" });
+      continue;
+    }
+    const deadline = new Date(`${r.dataIso}T${r.horario.slice(0, 5)}:00-03:00`);
+    const at = r.status === "SENT" ? r.sentAt : sendOf.get(r.id);
+    if (at && at > deadline) out.push({ id: r.id, reason: "late" });
   }
   return out;
 }
