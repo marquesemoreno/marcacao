@@ -20,6 +20,7 @@ export const ACQUISITION_CHANNELS = [
   "Site Conecta Saúde",
   "Site da Clínica",
   INSTAGRAM_DIRECT_CHANNEL,
+  "Marcador",
   DIRECT_CHANNEL,
 ] as const;
 

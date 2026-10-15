@@ -142,7 +142,7 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
 
   const applyStatus = useCallback(
     async (item: AgendaItem, status: AgendaStatusChoice) => {
-      await setAgendaStatus({ source: item.source, externalId: item.externalId, date: item.date, status });
+      await setAgendaStatus({ source: item.source, externalId: item.externalId, date: item.date, phone: item.phone, status });
       if (status === "AUTO") {
         reload(); // o automático depende do lembrete — recalcula no servidor
         setOpenItem(null);

@@ -9,6 +9,7 @@ import {
   Users,
   CalendarCheck,
   CalendarDays,
+  Handshake,
   Settings,
   BarChart3,
   Megaphone,
@@ -35,7 +36,10 @@ const NAV_GROUPS: NavGroup[] = [
   },
   {
     label: "Cadastro",
-    items: [{ href: "/clinic/contatos", label: "Pacientes", icon: Users }],
+    items: [
+      { href: "/clinic/contatos", label: "Pacientes", icon: Users },
+      { href: "/clinic/marcadores", label: "Marcadores", icon: Handshake },
+    ],
   },
   {
     label: "Administração",

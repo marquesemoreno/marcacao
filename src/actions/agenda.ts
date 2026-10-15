@@ -138,6 +138,8 @@ export async function setAgendaStatus(input: {
   source: "BRIDGE" | "LOCAL";
   externalId: string;
   date: string;
+  /** Telefone do paciente — pro relatório de marcadores (atendidos). */
+  phone?: string | null;
   /** "AUTO" apaga a marcação manual — volta a valer o status automático (lembrete). */
   status: ManualAgendaStatus | "AUTO";
 }): Promise<{ success: true }> {
@@ -160,8 +162,8 @@ export async function setAgendaStatus(input: {
   }
   await prisma.agendaMark.upsert({
     where: { clinicId_source_externalId: { clinicId, source: input.source, externalId: input.externalId } },
-    update: { status: input.status, updatedByUserId: userId, date },
-    create: { clinicId, source: input.source, externalId: input.externalId, date, status: input.status, updatedByUserId: userId },
+    update: { status: input.status, updatedByUserId: userId, date, phone: input.phone ?? undefined },
+    create: { clinicId, source: input.source, externalId: input.externalId, date, status: input.status, updatedByUserId: userId, phone: input.phone ?? null },
   });
   revalidatePath("/clinic/agenda");
   return { success: true };

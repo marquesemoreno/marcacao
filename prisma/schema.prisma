@@ -597,6 +597,11 @@ model Conversation {
   patientIntentAt         DateTime?               @map("patient_intent_at")
   /// Título do anúncio ou texto-chave que casou
   acquisitionDetail       String?                 @map("acquisition_detail")
+  /// Marcador (parceiro de marcação) que indicou o paciente — detectado pelo código
+  /// "#m-<codigo>" do link pessoal na 1ª mensagem (ver src/lib/marcadores.ts).
+  marcadorId              String?                 @map("marcador_id")
+  /// Quando a indicação foi registrada (início da contagem no relatório).
+  marcadorAt              DateTime?               @map("marcador_at")
   /// ID do anúncio do Meta (externalAdReply.sourceId), pra agrupar por campanha
   acquisitionAdId         String?                 @map("acquisition_ad_id")
   createdAt               DateTime                @default(now()) @map("created_at")
@@ -613,6 +618,7 @@ model Conversation {
 
   @@index([clinicId, status])
   @@index([contactId])
+  @@index([marcadorId])
   @@map("conversations")
 }
 
@@ -982,6 +988,8 @@ model AgendaMark {
   externalId      String   @map("external_id")
   date            DateTime @db.Date
   status          String
+  /// Telefone do paciente — liga a marcação ao relatório de marcadores (atendidos).
+  phone           String?
   updatedByUserId String?  @map("updated_by_user_id")
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")
@@ -989,4 +997,21 @@ model AgendaMark {
   @@unique([clinicId, source, externalId])
   @@index([clinicId, date])
   @@map("agenda_marks")
+}
+
+/// Parceiro de marcação da clínica (pessoa ou central que manda pacientes). Ver
+/// src/lib/marcadores.ts e /clinic/marcadores.
+model Marcador {
+  id        String   @id @default(cuid())
+  clinicId  String   @map("clinic_id")
+  name      String
+  phone     String
+  code      String
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([clinicId, code])
+  @@unique([clinicId, phone])
+  @@map("marcadores")
 }

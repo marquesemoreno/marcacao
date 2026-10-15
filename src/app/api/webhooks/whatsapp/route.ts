@@ -11,6 +11,7 @@ import { MEDIA_DOWNLOAD_FAILED_PREFIX } from "@/lib/chat-messages";
 import { isBroadcastOptOutReply } from "@/lib/broadcast-csv";
 import { formatContactCardMessage } from "@/lib/whatsapp-vcard";
 import { reopenIfResolved } from "@/lib/conversation-reopen";
+import { MARCADOR_CHANNEL, extractMarcadorCode } from "@/lib/marcadores";
 import { deviceOutboundTargetPhone, findPanelTwin } from "@/lib/device-outbound";
 import { autoAssignNewConversation } from "@/lib/conversation-auto-assign";
 import {
@@ -815,6 +816,31 @@ export async function POST(request: Request) {
         });
       } catch (error) {
         console.error("Falha ao detectar canal de aquisição:", error);
+      }
+    }
+
+    // Indicação de marcador (link pessoal com "#m-<codigo>", ver src/lib/marcadores.ts) —
+    // vale em qualquer mensagem, não só na 1ª: paciente antigo também pode chegar por
+    // indicação. Sobrescreve o canal de aquisição na conversa nova. Nunca bloqueia.
+    const marcadorCode = !conversation.marcadorId ? extractMarcadorCode(incoming.text) : null;
+    if (marcadorCode) {
+      try {
+        const marcador = await prisma.marcador.findUnique({
+          where: { clinicId_code: { clinicId: conversation.clinicId, code: marcadorCode } },
+          select: { id: true, name: true, active: true },
+        });
+        if (marcador?.active) {
+          await prisma.conversation.update({
+            where: { id: conversation.id },
+            data: {
+              marcadorId: marcador.id,
+              marcadorAt: new Date(),
+              ...(isNewConversation ? { acquisitionChannel: MARCADOR_CHANNEL, acquisitionDetail: marcador.name } : {}),
+            },
+          });
+        }
+      } catch (error) {
+        console.error("Falha ao registrar indicação de marcador:", error);
       }
     }
 
