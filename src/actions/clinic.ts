@@ -103,7 +103,8 @@ export async function getClinicChatReport(days: number = 30, tags?: string[], ch
 
   const [conversations, audits] = await Promise.all([
     prisma.conversation.findMany({
-      where: { clinicId, createdAt: inWindow, ...tagsFilter },
+      // Conversas "Administrativo" (médico/equipe) não são atendimento de paciente.
+      where: { clinicId, createdAt: inWindow, ...tagsFilter, AND: [NOT_ADMINISTRATIVE] },
       select: { id: true, status: true, resolutionReason: true, createdAt: true, resolvedAt: true },
     }),
     // Filtra pela data da CONVERSA, não do audit — um audit é criado só quando a conversa
@@ -238,6 +239,10 @@ export async function getClinicAppointmentsReport(days: number = 30, doctorName?
 /** Métricas de gestão do /clinic/relatorio (equipe, confirmações, médicos, tipo de
  * atendimento, horário de pico). Agregação em src/lib/report-metrics.ts. O atendente de
  * uma conversa é quem a resolveu (resolvedByUserId), senão quem está atribuído. */
+/** Conversa "Administrativo" (médico/equipe) fica fora dos números de atendimento. OR com
+ * null porque NOT sozinho também excluiria as conversas ainda sem motivo (abertas). */
+const NOT_ADMINISTRATIVE = { OR: [{ resolutionReason: null }, { resolutionReason: { not: "ADMINISTRATIVO" } }] };
+
 export async function getClinicManagementReport(days: number = 30, channel?: string, previous = false) {
   const { clinicId } = await requireClinicSession();
   // `previous` = mesma janela imediatamente antes (comparação no relatório).
@@ -246,7 +251,7 @@ export async function getClinicManagementReport(days: number = 30, channel?: str
 
   const [allConversations, appointments, inbound, bridgeLogs, clinic] = await Promise.all([
     prisma.conversation.findMany({
-      where: { clinicId, createdAt: inWindow },
+      where: { clinicId, createdAt: inWindow, AND: [NOT_ADMINISTRATIVE] },
       select: {
         acquisitionChannel: true,
         status: true,

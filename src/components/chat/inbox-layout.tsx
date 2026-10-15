@@ -105,6 +105,9 @@ const FINISH_REASONS: { id: string; label: string; negative?: boolean }[] = [
   { id: 'AGENDAMENTO_CANCELADO', label: 'Cancelou a consulta', negative: true },
   { id: 'CANCELAMENTO', label: 'Desistiu', negative: true },
   { id: 'ENCAMINHADO', label: 'Encaminhado a outro setor', negative: true },
+  // Conversa que não é de paciente (médico, equipe da clínica, fornecedor) — fica fora
+  // dos números de atendimento/conversão do relatório.
+  { id: 'ADMINISTRATIVO', label: 'Administrativo — médico ou equipe da clínica' },
 ];
 
 const CRM_PANEL_STORAGE_KEY = 'inbox-crm-panel';
@@ -3357,7 +3360,9 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                 const common = [selectedReason, 'DUVIDA_ESCLARECIDA', 'AGENDAMENTO_CONCLUIDO', 'CONFIRMACAO_AGENDA'].filter(
                   (id, i, arr): id is string => !!id && arr.indexOf(id) === i
                 ).slice(0, 3);
-                const visible = showAllReasons ? FINISH_REASONS : FINISH_REASONS.filter((r) => common.includes(r.id)).sort((x, y) => common.indexOf(x.id) - common.indexOf(y.id));
+                // "Administrativo" sempre à vista: é um caso frequente (mensagem de médico ou da equipe).
+                const shown = common.includes('ADMINISTRATIVO') ? common : [...common, 'ADMINISTRATIVO'];
+                const visible = showAllReasons ? FINISH_REASONS : FINISH_REASONS.filter((r) => shown.includes(r.id)).sort((x, y) => shown.indexOf(x.id) - shown.indexOf(y.id));
                 const focusId = selectedReason && visible.some((r) => r.id === selectedReason) ? selectedReason : visible[0]?.id;
                 return (
                   <>

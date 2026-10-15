@@ -1523,6 +1523,7 @@ const REASON_LABELS: Record<string, string> = {
   AGENDAMENTO_CANCELADO: "🚫 Agendamento Cancelado",
   CANCELAMENTO: "❌ Cancelamento / Desistência",
   ENCAMINHADO: "🔄 Encaminhado para Outro Setor",
+  ADMINISTRATIVO: "🏥 Administrativo (médico ou equipe da clínica)",
   ATENDIDO_NO_CELULAR: "📱 Atendido pelo Celular (fora da plataforma)",
   INATIVIDADE: "⌛ Finalizado por inatividade (automático)",
   ATENDIMENTO_CONCLUIDO: "✅ Conversa já tinha terminado (automático)",

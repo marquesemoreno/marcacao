@@ -23,6 +23,7 @@ export const RESOLUTION_LABELS: Record<string, string> = {
   SEM_RETORNO: "Sem retorno do paciente",
   ATENDIDO_NO_CELULAR: "Atendido pelo celular",
   INATIVIDADE: "Finalizado por inatividade",
+  ADMINISTRATIVO: "Administrativo (médico ou equipe)",
   ATENDIMENTO_CONCLUIDO: "Concluído (conversa já tinha terminado)",
 };
 
