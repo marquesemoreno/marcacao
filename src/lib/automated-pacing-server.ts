@@ -7,7 +7,7 @@ import { isWithinMarketingWindow, MARKETING_DAILY_CAP, startOfBrazilDay } from "
  * remarcação (desde 15/10/2026 o aviso também respeita o intervalo). Base do intervalo
  * único de 4–6 min entre mensagens automáticas (ver automated-pacing.ts). */
 export async function lastAutomatedSend(clinicId: string): Promise<{ at: Date | null; kind: "reminder" | "campaign" | null }> {
-  const [reminder, campaign] = await Promise.all([
+  const [reminder, campaign, failed] = await Promise.all([
     prisma.bridgeReminderLog.findFirst({ where: { clinicId }, orderBy: { sentAt: "desc" }, select: { sentAt: true } }),
     prisma.broadcastRecipient.findFirst({
       where: {
@@ -18,8 +18,18 @@ export async function lastAutomatedSend(clinicId: string): Promise<{ at: Date | 
       orderBy: { sentAt: "desc" },
       select: { sentAt: true },
     }),
+    // Tentativa automática que FALHOU também conta pro intervalo — antes só o sucesso
+    // contava, e com o número bloqueado (Urolaser, 15/10) o lembrete era reenviado a
+    // cada minuto.
+    prisma.message.findFirst({
+      where: { status: "FAILED", direction: "OUTBOUND", senderUserId: null, sentFromDevice: false, conversation: { clinicId } },
+      orderBy: { createdAt: "desc" },
+      select: { createdAt: true },
+    }),
   ]);
-  const r = reminder?.sentAt ?? null;
+  const f = failed?.createdAt ?? null;
+  const r0 = reminder?.sentAt ?? null;
+  const r = f && (!r0 || f > r0) ? f : r0;
   const c = campaign?.sentAt ?? null;
   if (!r && !c) return { at: null, kind: null };
   if (r && (!c || r >= c)) return { at: r, kind: "reminder" };

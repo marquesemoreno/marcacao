@@ -82,6 +82,22 @@ export async function dispatchBridgeReminders(options?: { clinicId?: string; dat
       }
       if (options?.max !== undefined && attempted >= options.max) break;
 
+      // Desiste depois de MAX_REMINDER_FAILURES falhas pro mesmo telefone em 24h (número
+      // inválido ou WhatsApp bloqueado) — sem isso o mesmo paciente era tentado sem fim.
+      const recentFailures = await prisma.message.count({
+        where: {
+          status: "FAILED",
+          direction: "OUTBOUND",
+          senderUserId: null,
+          createdAt: { gte: new Date(Date.now() - 86_400_000) },
+          conversation: { clinicId: clinic.id, contact: { phone: formatToWhatsAppNumber(item.telefone) } },
+        },
+      });
+      if (recentFailures >= MAX_REMINDER_FAILURES) {
+        skipped++;
+        continue;
+      }
+
       if (attempted > 0) await sleep(randomDelayMs());
       attempted++;
 
@@ -151,6 +167,8 @@ export async function dispatchBridgeReminders(options?: { clinicId?: string; dat
 
   return { sent, skipped, failed };
 }
+
+const MAX_REMINDER_FAILURES = 2;
 
 /** Chamado a cada minuto (cron broadcast-dispatch): no máximo UM lembrete por clínica,
  * 08–18h, com 4–6 min desde a última mensagem automática da clínica e intercalando com a
