@@ -73,7 +73,7 @@ export async function listClinicBroadcastCampaigns() {
       skipped,
       pending,
       situation: isReschedule && c.status === "RUNNING" && pending > 0
-        ? { tone: "ok" as const, text: "Enviando aviso urgente — 1 a cada 4–6 min, das 8h às 18h" }
+        ? { tone: "ok" as const, text: "Enviando aviso de remarcação — 1 a cada 4–6 min, das 8h às 18h" }
         : campaignSituation({ status: c.status, pending, sentToday, yielding, now, sharing }),
       isReschedule,
       urgentLastAt: isReschedule && pending > 0 ? urgentSendTimes(pending, now).at(-1)?.toISOString() ?? null : null,

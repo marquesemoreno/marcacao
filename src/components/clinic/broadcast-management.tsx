@@ -391,7 +391,7 @@ export function BroadcastManagement() {
               className="inline-flex h-9 items-center gap-1.5 px-3 text-sm font-medium text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg"
             >
               <CalendarClock className="w-4 h-4" aria-hidden />
-              Aviso urgente de remarcação
+              Aviso de remarcação
             </button>
             <button
               type="button"
@@ -721,7 +721,7 @@ export function BroadcastManagement() {
               {confirming.preview.isReschedule ? (
                 <div className="space-y-2">
                   <p className="text-sm text-slate-700 dark:text-slate-200">
-                    Aviso urgente para <strong>{plural(confirming.preview.pending, "paciente", "pacientes")}</strong>: 1 a cada 4–6 min, das 8h às 18h,
+                    Aviso de remarcação para <strong>{plural(confirming.preview.pending, "paciente", "pacientes")}</strong>: 1 a cada 4–6 min, das 8h às 18h,
                     todo dia
                     {confirming.preview.urgentLastAt
                       ? ` — o último recebe por volta de ${new Date(confirming.preview.urgentLastAt).toLocaleString("pt-BR", { weekday: "short", hour: "2-digit", minute: "2-digit", timeZone: "America/Bahia" })}`

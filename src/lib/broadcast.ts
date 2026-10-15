@@ -32,7 +32,7 @@ export async function dispatchNextBatch(): Promise<{ processed: number }> {
     const isMarketing = campaign.tagOnSend !== RESCHEDULE_PENDING_TAG;
     const take = 1;
     if (!isMarketing) {
-      // Aviso urgente de remarcação: também 1 a cada 4–6 min, no intervalo único da clínica
+      // Aviso de remarcação: também 1 a cada 4–6 min, no intervalo único da clínica
       // (decisão do usuário em 15/10/2026, pra evitar bloqueio), mas sem esperar o horário
       // das campanhas — sai das 08h às 18h todo dia, como os lembretes, e sem limite diário.
       if (!isWithinReminderWindow(now)) continue;

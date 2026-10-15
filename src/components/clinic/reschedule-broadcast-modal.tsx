@@ -108,7 +108,7 @@ export function RescheduleBroadcastModal({ open, onOpenChange }: { open: boolean
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <AlertTriangle className="w-4 h-4 text-amber-500" aria-hidden />
-            Aviso urgente de remarcação
+            Aviso de remarcação
           </DialogTitle>
         </DialogHeader>
 
