@@ -5,6 +5,7 @@ import { BusinessHoursForm } from "@/components/clinic/business-hours-form";
 import { ProceduresTable } from "@/components/clinic/procedures-table";
 import { ReportSettingsForm } from "@/components/clinic/report-settings-form";
 import { TrackedLinksCard } from "@/components/clinic/tracked-links-card";
+import { CampaignExclusionsCard } from "@/components/clinic/campaign-exclusions-card";
 import type { BusinessHours } from "@/lib/schemas/clinic";
 import type { PlainClinicProcedureItem } from "@/lib/serialize";
 import type { Procedure } from "@prisma/client";
@@ -34,7 +35,7 @@ export function PrecosPageTabs({
       <TabsList className="sticky top-0 z-10 h-auto! w-full sm:w-fit flex-wrap justify-start bg-muted shadow-xs">
         <TabsTrigger value="horarios">Horários de Atendimento</TabsTrigger>
         <TabsTrigger value="precos">Procedimentos e Preços</TabsTrigger>
-        <TabsTrigger value="parametros">Parâmetros e Links Rastreados</TabsTrigger>
+        <TabsTrigger value="parametros">Parâmetros, Links e Campanhas</TabsTrigger>
       </TabsList>
 
       <TabsContent value="horarios" className="min-w-0">
@@ -48,6 +49,7 @@ export function PrecosPageTabs({
       <TabsContent value="parametros" className="min-w-0 space-y-3">
         <ReportSettingsForm defaultTicket={defaultTicket} rules={acquisitionRules} />
         {trackedLinks.length > 0 && <TrackedLinksCard links={trackedLinks} />}
+        <CampaignExclusionsCard />
       </TabsContent>
     </Tabs>
   );

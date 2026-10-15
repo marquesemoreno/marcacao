@@ -5,7 +5,8 @@ import { prisma } from "@/lib/prisma";
 import { requireClinicSession } from "@/lib/session";
 import { formatToWhatsAppNumber } from "@/lib/whatsapp";
 import { uploadWhatsAppMedia } from "@/lib/whatsapp-media";
-import { type ParsedBroadcastRecipient } from "@/lib/broadcast-csv";
+import { buildBroadcastMessage, type ParsedBroadcastRecipient } from "@/lib/broadcast-csv";
+import { campaignSituation, estimateCampaignFinish, startOfBrazilDay, unknownTemplateVariables } from "@/lib/broadcast-schedule";
 import { RESCHEDULE_PENDING_TAG } from "@/lib/conversation-tags";
 import { formatDate } from "@/lib/format";
 import { fetchBridgeCampaignPatients } from "@/lib/hospital-bridge";
@@ -18,19 +19,31 @@ const MAX_IMAGE_SIZE_BYTES = 15 * 1024 * 1024; // mesmo limite já usado pra mí
  * não é parâmetro (a clínica só pode ver as próprias campanhas). */
 export async function listClinicBroadcastCampaigns() {
   const { clinicId } = await requireClinicSession();
+  const now = new Date();
+  const dayStart = startOfBrazilDay(now);
   const campaigns = await prisma.broadcastCampaign.findMany({
     where: { clinicId },
     orderBy: { createdAt: "desc" },
     include: {
       _count: { select: { recipients: true } },
-      recipients: { select: { status: true } },
+      recipients: { select: { status: true, sentAt: true, errorMessage: true } },
     },
   });
+  // Alguma campanha normal com gente na fila? (a de baixa prioridade cede a vez — ver
+  // lowPriorityMustYield em automated-pacing.ts)
+  const highPriorityPending = campaigns.some(
+    (c) => c.status === "RUNNING" && !c.lowPriority && c.recipients.some((r) => r.status === "PENDING")
+  );
 
   return campaigns.map((c) => {
     const sent = c.recipients.filter((r) => r.status === "SENT").length;
-    const failed = c.recipients.filter((r) => r.status === "FAILED").length;
+    const failedList = c.recipients.filter((r) => r.status === "FAILED");
     const skipped = c.recipients.filter((r) => r.status === "SKIPPED_OPT_OUT").length;
+    const pending = c.recipients.filter((r) => r.status === "PENDING").length;
+    const sentToday = c.recipients.filter((r) => r.status === "SENT" && r.sentAt && r.sentAt >= dayStart).length;
+    const yielding = c.lowPriority && highPriorityPending;
+    const isReschedule = c.tagOnSend === RESCHEDULE_PENDING_TAG;
+    const estimate = isReschedule ? { businessDays: 0, finishIso: null } : estimateCampaignFinish({ pending, sentToday, now });
     return {
       id: c.id,
       name: c.name,
@@ -39,11 +52,75 @@ export async function listClinicBroadcastCampaigns() {
       lowPriority: c.lowPriority,
       total: c._count.recipients,
       sent,
-      failed,
+      failed: failedList.length,
+      failureReasons: [...new Set(failedList.map((r) => r.errorMessage).filter((m): m is string => !!m))].slice(0, 3),
       skipped,
+      pending,
+      situation: isReschedule && c.status === "RUNNING" && pending > 0
+        ? { tone: "ok" as const, text: "Enviando aviso urgente de remarcação" }
+        : campaignSituation({ status: c.status, pending, sentToday, yielding, now }),
+      finishIso: c.status === "COMPLETED" ? null : estimate.finishIso,
+      businessDays: estimate.businessDays,
       createdAt: c.createdAt,
     };
   });
+}
+
+/** Prévia antes de iniciar: quantos vão receber, a mensagem como o 1º destinatário
+ * recebe (variáveis preenchidas + rodapé de saída) e a previsão de término. */
+export async function getClinicCampaignStartPreview(campaignId: string) {
+  const { clinicId } = await requireClinicSession();
+  await assertClinicOwnsCampaign(campaignId, clinicId);
+  const campaign = await prisma.broadcastCampaign.findUnique({
+    where: { id: campaignId },
+    select: { messageTemplate: true, imagePath: true, lowPriority: true },
+  });
+  const [pending, first, sentToday] = await Promise.all([
+    prisma.broadcastRecipient.count({ where: { campaignId, status: "PENDING" } }),
+    prisma.broadcastRecipient.findFirst({ where: { campaignId, status: "PENDING" }, orderBy: { createdAt: "asc" }, select: { phone: true, variables: true } }),
+    prisma.broadcastRecipient.count({ where: { campaignId, status: "SENT", sentAt: { gte: startOfBrazilDay(new Date()) } } }),
+  ]);
+  const vars = (first?.variables ?? {}) as Record<string, string>;
+  return {
+    pending,
+    samplePhone: first?.phone ?? null,
+    sampleMessage: campaign ? buildBroadcastMessage(campaign.messageTemplate, vars) : "",
+    unknownVariables: campaign ? unknownTemplateVariables(campaign.messageTemplate, vars) : [],
+    hasImage: Boolean(campaign?.imagePath),
+    lowPriority: Boolean(campaign?.lowPriority),
+    ...estimateCampaignFinish({ pending, sentToday, now: new Date() }),
+  };
+}
+
+/** Exclui um rascunho (nunca iniciado). */
+export async function deleteClinicDraftCampaign(campaignId: string) {
+  const { clinicId } = await requireClinicSession();
+  await assertClinicOwnsCampaign(campaignId, clinicId);
+  const c = await prisma.broadcastCampaign.findUnique({ where: { id: campaignId }, select: { status: true } });
+  if (c?.status !== "DRAFT") throw new Error("Só dá para excluir campanha que ainda não começou.");
+  await prisma.$transaction([
+    prisma.broadcastRecipient.deleteMany({ where: { campaignId } }),
+    prisma.broadcastCampaign.delete({ where: { id: campaignId } }),
+  ]);
+  revalidatePath("/clinic/disparos");
+  return { success: true as const };
+}
+
+/** Copia uma campanha (mesmo texto, imagem e público) como rascunho novo — serve
+ * também pra "editar" um rascunho: duplica, ajusta e exclui o antigo. */
+export async function getClinicCampaignForDuplicate(campaignId: string) {
+  const { clinicId } = await requireClinicSession();
+  await assertClinicOwnsCampaign(campaignId, clinicId);
+  const c = await prisma.broadcastCampaign.findUnique({
+    where: { id: campaignId },
+    select: { name: true, messageTemplate: true, recipients: { select: { phone: true, variables: true } } },
+  });
+  if (!c) throw new Error("Campanha não encontrada");
+  return {
+    name: `${c.name} (cópia)`,
+    template: c.messageTemplate,
+    recipients: c.recipients.map((r) => ({ phone: r.phone, variables: (r.variables ?? {}) as Record<string, string> })),
+  };
 }
 
 /** Baixa prioridade: a campanha pausa sozinha enquanto houver lembrete de confirmação
@@ -124,7 +201,7 @@ export async function createClinicBroadcastCampaign(
   if (imageBuffer && imageMimeType) {
     const uploaded = await uploadWhatsAppMedia(campaign.id, imageBuffer, imageMimeType);
     if (!uploaded) {
-      throw new Error("Campanha criada, mas não foi possível subir a imagem. Tente editar e reenviar.");
+      throw new Error("Campanha criada, mas não foi possível subir a imagem. Duplique a campanha, anexe a imagem de novo e exclua o rascunho antigo.");
     }
     await prisma.broadcastCampaign.update({
       where: { id: campaign.id },
