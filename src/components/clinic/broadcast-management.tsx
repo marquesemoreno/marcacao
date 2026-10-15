@@ -12,6 +12,7 @@ import {
   clinicHasBridgeAudience,
 } from "@/actions/clinic-broadcast";
 import { BridgeAudiencePicker } from "@/components/clinic/bridge-audience-picker";
+import { listMarcadoresAudience } from "@/actions/marcadores";
 import { SELECTION_BROADCAST_KEY } from "@/components/clinic/patient-list-table";
 import { parseBroadcastCsv, BROADCAST_OPT_OUT_FOOTER, type ParsedBroadcastRecipient } from "@/lib/broadcast-csv";
 import { RescheduleBroadcastModal } from "@/components/clinic/reschedule-broadcast-modal";
@@ -32,6 +33,18 @@ const STATUS_CLASS: Record<Campaign["status"], string> = {
   COMPLETED: "bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800",
 };
 
+const MARCADORES_TEMPLATE = `Olá, {{nome}}! Tudo bem? 😊
+
+Passando para avisar que temos novos médicos na nossa equipe!
+
+👨‍⚕️ [NOME DO MÉDICO] — [ESPECIALIDADE]
+📅 Atendimento: [DIAS E HORÁRIOS]
+
+Para agendar seus pacientes, é só encaminhar este link — assim já sabemos que a indicação é sua:
+{{link}}
+
+Qualquer dúvida, estamos à disposição!`;
+
 export function BroadcastManagement() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(true);
@@ -47,7 +60,8 @@ export function BroadcastManagement() {
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
   const [rescheduleModalOpen, setRescheduleModalOpen] = useState(false);
   const [hasBridge, setHasBridge] = useState(false);
-  const [audienceSource, setAudienceSource] = useState<"csv" | "bridge" | "selecao">("csv");
+  const [marcadoresAudience, setMarcadoresAudience] = useState<ParsedBroadcastRecipient[]>([]);
+  const [audienceSource, setAudienceSource] = useState<"csv" | "bridge" | "selecao" | "marcadores">("csv");
 
   async function loadCampaigns() {
     setLoading(true);
@@ -63,6 +77,7 @@ export function BroadcastManagement() {
   useEffect(() => {
     loadCampaigns();
     clinicHasBridgeAudience().then(setHasBridge).catch(() => {});
+    listMarcadoresAudience().then(setMarcadoresAudience).catch(() => {});
     // N4: "Enviar disparo" da lista de pacientes chega com ?selecao=1 e a seleção no
     // sessionStorage — vira o público desta campanha (lido uma vez e apagado).
     if (new URLSearchParams(window.location.search).get("selecao") === "1") {
@@ -80,9 +95,9 @@ export function BroadcastManagement() {
     }
   }, []);
 
-  function switchSource(next: "csv" | "bridge" | "selecao") {
+  function switchSource(next: "csv" | "bridge" | "selecao" | "marcadores") {
     setAudienceSource(next);
-    setRecipients([]);
+    setRecipients(next === "marcadores" ? marcadoresAudience : []);
     setCsvText("");
     setCsvError(null);
   }
@@ -262,13 +277,14 @@ export function BroadcastManagement() {
           )}
         </div>
 
-        {hasBridge && (
+        {(hasBridge || marcadoresAudience.length > 0) && (
           <div>
             <p className="text-xs font-medium text-slate-600 dark:text-slate-400">Público</p>
             <div className="mt-1 inline-flex rounded-lg border border-slate-200 dark:border-slate-800 p-0.5 text-xs">
               {(
                 [
-                  ["bridge", "Pacientes do sistema da clínica"],
+                  ...(hasBridge ? ([["bridge", "Pacientes do sistema da clínica"]] as const) : []),
+                  ...(marcadoresAudience.length > 0 ? ([["marcadores", `Marcadores (${marcadoresAudience.length})`]] as const) : []),
                   ["csv", "Lista CSV"],
                 ] as const
               ).map(([value, label]) => (
@@ -297,6 +313,29 @@ export function BroadcastManagement() {
             <button type="button" onClick={() => switchSource("csv")} className="text-sm font-medium underline underline-offset-2 text-emerald-900 dark:text-emerald-200">
               Trocar público
             </button>
+          </div>
+        ) : audienceSource === "marcadores" ? (
+          <div className="rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 p-3 text-sm space-y-1">
+            <p className="text-emerald-900 dark:text-emerald-200">
+              Público: <strong>{recipients.length} marcador(es) ativo(s)</strong> — cadastro em Marcadores.
+            </p>
+            <p className="text-emerald-900/80 dark:text-emerald-200/80">
+              Use {"{{nome}}"} para o nome e {"{{link}}"} para o link pessoal de cada um: os pacientes que chegarem por ele contam no
+              relatório do marcador.
+            </p>
+            <p className="text-emerald-900/80 dark:text-emerald-200/80">
+              Envio protegido contra bloqueio: 1 mensagem a cada 4–6 min, de segunda a sexta das 9h às 17h, intercalada com os lembretes
+              — {recipients.length} marcadores levam cerca de {Math.ceil((recipients.length * 5) / 60)}h a {Math.ceil((recipients.length * 10) / 60)}h.
+            </p>
+            {!template.trim() && (
+              <button
+                type="button"
+                onClick={() => setTemplate(MARCADORES_TEMPLATE)}
+                className="font-semibold text-emerald-800 dark:text-emerald-300 underline underline-offset-2"
+              >
+                Usar modelo de aviso de novos médicos
+              </button>
+            )}
           </div>
         ) : audienceSource === "bridge" ? (
           <BridgeAudiencePicker onRecipients={setRecipients} />

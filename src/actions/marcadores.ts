@@ -145,3 +145,17 @@ export async function updateMarcador(id: string, input: { name?: string; phone?:
   revalidatePath("/clinic/marcadores");
   return { success: true as const };
 }
+
+/** Público "Marcadores" pro Disparos: marcadores ativos, com {{nome}} e {{link}} (link
+ * pessoal com o código — quem o marcador mandar entra no relatório dele). */
+export async function listMarcadoresAudience(): Promise<{ phone: string; variables: Record<string, string> }[]> {
+  const { clinicId } = await requireClinicSession();
+  const [clinic, marcadores] = await Promise.all([
+    prisma.clinic.findUnique({ where: { id: clinicId }, select: { whatsapp: true } }),
+    prisma.marcador.findMany({ where: { clinicId, active: true }, orderBy: { name: "asc" } }),
+  ]);
+  return marcadores.map((m) => ({
+    phone: m.phone,
+    variables: { nome: m.name, link: clinic?.whatsapp ? buildMarcadorLink(clinic.whatsapp, m) : "" },
+  }));
+}
