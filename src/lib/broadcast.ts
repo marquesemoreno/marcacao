@@ -5,10 +5,9 @@ import { getSignedMediaUrl } from "@/lib/whatsapp-media";
 import { buildBroadcastMessage } from "@/lib/broadcast-csv";
 import { RESCHEDULE_PENDING_TAG } from "@/lib/conversation-tags";
 import { lastAutomatedSend } from "@/lib/automated-pacing-server";
-import { lowPriorityMustYield } from "@/lib/automated-pacing";
-import { isMarketingGapElapsed, isWithinMarketingWindow, MARKETING_DAILY_CAP, startOfBrazilDay, URGENT_MAX_IMMEDIATE } from "@/lib/broadcast-schedule";
+import { isWithinReminderWindow, lowPriorityMustYield } from "@/lib/automated-pacing";
+import { isMarketingGapElapsed, isWithinMarketingWindow, MARKETING_DAILY_CAP, startOfBrazilDay } from "@/lib/broadcast-schedule";
 
-const BATCH_SIZE = Number(process.env.BROADCAST_BATCH_SIZE) || 3;
 
 function randomDelayMs(): number {
   return 1500 + Math.floor(Math.random() * 1500);
@@ -29,14 +28,17 @@ export async function dispatchNextBatch(): Promise<{ processed: number }> {
   for (const campaign of campaigns) {
     // Marketing (tudo que não é aviso de remarcação, com ou sem tag de acompanhamento): só
     // seg–sex 09–17h, 1 por vez com 4–6 min sorteados desde a última enviada e no máximo
-    // MARKETING_DAILY_CAP por dia. Aviso de remarcação é urgente e mantém o ritmo antigo.
-    // Aviso de remarcação grande (> URGENT_MAX_IMMEDIATE) também entra no ritmo seguro —
-    // decisão do usuário em 15/10/2026, depois do envio por engano de 06/10.
-    const isMarketing =
-      campaign.tagOnSend !== RESCHEDULE_PENDING_TAG ||
-      (await prisma.broadcastRecipient.count({ where: { campaignId: campaign.id } })) > URGENT_MAX_IMMEDIATE;
-    let take = BATCH_SIZE;
-    if (isMarketing) {
+    // MARKETING_DAILY_CAP por dia.
+    const isMarketing = campaign.tagOnSend !== RESCHEDULE_PENDING_TAG;
+    const take = 1;
+    if (!isMarketing) {
+      // Aviso urgente de remarcação: também 1 a cada 4–6 min, no intervalo único da clínica
+      // (decisão do usuário em 15/10/2026, pra evitar bloqueio), mas sem esperar o horário
+      // das campanhas — sai das 08h às 18h todo dia, como os lembretes, e sem limite diário.
+      if (!isWithinReminderWindow(now)) continue;
+      const last = await lastAutomatedSend(campaign.clinicId);
+      if (!isMarketingGapElapsed(last.at, now, Math.random())) continue;
+    } else {
       if (!isWithinMarketingWindow(now)) continue;
       const sentToday = await prisma.broadcastRecipient.count({
         where: { campaignId: campaign.id, status: "SENT", sentAt: { gte: startOfBrazilDay(now) } },
@@ -58,7 +60,6 @@ export async function dispatchNextBatch(): Promise<{ processed: number }> {
       // tipo (lembrete D-1 ou campanha) — nunca saem juntos (ver automated-pacing.ts).
       const last = await lastAutomatedSend(campaign.clinicId);
       if (!isMarketingGapElapsed(last.at, now, Math.random())) continue;
-      take = 1;
     }
     const recipients = await prisma.broadcastRecipient.findMany({
       where: { campaignId: campaign.id, status: "PENDING" },

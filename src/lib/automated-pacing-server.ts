@@ -3,9 +3,9 @@ import { prisma } from "@/lib/prisma";
 import { RESCHEDULE_PENDING_TAG } from "@/lib/conversation-tags";
 import { isWithinMarketingWindow, MARKETING_DAILY_CAP, startOfBrazilDay } from "@/lib/broadcast-schedule";
 
-/** Última mensagem automática da clínica — lembrete D-1 ou campanha de marketing (o aviso
- * de remarcação fica de fora: é urgente e tem ritmo próprio). Base do intervalo único de
- * 4–6 min entre mensagens automáticas (ver automated-pacing.ts). */
+/** Última mensagem automática da clínica — lembrete D-1, campanha ou aviso urgente de
+ * remarcação (desde 15/10/2026 o aviso também respeita o intervalo). Base do intervalo
+ * único de 4–6 min entre mensagens automáticas (ver automated-pacing.ts). */
 export async function lastAutomatedSend(clinicId: string): Promise<{ at: Date | null; kind: "reminder" | "campaign" | null }> {
   const [reminder, campaign] = await Promise.all([
     prisma.bridgeReminderLog.findFirst({ where: { clinicId }, orderBy: { sentAt: "desc" }, select: { sentAt: true } }),
@@ -13,7 +13,7 @@ export async function lastAutomatedSend(clinicId: string): Promise<{ at: Date | 
       where: {
         status: "SENT",
         sentAt: { not: null },
-        campaign: { clinicId, OR: [{ tagOnSend: null }, { tagOnSend: { not: RESCHEDULE_PENDING_TAG } }] },
+        campaign: { clinicId },
       },
       orderBy: { sentAt: "desc" },
       select: { sentAt: true },

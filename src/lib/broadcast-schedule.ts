@@ -7,10 +7,6 @@ const BRAZIL_OFFSET_MS = 3 * 3_600_000;
 
 export const MARKETING_START_HOUR = 9;
 export const MARKETING_END_HOUR = 17;
-/** Aviso urgente de remarcação sai na hora só até este tamanho; acima, segue o ritmo
- * seguro das campanhas (decisão do usuário em 15/10/2026). */
-export const URGENT_MAX_IMMEDIATE = 40;
-
 /** Máximo por campanha por dia (~1 a cada 4–6 min em 8h dá ~95). */
 export const MARKETING_DAILY_CAP = 100;
 

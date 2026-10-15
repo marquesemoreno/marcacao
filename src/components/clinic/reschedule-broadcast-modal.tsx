@@ -7,7 +7,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { getDistinctDoctorNames, getAppointmentsByDoctorAndDate } from "@/actions/clinic";
 import { createRescheduleBroadcast } from "@/actions/clinic-broadcast";
-import { URGENT_MAX_IMMEDIATE } from "@/lib/broadcast-schedule";
 
 const DEFAULT_TEMPLATE =
   "Olá {{nome}}, informamos que por motivo de força maior, o Dr(a). {{medico}} não poderá atender no dia {{data}}. Para sua comodidade, você tem prioridade para remarcação. Responda esta mensagem para escolhermos um novo horário.";
@@ -89,8 +88,7 @@ export function RescheduleBroadcastModal({ open, onOpenChange }: { open: boolean
 
         <div className="space-y-4">
           <p className="text-sm text-slate-600 dark:text-slate-400">
-            Para quando o médico desmarca um dia: avisa todos os pacientes dele naquela data. Até {URGENT_MAX_IMMEDIATE} pacientes sai na hora; acima
-            disso, no ritmo seguro.
+            Para quando o médico desmarca um dia: avisa todos os pacientes dele naquela data, 1 a cada 4–6 min (das 8h às 18h, todo dia).
           </p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
@@ -188,14 +186,12 @@ export function RescheduleBroadcastModal({ open, onOpenChange }: { open: boolean
           {confirming ? (
             <div role="alertdialog" aria-labelledby="reschedule-confirm-title" className="rounded-lg border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/40 p-3 space-y-3">
               <p id="reschedule-confirm-title" className="text-sm font-semibold text-amber-900 dark:text-amber-200">
-                {preview.length > URGENT_MAX_IMMEDIATE ? `Enviar para ${preview.length} pacientes no ritmo seguro?` : `Enviar agora para ${preview.length} paciente(s)?`}
+                {`Enviar para ${preview.length} paciente(s)?`}
               </p>
               <p className="text-xs text-amber-900 dark:text-amber-200">
                 Avisa que {doctorName} não atenderá em{" "}
                 {date ? new Date(`${date}T12:00:00Z`).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : ""}.{" "}
-                {preview.length > URGENT_MAX_IMMEDIATE
-                  ? `Como são mais de ${URGENT_MAX_IMMEDIATE}, o aviso sai no ritmo seguro (1 a cada 4–6 min, seg–sex 9h–17h) para proteger o número da clínica.`
-                  : "O aviso sai na hora, fora do ritmo seguro das campanhas, e não pode ser desfeito."}
+                {`Sai 1 mensagem a cada 4–6 min (das 8h às 18h, todo dia) para proteger o número da clínica — cerca de ${Math.max(1, Math.round((preview.length * 5) / 60))}h para todos. Não pode ser desfeito.`}
               </p>
               <div className="flex items-center justify-end gap-2">
                 <button

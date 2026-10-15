@@ -6,7 +6,7 @@ import { requireClinicSession } from "@/lib/session";
 import { formatToWhatsAppNumber } from "@/lib/whatsapp";
 import { uploadWhatsAppMedia } from "@/lib/whatsapp-media";
 import { buildBroadcastMessage, type ParsedBroadcastRecipient } from "@/lib/broadcast-csv";
-import { campaignSituation, estimateCampaignFinish, startOfBrazilDay, unfilledPlaceholders, unknownTemplateVariables, URGENT_MAX_IMMEDIATE } from "@/lib/broadcast-schedule";
+import { campaignSituation, estimateCampaignFinish, startOfBrazilDay, unfilledPlaceholders, unknownTemplateVariables } from "@/lib/broadcast-schedule";
 import { RESCHEDULE_PENDING_TAG } from "@/lib/conversation-tags";
 import { formatDate } from "@/lib/format";
 import { fetchBridgeCampaignPatients } from "@/lib/hospital-bridge";
@@ -43,8 +43,7 @@ export async function listClinicBroadcastCampaigns() {
     const pending = c.recipients.filter((r) => r.status === "PENDING").length;
     const sentToday = c.recipients.filter((r) => r.status === "SENT" && r.sentAt && r.sentAt >= dayStart).length;
     const yielding = c.lowPriority && highPriorityPending;
-    // Aviso de remarcação pequeno sai na hora; acima de URGENT_MAX_IMMEDIATE segue o ritmo seguro.
-    const isReschedule = c.tagOnSend === RESCHEDULE_PENDING_TAG && c._count.recipients <= URGENT_MAX_IMMEDIATE;
+    const isReschedule = c.tagOnSend === RESCHEDULE_PENDING_TAG;
     // Campanhas normais ativas se revezam no mesmo ritmo da clínica (ver automated-pacing).
     const sharing = c.lowPriority ? 1 : Math.max(1, highPriorityActive);
     const estimate = isReschedule ? { businessDays: 0, finishIso: null } : estimateCampaignFinish({ pending, sentToday, now, sharing });
@@ -62,7 +61,7 @@ export async function listClinicBroadcastCampaigns() {
       skipped,
       pending,
       situation: isReschedule && c.status === "RUNNING" && pending > 0
-        ? { tone: "ok" as const, text: "Enviando aviso urgente de remarcação" }
+        ? { tone: "ok" as const, text: "Enviando aviso urgente — 1 a cada 4–6 min, das 8h às 18h" }
         : campaignSituation({ status: c.status, pending, sentToday, yielding, now, sharing }),
       finishIso: c.status === "COMPLETED" ? null : estimate.finishIso,
       businessDays: estimate.businessDays,
