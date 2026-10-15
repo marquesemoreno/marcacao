@@ -1,7 +1,7 @@
 "use client";
 
 import { PageHeader } from "@/components/clinic/page-header";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Search, MessageCircle, UserPlus, Upload, X, Eye } from "lucide-react";
 import { toast } from "sonner";
@@ -13,7 +13,10 @@ import {
   updateContactInfo,
   updateConversationTags,
   listContactMedia,
+  listChatAgents,
+  type ContactsListParams,
 } from "@/actions/inbox";
+import { PATIENT_SORTS, type PatientSort } from "@/lib/patient-list";
 import {
   listAllContactsAdmin,
   createContactAdmin,
@@ -106,6 +109,12 @@ export function ContactsApp({ scope, basePath }: { scope: Scope; basePath: strin
   const page = Math.max(1, Number(searchParams.get("page")) || 1);
   const convenioFilter = searchParams.get("convenio") ?? "";
   const doctorFilter = searchParams.get("doctor") ?? "";
+  const stageFilter = searchParams.get("etapa") ?? "";
+  const ownerFilter = searchParams.get("atendente") ?? "";
+  const sortParam = (searchParams.get("ordem") as PatientSort | null) ?? "espera";
+  const sort: PatientSort = PATIENT_SORTS.some((s) => s.id === sortParam) ? sortParam : "espera";
+  const [loadError, setLoadError] = useState(false);
+  const [agents, setAgents] = useState<{ id: string; name: string }[]>([]);
   const [search, setSearch] = useState(urlQ);
   const [total, setTotal] = useState(0);
   const [contacts, setContacts] = useState<ContactRow[]>([]);
@@ -157,24 +166,44 @@ export function ContactsApp({ scope, basePath }: { scope: Scope; basePath: strin
     return () => clearTimeout(timeout);
   }, [search, urlQ, updateParams]);
 
+  const listParams: ContactsListParams = useMemo(
+    () => ({
+      q: urlQ || undefined,
+      page,
+      convenio: convenioFilter || undefined,
+      doctor: doctorFilter || undefined,
+      stage: stageFilter || undefined,
+      owner: ownerFilter || undefined,
+      sort,
+    }),
+    [urlQ, page, convenioFilter, doctorFilter, stageFilter, ownerFilter, sort]
+  );
+
   const fetchContacts = useCallback(async () => {
     if (scope === "admin") {
       const all = await listAllContactsAdmin(urlQ || undefined);
       setContacts(all);
       setTotal(all.length);
     } else {
-      const result = await listContactsPage({ q: urlQ || undefined, page, convenio: convenioFilter || undefined, doctor: doctorFilter || undefined });
+      const result = await listContactsPage(listParams);
       setContacts(result.rows);
       setTotal(result.total);
     }
-  }, [scope, urlQ, page, convenioFilter, doctorFilter]);
+  }, [scope, urlQ, listParams]);
 
   useEffect(() => {
     let cancelled = false;
     setIsLoading(true);
-    fetchContacts().finally(() => {
-      if (!cancelled) setIsLoading(false);
-    });
+    setLoadError(false);
+    // Erro de carregamento nunca vira "nenhum paciente" (crítica 15/10/2026) — a tela
+    // diz que não carregou e oferece tentar de novo.
+    fetchContacts()
+      .catch(() => {
+        if (!cancelled) setLoadError(true);
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
     return () => {
       cancelled = true;
     };
@@ -186,6 +215,7 @@ export function ContactsApp({ scope, basePath }: { scope: Scope; basePath: strin
     } else {
       getDistinctConvenios().then(setConvenios).catch(() => {});
       getDistinctDoctorNames().then(setDoctors).catch(() => {});
+      listChatAgents().then((a) => setAgents(a.map((x) => ({ id: x.id, name: x.name })))).catch(() => {});
     }
   }, [scope]);
 
@@ -296,7 +326,15 @@ export function ContactsApp({ scope, basePath }: { scope: Scope; basePath: strin
     <div className="flex-1 space-y-5 overflow-y-auto p-4 sm:p-6 font-sans text-slate-900 dark:text-slate-100">
       <PageHeader
         title="Pacientes"
-        subtitle={isLoading && total === 0 ? "Carregando…" : `${total} paciente${total === 1 ? "" : "s"}${urlQ || convenioFilter || doctorFilter ? " com os filtros atuais" : ""}`}
+        subtitle={
+          loadError
+            ? "Não foi possível carregar"
+            : isLoading && total === 0
+              ? "Carregando…"
+              : `${total} paciente${total === 1 ? "" : "s"}${urlQ || convenioFilter || doctorFilter || stageFilter || ownerFilter ? " com os filtros atuais" : ""}${
+                  scope === "clinic" && sort === "espera" ? " · quem espera resposta aparece primeiro" : ""
+                }`
+        }
         actions={
         <div className="flex shrink-0 items-center gap-2">
           {scope === "admin" && (
@@ -304,14 +342,14 @@ export function ContactsApp({ scope, basePath }: { scope: Scope; basePath: strin
               onClick={() => setIsImportModalOpen(true)}
               className="flex items-center gap-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 px-3.5 py-2 text-xs font-medium text-slate-700 dark:text-slate-300 transition-all shadow-xs"
             >
-              <Upload className="size-4" /> Importar Contatos
+              <Upload className="size-4" aria-hidden /> Importar contatos
             </button>
           )}
           <button
             onClick={() => setIsModalOpen(true)}
             className="flex items-center gap-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 px-3.5 py-2 text-xs font-medium text-white transition-all shadow-xs"
           >
-            <UserPlus className="size-4" /> Novo Contato
+            <UserPlus className="size-4" aria-hidden /> Novo paciente
           </button>
         </div>
         }
@@ -323,12 +361,52 @@ export function ContactsApp({ scope, basePath }: { scope: Scope; basePath: strin
           <input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            placeholder="Buscar por nome, telefone, CPF ou convênio..."
-            className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 py-2.5 pl-9 pr-3 text-sm outline-none transition-all focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:focus:ring-slate-700"
+            aria-label="Buscar pacientes"
+            placeholder="Buscar por nome, telefone, CPF ou convênio…"
+            className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 py-2.5 pl-9 pr-3 text-sm outline-none transition-all focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
           />
         </div>
         {scope === "clinic" && (
           <>
+            <select
+              aria-label="Ordenar"
+              value={sort}
+              onChange={(e) => updateParams({ ordem: e.target.value === "espera" ? null : e.target.value, page: null })}
+              className="h-9 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2.5 text-sm text-slate-700 dark:text-slate-300"
+            >
+              {PATIENT_SORTS.map((s) => (
+                <option key={s.id} value={s.id}>
+                  Ordem: {s.label}
+                </option>
+              ))}
+            </select>
+            <select
+              aria-label="Filtrar por etapa"
+              value={stageFilter}
+              onChange={(e) => updateParams({ etapa: e.target.value, page: null })}
+              className="h-9 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2.5 text-sm text-slate-700 dark:text-slate-300"
+            >
+              <option value="">Todas as etapas</option>
+              <option value="NOVOS">Novo</option>
+              <option value="TRIAGEM">Em atendimento</option>
+              <option value="ORCAMENTO">Orçamento</option>
+              <option value="AGENDADO">Agendado</option>
+              <option value="FINALIZADO">Finalizado</option>
+            </select>
+            <select
+              aria-label="Filtrar por atendente"
+              value={ownerFilter}
+              onChange={(e) => updateParams({ atendente: e.target.value, page: null })}
+              className="h-9 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2.5 text-sm text-slate-700 dark:text-slate-300"
+            >
+              <option value="">Todas as atendentes</option>
+              <option value="sem_dono">Sem dono</option>
+              {agents.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name}
+                </option>
+              ))}
+            </select>
             {convenios.length > 0 && (
             <select
               aria-label="Filtrar por convênio"
@@ -370,7 +448,21 @@ export function ContactsApp({ scope, basePath }: { scope: Scope; basePath: strin
         <PatientListTable
           rows={filteredContacts}
           isLoading={isLoading}
-          emptyMessage={urlQ || convenioFilter || doctorFilter ? "Nenhum paciente encontrado para esse filtro." : "Nenhum paciente cadastrado ainda."}
+          loadError={loadError}
+          onRetry={() => {
+            setIsLoading(true);
+            setLoadError(false);
+            fetchContacts()
+              .catch(() => setLoadError(true))
+              .finally(() => setIsLoading(false));
+          }}
+          total={total}
+          listParams={listParams}
+          emptyMessage={
+            urlQ || convenioFilter || doctorFilter || stageFilter || ownerFilter
+              ? "Nenhum paciente encontrado para esse filtro."
+              : "Nenhum paciente ainda. Os pacientes aparecem aqui quando falam com a clínica pelo WhatsApp ou Instagram, ou quando você cadastra em “Novo paciente”."
+          }
           onChanged={fetchContacts}
         />
       ) : (

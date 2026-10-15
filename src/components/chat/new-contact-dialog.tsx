@@ -126,7 +126,7 @@ export function NewContactDialog({
         <DialogHeader>
           <DialogTitle className="text-base font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-2">
             <UserPlus className="w-4 h-4 text-emerald-600" />
-            Novo contato
+            Novo paciente
           </DialogTitle>
         </DialogHeader>
 

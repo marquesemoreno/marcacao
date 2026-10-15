@@ -1,11 +1,12 @@
 "use server";
 
+import { sortPatientList, type PatientSort } from "@/lib/patient-list";
 import { CHAT_LIMIT_ENABLED } from "@/lib/chat-limit";
 import { getAttendantLoad } from "@/lib/attendant-load-server";
 
 import { parseNewContactExtra, type NewContactExtra } from "@/lib/new-contact-extra";
 import { revalidatePath } from "next/cache";
-import { ConversationStatus, Prisma } from "@prisma/client";
+import { ConversationStatus, Prisma, type ConversationFunnelStage } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireClinicSession } from "@/lib/session";
 import { assertCanSendText, dispatchOutboundText, requireWhatsAppPhone } from "@/lib/outbound-dispatch";
@@ -184,12 +185,22 @@ async function buildContactRows(conversations: ContactConversation[], clinicId: 
 
 const CONTACTS_PAGE_SIZE = 50;
 
-/** F3 — tabela de Contatos paginada no servidor (50 por página), com busca e filtros
- * no banco. Antes a tela carregava todos (833 linhas) e filtrava no navegador. O filtro
- * de médico é pelo médico da ÚLTIMA consulta, mesma regra da coluna exibida. */
-export async function listContactsPage(params: { q?: string; page?: number; convenio?: string; doctor?: string }) {
-  const { clinicId } = await requireClinicSession();
-  const page = Math.max(1, Math.floor(params.page ?? 1));
+export type ContactsListParams = {
+  q?: string;
+  page?: number;
+  convenio?: string;
+  doctor?: string;
+  /** NOVOS | TRIAGEM | ORCAMENTO | AGENDADO | FINALIZADO */
+  stage?: string;
+  /** id do atendente ou "sem_dono" */
+  owner?: string;
+  sort?: PatientSort;
+};
+
+/** Monta o filtro e devolve TODAS as conversas que batem, já ordenadas (ver
+ * sortPatientList) — a paginação/seleção acontece em cima disso. "Esperando resposta" =
+ * conversa aberta cuja última mensagem (sem nota interna) é do paciente. */
+async function filteredSortedConversations(clinicId: string, params: ContactsListParams) {
   const q = params.q?.trim();
   const qDigits = q?.replace(/\D/g, "");
 
@@ -219,31 +230,104 @@ export async function listContactsPage(params: { q?: string; page?: number; conv
   if (params.convenio) contactFilters.push({ convenio: { equals: params.convenio, mode: "insensitive" } });
   if (doctorPhones) contactFilters.push({ phone: { in: doctorPhones } });
 
-  const where: Prisma.ConversationWhereInput = { clinicId, ...(contactFilters.length ? { contact: { AND: contactFilters } } : {}) };
-  const [total, conversations] = await Promise.all([
-    prisma.conversation.count({ where }),
-    prisma.conversation.findMany({
-      where,
-      include: { contact: true, assignedUser: { select: { name: true } } },
-      orderBy: { contact: { name: "asc" } },
-      skip: (page - 1) * CONTACTS_PAGE_SIZE,
-      take: CONTACTS_PAGE_SIZE,
-    }),
-  ]);
-  // N4: colunas da lista de pacientes (etapa, interesse/origem, última interação, atendente).
+  const stageFilter: Prisma.ConversationWhereInput =
+    params.stage === "FINALIZADO"
+      ? { status: "RESOLVED" }
+      : params.stage && ["NOVOS", "TRIAGEM", "ORCAMENTO", "AGENDADO"].includes(params.stage)
+        ? { status: { not: "RESOLVED" }, funnelStage: params.stage as ConversationFunnelStage }
+        : {};
+  const ownerFilter: Prisma.ConversationWhereInput =
+    params.owner === "sem_dono" ? { assignedUserId: null } : params.owner ? { assignedUserId: params.owner } : {};
+
+  const where: Prisma.ConversationWhereInput = {
+    clinicId,
+    ...stageFilter,
+    ...ownerFilter,
+    ...(contactFilters.length ? { contact: { AND: contactFilters } } : {}),
+  };
+  const all = await prisma.conversation.findMany({
+    where,
+    select: { id: true, status: true, lastMessageAt: true, createdAt: true, contact: { select: { name: true, phone: true, instagramUsername: true } } },
+  });
+
+  // Última mensagem (sem nota) de cada conversa aberta, numa consulta só.
+  const openIds = all.filter((c) => c.status !== "RESOLVED").map((c) => c.id);
+  const lastRows = openIds.length
+    ? await prisma.$queryRaw<{ conversation_id: string; direction: string; created_at: Date }[]>`
+        SELECT DISTINCT ON (conversation_id) conversation_id, direction::text AS direction, created_at
+        FROM messages
+        WHERE conversation_id = ANY(${openIds}) AND type <> 'INTERNAL_NOTE' AND deleted_at IS NULL
+        ORDER BY conversation_id, created_at DESC`
+    : [];
+  const waitingSinceOf = new Map(lastRows.filter((r) => r.direction === "INBOUND").map((r) => [r.conversation_id, r.created_at]));
+
+  const items = all.map((c) => ({
+    id: c.id,
+    name: c.contact.name,
+    phone: c.contact.phone,
+    instagramUsername: c.contact.instagramUsername,
+    lastAt: c.lastMessageAt ?? c.createdAt,
+    waitingSince: waitingSinceOf.get(c.id) ?? null,
+  }));
+  return sortPatientList(items, params.sort ?? "espera");
+}
+
+/** F3/N4 — tabela de Pacientes paginada no servidor (50 por página): busca, filtros
+ * (convênio, médico da última consulta, etapa, atendente) e ordenação ("esperando
+ * resposta" por padrão). */
+export async function listContactsPage(params: ContactsListParams) {
+  const { clinicId } = await requireClinicSession();
+  const page = Math.max(1, Math.floor(params.page ?? 1));
+  const sorted = await filteredSortedConversations(clinicId, params);
+  const total = sorted.length;
+  const pageItems = sorted.slice((page - 1) * CONTACTS_PAGE_SIZE, page * CONTACTS_PAGE_SIZE);
+  const ids = pageItems.map((i) => i.id);
+
+  const found = await prisma.conversation.findMany({
+    where: { id: { in: ids } },
+    include: { contact: true, assignedUser: { select: { name: true } } },
+  });
+  const byId = new Map(found.map((c) => [c.id, c]));
+  const conversations = ids.map((id) => byId.get(id)!).filter(Boolean);
+
+  // Paciente que está na agenda do sistema da clínica (recebeu lembrete da ponte).
+  const tails = conversations.map((c) => (c.contact.phone ?? "").replace(/\D/g, "").slice(-8)).filter((t) => t.length === 8);
+  const inClinicSystem = new Set(
+    tails.length
+      ? (
+          await prisma.bridgeReminderLog.findMany({
+            where: { clinicId, OR: tails.map((t) => ({ phone: { endsWith: t } })) },
+            select: { phone: true },
+          })
+        ).map((r) => (r.phone ?? "").replace(/\D/g, "").slice(-8))
+      : []
+  );
+
   const base = await buildContactRows(conversations, clinicId);
+  const waitingOf = new Map(pageItems.map((i) => [i.id, i.waitingSince]));
   const rows = base.map((row, i) => {
     const c = conversations[i];
+    const tail = (c.contact.phone ?? "").replace(/\D/g, "").slice(-8);
     return {
       ...row,
       funnelStage: c.funnelStage,
       acquisitionChannel: c.acquisitionChannel,
       lastInteractionAt: (c.lastMessageAt ?? c.createdAt).toISOString(),
+      waitingSince: waitingOf.get(c.id)?.toISOString() ?? null,
       attendant: c.assignedUser?.name ?? null,
       instagramUsername: c.contact.instagramUsername,
+      inClinicSystem: tail.length === 8 && inClinicSystem.has(tail),
     };
   });
   return { rows, total, page, pageSize: CONTACTS_PAGE_SIZE };
+}
+
+/** "Selecionar todos os N do filtro": conversa, nome e telefone de todos os resultados
+ * (não só da página) — base pra Enviar disparo / Atribuir em massa. */
+export async function listContactsSelection(params: ContactsListParams) {
+  const { clinicId } = await requireClinicSession();
+  const sorted = await filteredSortedConversations(clinicId, params);
+  return sorted.map((i) => ({ conversationId: i.id, name: i.name, phone: i.phone ?? "", instagramUsername: i.instagramUsername }));
 }
 
 /** Lista conversas-destino pra "Reencaminhar mensagem" — só da mesma clínica da
