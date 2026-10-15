@@ -194,6 +194,8 @@ export type ContactsListParams = {
   stage?: string;
   /** id do atendente ou "sem_dono" */
   owner?: string;
+  /** resolutionReason (link do relatório: "Por que as conversas terminaram") */
+  reason?: string;
   sort?: PatientSort;
 };
 
@@ -243,6 +245,7 @@ async function filteredSortedConversations(clinicId: string, params: ContactsLis
     clinicId,
     ...stageFilter,
     ...ownerFilter,
+    ...(params.reason ? { status: "RESOLVED", resolutionReason: params.reason } : {}),
     ...(contactFilters.length ? { contact: { AND: contactFilters } } : {}),
   };
   const all = await prisma.conversation.findMany({

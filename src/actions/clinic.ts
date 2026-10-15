@@ -5,7 +5,7 @@ import type { AppointmentStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireClinicSession } from "@/lib/session";
 import { startOfUTCDay, addUTCDays } from "@/lib/date";
-import { reportWindow } from "@/lib/report-period";
+import { periodWindow, type PeriodKey } from "@/lib/report-period";
 import { computeCampaignStats, phoneKey, type CampaignStats } from "@/lib/campaign-report";
 import { RESCHEDULE_PENDING_TAG as CAMPAIGN_RESCHEDULE_TAG } from "@/lib/conversation-tags";
 import {
@@ -27,6 +27,7 @@ import {
   computeChannelConversion,
   UNIDENTIFIED_CHANNEL,
   computeResponseStats,
+  computeOutcomes,
 } from "@/lib/report-metrics";
 
 export async function getClinicInfo() {
@@ -72,11 +73,11 @@ export async function listClinicAppointments(filters?: { status?: AppointmentSta
 /** Nomes distintos de tags usadas nas conversas da clínica no período — popula o
  * filtro "Tags" do relatório (ver /clinic/relatorio). Simples lista pra filtro, não
  * é gestão de tags (essa feature foi removida — ver memória do projeto). */
-export async function getDistinctConversationTags(days: number = 30) {
+export async function getDistinctConversationTags(period: PeriodKey = "30") {
   const { clinicId } = await requireClinicSession();
-  const since = addUTCDays(startOfUTCDay(new Date()), -days);
+  const { since, until } = periodWindow(period, false);
   const conversations = await prisma.conversation.findMany({
-    where: { clinicId, createdAt: { gte: since }, tags: { isEmpty: false } },
+    where: { clinicId, createdAt: { gte: since, ...(until ? { lt: until } : {}) }, tags: { isEmpty: false } },
     select: { tags: true },
   });
   return [...new Set(conversations.flatMap((c) => c.tags))].sort();
@@ -94,10 +95,10 @@ function channelWhere(channel?: string) {
   return { acquisitionChannel: channel === UNIDENTIFIED_CHANNEL ? null : channel };
 }
 
-export async function getClinicChatReport(days: number = 30, tags?: string[], channel?: string, previous = false) {
+export async function getClinicChatReport(period: PeriodKey = "30", tags?: string[], channel?: string, previous = false) {
   const { clinicId } = await requireClinicSession();
-  // `previous` = mesma janela imediatamente antes (comparação no relatório).
-  const { since, until } = reportWindow(days, previous);
+  // `previous` = janela de comparação (mesmo tamanho logo antes, ou o mês anterior).
+  const { since, until } = periodWindow(period, previous);
   const inWindow = { gte: since, ...(until ? { lt: until } : {}) };
   const tagsFilter = { ...(tags && tags.length > 0 ? { tags: { hasSome: tags } } : {}), ...channelWhere(channel) };
 
@@ -112,14 +113,18 @@ export async function getClinicChatReport(days: number = 30, tags?: string[], ch
     // abertas há semanas e resolvidas só agora, distorcendo a média de resolução pra
     // muito acima da realidade (bug real: média de 118h só por causa de 1 conversa velha).
     prisma.conversationQualityAudit.findMany({
-      where: { conversation: { clinicId, createdAt: inWindow, ...tagsFilter } },
+      // Administrativas fora também aqui — antes entravam no SLA, medianas e sentimento.
+      where: { conversation: { clinicId, createdAt: inWindow, ...tagsFilter, AND: [NOT_ADMINISTRATIVE] } },
       select: { sentiment: true, firstResponseSec: true, resolutionSec: true },
     }),
   ]);
 
-  const totalResolved = conversations.filter((c) => c.status === "RESOLVED").length;
+  const outcomes = computeOutcomes(conversations);
+  const totalResolved = outcomes.resolved;
   const totalAgendados = conversations.filter((c) => c.resolutionReason === "AGENDAMENTO_CONCLUIDO").length;
-  const conversionRate = totalResolved > 0 ? Math.round((totalAgendados / totalResolved) * 1000) / 10 : 0;
+  // Base = conversas com desfecho (sem inatividade/sem resposta) — ver NO_OUTCOME_REASONS.
+  const conversionRate =
+    outcomes.withOutcome > 0 ? Math.round((totalAgendados / outcomes.withOutcome) * 1000) / 10 : null;
 
   const withFrt = audits.filter((a) => a.firstResponseSec !== null);
   // Resolução só entra na média se a conversa teve resposta de verdade (firstResponseSec
@@ -172,6 +177,7 @@ export async function getClinicChatReport(days: number = 30, tags?: string[], ch
     totalResolved,
     totalAgendados,
     conversionRate,
+    outcomes,
     avgFrtSec,
     avgTtrSec,
     sentimentPositivePct: sentimentPct("POSITIVO"),
@@ -186,14 +192,14 @@ export async function getClinicChatReport(days: number = 30, tags?: string[], ch
  * `doctorName`/`procedureId`, quando informados, filtram os agendamentos — só fazem
  * sentido aqui (não no relatório de chat): não existe vínculo entre Conversation e
  * Appointment no banco, então médico/procedimento não dá pra filtrar conversas. */
-export async function getClinicAppointmentsReport(days: number = 30, doctorName?: string, procedureId?: string) {
+export async function getClinicAppointmentsReport(period: PeriodKey = "30", doctorName?: string, procedureId?: string) {
   const { clinicId } = await requireClinicSession();
-  const since = addUTCDays(startOfUTCDay(new Date()), -days);
+  const { since, until } = periodWindow(period, false);
 
   const appointments = await prisma.appointment.findMany({
     where: {
       clinicProcedure: { clinicId, ...(procedureId ? { procedureId } : {}) },
-      createdAt: { gte: since },
+      createdAt: { gte: since, ...(until ? { lt: until } : {}) },
       ...(doctorName ? { doctorName } : {}),
     },
     include: { clinicProcedure: { include: { procedure: true } } },
@@ -243,10 +249,10 @@ export async function getClinicAppointmentsReport(days: number = 30, doctorName?
  * null porque NOT sozinho também excluiria as conversas ainda sem motivo (abertas). */
 const NOT_ADMINISTRATIVE = { OR: [{ resolutionReason: null }, { resolutionReason: { not: "ADMINISTRATIVO" } }] };
 
-export async function getClinicManagementReport(days: number = 30, channel?: string, previous = false) {
+export async function getClinicManagementReport(period: PeriodKey = "30", channel?: string, previous = false) {
   const { clinicId } = await requireClinicSession();
-  // `previous` = mesma janela imediatamente antes (comparação no relatório).
-  const { since, until } = reportWindow(days, previous);
+  // `previous` = janela de comparação (mesmo tamanho logo antes, ou o mês anterior).
+  const { since, until } = periodWindow(period, previous);
   const inWindow = { gte: since, ...(until ? { lt: until } : {}) };
 
   const [allConversations, appointments, inbound, bridgeLogs, clinic] = await Promise.all([
@@ -434,12 +440,12 @@ export async function updateAppointmentDoctor(appointmentId: string, doctorName:
 /** Nomes distintos já preenchidos em Appointment.doctorName pra essa clínica — popula
  * o seletor de médico do modal de remarcação em massa (ver reschedule-broadcast-modal). */
 /** Canais de aquisição presentes nas conversas do período — opções do filtro do relatório. */
-export async function getDistinctAcquisitionChannels(days: number = 30) {
+export async function getDistinctAcquisitionChannels(period: PeriodKey = "30") {
   const { clinicId } = await requireClinicSession();
-  const since = addUTCDays(startOfUTCDay(new Date()), -days);
+  const { since, until } = periodWindow(period, false);
   const rows = await prisma.conversation.groupBy({
     by: ["acquisitionChannel"],
-    where: { clinicId, createdAt: { gte: since } },
+    where: { clinicId, createdAt: { gte: since, ...(until ? { lt: until } : {}) } },
     _count: true,
   });
   return rows
@@ -633,9 +639,9 @@ export type CampaignReportRow = {
 
 /** Campanhas de disparo (marketing) da clínica pro relatório: em andamento/pausadas, ou
  * criadas no período. Aviso de remarcação em massa fica de fora (não é campanha). */
-export async function getClinicCampaignReport(days: number = 30): Promise<CampaignReportRow[]> {
+export async function getClinicCampaignReport(period: PeriodKey = "30"): Promise<CampaignReportRow[]> {
   const { clinicId } = await requireClinicSession();
-  const since = addUTCDays(startOfUTCDay(new Date()), -days);
+  const { since, until } = periodWindow(period, false);
 
   const campaigns = await prisma.broadcastCampaign.findMany({
     where: {
@@ -643,7 +649,7 @@ export async function getClinicCampaignReport(days: number = 30): Promise<Campai
       status: { not: "DRAFT" },
       // (Prisma: `not` em coluna nullable exclui os null — por isso o OR explícito.)
       AND: [
-        { OR: [{ status: { in: ["RUNNING", "PAUSED"] } }, { createdAt: { gte: since } }] },
+        { OR: [{ status: { in: ["RUNNING", "PAUSED"] } }, { createdAt: { gte: since, ...(until ? { lt: until } : {}) } }] },
         { OR: [{ tagOnSend: null }, { tagOnSend: { not: CAMPAIGN_RESCHEDULE_TAG } }] },
       ],
     },

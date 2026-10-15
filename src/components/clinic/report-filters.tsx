@@ -36,7 +36,7 @@ export function ReportSelectFilter({
 
   return (
     <Select defaultValue={currentValue} onValueChange={update}>
-      <SelectTrigger className="w-full sm:w-48">
+      <SelectTrigger className="w-full sm:w-48" aria-label={`Filtrar por ${placeholder.toLowerCase()}`}>
         <SelectValue placeholder={placeholder}>{() => currentLabel}</SelectValue>
       </SelectTrigger>
       <SelectContent>

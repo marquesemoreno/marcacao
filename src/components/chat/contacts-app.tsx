@@ -17,6 +17,7 @@ import {
   type ContactsListParams,
 } from "@/actions/inbox";
 import { PATIENT_SORTS, type PatientSort } from "@/lib/patient-list";
+import { outcomeLabel } from "@/lib/report-metrics";
 import {
   listAllContactsAdmin,
   createContactAdmin,
@@ -111,6 +112,7 @@ export function ContactsApp({ scope, basePath }: { scope: Scope; basePath: strin
   const doctorFilter = searchParams.get("doctor") ?? "";
   const stageFilter = searchParams.get("etapa") ?? "";
   const ownerFilter = searchParams.get("atendente") ?? "";
+  const reasonFilter = searchParams.get("motivo") ?? "";
   const sortParam = (searchParams.get("ordem") as PatientSort | null) ?? "espera";
   const sort: PatientSort = PATIENT_SORTS.some((s) => s.id === sortParam) ? sortParam : "espera";
   const [loadError, setLoadError] = useState(false);
@@ -174,9 +176,10 @@ export function ContactsApp({ scope, basePath }: { scope: Scope; basePath: strin
       doctor: doctorFilter || undefined,
       stage: stageFilter || undefined,
       owner: ownerFilter || undefined,
+      reason: reasonFilter || undefined,
       sort,
     }),
-    [urlQ, page, convenioFilter, doctorFilter, stageFilter, ownerFilter, sort]
+    [urlQ, page, convenioFilter, doctorFilter, stageFilter, ownerFilter, reasonFilter, sort]
   );
 
   const fetchContacts = useCallback(async () => {
@@ -331,7 +334,7 @@ export function ContactsApp({ scope, basePath }: { scope: Scope; basePath: strin
             ? "Não foi possível carregar"
             : isLoading && total === 0
               ? "Carregando…"
-              : `${total} paciente${total === 1 ? "" : "s"}${urlQ || convenioFilter || doctorFilter || stageFilter || ownerFilter ? " com os filtros atuais" : ""}${
+              : `${total} paciente${total === 1 ? "" : "s"}${urlQ || convenioFilter || doctorFilter || stageFilter || ownerFilter || reasonFilter ? " com os filtros atuais" : ""}${
                   scope === "clinic" && sort === "espera" ? " · quem espera resposta aparece primeiro" : ""
                 }`
         }
@@ -407,6 +410,17 @@ export function ContactsApp({ scope, basePath }: { scope: Scope; basePath: strin
                 </option>
               ))}
             </select>
+            {reasonFilter && (
+              <button
+                type="button"
+                onClick={() => updateParams({ motivo: "", page: null })}
+                className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 px-2.5 text-xs font-medium text-slate-700 dark:text-slate-200"
+                aria-label={`Remover filtro de motivo: ${outcomeLabel(reasonFilter)}`}
+              >
+                Motivo: {outcomeLabel(reasonFilter)}
+                <X className="h-3.5 w-3.5" aria-hidden />
+              </button>
+            )}
             {convenios.length > 0 && (
             <select
               aria-label="Filtrar por convênio"
@@ -459,7 +473,7 @@ export function ContactsApp({ scope, basePath }: { scope: Scope; basePath: strin
           total={total}
           listParams={listParams}
           emptyMessage={
-            urlQ || convenioFilter || doctorFilter || stageFilter || ownerFilter
+            urlQ || convenioFilter || doctorFilter || stageFilter || ownerFilter || reasonFilter
               ? "Nenhum paciente encontrado para esse filtro."
               : "Nenhum paciente ainda. Os pacientes aparecem aqui quando falam com a clínica pelo WhatsApp ou Instagram, ou quando você cadastra em “Novo paciente”."
           }

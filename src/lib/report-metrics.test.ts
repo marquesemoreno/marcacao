@@ -10,10 +10,12 @@ import {
   mergeConfirmationStats,
   computeChannelConversion,
   computeResponseStats,
+  computeOutcomes,
+  topConverter,
 } from "./report-metrics";
 
 describe("computeAttendantPerformance", () => {
-  it("agrupa por atendente, calcula FRT médio e conversão, ordena por conversão", () => {
+  it("agrupa por atendente, calcula FRT mediano e conversão, ordena por conversão", () => {
     const rows = computeAttendantPerformance([
       { userId: "a", userName: "Ana", status: "RESOLVED", resolutionReason: "AGENDAMENTO_CONCLUIDO", firstResponseSec: 60 },
       { userId: "a", userName: "Ana", status: "RESOLVED", resolutionReason: "DUVIDA", firstResponseSec: 120 },
@@ -22,8 +24,49 @@ describe("computeAttendantPerformance", () => {
       { userId: null, userName: null, status: "RESOLVED", resolutionReason: "AGENDAMENTO_CONCLUIDO", firstResponseSec: 10 },
     ]);
     expect(rows).toEqual([
-      { userId: "b", userName: "Bia", total: 2, scheduled: 1, conversionRate: 100, avgFrtSec: 30 },
-      { userId: "a", userName: "Ana", total: 2, scheduled: 1, conversionRate: 50, avgFrtSec: 90 },
+      { userId: "b", userName: "Bia", total: 2, withOutcome: 1, scheduled: 1, conversionRate: 100, medianFrtSec: 30 },
+      { userId: "a", userName: "Ana", total: 2, withOutcome: 2, scheduled: 1, conversionRate: 50, medianFrtSec: 90 },
+    ]);
+  });
+
+  it("inatividade não entra na base da conversão; sem desfecho = null", () => {
+    const rows = computeAttendantPerformance([
+      { userId: "a", userName: "Ana", status: "RESOLVED", resolutionReason: "AGENDAMENTO_CONCLUIDO", firstResponseSec: 60 },
+      { userId: "a", userName: "Ana", status: "RESOLVED", resolutionReason: "INATIVIDADE", firstResponseSec: 60 },
+      { userId: "b", userName: "Bia", status: "RESOLVED", resolutionReason: "SEM_RESPOSTA", firstResponseSec: null },
+    ]);
+    expect(rows.find((r) => r.userId === "a")?.conversionRate).toBe(100);
+    expect(rows.find((r) => r.userId === "b")?.conversionRate).toBeNull();
+  });
+});
+
+describe("topConverter", () => {
+  const row = (userId: string, withOutcome: number, scheduled: number) => ({
+    userId, userName: userId, total: withOutcome, withOutcome, scheduled,
+    conversionRate: withOutcome ? (scheduled / withOutcome) * 100 : null, medianFrtSec: null,
+  });
+  it("ignora quem não tem volume mínimo (1 de 1 não ganha de 30 de 50)", () => {
+    expect(topConverter([row("a", 1, 1), row("b", 50, 30)])).toBe("b");
+  });
+  it("ninguém elegível = null", () => {
+    expect(topConverter([row("a", 2, 2)])).toBeNull();
+  });
+});
+
+describe("computeOutcomes", () => {
+  it("agrupa motivos (agendou → perdido → outros → sem desfecho) e acha o principal motivo de perda", () => {
+    const r = (resolutionReason: string | null, status = "RESOLVED") => ({ status, resolutionReason });
+    const out = computeOutcomes([
+      r("INATIVIDADE"), r("INATIVIDADE"), r("PERDA_PRECO"), r("PERDA_PRECO"), r("PERDA_HORARIO"),
+      r("AGENDAMENTO_CONCLUIDO"), r("DUVIDA_ESCLARECIDA"), r(null, "OPEN"),
+    ]);
+    expect(out.resolved).toBe(7);
+    expect(out.withOutcome).toBe(5);
+    expect(out.noOutcome).toBe(2);
+    expect(out.lostTotal).toBe(3);
+    expect(out.topLossReason?.reason).toBe("PERDA_PRECO");
+    expect(out.rows.map((x) => x.reason)).toEqual([
+      "AGENDAMENTO_CONCLUIDO", "PERDA_PRECO", "PERDA_HORARIO", "DUVIDA_ESCLARECIDA", "INATIVIDADE",
     ]);
   });
 });
@@ -128,7 +171,7 @@ describe("computeBridgeConfirmationStats", () => {
 });
 
 describe("computeChannelConversion", () => {
-  it("agrupa por canal (null = Não identificado), conversão sobre resolvidas, ordena por agendamentos", () => {
+  it("agrupa por canal (null = Não identificado), conversão sobre conversas com desfecho, ordena por agendamentos", () => {
     const rows = computeChannelConversion(
       [
         { acquisitionChannel: "Instagram Ads", status: "RESOLVED", resolutionReason: "AGENDAMENTO_CONCLUIDO" },

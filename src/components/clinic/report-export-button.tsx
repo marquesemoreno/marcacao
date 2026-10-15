@@ -9,22 +9,23 @@ import { buildReportCsv, reportCsvFilename } from "@/lib/report-csv";
 export function ReportExportButton({
   rows,
   clinic,
-  days,
+  periodKey,
+  periodLabel,
   filters,
 }: {
   rows: [string, string | number][];
   clinic: string;
-  days: number;
+  periodKey: string;
+  /** Ex.: "setembro (01/09/2026 a 30/09/2026)" — montado no servidor. */
+  periodLabel: string;
   filters: string[];
 }) {
   function handleExport() {
     const now = new Date();
-    const fmt = (d: Date) => d.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
-    const since = new Date(now.getTime() - days * 86_400_000);
     const csv = buildReportCsv(
       {
         clinic,
-        periodLabel: `Últimos ${days} dias (${fmt(since)} a ${fmt(now)})`,
+        periodLabel,
         filters,
         generatedAt: now.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" }),
       },
@@ -34,7 +35,7 @@ export function ReportExportButton({
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = reportCsvFilename(clinic, days, now);
+    link.download = reportCsvFilename(clinic, periodKey, now);
     link.click();
     URL.revokeObjectURL(url);
   }

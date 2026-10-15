@@ -17,12 +17,12 @@ export function buildReportCsv(ctx: ReportCsvContext, rows: [string, string | nu
   ].join("\n");
 }
 
-export function reportCsvFilename(clinic: string, days: number, now: Date): string {
+export function reportCsvFilename(clinic: string, period: string | number, now: Date): string {
   const slug = clinic
     .normalize("NFD")
     .replace(/[̀-ͯ]/g, "")
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "");
-  return `relatorio-${slug}-${days}d-${now.toISOString().slice(0, 10)}.csv`;
+  return `relatorio-${slug}-${/^\d+$/.test(String(period)) ? `${period}d` : period}-${now.toISOString().slice(0, 10)}.csv`;
 }

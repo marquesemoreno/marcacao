@@ -8,35 +8,32 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { PERIOD_KEYS, parsePeriodKey, periodLabels } from "@/lib/report-period";
 
-const periodOptions = [
-  { value: "7", label: "Últimos 7 dias" },
-  { value: "30", label: "Últimos 30 dias" },
-  { value: "90", label: "Últimos 90 dias" },
-];
-
+/** Seletor de período do relatório — janelas móveis e mês-calendário (`?periodo=`;
+ * `?days=` antigo continua valendo). */
 export function PeriodFilter({ basePath }: { basePath: string }) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const currentValue = searchParams.get("days") ?? "30";
-  const currentLabel = periodOptions.find((option) => option.value === currentValue)?.label ?? periodOptions[1].label;
+  const current = parsePeriodKey(searchParams.get("periodo") ?? undefined, searchParams.get("days") ?? undefined);
 
   function updatePeriod(value: string | null) {
     if (!value) return;
     const params = new URLSearchParams(searchParams.toString());
-    params.set("days", value);
+    params.delete("days");
+    params.set("periodo", value);
     router.push(`${basePath}?${params.toString()}`);
   }
 
   return (
-    <Select defaultValue={currentValue} onValueChange={updatePeriod}>
-      <SelectTrigger className="w-full sm:w-56">
-        <SelectValue placeholder="Período">{() => currentLabel}</SelectValue>
+    <Select defaultValue={current} onValueChange={updatePeriod}>
+      <SelectTrigger className="w-full sm:w-44" aria-label="Período do relatório">
+        <SelectValue placeholder="Período">{() => periodLabels(current).short}</SelectValue>
       </SelectTrigger>
       <SelectContent>
-        {periodOptions.map((option) => (
-          <SelectItem key={option.value} value={option.value}>
-            {option.label}
+        {PERIOD_KEYS.map((key) => (
+          <SelectItem key={key} value={key}>
+            {periodLabels(key).short}
           </SelectItem>
         ))}
       </SelectContent>

@@ -37,7 +37,7 @@ export function HorizontalBarChart({ data, unit }: { data: BarDatum[]; unit?: st
   );
 }
 
-/** Barra única segmentada (soma ~100%) — usada pra sentimento. `rounded-full h-3` fina
+/** Barra única segmentada (soma ~100%) — usada pra sentimento. `rounded-[4px] h-3` fina
  * demais pra rótulo dentro do segmento, por isso o valor por extenso vive só na legenda
  * abaixo (ver skill de dataviz: rótulo direto, nunca só cor carregando o dado). */
 export function SentimentBar({
@@ -62,7 +62,7 @@ export function SentimentBar({
 
   return (
     <div className="space-y-3">
-      <div className="flex h-3 w-full gap-0.5 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800" aria-hidden>
+      <div className="flex h-3 w-full gap-0.5 overflow-hidden rounded-[4px] bg-slate-100 dark:bg-slate-800" aria-hidden>
         {segments
           .filter((s) => s.pct > 0)
           .map((s) => (
@@ -77,7 +77,7 @@ export function SentimentBar({
       <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs font-medium text-slate-600 dark:text-slate-300">
         {segments.map((s) => (
           <span key={s.key} className="inline-flex items-center gap-1.5">
-            <span className={`inline-block w-2 h-2 rounded-full ${s.colorClass}`} />
+            <span className={`inline-block w-2 h-2 rounded-[4px] ${s.colorClass}`} />
             {s.label}: {s.pct}%
           </span>
         ))}

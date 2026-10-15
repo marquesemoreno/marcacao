@@ -19,20 +19,38 @@ export type AttendantRow = {
   userId: string;
   userName: string;
   total: number;
+  /** Conversas com desfecho (base da conversão — ver outcomeBase). */
+  withOutcome: number;
   scheduled: number;
-  conversionRate: number;
-  avgFrtSec: number | null;
+  conversionRate: number | null;
+  medianFrtSec: number | null;
 };
 
-/** Conversão = agendamentos / conversas RESOLVIDAS pelo atendente (mesma base do card
- * "Conversão em Agendamento" do bloco de chat). Conversas sem atendente ficam de fora. */
+/** Finalizações automáticas que não dizem nada sobre o atendimento: o paciente sumiu
+ * (auto-close por inatividade, "sem resposta"). Ficam FORA da base da conversão — sem
+ * isso, cada conversa fechada pelo auto-close de 4h úteis derrubava a conversão sem
+ * nenhuma mudança real (crítica de Relatórios, 15/10). */
+export const NO_OUTCOME_REASONS = new Set(["INATIVIDADE", "SEM_RESPOSTA"]);
+
+/** Conversa entra na base da conversão: resolvida e com desfecho de verdade. */
+export function hasOutcome(c: { status: string; resolutionReason: string | null }) {
+  return c.status === "RESOLVED" && !NO_OUTCOME_REASONS.has(c.resolutionReason ?? "");
+}
+
+/** Volume mínimo de conversas com desfecho pra uma atendente concorrer ao selo "Maior
+ * conversão" — 1 de 1 (100%) não pode ganhar de 30 de 50. */
+export const MIN_ATTENDANT_VOLUME = 5;
+
+/** Conversão = agendamentos / conversas COM DESFECHO da atendente (mesma base do card
+ * "Conversão em agendamento"). Tempo de 1ª resposta em MEDIANA, como o resto da página
+ * (média deixava uma conversa esquecida puxar tudo). Conversas sem atendente ficam de fora. */
 export function computeAttendantPerformance(conversations: AttendantConversation[]): AttendantRow[] {
-  const byUser = new Map<string, { name: string; total: number; resolved: number; scheduled: number; frt: number[] }>();
+  const byUser = new Map<string, { name: string; total: number; withOutcome: number; scheduled: number; frt: number[] }>();
   for (const c of conversations) {
     if (!c.userId) continue;
-    const entry = byUser.get(c.userId) ?? { name: c.userName ?? "—", total: 0, resolved: 0, scheduled: 0, frt: [] };
+    const entry = byUser.get(c.userId) ?? { name: c.userName ?? "—", total: 0, withOutcome: 0, scheduled: 0, frt: [] };
     entry.total++;
-    if (c.status === "RESOLVED") entry.resolved++;
+    if (hasOutcome(c)) entry.withOutcome++;
     if (c.resolutionReason === "AGENDAMENTO_CONCLUIDO") entry.scheduled++;
     if (c.firstResponseSec !== null) entry.frt.push(c.firstResponseSec);
     byUser.set(c.userId, entry);
@@ -42,11 +60,74 @@ export function computeAttendantPerformance(conversations: AttendantConversation
       userId,
       userName: e.name,
       total: e.total,
+      withOutcome: e.withOutcome,
       scheduled: e.scheduled,
-      conversionRate: pct(e.scheduled, e.resolved),
-      avgFrtSec: e.frt.length > 0 ? Math.round(e.frt.reduce((a, b) => a + b, 0) / e.frt.length) : null,
+      conversionRate: e.withOutcome > 0 ? pct(e.scheduled, e.withOutcome) : null,
+      medianFrtSec: median(e.frt),
     }))
-    .sort((a, b) => b.conversionRate - a.conversionRate || b.total - a.total);
+    .sort((a, b) => (b.conversionRate ?? -1) - (a.conversionRate ?? -1) || b.total - a.total);
+}
+
+/** Atendente com maior conversão entre as que têm volume mínimo (e ao menos 1 agendamento). */
+export function topConverter(rows: AttendantRow[]): string | null {
+  const eligible = rows.filter((r) => r.withOutcome >= MIN_ATTENDANT_VOLUME && r.scheduled > 0);
+  eligible.sort((a, b) => (b.conversionRate ?? 0) - (a.conversionRate ?? 0) || b.withOutcome - a.withOutcome);
+  return eligible[0]?.userId ?? null;
+}
+
+export type OutcomeGroup = "agendou" | "perdido" | "outro" | "sem_desfecho";
+
+const OUTCOME_LABELS: Record<string, { label: string; group: OutcomeGroup }> = {
+  AGENDAMENTO_CONCLUIDO: { label: "Agendou", group: "agendou" },
+  PERDA_PRECO: { label: "Perdido — preço", group: "perdido" },
+  PERDA_CONVENIO: { label: "Perdido — convênio não atendido", group: "perdido" },
+  PERDA_HORARIO: { label: "Perdido — horário/agenda", group: "perdido" },
+  PERDA_OUTRO: { label: "Perdido — outro motivo", group: "perdido" },
+  CANCELAMENTO: { label: "Desistiu / cancelou", group: "perdido" },
+  DUVIDA_ESCLARECIDA: { label: "Dúvida esclarecida", group: "outro" },
+  ORCAMENTO_ENVIADO: { label: "Orçamento enviado", group: "outro" },
+  CONFIRMACAO_AGENDA: { label: "Confirmou a agenda", group: "outro" },
+  AGENDAMENTO_REMARCADO: { label: "Remarcou", group: "outro" },
+  AGENDAMENTO_CANCELADO: { label: "Cancelou agendamento", group: "outro" },
+  ENCAMINHADO: { label: "Encaminhado a outro setor", group: "outro" },
+  ATENDIDO_NO_CELULAR: { label: "Atendido pelo celular", group: "outro" },
+  ATENDIMENTO_CONCLUIDO: { label: "Conversa já tinha terminado", group: "outro" },
+  INATIVIDADE: { label: "Encerrada por inatividade", group: "sem_desfecho" },
+  SEM_RESPOSTA: { label: "Paciente não respondeu", group: "sem_desfecho" },
+};
+/** Rótulo curto do motivo de finalização (relatório e filtro "motivo" de Pacientes). */
+export function outcomeLabel(reason: string) {
+  return OUTCOME_LABELS[reason]?.label ?? reason;
+}
+
+const GROUP_ORDER: OutcomeGroup[] = ["agendou", "perdido", "outro", "sem_desfecho"];
+
+export type OutcomeRow = { reason: string; label: string; group: OutcomeGroup; count: number; pct: number };
+
+/** "Por que as conversas terminaram": conversas resolvidas por motivo de finalização,
+ * agrupadas (agendou → perdido → outros → sem desfecho). % sobre todas as resolvidas. */
+export function computeOutcomes(conversations: { status: string; resolutionReason: string | null }[]) {
+  const resolved = conversations.filter((c) => c.status === "RESOLVED");
+  const counts = new Map<string, number>();
+  for (const c of resolved) {
+    const key = c.resolutionReason ?? "OUTRO";
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  const rows: OutcomeRow[] = [...counts.entries()].map(([reason, count]) => {
+    const meta = OUTCOME_LABELS[reason] ?? { label: "Outro motivo", group: "outro" as const };
+    return { reason, label: meta.label, group: meta.group, count, pct: pct(count, resolved.length) };
+  });
+  rows.sort((a, b) => GROUP_ORDER.indexOf(a.group) - GROUP_ORDER.indexOf(b.group) || b.count - a.count);
+  const lost = rows.filter((r) => r.group === "perdido");
+  const lostTotal = lost.reduce((s, r) => s + r.count, 0);
+  return {
+    resolved: resolved.length,
+    withOutcome: resolved.filter(hasOutcome).length,
+    noOutcome: rows.filter((r) => r.group === "sem_desfecho").reduce((s, r) => s + r.count, 0),
+    lostTotal,
+    topLossReason: lost[0] ?? null,
+    rows,
+  };
 }
 
 export type ReminderAppointment = {
@@ -171,18 +252,18 @@ export function mergeConfirmationStats(a: ConfirmationStats, b: BridgeConfirmati
 export const UNIDENTIFIED_CHANNEL = "Não identificado";
 
 /** Conversão por canal de aquisição — mesma base do card de conversão do chat
- * (agendamentos / conversas resolvidas). Receita = agendamentos × ticket médio (não há
+ * (agendamentos / conversas com desfecho, sem inatividade). Receita = agendamentos × ticket médio (não há
  * vínculo Conversation↔Appointment pra saber o procedimento de cada uma). */
 export function computeChannelConversion(
   conversations: { acquisitionChannel: string | null; status: string; resolutionReason: string | null }[],
   ticket: number | null
 ) {
-  const byChannel = new Map<string, { conversations: number; resolved: number; scheduled: number }>();
+  const byChannel = new Map<string, { conversations: number; withOutcome: number; scheduled: number }>();
   for (const c of conversations) {
     const key = c.acquisitionChannel ?? UNIDENTIFIED_CHANNEL;
-    const e = byChannel.get(key) ?? { conversations: 0, resolved: 0, scheduled: 0 };
+    const e = byChannel.get(key) ?? { conversations: 0, withOutcome: 0, scheduled: 0 };
     e.conversations++;
-    if (c.status === "RESOLVED") e.resolved++;
+    if (hasOutcome(c)) e.withOutcome++;
     if (c.resolutionReason === "AGENDAMENTO_CONCLUIDO") e.scheduled++;
     byChannel.set(key, e);
   }
@@ -191,7 +272,7 @@ export function computeChannelConversion(
       channel,
       conversations: e.conversations,
       scheduled: e.scheduled,
-      conversionRate: pct(e.scheduled, e.resolved),
+      conversionRate: e.withOutcome > 0 ? pct(e.scheduled, e.withOutcome) : null,
       estimatedRevenue: ticket !== null ? e.scheduled * ticket : null,
     }))
     .sort((a, b) => b.scheduled - a.scheduled || b.conversations - a.conversations);
