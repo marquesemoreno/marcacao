@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { CalendarClock, Copy, Image as ImageIcon, Loader2, Pause, Play, Plus, Trash2, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import {
   listClinicBroadcastCampaigns,
   createClinicBroadcastCampaign,
@@ -15,12 +16,13 @@ import {
   getClinicCampaignStartPreview,
   deleteClinicDraftCampaign,
   getClinicCampaignForDuplicate,
+  retryClinicCampaignFailures,
 } from "@/actions/clinic-broadcast";
 import { BridgeAudiencePicker } from "@/components/clinic/bridge-audience-picker";
 import { listMarcadoresAudience } from "@/actions/marcadores";
 import { SELECTION_BROADCAST_KEY } from "@/components/clinic/patient-list-table";
-import { parseBroadcastCsv, BROADCAST_OPT_OUT_FOOTER, type ParsedBroadcastRecipient } from "@/lib/broadcast-csv";
-import { estimateCampaignFinish, unknownTemplateVariables } from "@/lib/broadcast-schedule";
+import { buildBroadcastMessage, parseBroadcastCsv, BROADCAST_OPT_OUT_FOOTER, type ParsedBroadcastRecipient } from "@/lib/broadcast-csv";
+import { estimateCampaignFinish, unfilledPlaceholders, unknownTemplateVariables } from "@/lib/broadcast-schedule";
 import { RescheduleBroadcastModal } from "@/components/clinic/reschedule-broadcast-modal";
 
 type Campaign = Awaited<ReturnType<typeof listClinicBroadcastCampaigns>>[number];
@@ -315,6 +317,19 @@ export function BroadcastManagement() {
     }
   }
 
+  async function retryFailures(c: Campaign) {
+    setBusyId(c.id);
+    try {
+      const r = await retryClinicCampaignFailures(c.id);
+      toast.success(`${r.requeued} falha(s) de volta à fila. A campanha ficou pausada — clique em Retomar para enviar.`);
+      await loadCampaigns(true);
+    } catch {
+      toast.error("Não foi possível devolver as falhas à fila.");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   async function toggleLowPriority(c: Campaign) {
     try {
       await setClinicCampaignLowPriority(c.id, !c.lowPriority);
@@ -328,6 +343,8 @@ export function BroadcastManagement() {
   const sampleVars = recipients[0]?.variables ?? {};
   const columns = Object.keys(sampleVars);
   const unknownVars = template.trim() && recipients.length ? unknownTemplateVariables(template, sampleVars) : [];
+  const unfilled = unfilledPlaceholders(template);
+  const livePreview = template.trim() ? buildBroadcastMessage(template, sampleVars) : "";
   const formEstimate = recipients.length ? estimateCampaignFinish({ pending: recipients.length, sentToday: 0, now: new Date() }) : null;
   const sourceOptions: [Source, string][] = [
     ...(audienceSource === "selecao" ? ([["selecao", `Seleção da lista de pacientes`]] as [Source, string][]) : []),
@@ -336,14 +353,19 @@ export function BroadcastManagement() {
     ["csv", "Colar lista / arquivo"],
   ];
 
-  const active = campaigns.filter((c) => c.status !== "COMPLETED");
+  const running = campaigns.filter((c) => c.status === "RUNNING");
+  const active = campaigns.filter((c) => c.status === "DRAFT" || c.status === "PAUSED");
   const done = campaigns.filter((c) => c.status === "COMPLETED");
 
   return (
     <div className="p-4 sm:p-6 space-y-6 max-w-4xl mx-auto">
       <PageHeader
         title="Disparos"
-        subtitle={loading ? "Carregando…" : `${campaigns.filter((c) => c.status === "RUNNING").length} em andamento · ${campaigns.length} campanha(s)`}
+        subtitle={
+          loading
+            ? "Carregando…"
+            : `${campaigns.filter((c) => c.status === "RUNNING").length} em andamento · ${campaigns.filter((c) => c.status === "DRAFT" || c.status === "PAUSED").length} rascunho(s) ou pausada(s)`
+        }
         actions={
           <div className="flex flex-wrap gap-2">
             <button
@@ -352,16 +374,15 @@ export function BroadcastManagement() {
               className="inline-flex h-9 items-center gap-1.5 px-3 text-sm font-medium text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg"
             >
               <CalendarClock className="w-4 h-4" aria-hidden />
-              Aviso de remarcação
+              Aviso urgente de remarcação
             </button>
             <button
               type="button"
-              onClick={() => setFormOpen((o) => !o)}
-              aria-expanded={formOpen}
+              onClick={() => setFormOpen(true)}
               className="inline-flex h-9 items-center gap-1.5 px-3 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg"
             >
-              {formOpen ? <X className="w-4 h-4" aria-hidden /> : <Plus className="w-4 h-4" aria-hidden />}
-              {formOpen ? "Fechar" : "Nova campanha"}
+              <Plus className="w-4 h-4" aria-hidden />
+              Nova campanha
             </button>
           </div>
         }
@@ -375,15 +396,17 @@ export function BroadcastManagement() {
         }}
       />
 
-      {formOpen && (
-        <section className={`${panel} p-5 space-y-5`} aria-labelledby="new-campaign-title">
-          <h2 id="new-campaign-title" className="text-sm font-semibold text-slate-800 dark:text-slate-100">
-            Nova campanha
-          </h2>
+      <Sheet open={formOpen} onOpenChange={setFormOpen}>
+        <SheetContent side="right" className="w-full sm:max-w-2xl overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>Nova campanha</SheetTitle>
+            <SheetDescription>Cria um rascunho — nada é enviado até você clicar em Iniciar e confirmar.</SheetDescription>
+          </SheetHeader>
+        <section className="px-4 pb-6 space-y-5" aria-label="Nova campanha">
 
           <div>
             <label htmlFor="broadcast-name" className={labelClass}>
-              Nome da campanha (só a equipe vê)
+              Nome da campanha (só a equipe vê) <span className="text-red-600" aria-hidden>*</span>
             </label>
             <input
               id="broadcast-name"
@@ -391,6 +414,8 @@ export function BroadcastManagement() {
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Ex.: Novos médicos — marcadores"
+              required
+              aria-required="true"
               className={inputClass}
             />
           </div>
@@ -398,13 +423,28 @@ export function BroadcastManagement() {
           {/* 1. Público */}
           <fieldset className="space-y-2">
             <legend className="text-sm font-semibold text-slate-800 dark:text-slate-100">1. Para quem</legend>
-            <div role="radiogroup" aria-label="Público" className="inline-flex flex-wrap rounded-lg border border-slate-200 dark:border-slate-700 p-0.5 text-sm">
+            <div
+              role="radiogroup"
+              aria-label="Público"
+              className="inline-flex flex-wrap rounded-lg border border-slate-200 dark:border-slate-700 p-0.5 text-sm"
+              onKeyDown={(e) => {
+                const delta = e.key === "ArrowRight" || e.key === "ArrowDown" ? 1 : e.key === "ArrowLeft" || e.key === "ArrowUp" ? -1 : 0;
+                if (!delta) return;
+                e.preventDefault();
+                const idx = sourceOptions.findIndex(([v]) => v === audienceSource);
+                const next = sourceOptions[(idx + delta + sourceOptions.length) % sourceOptions.length][0];
+                switchSource(next);
+                (e.currentTarget.querySelector(`[data-source="${next}"]`) as HTMLElement | null)?.focus();
+              }}
+            >
               {sourceOptions.map(([value, label]) => (
                 <button
                   key={value}
                   type="button"
                   role="radio"
+                  data-source={value}
                   aria-checked={audienceSource === value}
+                  tabIndex={audienceSource === value ? 0 : -1}
                   onClick={() => switchSource(value)}
                   className={`px-3 h-8 rounded-md font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50 ${
                     audienceSource === value ? "bg-emerald-600 text-white" : "text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
@@ -504,9 +544,22 @@ export function BroadcastManagement() {
                 criar.
               </p>
             )}
+            {unfilled.length > 0 && (
+              <p role="alert" className="text-sm text-red-600 dark:text-red-400">
+                Preencha antes de criar: {unfilled.join(", ")}.
+              </p>
+            )}
             <p className="text-xs text-slate-500 dark:text-slate-400">
               Toda mensagem termina com “{BROADCAST_OPT_OUT_FOOTER}” — quem responder 9 não recebe mais campanhas.
             </p>
+            {livePreview && (
+              <div>
+                <p className={labelClass}>Prévia{recipients[0] ? " (1º destinatário)" : ""}</p>
+                <div className="mt-1 max-h-60 overflow-y-auto whitespace-pre-wrap rounded-lg border border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/40 p-3 text-sm text-slate-900 dark:text-slate-100">
+                  {livePreview}
+                </div>
+              </div>
+            )}
           </fieldset>
 
           {/* 3. Imagem */}
@@ -541,7 +594,8 @@ export function BroadcastManagement() {
             </p>
             <button
               type="button"
-              disabled={creating || unknownVars.length > 0}
+              disabled={creating || unknownVars.length > 0 || unfilled.length > 0 || !name.trim() || !template.trim()}
+              title={!name.trim() ? "Dê um nome à campanha" : !template.trim() ? "Escreva a mensagem" : undefined}
               onClick={handleCreate}
               className="inline-flex h-9 items-center gap-1.5 px-4 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 rounded-lg"
             >
@@ -550,7 +604,8 @@ export function BroadcastManagement() {
             </button>
           </div>
         </section>
-      )}
+        </SheetContent>
+      </Sheet>
 
       <section className="space-y-3" aria-labelledby="campaigns-title">
         <h2 id="campaigns-title" className="text-sm font-semibold text-slate-800 dark:text-slate-100">
@@ -566,6 +621,25 @@ export function BroadcastManagement() {
           </div>
         ) : (
           <>
+            {running.length > 0 && (
+              <div className="space-y-3">
+                <h3 className="text-xs font-medium text-emerald-700 dark:text-emerald-400">Agora</h3>
+                {running.map((c) => (
+                  <CampaignCard
+                    key={c.id}
+                    c={c}
+                    busy={busyId === c.id}
+                    onStart={() => askStart(c)}
+                    onPause={() => pause(c)}
+                    onDelete={() => removeDraft(c)}
+                    onDuplicate={() => duplicate(c)}
+                    onRetry={() => retryFailures(c)}
+                    onToggleLowPriority={() => toggleLowPriority(c)}
+                  />
+                ))}
+              </div>
+            )}
+            {active.length > 0 && <h3 className="text-xs font-medium text-slate-600 dark:text-slate-400 pt-1">Rascunhos e pausadas</h3>}
             {active.map((c) => (
               <CampaignCard
                 key={c.id}
@@ -575,6 +649,7 @@ export function BroadcastManagement() {
                 onPause={() => pause(c)}
                 onDelete={() => removeDraft(c)}
                 onDuplicate={() => duplicate(c)}
+                onRetry={() => retryFailures(c)}
                 onToggleLowPriority={() => toggleLowPriority(c)}
               />
             ))}
@@ -593,6 +668,7 @@ export function BroadcastManagement() {
                       onPause={() => {}}
                       onDelete={() => {}}
                       onDuplicate={() => duplicate(c)}
+                      onRetry={() => retryFailures(c)}
                       onToggleLowPriority={() => {}}
                     />
                   ))}
@@ -628,11 +704,25 @@ export function BroadcastManagement() {
                   {confirming.preview.sampleMessage}
                 </div>
               </div>
-              {confirming.preview.unknownVariables.length > 0 && (
-                <p role="alert" className="text-sm text-red-600 dark:text-red-400">
-                  Atenção: {confirming.preview.unknownVariables.map((v) => `{{${v}}}`).join(", ")} vai sair escrito assim, entre chaves. Duplique a
-                  campanha e corrija o texto antes de iniciar.
-                </p>
+              {(confirming.preview.unknownVariables.length > 0 || confirming.preview.unfilled.length > 0) && (
+                <div role="alert" className="rounded-lg border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/40 p-3 text-sm text-red-800 dark:text-red-300 space-y-2">
+                  <p>
+                    O texto tem trechos que sairiam assim para o paciente:{" "}
+                    <strong>{[...confirming.preview.unknownVariables.map((v) => `{{${v}}}`), ...confirming.preview.unfilled].join(", ")}</strong>. Não dá para
+                    iniciar.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const c = confirming.campaign;
+                      setConfirming(null);
+                      duplicate(c);
+                    }}
+                    className="font-semibold underline underline-offset-2"
+                  >
+                    Duplicar e corrigir o texto
+                  </button>
+                </div>
               )}
               <div className="flex justify-end gap-2">
                 <button
@@ -644,7 +734,12 @@ export function BroadcastManagement() {
                 </button>
                 <button
                   type="button"
-                  disabled={busyId === confirming.campaign.id || confirming.preview.pending === 0}
+                  disabled={
+                    busyId === confirming.campaign.id ||
+                    confirming.preview.pending === 0 ||
+                    confirming.preview.unknownVariables.length > 0 ||
+                    confirming.preview.unfilled.length > 0
+                  }
                   onClick={confirmStart}
                   className="inline-flex h-9 items-center gap-1.5 px-4 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 rounded-lg"
                 >
@@ -667,6 +762,7 @@ function CampaignCard({
   onPause,
   onDelete,
   onDuplicate,
+  onRetry,
   onToggleLowPriority,
 }: {
   c: Campaign;
@@ -675,13 +771,20 @@ function CampaignCard({
   onPause: () => void;
   onDelete: () => void;
   onDuplicate: () => void;
+  onRetry: () => void;
   onToggleLowPriority: () => void;
 }) {
-  const progress = c.total ? Math.round(((c.sent + c.failed + c.skipped) / c.total) * 100) : 0;
+  // Falha não conta como progresso (não chegou ao paciente).
+  const progress = c.total ? Math.round(((c.sent + c.skipped) / c.total) * 100) : 0;
   const actionBtn =
     "inline-flex h-8 items-center gap-1.5 px-3 text-xs font-medium rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50";
   return (
-    <article className={`${panel} p-4 space-y-3`} aria-label={c.name}>
+    <article
+      className={`rounded-lg border bg-white dark:bg-slate-900 p-4 space-y-3 ${
+        c.status === "RUNNING" ? "border-emerald-300 dark:border-emerald-800 shadow-xs" : "border-slate-200 dark:border-slate-800"
+      }`}
+      aria-label={c.name}
+    >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
@@ -689,10 +792,12 @@ function CampaignCard({
             <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border ${STATUS_CLASS[c.status]}`}>{STATUS_LABEL[c.status]}</span>
             {c.hasImage && <ImageIcon className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 shrink-0" aria-label="Com imagem" />}
           </div>
-          <p className={`mt-1 text-sm font-medium ${SITUATION_CLASS[c.situation.tone]}`} aria-live="polite">
+          {c.status === "RUNNING" && (
+          <p className={`mt-1 text-sm font-medium ${SITUATION_CLASS[c.situation.tone]}`}>
             {c.situation.text}
-            {c.finishIso && c.status === "RUNNING" && <span className="font-normal text-slate-500 dark:text-slate-400"> · {estimateText(c.businessDays, c.finishIso)}</span>}
+            {c.finishIso && <span className="font-normal text-slate-500 dark:text-slate-400"> · {estimateText(c.businessDays, c.finishIso)}</span>}
           </p>
+          )}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {c.status === "RUNNING" ? (
@@ -730,18 +835,34 @@ function CampaignCard({
           {c.sent} de {c.total} enviadas
           {c.pending > 0 && c.status !== "DRAFT" && ` · ${c.pending} na fila`}
           {c.skipped > 0 && ` · ${c.skipped} pediram para não receber`}
-          {c.failed > 0 && (
-            <span className="text-red-700 dark:text-red-400" title={c.failureReasons.join("\n") || undefined}>
-              {" "}
-              · {c.failed} falha(s){c.failureReasons[0] ? ` (${c.failureReasons[0]})` : ""}
-            </span>
-          )}
+          {c.failed > 0 && <span className="text-red-700 dark:text-red-400"> · {c.failed} falha(s)</span>}
         </p>
+        {c.failed > 0 && (
+          <details className="mt-2 text-xs">
+            <summary className="cursor-pointer font-medium text-red-700 dark:text-red-400">Ver falhas</summary>
+            <ul className="mt-1 space-y-0.5 text-slate-600 dark:text-slate-300">
+              {c.failures.map((f, i) => (
+                <li key={i} className="tabular-nums">
+                  {f.phone} — {f.reason ?? "motivo não informado"}
+                </li>
+              ))}
+              {c.failed > c.failures.length && <li>…e mais {c.failed - c.failures.length}</li>}
+            </ul>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={onRetry}
+              className="mt-2 inline-flex h-8 items-center gap-1.5 px-3 text-xs font-medium rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-50"
+            >
+              Tentar de novo as falhas
+            </button>
+          </details>
+        )}
       </div>
 
       {c.status !== "COMPLETED" && (
         <label className="flex items-start gap-2 text-xs text-slate-600 dark:text-slate-300 cursor-pointer">
-          <input type="checkbox" checked={c.lowPriority} onChange={onToggleLowPriority} className="mt-0.5 size-3.5 accent-emerald-600" />
+          <input type="checkbox" checked={c.lowPriority} onChange={onToggleLowPriority} className="mt-0.5 size-4 accent-emerald-600" />
           <span>
             <span className="font-medium">Baixa prioridade</span> — espera os lembretes de confirmação e outras campanhas terminarem.
           </span>

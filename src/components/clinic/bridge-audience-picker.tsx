@@ -14,7 +14,7 @@ const selectClass =
 /** Público da campanha direto do sistema da clínica (Firebird via bridge) — alternativa
  * ao CSV. A prévia consulta na hora e entrega os destinatários prontos pro formulário. */
 export function BridgeAudiencePicker({ onRecipients }: { onRecipients: (r: ParsedBroadcastRecipient[]) => void }) {
-  const [sexo, setSexo] = useState<"" | "F" | "M">("F");
+  const [sexo, setSexo] = useState<"" | "F" | "M">("");
   const [months, setMonths] = useState(12);
   const [minAge, setMinAge] = useState("18");
   const [maxAge, setMaxAge] = useState("");
@@ -52,9 +52,9 @@ export function BridgeAudiencePicker({ onRecipients }: { onRecipients: (r: Parse
         <label className="text-xs font-medium text-slate-600 dark:text-slate-400">
           Sexo
           <select value={sexo} onChange={(e) => { setSexo(e.target.value as "" | "F" | "M"); invalidate(); }} className={selectClass}>
+            <option value="">Todos</option>
             <option value="F">Feminino</option>
             <option value="M">Masculino</option>
-            <option value="">Todos</option>
           </select>
         </label>
         <label className="text-xs font-medium text-slate-600 dark:text-slate-400">
@@ -76,7 +76,7 @@ export function BridgeAudiencePicker({ onRecipients }: { onRecipients: (r: Parse
       </div>
 
       <p className="text-xs text-slate-500 dark:text-slate-400">
-        Pacientes que nunca recebem campanha: lista em <a href="/clinic/precos" className="font-medium underline underline-offset-2">Configurações › Parâmetros</a>.
+        Pacientes que nunca recebem campanha: lista em <a href="/clinic/precos" className="font-medium underline underline-offset-2">Configurações › Parâmetros, Links e Campanhas</a>.
       </p>
 
       <button
@@ -85,7 +85,7 @@ export function BridgeAudiencePicker({ onRecipients }: { onRecipients: (r: Parse
         onClick={handlePreview}
         className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-emerald-800 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 rounded-lg disabled:opacity-50"
       >
-        {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Database className="w-3.5 h-3.5" />}
+        {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden /> : <Database className="w-3.5 h-3.5" aria-hidden />}
         {loading ? "Consultando o sistema da clínica…" : "Ver prévia do público"}
       </button>
 

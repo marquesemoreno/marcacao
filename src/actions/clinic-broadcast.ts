@@ -6,7 +6,7 @@ import { requireClinicSession } from "@/lib/session";
 import { formatToWhatsAppNumber } from "@/lib/whatsapp";
 import { uploadWhatsAppMedia } from "@/lib/whatsapp-media";
 import { buildBroadcastMessage, type ParsedBroadcastRecipient } from "@/lib/broadcast-csv";
-import { campaignSituation, estimateCampaignFinish, startOfBrazilDay, unknownTemplateVariables } from "@/lib/broadcast-schedule";
+import { campaignSituation, estimateCampaignFinish, startOfBrazilDay, unfilledPlaceholders, unknownTemplateVariables, URGENT_MAX_IMMEDIATE } from "@/lib/broadcast-schedule";
 import { RESCHEDULE_PENDING_TAG } from "@/lib/conversation-tags";
 import { formatDate } from "@/lib/format";
 import { fetchBridgeCampaignPatients } from "@/lib/hospital-bridge";
@@ -26,14 +26,15 @@ export async function listClinicBroadcastCampaigns() {
     orderBy: { createdAt: "desc" },
     include: {
       _count: { select: { recipients: true } },
-      recipients: { select: { status: true, sentAt: true, errorMessage: true } },
+      recipients: { select: { status: true, sentAt: true, errorMessage: true, phone: true } },
     },
   });
   // Alguma campanha normal com gente na fila? (a de baixa prioridade cede a vez — ver
   // lowPriorityMustYield em automated-pacing.ts)
-  const highPriorityPending = campaigns.some(
-    (c) => c.status === "RUNNING" && !c.lowPriority && c.recipients.some((r) => r.status === "PENDING")
-  );
+  const isActiveMarketing = (c: (typeof campaigns)[number]) =>
+    c.status === "RUNNING" && c.tagOnSend !== RESCHEDULE_PENDING_TAG && c.recipients.some((r) => r.status === "PENDING");
+  const highPriorityActive = campaigns.filter((c) => isActiveMarketing(c) && !c.lowPriority).length;
+  const highPriorityPending = highPriorityActive > 0;
 
   return campaigns.map((c) => {
     const sent = c.recipients.filter((r) => r.status === "SENT").length;
@@ -42,8 +43,11 @@ export async function listClinicBroadcastCampaigns() {
     const pending = c.recipients.filter((r) => r.status === "PENDING").length;
     const sentToday = c.recipients.filter((r) => r.status === "SENT" && r.sentAt && r.sentAt >= dayStart).length;
     const yielding = c.lowPriority && highPriorityPending;
-    const isReschedule = c.tagOnSend === RESCHEDULE_PENDING_TAG;
-    const estimate = isReschedule ? { businessDays: 0, finishIso: null } : estimateCampaignFinish({ pending, sentToday, now });
+    // Aviso de remarcação pequeno sai na hora; acima de URGENT_MAX_IMMEDIATE segue o ritmo seguro.
+    const isReschedule = c.tagOnSend === RESCHEDULE_PENDING_TAG && c._count.recipients <= URGENT_MAX_IMMEDIATE;
+    // Campanhas normais ativas se revezam no mesmo ritmo da clínica (ver automated-pacing).
+    const sharing = c.lowPriority ? 1 : Math.max(1, highPriorityActive);
+    const estimate = isReschedule ? { businessDays: 0, finishIso: null } : estimateCampaignFinish({ pending, sentToday, now, sharing });
     return {
       id: c.id,
       name: c.name,
@@ -54,11 +58,12 @@ export async function listClinicBroadcastCampaigns() {
       sent,
       failed: failedList.length,
       failureReasons: [...new Set(failedList.map((r) => r.errorMessage).filter((m): m is string => !!m))].slice(0, 3),
+      failures: failedList.slice(0, 30).map((r) => ({ phone: r.phone, reason: r.errorMessage })),
       skipped,
       pending,
       situation: isReschedule && c.status === "RUNNING" && pending > 0
         ? { tone: "ok" as const, text: "Enviando aviso urgente de remarcação" }
-        : campaignSituation({ status: c.status, pending, sentToday, yielding, now }),
+        : campaignSituation({ status: c.status, pending, sentToday, yielding, now, sharing }),
       finishIso: c.status === "COMPLETED" ? null : estimate.finishIso,
       businessDays: estimate.businessDays,
       createdAt: c.createdAt,
@@ -75,6 +80,16 @@ export async function getClinicCampaignStartPreview(campaignId: string) {
     where: { id: campaignId },
     select: { messageTemplate: true, imagePath: true, lowPriority: true },
   });
+  const otherActive = await prisma.broadcastCampaign.count({
+    where: {
+      clinicId,
+      status: "RUNNING",
+      lowPriority: false,
+      id: { not: campaignId },
+      OR: [{ tagOnSend: null }, { tagOnSend: { not: RESCHEDULE_PENDING_TAG } }],
+      recipients: { some: { status: "PENDING" } },
+    },
+  });
   const [pending, first, sentToday] = await Promise.all([
     prisma.broadcastRecipient.count({ where: { campaignId, status: "PENDING" } }),
     prisma.broadcastRecipient.findFirst({ where: { campaignId, status: "PENDING" }, orderBy: { createdAt: "asc" }, select: { phone: true, variables: true } }),
@@ -86,10 +101,25 @@ export async function getClinicCampaignStartPreview(campaignId: string) {
     samplePhone: first?.phone ?? null,
     sampleMessage: campaign ? buildBroadcastMessage(campaign.messageTemplate, vars) : "",
     unknownVariables: campaign ? unknownTemplateVariables(campaign.messageTemplate, vars) : [],
+    unfilled: campaign ? unfilledPlaceholders(campaign.messageTemplate) : [],
     hasImage: Boolean(campaign?.imagePath),
     lowPriority: Boolean(campaign?.lowPriority),
-    ...estimateCampaignFinish({ pending, sentToday, now: new Date() }),
+    ...estimateCampaignFinish({ pending, sentToday, now: new Date(), sharing: campaign?.lowPriority ? 1 : 1 + otherActive }),
   };
+}
+
+/** Devolve as falhas pra fila e deixa a campanha pausada — a recepção confere e clica
+ * em Retomar (passa pela confirmação de novo). */
+export async function retryClinicCampaignFailures(campaignId: string) {
+  const { clinicId } = await requireClinicSession();
+  await assertClinicOwnsCampaign(campaignId, clinicId);
+  const { count } = await prisma.broadcastRecipient.updateMany({
+    where: { campaignId, status: "FAILED" },
+    data: { status: "PENDING", errorMessage: null },
+  });
+  if (count > 0) await prisma.broadcastCampaign.update({ where: { id: campaignId }, data: { status: "PAUSED" } });
+  revalidatePath("/clinic/disparos");
+  return { requeued: count };
 }
 
 /** Exclui um rascunho (nunca iniciado). */

@@ -6,7 +6,7 @@ import { buildBroadcastMessage } from "@/lib/broadcast-csv";
 import { RESCHEDULE_PENDING_TAG } from "@/lib/conversation-tags";
 import { lastAutomatedSend } from "@/lib/automated-pacing-server";
 import { lowPriorityMustYield } from "@/lib/automated-pacing";
-import { isMarketingGapElapsed, isWithinMarketingWindow, MARKETING_DAILY_CAP, startOfBrazilDay } from "@/lib/broadcast-schedule";
+import { isMarketingGapElapsed, isWithinMarketingWindow, MARKETING_DAILY_CAP, startOfBrazilDay, URGENT_MAX_IMMEDIATE } from "@/lib/broadcast-schedule";
 
 const BATCH_SIZE = Number(process.env.BROADCAST_BATCH_SIZE) || 3;
 
@@ -30,7 +30,11 @@ export async function dispatchNextBatch(): Promise<{ processed: number }> {
     // Marketing (tudo que não é aviso de remarcação, com ou sem tag de acompanhamento): só
     // seg–sex 09–17h, 1 por vez com 4–6 min sorteados desde a última enviada e no máximo
     // MARKETING_DAILY_CAP por dia. Aviso de remarcação é urgente e mantém o ritmo antigo.
-    const isMarketing = campaign.tagOnSend !== RESCHEDULE_PENDING_TAG;
+    // Aviso de remarcação grande (> URGENT_MAX_IMMEDIATE) também entra no ritmo seguro —
+    // decisão do usuário em 15/10/2026, depois do envio por engano de 06/10.
+    const isMarketing =
+      campaign.tagOnSend !== RESCHEDULE_PENDING_TAG ||
+      (await prisma.broadcastRecipient.count({ where: { campaignId: campaign.id } })) > URGENT_MAX_IMMEDIATE;
     let take = BATCH_SIZE;
     if (isMarketing) {
       if (!isWithinMarketingWindow(now)) continue;

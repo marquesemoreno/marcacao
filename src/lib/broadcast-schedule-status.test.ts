@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { campaignSituation, estimateCampaignFinish, nextMarketingWindowLabel, unknownTemplateVariables } from "./broadcast-schedule";
+import { campaignSituation, estimateCampaignFinish, nextMarketingWindowLabel, unfilledPlaceholders, unknownTemplateVariables } from "./broadcast-schedule";
 
 const br = (iso: string) => new Date(`${iso}-03:00`);
 
@@ -61,5 +61,30 @@ describe("unknownTemplateVariables", () => {
   it("aponta {{variaveis}} que o público não tem", () => {
     expect(unknownTemplateVariables("Oi {{nome}}, {{link}} {{medico}}", { nome: "a", link: "b" })).toEqual(["medico"]);
     expect(unknownTemplateVariables("Oi {{ nome }}", { nome: "a" })).toEqual([]);
+  });
+});
+
+describe("unfilledPlaceholders", () => {
+  it("acha trechos do modelo ainda sem preencher", () => {
+    expect(unfilledPlaceholders("👨‍⚕️ [NOME DO MÉDICO] — [ESPECIALIDADE]")).toEqual(["[NOME DO MÉDICO]", "[ESPECIALIDADE]"]);
+    expect(unfilledPlaceholders("Dr. João — Urologia [obs]")).toEqual([]);
+  });
+});
+
+describe("revezamento e feriados", () => {
+  it("com outra campanha enviando, a previsão dobra", () => {
+    const solo = estimateCampaignFinish({ pending: 150, sentToday: 0, now: br("2026-10-14T09:00:00") });
+    const shared = estimateCampaignFinish({ pending: 150, sentToday: 0, now: br("2026-10-14T09:00:00"), sharing: 2 });
+    expect(solo.businessDays).toBe(2);
+    expect(shared.businessDays).toBe(4);
+  });
+  it("pula feriado nacional (sex 09/10 → seg 12/10 é feriado → ter 13/10)", () => {
+    const r = estimateCampaignFinish({ pending: 120, sentToday: 0, now: br("2026-10-09T09:00:00") });
+    expect(r.finishIso).toBe("2026-10-13");
+  });
+  it("situação mostra o revezamento", () => {
+    expect(campaignSituation({ status: "RUNNING", pending: 10, sentToday: 1, yielding: false, now: br("2026-10-15T10:00:00"), sharing: 2 }).text).toBe(
+      "Enviando em revezamento com outro envio — ~1 mensagem a cada 10 min"
+    );
   });
 });

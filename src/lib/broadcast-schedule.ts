@@ -1,3 +1,5 @@
+import { isNationalHolidayYMD } from "./holidays";
+
 /** Regras de ritmo das campanhas de marketing (todo disparo em massa que não é o aviso de
  * remarcação) — pra não queimar o número da clínica no WhatsApp. Aviso de remarcação NÃO passa por
  * aqui: é urgente e sai a qualquer hora. Brasil sem horário de verão: offset fixo -3h. */
@@ -5,6 +7,10 @@ const BRAZIL_OFFSET_MS = 3 * 3_600_000;
 
 export const MARKETING_START_HOUR = 9;
 export const MARKETING_END_HOUR = 17;
+/** Aviso urgente de remarcação sai na hora só até este tamanho; acima, segue o ritmo
+ * seguro das campanhas (decisão do usuário em 15/10/2026). */
+export const URGENT_MAX_IMMEDIATE = 40;
+
 /** Máximo por campanha por dia (~1 a cada 4–6 min em 8h dá ~95). */
 export const MARKETING_DAILY_CAP = 100;
 
@@ -40,13 +46,22 @@ function brParts(now: Date) {
   return { br, day: br.getUTCDay(), minutes: br.getUTCHours() * 60 + br.getUTCMinutes() };
 }
 
-const isBusinessDay = (d: Date) => d.getUTCDay() !== 0 && d.getUTCDay() !== 6;
+const isBusinessDay = (d: Date) =>
+  d.getUTCDay() !== 0 && d.getUTCDay() !== 6 && !isNationalHolidayYMD(d.getUTCFullYear(), d.getUTCMonth() + 1, d.getUTCDate());
 
 /** Previsão de término de uma campanha de marketing: dias úteis (contando hoje, se
  * ainda dá pra enviar hoje) e a data do último dia. Ignora a disputa com lembretes —
  * é uma estimativa otimista e o texto da tela diz "cerca de". */
-export function estimateCampaignFinish(input: { pending: number; sentToday: number; now: Date }): { businessDays: number; finishIso: string | null } {
+export function estimateCampaignFinish(input: {
+  pending: number;
+  sentToday: number;
+  now: Date;
+  /** Quantos envios dividem o ritmo da clínica (esta campanha + outras ativas). */
+  sharing?: number;
+}): { businessDays: number; finishIso: string | null } {
   if (input.pending <= 0) return { businessDays: 0, finishIso: null };
+  const share = Math.max(1, input.sharing ?? 1);
+  const perDay = Math.floor(MARKETING_PER_DAY / share);
   const { br, minutes } = brParts(input.now);
   let left = input.pending;
   let days = 0;
@@ -54,7 +69,7 @@ export function estimateCampaignFinish(input: { pending: number; sentToday: numb
   // Hoje: só o que cabe no resto da janela e no limite do dia.
   if (isBusinessDay(day) && minutes < MARKETING_END_HOUR * 60) {
     const start = Math.max(minutes, MARKETING_START_HOUR * 60);
-    const today = Math.min(Math.floor((MARKETING_END_HOUR * 60 - start) / 5), MARKETING_DAILY_CAP - input.sentToday, MARKETING_PER_DAY);
+    const today = Math.min(Math.floor((MARKETING_END_HOUR * 60 - start) / (5 * share)), MARKETING_DAILY_CAP - input.sentToday, perDay);
     if (today > 0) {
       left -= today;
       days++;
@@ -64,7 +79,7 @@ export function estimateCampaignFinish(input: { pending: number; sentToday: numb
   for (let guard = 0; guard < 400; guard++) {
     day.setUTCDate(day.getUTCDate() + 1);
     if (!isBusinessDay(day)) continue;
-    left -= MARKETING_PER_DAY;
+    left -= perDay;
     days++;
     if (left <= 0) break;
   }
@@ -90,6 +105,8 @@ export function campaignSituation(input: {
   sentToday: number;
   yielding: boolean;
   now: Date;
+  /** Quantos envios dividem o ritmo agora (esta + outras campanhas ativas da clínica). */
+  sharing?: number;
 }): CampaignSituation {
   if (input.status === "DRAFT") return { tone: "idle", text: "Rascunho — ainda não começou" };
   if (input.status === "PAUSED") return { tone: "idle", text: "Pausada" };
@@ -99,6 +116,10 @@ export function campaignSituation(input: {
   }
   if (!isWithinMarketingWindow(input.now)) return { tone: "wait", text: `Fora do horário de envio — retoma ${nextMarketingWindowLabel(input.now)}` };
   if (input.yielding) return { tone: "wait", text: "Aguardando: lembretes ou outra campanha estão na frente" };
+  const share = Math.max(1, input.sharing ?? 1);
+  if (share > 1) {
+    return { tone: "ok", text: `Enviando em revezamento com ${share === 2 ? "outro envio" : `mais ${share - 1} envios`} — ~1 mensagem a cada ${share * 5} min` };
+  }
   return { tone: "ok", text: "Enviando — 1 mensagem a cada 4–6 min" };
 }
 
@@ -107,4 +128,10 @@ export function unknownTemplateVariables(template: string, sampleVars: Record<st
   const keys = new Set(Object.keys(sampleVars).map((k) => k.toLowerCase()));
   const found = [...template.matchAll(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g)].map((m) => m[1]);
   return [...new Set(found.filter((k) => !keys.has(k.toLowerCase())))];
+}
+
+/** Trechos do modelo que ficaram sem preencher ("[NOME DO MÉDICO]") — sairiam assim
+ * pro paciente. Só maiúsculas, pra não pegar colchetes normais do texto. */
+export function unfilledPlaceholders(template: string): string[] {
+  return [...new Set(template.match(/\[[A-ZÀ-Ú][A-ZÀ-Ú0-9 /-]{2,}\]/g) ?? [])];
 }
