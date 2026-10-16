@@ -172,7 +172,17 @@ export async function listCloudAssets(): Promise<CloudAssets[]> {
   const accounts = await prisma.whatsappCloudAccount.findMany({ include: { clinic: { select: { tradeName: true } } } });
   return Promise.all(
     accounts.map(async (a) => {
-      const numbers = await listWabaPhoneNumbers(a.wabaId, decryptToken(a.accessToken));
+      // Token ilegível (chave WHATSAPP_TOKEN_ENCRYPTION_KEY ausente ou diferente da usada
+      // pra gravar) não pode derrubar a página inteira — vira aviso no card da conta.
+      let token: string | null = null;
+      try {
+        token = decryptToken(a.accessToken);
+      } catch {
+        token = null;
+      }
+      const numbers = token
+        ? await listWabaPhoneNumbers(a.wabaId, token)
+        : { success: false as const, error: "Não deu para ler o token: confira WHATSAPP_TOKEN_ENCRYPTION_KEY na Vercel (mesmo valor usado ao conectar)." };
       return {
         clinicId: a.clinicId,
         clinicName: a.clinic.tradeName,
