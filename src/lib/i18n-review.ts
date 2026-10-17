@@ -108,12 +108,39 @@ const DICT = {
   "tpl.sendOnlyApproved": ["Só modelos aprovados podem ser enviados.", "Only approved templates can be sent."],
   "tpl.variable": ["Variável", "Variable"],
 
+  "err.missingIds": ["A Meta não devolveu a conta ou o número. Refaça o cadastro até o fim, sem fechar a janela.", "Meta did not return the business account or the phone number. Run the signup again to the end without closing the window."],
+  "err.onlyWaba": ["A conta foi criada, mas nenhum número foi adicionado. Refaça o cadastro e adicione o número.", "The business account was created but no phone number was added. Run the signup again and add the number."],
+  "err.numberTaken": ["Esse número já está conectado a outra clínica.", "This phone number is already connected to another clinic."],
+  "err.codeRejected": ["A Meta recusou o código do cadastro ({detail}). Tente conectar de novo.", "Meta rejected the signup code ({detail}). Try connecting again."],
+  "err.unexpected": ["Erro inesperado. Tente de novo.", "Unexpected error. Please try again."],
+  "err.noAccount": ["Clínica sem conta da API oficial.", "This clinic has no Cloud API account."],
+  "err.badNumber": ["Informe o número com DDI e DDD (ex: 5577999998888).", "Enter the number with country and area code (e.g. 5577999998888)."],
+  "warn.webhook": ["Webhook não assinado na conta ({detail}) — mensagens recebidas e status não vão chegar até resolver.", "Webhook not subscribed on the account ({detail}) — incoming messages and statuses will not arrive until fixed."],
+  "warn.register": ["Número não registrado na Cloud API ({detail}) — o envio não vai funcionar até registrar.", "Phone number not registered on the Cloud API ({detail}) — sending will not work until it is registered."],
+  "warn.sync": ["Sincronização \"{type}\" não iniciada ({detail}).", "Sync \"{type}\" not started ({detail})."],
+  "connect.justConnected": ["Conectado agora", "Just connected"],
+  "connect.successBanner": ["Número conectado. Confira abaixo a conta e o número que o Conecta Saúde vai usar.", "Phone number connected. The business account and phone number our app will use are shown below."],
+  "connect.nextSend": ["Enviar uma mensagem →", "Send a message →"],
+  "connect.phone": ["Número", "Phone number"],
+  "connect.copy": ["Copiar", "Copy"],
+  "connect.copied": ["Copiado", "Copied"],
+  "connect.dismiss": ["Fechar", "Dismiss"],
+  "connect.testLabel": ["Número para o teste (DDI + DDD)", "Test recipient (country + area code)"],
+  "connect.testSent": ["Modelo hello_world enviado para {to}.", "Template hello_world sent to {to}."],
+  "connect.removeTitle": ["Remover a conexão de {clinic}?", "Disconnect {clinic}?"],
+  "connect.removeBody": ["O token salvo é apagado e o número {phone} deixa de enviar pela API oficial nesta clínica.", "The saved token is deleted and {phone} stops sending through the Cloud API for this clinic."],
+  "connect.removeCoex": ["Em coexistência, desconecte também no celular: WhatsApp Business › Configurações › Conta › Plataforma Business.", "For coexistence, also disconnect on the phone: WhatsApp Business › Settings › Account › Business Platform."],
+  "connect.removeCancel": ["Cancelar", "Cancel"],
+  "connect.removeConfirmButton": ["Remover {phone}", "Disconnect {phone}"],
+  "connect.removed": ["Conexão de {clinic} removida.", "{clinic} disconnected."],
   "common.loading": ["Carregando…", "Loading…"],
   "common.error": ["Erro", "Error"],
 } as const;
 
 export type I18nKey = keyof typeof DICT;
 
-export function t(lang: Lang, key: I18nKey): string {
-  return DICT[key][lang === "en" ? 1 : 0];
+export function t(lang: Lang, key: I18nKey, vars?: Record<string, string>): string {
+  let s: string = DICT[key][lang === "en" ? 1 : 0];
+  for (const [k, v] of Object.entries(vars ?? {})) s = s.replaceAll(`{${k}}`, v);
+  return s;
 }

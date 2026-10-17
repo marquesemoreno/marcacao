@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireAdminSession } from "@/lib/session";
 import { decryptToken, encryptToken } from "@/lib/token-crypto";
+import { t, type Lang } from "@/lib/i18n-review";
 import {
   createCloudTemplate,
   exchangeEmbeddedSignupCode,
@@ -81,30 +82,32 @@ export async function connectWhatsappCloud(input: {
   wabaId: string;
   phoneNumberId: string;
   coexistence: boolean;
+  /** Idioma das mensagens devolvidas (a gravação da análise da Meta é em inglês). */
+  lang?: Lang;
 }): Promise<{ success: true; displayPhoneNumber: string | null; warnings: string[] } | { success: false; error: string }> {
   await requireAdminSession();
-  if (!input.code || !input.wabaId || !input.phoneNumberId) {
-    return { success: false, error: "A Meta não devolveu a conta ou o número. Refaça o cadastro até o fim, sem fechar a janela." };
-  }
+  const lang = input.lang ?? "pt";
+  if (!input.code || !input.wabaId) return { success: false, error: t(lang, "err.missingIds") };
+  if (!input.phoneNumberId) return { success: false, error: t(lang, "err.onlyWaba") };
 
   const existingForNumber = await prisma.whatsappCloudAccount.findUnique({ where: { phoneNumberId: input.phoneNumberId } });
   if (existingForNumber && existingForNumber.clinicId !== input.clinicId) {
-    return { success: false, error: "Esse número já está conectado a outra clínica." };
+    return { success: false, error: t(lang, "err.numberTaken") };
   }
 
   const exchange = await exchangeEmbeddedSignupCode(input.code);
-  if (!exchange.success) return { success: false, error: `A Meta recusou o código do cadastro (${exchange.error}). Tente conectar de novo.` };
+  if (!exchange.success) return { success: false, error: t(lang, "err.codeRejected", { detail: exchange.error }) };
   const token = exchange.data.access_token;
 
   const warnings: string[] = [];
   const sub = await subscribeAppToWaba(input.wabaId, token);
-  if (!sub.success) warnings.push(`Webhook não assinado na conta (${sub.error}) — as mensagens recebidas e os status não vão chegar até resolver.`);
+  if (!sub.success) warnings.push(t(lang, "warn.webhook", { detail: sub.error }));
 
   let pin: string | null = null;
   if (!input.coexistence) {
     pin = String(randomInt(0, 1_000_000)).padStart(6, "0");
     const reg = await registerPhoneNumber(input.phoneNumberId, token, pin);
-    if (!reg.success) warnings.push(`Número não registrado na Cloud API (${reg.error}) — o envio não vai funcionar até registrar.`);
+    if (!reg.success) warnings.push(t(lang, "warn.register", { detail: reg.error }));
   }
 
   const info = await getPhoneNumberInfo(input.phoneNumberId, token);
@@ -129,7 +132,7 @@ export async function connectWhatsappCloud(input: {
   if (input.coexistence) {
     for (const type of ["smb_app_state_sync", "history"] as const) {
       const r = await requestCoexistenceSync(input.phoneNumberId, token, type);
-      if (!r.success) warnings.push(`Sincronização "${type}" não iniciada (${r.error}).`);
+      if (!r.success) warnings.push(t(lang, "warn.sync", { type, detail: r.error }));
     }
   }
 
@@ -138,10 +141,16 @@ export async function connectWhatsappCloud(input: {
 }
 
 /** Teste rápido da conexão: modelo "hello_world" (existe em toda conta nova da Meta). */
-export async function sendCloudTestMessage(clinicId: string, to: string): Promise<{ success: boolean; error?: string }> {
+export async function sendCloudTestMessage(clinicId: string, to: string, lang: Lang = "pt"): Promise<{ success: boolean; error?: string }> {
   await requireAdminSession();
   const r = await sendTemplateLogged(clinicId, to, { name: "hello_world", language: "en_US", bodyParams: [] }, "Hello World");
-  return r.success ? { success: true } : { success: false, error: r.error };
+  if (r.success) return { success: true };
+  // Erros nossos vêm em pt — traduz os conhecidos; os da Meta já vêm em inglês.
+  const known: Record<string, Parameters<typeof t>[1]> = {
+    "Clínica sem conta da API oficial.": "err.noAccount",
+    "Informe o número com DDI e DDD (ex: 5577999998888).": "err.badNumber",
+  };
+  return { success: false, error: known[r.error] ? t(lang, known[r.error]) : r.error };
 }
 
 /** Desconecta no nosso lado (apaga a conta e o token). Em coexistência, a clínica
