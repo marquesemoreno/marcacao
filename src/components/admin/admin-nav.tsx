@@ -39,7 +39,14 @@ const navItems: { href: string; label: string; icon: LucideIcon; exact?: boolean
  * é só o fallback pra telas estreitas (abaixo do breakpoint `md`, onde o trilho
  * vertical fica escondido — ver layout.tsx); mesmas cores e estados, só o eixo
  * muda pra caber numa faixa curta e rolável. */
-export function AdminNav({ orientation = "vertical" }: { orientation?: "vertical" | "horizontal" }) {
+export function AdminNav({
+  orientation = "vertical",
+  collapsed = false,
+}: {
+  orientation?: "vertical" | "horizontal";
+  /** Menu recolhido: só ícones, nome no title/aria-label. */
+  collapsed?: boolean;
+}) {
   const pathname = usePathname();
   const isHorizontal = orientation === "horizontal";
 
@@ -60,8 +67,10 @@ export function AdminNav({ orientation = "vertical" }: { orientation?: "vertical
             key={item.href}
             href={item.href}
             aria-current={isActive ? "page" : undefined}
+            title={collapsed ? item.label : undefined}
+            aria-label={collapsed ? item.label : undefined}
             className={`group flex shrink-0 items-center gap-2.5 rounded-lg text-[13px] font-semibold tracking-[-0.01em] transition-colors duration-150 ${
-              isHorizontal ? "px-3 py-2 whitespace-nowrap" : "px-3 py-2.5"
+              collapsed ? "justify-center px-2 py-2.5" : isHorizontal ? "px-3 py-2 whitespace-nowrap" : "px-3 py-2.5"
             } ${
               isActive
                 ? "bg-emerald-600 text-white shadow-sm shadow-emerald-950/40"
@@ -73,7 +82,7 @@ export function AdminNav({ orientation = "vertical" }: { orientation?: "vertical
                 isActive ? "text-white" : "text-slate-500 group-hover:text-slate-200"
               }`}
             />
-            <span className={isHorizontal ? "" : "truncate"}>{item.label}</span>
+            {!collapsed && <span className={isHorizontal ? "" : "truncate"}>{item.label}</span>}
           </Link>
         );
       })}
