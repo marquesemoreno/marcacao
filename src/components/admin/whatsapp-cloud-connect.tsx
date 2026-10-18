@@ -233,7 +233,7 @@ export function WhatsappCloudConnect({ rows, lang }: { rows: CloudAccountRow[]; 
   const removingPhone = removing?.account?.displayPhoneNumber ?? removing?.account?.phoneNumberId ?? "";
 
   return (
-    <div className="space-y-6 p-4 sm:p-6 max-w-4xl">
+    <div lang={lang === "en" ? "en" : "pt-BR"} className="space-y-6 p-4 sm:p-6 max-w-4xl">
       <CloudTabs lang={lang} active="/admin/whatsapp" />
       <div>
         <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">{tt("connect.title")}</h1>
@@ -248,6 +248,7 @@ export function WhatsappCloudConnect({ rows, lang }: { rows: CloudAccountRow[]; 
             <select
               value={clinicId}
               onChange={(e) => setClinicId(e.target.value)}
+              disabled={connecting}
               className="mt-1 h-9 w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 px-2 text-sm"
             >
               <option value="">{tt("connect.chooseClinic")}</option>
@@ -262,7 +263,7 @@ export function WhatsappCloudConnect({ rows, lang }: { rows: CloudAccountRow[]; 
         </div>
         {!clinicId && <p className="-mt-2 text-xs text-slate-500 dark:text-slate-400">{tt("connect.clinicHint")}</p>}
         {/* Número novo × coexistência: escolha que muda o fluxo inteiro da Meta (SMS × QR). */}
-        <fieldset className="space-y-2">
+        <fieldset className="space-y-2 disabled:opacity-60" disabled={connecting}>
           <legend className="text-sm font-medium text-slate-700 dark:text-slate-300">{tt("connect.numberType")}</legend>
           <div className="grid gap-3 sm:grid-cols-2">
             {[
@@ -400,6 +401,11 @@ export function WhatsappCloudConnect({ rows, lang }: { rows: CloudAccountRow[]; 
                       onChange={(e) => setTestTo((p) => ({ ...p, [row.clinicId]: e.target.value }))}
                       placeholder="5577999998888"
                       inputMode="tel"
+                      aria-describedby={`test-hint-${row.clinicId}`}
+                      aria-invalid={(() => {
+                        const n = (testTo[row.clinicId] ?? "").replace(/\D/g, "").length;
+                        return n > 0 && n < 12;
+                      })()}
                       className="mt-1 block h-8 w-48 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 px-2 text-sm"
                     />
                   </label>
@@ -415,7 +421,11 @@ export function WhatsappCloudConnect({ rows, lang }: { rows: CloudAccountRow[]; 
                   </button>
                   {(() => {
                     const n = (testTo[row.clinicId] ?? "").replace(/\D/g, "").length;
-                    return n > 0 && n < 12 ? <p className="basis-full text-xs text-amber-800 dark:text-amber-300">{tt("err.badNumber")}</p> : null;
+                    return (
+                      <p id={`test-hint-${row.clinicId}`} aria-live="polite" className="basis-full text-xs text-amber-800 dark:text-amber-300">
+                        {n > 0 && n < 12 ? tt("err.badNumber") : ""}
+                      </p>
+                    );
                   })()}
                   <button
                     type="button"

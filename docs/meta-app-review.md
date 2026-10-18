@@ -12,7 +12,7 @@ Telas usadas (todas no painel Admin, só equipe TIVDC) — abra sempre com `?lan
 | Send message | `https://www.conectasaudevc.com.br/admin/whatsapp/enviar?lang=en` |
 | Message templates | `https://www.conectasaudevc.com.br/admin/whatsapp/templates?lang=en` |
 
-Cada botão tem tooltip em inglês (passe o mouse antes de clicar, para aparecer no vídeo).
+Cada ação tem um texto de ajuda em inglês visível na própria tela (abaixo do botão).
 
 ---
 
@@ -33,9 +33,9 @@ Legendas: use o texto da coluna **Caption** como legenda queimada no vídeo (ou 
 | # | O que fazer | Caption (em inglês) |
 |---|---|---|
 | 1 | Abrir `/admin/whatsapp?lang=en`. Mostrar o título "WhatsApp — Cloud API". | "Conecta Saúde admin panel — the clinic connects its WhatsApp number to our app." |
-| 2 | Escolher a clínica no seletor "Clinic (tenant)". Deixar **desmarcado** "already uses the WhatsApp Business app". Passar o mouse em **Connect WhatsApp** (tooltip). | "The business admin starts Meta's Embedded Signup from our app." |
+| 2 | Escolher a clínica em **Clinic** (o botão só libera depois disso). Em "How is this number used today?", deixar selecionado **New number**. Mostrar o texto de ajuda abaixo de **Connect WhatsApp**. | "The business admin starts Meta's Embedded Signup from our app." |
 | 3 | Clicar **Connect WhatsApp**. No popup da Meta: login do Facebook (se pedir), **Continue**, escolher o portfólio **TIVDC**, criar/selecionar a **WhatsApp Business Account**, informar nome de exibição, **adicionar o número do chip novo**, receber e digitar o código, revisar as permissões e clicar **Confirm/Finish**. | "Meta login: the client selects the business portfolio, the WhatsApp Business Account and the phone number, and grants access to Conecta Saúde." |
-| 4 | De volta ao painel: toast "Connected", e o card em "Connected numbers" mostrando **número, verified name, WABA ID e Phone number ID**. | "Asset connected: WhatsApp Business Account and phone number now visible in our app." |
+| 4 | De volta ao painel: o botão mostra "Finishing setup with Meta…", depois aparece o aviso verde fixo e a tela rola até o card com o selo **Just connected**, mostrando **Verified name, Phone number, WABA ID e Phone number ID**. Deixar parado uns 3 s nesse card. Clicar em **Send a message →** no aviso. | "Asset connected: WhatsApp Business Account and phone number now visible in our app." |
 | 5 | No celular de teste (native client), mandar um "Hi" **para o número do chip** (abre a janela de 24 h para texto livre). | "The customer messages the business first (opens the 24-hour window)." |
 | 6 | Aba **Send message**. Mostrar o bloco "Sending business account and phone number" com **WABA** e **número** selecionados. | "Asset selection: the sending WABA and phone number are shown and selectable." |
 | 7 | Digitar o número de destino (o do celular de teste), o texto, por exemplo: `Hi Maria, your exam results are ready. Reply here if you have questions.` Passar o mouse em **Send** e clicar. | "Live send from our app UI via the Cloud API (POST /{phone-number-id}/messages)." |

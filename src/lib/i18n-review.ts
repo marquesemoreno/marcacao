@@ -133,7 +133,7 @@ const DICT = {
   "warn.register": ["Número não registrado na Cloud API ({detail}) — o envio não vai funcionar até registrar.", "Phone number not registered on the Cloud API ({detail}) — sending will not work until it is registered."],
   "warn.sync": ["Sincronização \"{type}\" não iniciada ({detail}).", "Sync \"{type}\" not started ({detail})."],
   "connect.justConnected": ["Conectado agora", "Just connected"],
-  "connect.successBanner": ["Número conectado. Confira abaixo a conta e o número que o Conecta Saúde vai usar.", "Phone number connected. The business account and phone number our app will use are shown below."],
+  "connect.successBanner": ["Número conectado. Confira abaixo a conta e o número que o Conecta Saúde vai usar.", "Phone number connected. The business account and phone number Conecta Saúde will use are shown below."],
   "connect.nextSend": ["Enviar uma mensagem →", "Send a message →"],
   "connect.phone": ["Número", "Phone number"],
   "connect.copy": ["Copiar", "Copy"],
