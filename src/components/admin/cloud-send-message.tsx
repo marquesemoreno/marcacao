@@ -59,7 +59,7 @@ export function CloudSendMessage({ assets, lang }: { assets: CloudAssets[]; lang
   const input = "mt-1 w-full h-9 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500";
 
   return (
-    <div className="space-y-6 p-4 sm:p-6 max-w-4xl">
+    <div className="flex-1 min-h-0 overflow-y-auto"><div className="space-y-6 p-4 sm:p-6 max-w-4xl">
       <CloudTabs lang={lang} active="/admin/whatsapp/enviar" />
       <div>
         <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">{tt("send.title")}</h1>
@@ -161,6 +161,7 @@ export function CloudSendMessage({ assets, lang }: { assets: CloudAssets[]; lang
           </ul>
         )}
       </section>
+    </div>
     </div>
   );
 }

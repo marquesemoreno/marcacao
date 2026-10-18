@@ -233,7 +233,7 @@ export function WhatsappCloudConnect({ rows, lang }: { rows: CloudAccountRow[]; 
   const removingPhone = removing?.account?.displayPhoneNumber ?? removing?.account?.phoneNumberId ?? "";
 
   return (
-    <div lang={lang === "en" ? "en" : "pt-BR"} className="space-y-6 p-4 sm:p-6 max-w-4xl">
+    <div lang={lang === "en" ? "en" : "pt-BR"} className="flex-1 min-h-0 overflow-y-auto"><div className="space-y-6 p-4 sm:p-6 max-w-4xl">
       <CloudTabs lang={lang} active="/admin/whatsapp" />
       <div>
         <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">{tt("connect.title")}</h1>
@@ -469,6 +469,7 @@ export function WhatsappCloudConnect({ rows, lang }: { rows: CloudAccountRow[]; 
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
     </div>
   );
 }

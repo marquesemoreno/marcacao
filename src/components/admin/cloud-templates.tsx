@@ -108,7 +108,7 @@ export function CloudTemplates({ assets, lang }: { assets: CloudAssets[]; lang: 
   const managerUrl = asset ? `https://business.facebook.com/wa/manage/message-templates/?waba_id=${asset.wabaId}` : "#";
 
   return (
-    <div className="space-y-6 p-4 sm:p-6 max-w-5xl">
+    <div className="flex-1 min-h-0 overflow-y-auto"><div className="space-y-6 p-4 sm:p-6 max-w-5xl">
       <CloudTabs lang={lang} active="/admin/whatsapp/templates" />
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
@@ -274,6 +274,7 @@ export function CloudTemplates({ assets, lang }: { assets: CloudAssets[]; lang: 
           </section>
         </>
       )}
+    </div>
     </div>
   );
 }
