@@ -1,8 +1,11 @@
 import { listCloudAccounts } from "@/actions/admin-whatsapp-cloud";
 import { WhatsappCloudConnect } from "@/components/admin/whatsapp-cloud-connect";
-import { langFrom } from "@/lib/i18n-review";
+import { langFrom, t } from "@/lib/i18n-review";
 
-export const metadata = { title: "WhatsApp — API oficial" };
+/** Título da aba no idioma da tela (a gravação da análise da Meta é em inglês). */
+export async function generateMetadata({ searchParams }: { searchParams: Promise<{ lang?: string }> }) {
+  return { title: t(langFrom((await searchParams).lang), "connect.pageTitle") };
+}
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 

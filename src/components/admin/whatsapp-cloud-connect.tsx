@@ -82,6 +82,7 @@ export function WhatsappCloudConnect({ rows, lang }: { rows: CloudAccountRow[]; 
   const [clinicId, setClinicId] = useState("");
   const [coexistence, setCoexistence] = useState(false);
   const [connecting, setConnecting] = useState(false);
+  const [finishing, setFinishing] = useState(false);
   const [justConnected, setJustConnected] = useState<string | null>(null);
   const [testTo, setTestTo] = useState<Record<string, string>>({});
   const [testing, setTesting] = useState<string | null>(null);
@@ -126,6 +127,7 @@ export function WhatsappCloudConnect({ rows, lang }: { rows: CloudAccountRow[]; 
       return;
     }
     setConnecting(true);
+    setFinishing(false);
     setJustConnected(null);
     session.current = {};
     try {
@@ -140,12 +142,13 @@ export function WhatsappCloudConnect({ rows, lang }: { rows: CloudAccountRow[]; 
               s.error
                 ? `${tt("connect.cancelled")} (${s.error})`
                 : s.cancelledAt
-                  ? `${tt("connect.cancelled")} — ${s.cancelledAt}`
+                  ? `${tt("connect.cancelled")} — ${stepText(s.cancelledAt)}`
                   : tt("connect.cancelled")
             );
             return;
           }
           void (async () => {
+            setFinishing(true);
             const { wabaId, phoneNumberId } = await waitForSignupIds(session);
             const result = await connectWhatsappCloud({
               clinicId,
@@ -156,6 +159,7 @@ export function WhatsappCloudConnect({ rows, lang }: { rows: CloudAccountRow[]; 
               lang,
             }).catch(() => ({ success: false as const, error: tt("err.unexpected") }));
             setConnecting(false);
+            setFinishing(false);
             if (!result.success) {
               toast.error(result.error);
               return;
@@ -200,7 +204,8 @@ export function WhatsappCloudConnect({ rows, lang }: { rows: CloudAccountRow[]; 
     if (!removing) return;
     setRemovePending(true);
     try {
-      await disconnectWhatsappCloud(removing.clinicId);
+      const r = await disconnectWhatsappCloud(removing.clinicId);
+      if (!r.success) throw new Error("disconnect");
       toast.success(tt("connect.removed", { clinic: removing.clinicName }));
       if (justConnected === removing.clinicId) setJustConnected(null);
       setRemoving(null);
@@ -208,6 +213,15 @@ export function WhatsappCloudConnect({ rows, lang }: { rows: CloudAccountRow[]; 
       toast.error(tt("err.unexpected"));
     } finally {
       setRemovePending(false);
+    }
+  }
+
+  /** Passo cru da Meta (ex.: PHONE_NUMBER_SETUP) → frase legível. */
+  function stepText(step: string) {
+    try {
+      return tt(`connect.step.${step}` as Parameters<typeof t>[1]);
+    } catch {
+      return tt("connect.step.other");
     }
   }
 
@@ -245,24 +259,57 @@ export function WhatsappCloudConnect({ rows, lang }: { rows: CloudAccountRow[]; 
               ))}
             </select>
           </label>
-          <label className="flex items-start gap-2 text-sm text-slate-700 dark:text-slate-300 sm:pt-6">
-            <input type="checkbox" checked={coexistence} onChange={(e) => setCoexistence(e.target.checked)} className="mt-0.5 size-4 accent-emerald-600" />
-            <span>{tt("connect.coexistence")}</span>
-          </label>
         </div>
-        <p className="rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 p-3 text-xs text-slate-700 dark:text-slate-300">
-          {coexistence ? tt("connect.coexistenceNote") : tt("connect.newNumberNote")}
-        </p>
+        {!clinicId && <p className="-mt-2 text-xs text-slate-500 dark:text-slate-400">{tt("connect.clinicHint")}</p>}
+        {/* Número novo × coexistência: escolha que muda o fluxo inteiro da Meta (SMS × QR). */}
+        <fieldset className="space-y-2">
+          <legend className="text-sm font-medium text-slate-700 dark:text-slate-300">{tt("connect.numberType")}</legend>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {[
+              { value: false, label: tt("connect.typeNew"), hint: tt("connect.typeNewHint"), note: tt("connect.newNumberNote") },
+              { value: true, label: tt("connect.typeCoex"), hint: tt("connect.typeCoexHint"), note: tt("connect.coexistenceNote") },
+            ].map((o) => {
+              const selected = coexistence === o.value;
+              return (
+                <label
+                  key={String(o.value)}
+                  className={`flex cursor-pointer items-start gap-2 rounded-lg border p-3 text-sm ${
+                    selected ? "border-emerald-500 bg-emerald-50/60 dark:bg-emerald-950/30 ring-1 ring-emerald-500" : "border-slate-200 dark:border-slate-700"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="number-type"
+                    checked={selected}
+                    onChange={() => setCoexistence(o.value)}
+                    className="mt-0.5 size-4 accent-emerald-600"
+                  />
+                  <span className="space-y-1">
+                    <span className="block font-semibold text-slate-900 dark:text-slate-100">{o.label}</span>
+                    <span className="block text-xs text-slate-600 dark:text-slate-400">{o.hint}</span>
+                    {selected && (
+                      <span className={`block text-xs ${o.value ? "font-semibold text-amber-800 dark:text-amber-300" : "text-slate-700 dark:text-slate-300"}`}>
+                        {o.note}
+                      </span>
+                    )}
+                  </span>
+                </label>
+              );
+            })}
+          </div>
+        </fieldset>
         <button
           type="button"
           onClick={handleConnect}
-          disabled={connecting}
-          title={tt("connect.buttonTip")}
+          disabled={connecting || !clinicId}
           className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 px-4 py-2 text-sm font-semibold text-white"
         >
           {connecting ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden /> : <PlugZap className="w-4 h-4" aria-hidden />}
-          {connecting ? tt("connect.connecting") : tt("connect.button")}
+          {finishing ? tt("connect.finishing") : connecting ? tt("connect.connecting") : tt("connect.button")}
         </button>
+        <p className="sr-only" aria-live="polite">
+          {finishing ? tt("connect.finishing") : connecting ? tt("connect.connecting") : ""}
+        </p>
         <p className="text-xs text-slate-500 dark:text-slate-400">{tt("connect.buttonTip")}</p>
       </section>
 
@@ -308,7 +355,7 @@ export function WhatsappCloudConnect({ rows, lang }: { rows: CloudAccountRow[]; 
                     {isNew && (
                       <span className="rounded-md bg-emerald-600 px-1.5 py-0.5 text-xs font-semibold text-white">{tt("connect.justConnected")}</span>
                     )}
-                    {a.coexistence && <span className="text-xs text-slate-500">· coexistence</span>}
+                    {a.coexistence && <span className="text-xs text-slate-500">· {tt("connect.coexBadge")}</span>}
                   </div>
                   <span
                     className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-semibold ${
@@ -366,6 +413,10 @@ export function WhatsappCloudConnect({ rows, lang }: { rows: CloudAccountRow[]; 
                     {testing === row.clinicId ? <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden /> : <Send className="w-3.5 h-3.5" aria-hidden />}
                     {tt("connect.test")}
                   </button>
+                  {(() => {
+                    const n = (testTo[row.clinicId] ?? "").replace(/\D/g, "").length;
+                    return n > 0 && n < 12 ? <p className="basis-full text-xs text-amber-800 dark:text-amber-300">{tt("err.badNumber")}</p> : null;
+                  })()}
                   <button
                     type="button"
                     onClick={() => setRemoving(row)}
