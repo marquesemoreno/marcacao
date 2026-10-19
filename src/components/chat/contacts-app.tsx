@@ -19,7 +19,7 @@ import {
 import { PATIENT_SORTS, type PatientSort } from "@/lib/patient-list";
 import { outcomeLabel } from "@/lib/report-metrics";
 import {
-  listAllContactsAdmin,
+  listContactsPageAdmin,
   createContactAdmin,
   checkContactPhoneAdmin,
   listClinicsForReassignment,
@@ -29,7 +29,7 @@ import {
 import { getDistinctConvenios, getDistinctDoctorNames } from "@/actions/clinic";
 import { parseContactsCsv, type ParsedContactRow } from "@/lib/contacts-csv";
 import { formatPhone, formatCpf, toTitleCaseName } from "@/lib/format";
-import { displayName } from "@/lib/contact-display";
+import { displayName, isUsableContactName } from "@/lib/contact-display";
 import { splitDoctorAgendas } from "@/lib/doctor-names";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
@@ -184,9 +184,9 @@ export function ContactsApp({ scope, basePath }: { scope: Scope; basePath: strin
 
   const fetchContacts = useCallback(async () => {
     if (scope === "admin") {
-      const all = await listAllContactsAdmin(urlQ || undefined);
-      setContacts(all);
-      setTotal(all.length);
+      const result = await listContactsPageAdmin(urlQ || undefined, page);
+      setContacts(result.rows);
+      setTotal(result.total);
     } else {
       const result = await listContactsPage(listParams);
       setContacts(result.rows);
@@ -224,9 +224,8 @@ export function ContactsApp({ scope, basePath }: { scope: Scope; basePath: strin
 
   const doctorOptions = splitDoctorAgendas(doctors);
 
-  // Clínica já vem paginada do servidor; admin carrega tudo e pagina na tela.
-  const filteredContacts =
-    scope === "admin" ? contacts.slice((page - 1) * CONTACTS_PAGE_SIZE, page * CONTACTS_PAGE_SIZE) : contacts;
+  // Clínica e admin já vêm paginados do servidor.
+  const filteredContacts = contacts;
   const pageCount = Math.max(1, Math.ceil(total / CONTACTS_PAGE_SIZE));
 
   async function handleOpenSheet(row: ContactRow) {
@@ -482,7 +481,7 @@ export function ContactsApp({ scope, basePath }: { scope: Scope; basePath: strin
       ) : (
       <>
       {/* Celular: um card por paciente (a tabela de 7 colunas exigia rolar na horizontal). */}
-      <ul className="md:hidden space-y-2" aria-label="Contatos">
+      <ul className="lg:hidden space-y-2" aria-label="Contatos">
         {isLoading ? (
           <li className="rounded-lg border border-slate-200 dark:border-slate-800 p-6 text-center text-sm text-slate-400">Carregando contatos...</li>
         ) : filteredContacts.length === 0 ? (
@@ -541,7 +540,7 @@ export function ContactsApp({ scope, basePath }: { scope: Scope; basePath: strin
           ))
         )}
       </ul>
-      <div className="hidden md:block overflow-hidden rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs">
+      <div className="hidden lg:block overflow-hidden rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs">
         <Table>
           <TableHeader>
             <TableRow className="bg-slate-50/70 dark:bg-slate-800/40">
@@ -578,7 +577,11 @@ export function ContactsApp({ scope, basePath }: { scope: Scope; basePath: strin
                       className="flex items-center gap-2.5 text-left hover:underline decoration-slate-400 underline-offset-2"
                     >
                       <AvatarBadge name={displayName(contact)} size={32} />
-                      <span className="font-semibold text-sm text-slate-900 dark:text-slate-100 truncate max-w-[220px]">{displayName(contact)}</span>
+                      {isUsableContactName(contact.name) ? (
+                        <span className="font-semibold text-sm text-slate-900 dark:text-slate-100 truncate max-w-[220px]">{displayName(contact)}</span>
+                      ) : (
+                        <span className="text-sm italic text-slate-500 dark:text-slate-400">Sem nome</span>
+                      )}
                     </button>
                   </TableCell>
                   <TableCell className="font-mono text-xs text-slate-600 dark:text-slate-400">

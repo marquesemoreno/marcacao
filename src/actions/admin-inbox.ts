@@ -29,6 +29,7 @@ import { processDocumentMessage } from "@/lib/documents/document-processor";
 import { validateExtractedDocument, type DocumentReviewData } from "@/lib/documents/document-validator";
 import { mentionsInvoiceRequest } from "@/lib/chat-messages";
 import type { Department, FunnelStage, InboxFilter } from "@/types/chat-crm";
+import { sortContactsNamedFirst } from "@/lib/contact-sort";
 import {
   sendMessageSchema,
   updateTagsSchema,
@@ -70,6 +71,52 @@ export async function listAllContactsAdmin(search?: string) {
     status: conversation.status,
     clinicName: conversation.clinic.tradeName,
   }));
+}
+
+// Mesmo tamanho de página de CONTACTS_PAGE_SIZE em contacts-app.tsx (arquivo "use server" não exporta constantes).
+const ADMIN_CONTACTS_PAGE_SIZE = 50;
+
+/** Uma página da aba "Contatos" do admin: busca e ordena só id/nome/telefone de todos (leve) e
+ * só então traz os dados completos da página pedida — antes vinham os ~1.750 contatos de uma
+ * vez e a tela paginava no navegador. */
+export async function listContactsPageAdmin(search: string | undefined, page: number) {
+  await requireAdminSession();
+  const where = search
+    ? {
+        contact: {
+          OR: [
+            { name: { contains: search, mode: "insensitive" as const } },
+            { phone: { contains: search } },
+            { cpf: { contains: search } },
+          ],
+        },
+      }
+    : {};
+  const light = await prisma.conversation.findMany({ where, select: { id: true, contact: { select: { name: true, phone: true } } } });
+  const sorted = sortContactsNamedFirst(light.map((c) => ({ id: c.id, name: c.contact.name, phone: c.contact.phone })));
+  const safePage = Math.max(1, Math.floor(page) || 1);
+  const ids = sorted.slice((safePage - 1) * ADMIN_CONTACTS_PAGE_SIZE, safePage * ADMIN_CONTACTS_PAGE_SIZE).map((c) => c.id);
+
+  const conversations = await prisma.conversation.findMany({
+    where: { id: { in: ids } },
+    include: { contact: true, clinic: { select: { tradeName: true } } },
+  });
+  const byId = new Map(conversations.map((c) => [c.id, c]));
+  const rows = ids.flatMap((id) => {
+    const conversation = byId.get(id);
+    if (!conversation) return [];
+    return [
+      {
+        conversationId: conversation.id,
+        name: conversation.contact.name,
+        phone: conversation.contact.phone ?? "",
+        cpf: conversation.contact.cpf,
+        status: conversation.status,
+        clinicName: conversation.clinic.tradeName,
+      },
+    ];
+  });
+  return { rows, total: sorted.length };
 }
 
 /** Mirror admin de listForwardTargets (inbox.ts) — sem clínica própria na sessão,
