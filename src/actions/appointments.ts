@@ -25,22 +25,6 @@ async function getAffiliateRefCode() {
   }
 }
 
-export async function listUpcomingAppointments(clinicId: string) {
-  const today = new Date();
-  const startOfToday = new Date(
-    Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate())
-  );
-
-  return prisma.appointment.findMany({
-    where: {
-      clinicProcedure: { clinicId },
-      date: { gte: startOfToday },
-    },
-    orderBy: { date: "asc" },
-    include: { clinicProcedure: { include: { clinic: true, procedure: true } } },
-  });
-}
-
 export async function createAppointment(input: CreateAppointmentInput) {
   // ZodError não chega legível no client (o Next redige o erro em produção e
   // mostra só uma mensagem genérica) — converte pra um Error simples com o
@@ -105,11 +89,4 @@ export async function createAppointment(input: CreateAppointmentInput) {
   // o valor de retorno cruza a fronteira Server->Client igual a props de
   // Server Component, e Decimal não é um tipo serializável nela.
   return toPlainAppointment(appointment);
-}
-
-export async function getAppointmentById(id: string) {
-  return prisma.appointment.findUnique({
-    where: { id },
-    include: { clinicProcedure: { include: { clinic: true, procedure: true } } },
-  });
 }

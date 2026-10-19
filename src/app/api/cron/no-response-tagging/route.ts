@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { notifyInboxRealtime } from "@/lib/supabase-server";
 import { NO_RESPONSE_TAG } from "@/lib/conversation-tags";
+import { isCronAuthorized } from "@/lib/request-auth";
 
 const STALE_HOURS = 24;
 
@@ -11,7 +12,7 @@ const STALE_HOURS = 24;
  * Pro) — mesma autenticação dos outros crons (CRON_SECRET). */
 export async function GET(request: Request) {
   const authHeader = request.headers.get("authorization");
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!isCronAuthorized(authHeader, process.env.CRON_SECRET)) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 

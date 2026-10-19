@@ -1438,10 +1438,12 @@ export async function transferConversation(
 
   const targetUser = await prisma.user.findUnique({
     where: { id: targetUserId },
-    select: { name: true, maxConcurrentChats: true, role: true, clinic: { select: { tradeName: true } } },
+    select: { name: true, maxConcurrentChats: true, role: true, clinicId: true, clinic: { select: { tradeName: true } } },
   });
 
-  if (!targetUser) {
+  // Atendente de outra clínica é tratado como inexistente (mesma resposta) — não revela
+  // que o id existe e não deixa a conversa ser entregue a alguém de fora.
+  if (!targetUser || targetUser.clinicId !== clinicId) {
     return { success: false, message: "Atendente de destino não encontrado." };
   }
 
@@ -2022,6 +2024,11 @@ export async function listContactMedia(conversationId: string) {
   }));
 }
 
+async function userBelongsToClinic(userId: string, clinicId: string) {
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { clinicId: true } });
+  return user?.clinicId === clinicId;
+}
+
 export async function assignConversationToUser(conversationId: string, targetUserId: string) {
   const { clinicId } = await requireClinicSession();
 
@@ -2031,6 +2038,9 @@ export async function assignConversationToUser(conversationId: string, targetUse
   });
   if (!conversation || conversation.clinicId !== clinicId) {
     throw new Error("Conversa não encontrada");
+  }
+  if (!(await userBelongsToClinic(targetUserId, clinicId))) {
+    throw new Error("Atendente de destino não encontrado.");
   }
 
   await prisma.conversation.update({
@@ -2204,7 +2214,11 @@ export async function restoreConversationOwners(owners: { id: string; assignedUs
     select: { id: true },
   });
   const ok = new Set(allowed.map((c) => c.id));
-  owners = owners.filter((o) => ok.has(o.id));
+  const ownerIds = [...new Set(owners.map((o) => o.assignedUserId).filter((id): id is string => !!id))];
+  const clinicUsers = new Set(
+    (await prisma.user.findMany({ where: { id: { in: ownerIds }, clinicId }, select: { id: true } })).map((u) => u.id)
+  );
+  owners = owners.filter((o) => ok.has(o.id) && (o.assignedUserId === null || clinicUsers.has(o.assignedUserId)));
   for (const o of owners) {
     await prisma.conversation.update({ where: { id: o.id }, data: { assignedUserId: o.assignedUserId } });
     await prisma.message.create({

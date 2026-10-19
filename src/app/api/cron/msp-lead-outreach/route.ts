@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
 import { runMspOutreachTick } from "@/lib/msp-lead-outreach";
+import { isCronAuthorized } from "@/lib/request-auth";
 
 /** Chamado a cada 5min pelo Vercel Cron (ver vercel.json). A frequência dessa chamada não é a frequência do disparo: cada
  * chamada só manda mensagem se já passou do `nextRunAt` guardado. */
 export async function GET(request: Request) {
   const authHeader = request.headers.get("authorization");
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!isCronAuthorized(authHeader, process.env.CRON_SECRET)) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 

@@ -5,6 +5,7 @@ import { sendWhatsAppMessage } from "@/lib/whatsapp";
 import { isWithinReminderWindow } from "@/lib/automated-pacing";
 import { askJevChoice } from "@/lib/jev";
 import { NO_RESPONSE_TAG } from "@/lib/conversation-tags";
+import { isCronAuthorized } from "@/lib/request-auth";
 import {
   AUTO_CLOSE_CONCLUDED_REASON,
   AUTO_CLOSE_HOURS,
@@ -30,7 +31,7 @@ const MAX_CLASSIFICATIONS = 60;
  * paciente responder depois, o webhook reabre (reopenIfResolved). De hora em hora. */
 export async function GET(request: Request) {
   const authHeader = request.headers.get("authorization");
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!isCronAuthorized(authHeader, process.env.CRON_SECRET)) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 

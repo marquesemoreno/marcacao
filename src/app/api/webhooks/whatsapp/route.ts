@@ -2,6 +2,7 @@ import { NextResponse, after } from "next/server";
 import { classifyAndStorePatientIntent } from "@/lib/patient-intent-server";
 import type { AppointmentStatus, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { isWebhookTokenAuthorized } from "@/lib/request-auth";
 import { sendAppointmentConfirmation, sendWhatsAppMessage, formatToWhatsAppNumber, getEvolutionConfig, toggleNinthDigit } from "@/lib/whatsapp";
 import { detectAcquisition } from "@/lib/acquisition";
 import { fetchMediaBase64, uploadWhatsAppMedia, formatDuration } from "@/lib/whatsapp-media";
@@ -484,11 +485,11 @@ async function handleDeviceOutbound(
 
 export async function POST(request: Request) {
   const requiredSecret = process.env.WHATSAPP_WEBHOOK_SECRET;
-  if (requiredSecret) {
-    const providedSecret = request.headers.get("x-webhook-token");
-    if (providedSecret !== requiredSecret) {
-      return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-    }
+  if (!requiredSecret) {
+    console.warn("WHATSAPP_WEBHOOK_SECRET não configurado: webhook da Evolution aceita qualquer remetente.");
+  }
+  if (!isWebhookTokenAuthorized(request.headers.get("x-webhook-token"), requiredSecret)) {
+    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
   const body = await request.json().catch(() => null);
@@ -1137,6 +1138,9 @@ export async function POST(request: Request) {
     where: {
       patientPhone: { endsWith: phoneSuffix },
       status: { in: ["PENDING", "CONFIRMED"] },
+      // A resposta chegou numa conversa de UMA clínica: só mexe em agendamento dela.
+      // Sem conversa (nenhuma clínica resolvida) mantém a busca global de antes.
+      ...(conversation ? { clinicProcedure: { clinicId: conversation.clinicId } } : {}),
     },
     orderBy: { createdAt: "desc" },
     include: { clinicProcedure: { include: { clinic: true, procedure: true } } },
@@ -1330,7 +1334,7 @@ export async function POST(request: Request) {
   } else if (newStatus === "CANCELLED") {
     const cancelMsg = `Olá ${updated.patientName}! Seu agendamento para ${updated.clinicProcedure.procedure.name} na ${updated.clinicProcedure.clinic.tradeName} foi cancelado com sucesso. Caso precise remarcar, acesse nosso site!`;
     try {
-      await sendWhatsAppMessage(updated.patientPhone, cancelMsg, "appointment.cancelled.ack");
+      await sendWhatsAppMessage(updated.patientPhone, cancelMsg, "appointment.cancelled.ack", resolvedClinicId);
       if (conversation) {
         await prisma.message.create({
           data: { conversationId: conversation.id, direction: "OUTBOUND", content: cancelMsg, status: "DELIVERED" },

@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { getAppointmentById } from "@/actions/appointments";
+import { getAppointmentById } from "@/lib/appointment-read";
 import { VoucherCard } from "@/components/public/voucher-card";
 import { toPlainAppointment } from "@/lib/serialize";
 import { getBaseUrl } from "@/lib/format";
