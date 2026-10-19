@@ -33,6 +33,19 @@ describe("buildBridgeConfirmationMessage", () => {
     expect(message).toContain("Formas de pagamento");
   });
 
+  it("ordem de chegada com horário: diz que é a partir daquele horário, sem prometer horário fixo", () => {
+    const message = buildBridgeConfirmationMessage({ ...base, time: "08:10", byArrivalOrder: true });
+    expect(message).toContain("a partir das 08:10");
+    expect(message).toContain("ordem de chegada");
+    expect(message).not.toContain("Horário: 08:10");
+  });
+
+  it("horário marcado continua mostrando só o horário", () => {
+    const message = buildBridgeConfirmationMessage({ ...base, time: "08:10", byArrivalOrder: false });
+    expect(message).toContain("⏰ Horário: 08:10");
+    expect(message).not.toContain("ordem de chegada");
+  });
+
   it("mostra 'Por ordem de chegada' quando não tem horário marcado (modo Chegada no modal)", () => {
     const message = buildBridgeConfirmationMessage({ ...base, time: null });
     expect(message).toContain("Por ordem de chegada");

@@ -5,6 +5,9 @@ export type BridgeConfirmationInput = {
   doctorName: string | null;
   dateFormatted: string;
   time: string | null;
+  /** Atendimento por ordem de chegada com horário de referência ("a partir de"): o horário não é
+   * fixo, só o ponto de partida daquele paciente na fila. */
+  byArrivalOrder?: boolean;
   /** Aviso extra específico da clínica (ex: política de retorno/pagamento da
    * Urolaser) — quem chama decide se manda, não é regra genérica do bridge.
    * Sem isso, cada clínica com bridge (Urolaser, Santa Clara, RC) receberia o
@@ -30,7 +33,9 @@ export function buildBridgeConfirmationMessage(input: BridgeConfirmationInput): 
   const lines = [
     `Olá, ${input.patientName}! Seu agendamento foi realizado:`,
     `📅 Data: ${input.dateFormatted}`,
-    `⏰ Horário: ${input.time || "Por ordem de chegada"}`,
+    input.time && input.byArrivalOrder
+      ? `⏰ Horário: a partir das ${input.time} (atendimento por ordem de chegada)`
+      : `⏰ Horário: ${input.time || "Por ordem de chegada"}`,
   ];
   if (input.doctorName) {
     lines.push(`👨‍⚕️ Profissional: Dr(a). ${toTitleCaseName(input.doctorName)}`);

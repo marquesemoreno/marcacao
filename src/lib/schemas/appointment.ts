@@ -30,6 +30,8 @@ export const createAppointmentSchema = z.object({
   clinicProcedureId: z.string().min(1),
   date: z.string().min(1, "Escolha uma data"),
   timeSlot: z.string().optional(),
+  /** Atendimento por ordem de chegada: `timeSlot` é só o "a partir de" daquele paciente. */
+  arrivalOrder: z.boolean().optional(),
   notes: z.string().optional(),
   /** Só usado no fluxo de integração hospitalar (Santa Clara/bridge) — clínicas do
    * marketplace não têm conceito de médico específico no agendamento rápido. */

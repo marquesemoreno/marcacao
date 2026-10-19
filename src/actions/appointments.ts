@@ -45,6 +45,7 @@ export async function createAppointment(input: CreateAppointmentInput) {
       clinicProcedureId: data.clinicProcedureId,
       date: data.date,
       timeSlot: data.timeSlot,
+      arrivalOrder: data.arrivalOrder,
       medicoId: data.medicoId,
       convenioId: data.convenioId,
       patientId: data.patientId,

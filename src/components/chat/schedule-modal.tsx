@@ -206,10 +206,17 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
     };
   }, [isOpen, fetchAgenda, doctorId, date]);
 
-  // Horário marcado: com médico e data escolhidos, sugere o último horário do dia + 10 min
-  // (08:00 → 08:10 → 08:20…). Sem marcação ainda, a atendente digita o primeiro.
+  // Ordem de chegada: a atendente digita o primeiro horário do dia ("a partir de") e, com médico
+  // e data escolhidos, cada paciente seguinte vem com o último horário + 10 min (08:00 → 08:10 →
+  // 08:20…). Horário marcado não muda: continua livre.
   useEffect(() => {
-    if (!isOpen || timeMode !== 'scheduled' || loadingAgenda || !doctorId || !date) {
+    if (!isOpen || timeMode !== 'arrival') {
+      setSuggestedTime(null);
+      // Saiu da Chegada: some a sugestão (horário digitado pela atendente fica).
+      if (!timeTouched && timeMode === 'scheduled') setTime('');
+      return;
+    }
+    if (loadingAgenda || !doctorId || !date) {
       setSuggestedTime(null);
       return;
     }
@@ -285,7 +292,7 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
     !date && "data",
     phone.replace(/\D/g, '').length < 10 && "telefone",
     requiresDoctor && !doctorId && "médico",
-    timeMode === 'scheduled' && !time && "horário",
+    timeMode === 'arrival' && !time && "horário de chegada",
   ].filter((field): field is string => Boolean(field));
 
   // Campo pendente só ganha destaque de erro depois da primeira tentativa de
@@ -295,7 +302,7 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
   const doctorError = hasAttemptedSubmit && requiresDoctor && !doctorId;
   const procedureError = hasAttemptedSubmit && !procedureId;
   const dateError = hasAttemptedSubmit && !date;
-  const timeError = hasAttemptedSubmit && timeMode === 'scheduled' && !time;
+  const timeError = hasAttemptedSubmit && timeMode === 'arrival' && !time;
 
   const labelClass = "block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5";
   const inputClass = (hasError: boolean) =>
@@ -322,6 +329,7 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
         clinicProcedureId: procedureId,
         date,
         timeSlot: time || undefined,
+        arrivalOrder: timeMode === 'arrival' ? true : undefined,
         medicoId: doctorId || undefined,
         convenioId: convenioId || undefined,
         patientId: patientId || undefined,
@@ -336,7 +344,7 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
           specialty: selectedProcedure.procedure.name,
           doctor: 'Clínica Conecta Saúde',
           date,
-          time: time || 'Ordem de chegada',
+          time: time ? (timeMode === 'arrival' ? `${time} (ordem de chegada)` : time) : 'Ordem de chegada',
           price,
         });
         setIsSuccess(false);
@@ -668,8 +676,6 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
                       type="button"
                       onClick={() => {
                         setTimeMode('arrival');
-                        setTime('');
-                        setTimeTouched(false);
                       }}
                       className={`px-2 py-1 rounded text-[10px] font-semibold transition-colors ${
                         timeMode === 'arrival'
@@ -681,37 +687,38 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
                     </button>
                   </div>
                 </div>
-                {timeMode === 'scheduled' ? (
+                <input
+                  type="time"
+                  value={time}
+                  onChange={(e) => {
+                    setTime(e.target.value);
+                    setTimeTouched(true);
+                  }}
+                  aria-label={timeMode === 'arrival' ? 'Horário de chegada (a partir de)' : 'Horário'}
+                  aria-required={timeMode === 'arrival'}
+                  className={inputClass(timeError)}
+                />
+                {timeMode === 'arrival' ? (
                   <>
-                    <input
-                      type="time"
-                      value={time}
-                      onChange={(e) => {
-                        setTime(e.target.value);
-                        setTimeTouched(true);
-                      }}
-                      aria-required="true"
-                      className={inputClass(timeError)}
-                    />
                     {suggestedTime && time === suggestedTime ? (
                       <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                        Sugerido: 10 min depois do último paciente desse médico. Pode trocar.
+                        Atendimento por ordem de chegada, a partir desse horário. Sugerido: 10 min depois do último paciente desse médico. Pode trocar.
                       </p>
                     ) : !suggestedTime && doctorId && date && !loadingAgenda ? (
                       <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                        Sem marcação nesse dia: digite o primeiro horário. Os próximos entram de 10 em 10 minutos.
+                        Atendimento por ordem de chegada. Digite o primeiro horário do dia: os próximos pacientes entram de 10 em 10 minutos.
                       </p>
-                    ) : null}
-                    {time && occupiedTimes.includes(time) && (
-                      <p className="mt-1 text-xs text-amber-600 dark:text-amber-400 font-medium">
-                        ⚠️ Esse médico já tem uma marcação às {time} nesse dia.
-                      </p>
+                    ) : (
+                      <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Atendimento por ordem de chegada, a partir desse horário.</p>
                     )}
                   </>
                 ) : (
-                  <div className="w-full h-10 flex items-center text-sm border border-dashed border-slate-200 dark:border-slate-700 rounded-lg px-3 text-slate-500 dark:text-slate-400">
-                    Por ordem de chegada
-                  </div>
+                  time &&
+                  occupiedTimes.includes(time) && (
+                    <p className="mt-1 text-xs text-amber-600 dark:text-amber-400 font-medium">
+                      ⚠️ Esse médico já tem uma marcação às {time} nesse dia.
+                    </p>
+                  )
                 )}
               </div>
             </div>

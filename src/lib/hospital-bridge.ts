@@ -286,6 +286,8 @@ export async function createBridgeAppointment(
     clinicProcedureId: string;
     date: string;
     timeSlot?: string;
+    /** Ordem de chegada: o horário é só "a partir de" (vai assim na confirmação ao paciente). */
+    arrivalOrder?: boolean;
     medicoId?: string;
     /** Paciente já cadastrado, escolhido via busca (fetchBridgePatients) — reaproveita
      * o cadastro em vez de criar um novo/depender do CPF pra achar o existente. */
@@ -367,6 +369,7 @@ export async function createBridgeAppointment(
       doctorName: doctor?.nome ?? null,
       dateFormatted: `${day}/${month}/${year}`,
       time: input.timeSlot || null,
+      byArrivalOrder: input.arrivalOrder,
       policyNotice: clinic.tradeName.includes("Urolaser") ? UROLASER_RETURN_POLICY_NOTICE : undefined,
     });
     await sendWhatsAppMessage(input.patientPhone, messageText, "appointment.bridge_confirmation", clinicId);
