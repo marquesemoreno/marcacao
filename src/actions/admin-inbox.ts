@@ -158,6 +158,27 @@ export async function listForwardTargetsAdmin(sourceConversationId: string, sear
   }));
 }
 
+/** Mesmo que getChatContact (inbox.ts), para o admin. */
+export async function getChatContactAdmin(conversationId: string) {
+  const { userId } = await requireAdminSession();
+  const conversation = await prisma.conversation.findUnique({
+    where: { id: conversationId },
+    include: {
+      contact: true,
+      clinic: { select: { id: true, tradeName: true, businessHours: true } },
+      assignedUser: { select: { id: true, name: true } },
+      messages: {
+        orderBy: { createdAt: "desc" },
+        take: 3,
+        select: { type: true, content: true, mimeType: true, createdAt: true, direction: true },
+      },
+    },
+  });
+  if (!conversation) return null;
+  const unreadCount = await prisma.message.count({ where: { conversationId, direction: "INBOUND", readAt: null } });
+  return toChatContact({ ...conversation, unreadCount }, userId);
+}
+
 export async function listChatContactsAdmin(filter: InboxFilter, search?: string, clinicId?: string) {
   const { userId } = await requireAdminSession();
 

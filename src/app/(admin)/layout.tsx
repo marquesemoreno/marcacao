@@ -26,7 +26,7 @@ export default async function AdminLayout({
 
       {/* Barra superior compacta — só no mobile, onde o trilho fica escondido. */}
       <header className="md:hidden flex h-14 shrink-0 items-center justify-between gap-3 border-b border-slate-200/80 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 px-4 fixed top-0 inset-x-0 z-30">
-        <Logo variant="full" size="sm" />
+        <Logo variant="full" size="sm" adaptive />
         <div className="flex items-center gap-2">
           <ThemeToggle />
           <SignOutButton />

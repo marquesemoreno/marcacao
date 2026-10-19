@@ -465,6 +465,28 @@ export async function listConversations(filter: ConversationFilter, search?: str
   }));
 }
 
+/** Uma conversa no formato da lista do Chat — para abrir por link direto (?c=) uma conversa que
+ * não está na aba atual (ex.: de outra atendente, finalizada ou arquivada). */
+export async function getChatContact(conversationId: string) {
+  const { clinicId, userId } = await requireClinicSession();
+  const conversation = await prisma.conversation.findUnique({
+    where: { id: conversationId },
+    include: {
+      contact: true,
+      assignedUser: { select: { id: true, name: true, role: true, clinicId: true } },
+      clinic: { select: { businessHours: true } },
+      messages: {
+        orderBy: { createdAt: "desc" },
+        take: 3,
+        select: { type: true, content: true, mimeType: true, createdAt: true, direction: true },
+      },
+    },
+  });
+  if (!conversation || conversation.clinicId !== clinicId) return null;
+  const unreadCount = await prisma.message.count({ where: { conversationId, direction: "INBOUND", readAt: null } });
+  return toChatContact({ ...maskForeignAssignee(conversation, clinicId), unreadCount }, userId);
+}
+
 export async function getConversation(conversationId: string) {
   const { clinicId } = await requireClinicSession();
 

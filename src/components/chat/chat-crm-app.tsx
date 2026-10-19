@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   listChatContacts,
+  getChatContact,
   listChatAgents,
   getChatMessages,
   getOlderChatMessages,
@@ -66,6 +67,7 @@ import {
 } from "@/actions/inbox";
 import {
   listChatContactsAdmin,
+  getChatContactAdmin,
   listChatAgentsAdmin,
   getChatMessagesAdmin,
   getOlderChatMessagesAdmin,
@@ -160,6 +162,7 @@ const ACTIONS_BY_SCOPE = {
   clinic: {
     listChatContacts: ((filter, search, _clinicId, assignedUserIdFilter) =>
       listChatContacts(filter, search, assignedUserIdFilter)) as ListChatContactsFn,
+    getChatContact: (id: string) => getChatContact(id),
     listChatAgents: () => listChatAgents(),
     getChatMessages: (id: string) => getChatMessages(id),
     getOlderChatMessages: (id: string, beforeId: string) => getOlderChatMessages(id, beforeId),
@@ -204,6 +207,7 @@ const ACTIONS_BY_SCOPE = {
   admin: {
     listChatContacts: ((filter, search, clinicId) =>
       listChatContactsAdmin(filter, search, clinicId)) as ListChatContactsFn,
+    getChatContact: (id: string) => getChatContactAdmin(id),
     listChatAgents: () => listChatAgentsAdmin(),
     getChatMessages: (id: string) => getChatMessagesAdmin(id),
     getOlderChatMessages: (id: string, beforeId: string) => getOlderChatMessagesAdmin(id, beforeId),
@@ -332,6 +336,8 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
     if (scope === "clinic" && view === "crm") getClinicDefaultTicket().then(setClinicTicket).catch(() => {});
   }, [scope, view]);
   const [contactsLoadError, setContactsLoadError] = useState(false);
+  // Conversa aberta por link direto que não pertence à aba atual (ver getChatContact).
+  const [linkedContact, setLinkedContact] = useState<Contact | null>(null);
   // CRM: as finalizadas são ~1.600 conversas (~4 MB) — ficam em cache e só recarregam de tempos em
   // tempos, ao mudar a busca/clínica ou depois de finalizar/reabrir um card (ver crm-load.ts).
   const finalizedCacheRef = useRef<Contact[]>([]);
@@ -716,7 +722,27 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
   contacts.forEach((c) => contactCacheRef.current.set(c.id, c));
   const selectedContact =
     contacts.find((c) => c.id === selectedContactId) ??
-    (selectedContactId ? contactCacheRef.current.get(selectedContactId) ?? null : null);
+    (selectedContactId ? contactCacheRef.current.get(selectedContactId) ?? linkedContact : null);
+
+  // Link direto (?c=) para uma conversa que não está na aba atual — de outra atendente,
+  // finalizada ou arquivada: ela nunca vem na lista nem no cache, e a tela ficava vazia.
+  // Busca só essa conversa depois que a lista carrega.
+  const selectedKnown = !!selectedContactId && (contacts.some((c) => c.id === selectedContactId) || contactCacheRef.current.has(selectedContactId));
+  useEffect(() => {
+    if (!selectedContactId || isLoadingContacts || selectedKnown || linkedContact?.id === selectedContactId) return;
+    let alive = true;
+    actions
+      .getChatContact(selectedContactId)
+      .then((c) => {
+        if (!alive) return;
+        if (c) setLinkedContact(c);
+        else toast.error("Não encontrei essa conversa.");
+      })
+      .catch(() => alive && toast.error("Não foi possível abrir essa conversa. Tente de novo."));
+    return () => {
+      alive = false;
+    };
+  }, [selectedContactId, isLoadingContacts, selectedKnown, linkedContact?.id, actions]);
 
   function selectContact(id: string) {
     suppressAutoSelectRef.current = false;

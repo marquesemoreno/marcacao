@@ -52,10 +52,14 @@ export function Logo({
   className,
   variant = "full",
   size = "md",
+  adaptive = false,
 }: {
   className?: string;
   variant?: LogoVariant;
   size?: LogoSize;
+  /** Só para cabeçalhos do painel, que escurecem com o tema: o texto vira branco no escuro.
+   * Nas páginas públicas (fundo sempre claro) fica desligado, senão "Conecta" some. */
+  adaptive?: boolean;
 }) {
   if (variant === "icon-only") {
     return <LogoIcon size={size} white={false} className={className} />;
@@ -67,8 +71,8 @@ export function Logo({
     <span className={cn("inline-flex items-center gap-2.5", className)}>
       <LogoIcon size={size} white={isWhite} />
       <span className={cn("font-extrabold tracking-tight", brandTextClasses[size])}>
-        <span className={isWhite ? "text-white" : "text-slate-900 dark:text-white"}>Conecta</span>{" "}
-        <span className={isWhite ? "text-white" : "text-teal-700 dark:text-teal-300"}>Saúde</span>
+        <span className={isWhite ? "text-white" : adaptive ? "text-slate-900 dark:text-white" : "text-slate-900"}>Conecta</span>{" "}
+        <span className={isWhite ? "text-white" : adaptive ? "text-teal-700 dark:text-teal-300" : "text-teal-700"}>Saúde</span>
       </span>
     </span>
   );
