@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { AlertTriangle, CalendarX2, RefreshCw } from "lucide-react";
 import { getAgenda, setAgendaStatus, type AgendaResult } from "@/actions/agenda";
+import { getSlotCandidates, listWaitlist } from "@/actions/waitlist";
+import { openSlotFromStatus, type OpenSlot } from "@/lib/waitlist";
 import {
   getClinicDoctorAgenda,
   listClinicConveniosForAppointment,
@@ -30,6 +32,7 @@ import { AgendaGrid, type AgendaColumn } from "./agenda-grid";
 import { AgendaMonth } from "./agenda-month";
 import { AgendaSummary } from "./agenda-summary";
 import { PatientSheet } from "./patient-sheet";
+import { WaitlistDialog } from "./waitlist-dialog";
 
 function rangeFor(view: AgendaView, date: string): { from: string; to: string; days: string[] } {
   if (view === "semana") {
@@ -79,6 +82,14 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
     patient?: { name: string; phone: string; from: AgendaItem };
   } | null>(null);
   const [updatedAt, setUpdatedAt] = useState<string | null>(null);
+  const [waitlistOpen, setWaitlistOpen] = useState(false);
+  const [waitlistSlot, setWaitlistSlot] = useState<{ slot: OpenSlot; exceptPhone: string | null } | null>(null);
+  const [waitlistCount, setWaitlistCount] = useState<number | null>(null);
+  useEffect(() => {
+    listWaitlist()
+      .then((list) => setWaitlistCount(list.filter((e) => e.status === "WAITING").length))
+      .catch(() => setWaitlistCount(null));
+  }, []);
   const [nowTime, setNowTime] = useState(nowInBahia);
   const today = todayInBahia();
 
@@ -166,6 +177,28 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
         throw e;
       }
       const name = toTitleCase(item.patientName || "Paciente");
+      // Cancelou/faltou num horário que ainda não passou: avisa se tem alguém na espera que combina.
+      const openSlot = openSlotFromStatus(
+        { status, date: item.date, time: item.time, doctor: item.doctor, procedure: item.procedure },
+        { date: todayInBahia(), time: nowInBahia() }
+      );
+      if (openSlot) {
+        getSlotCandidates(openSlot, item.phone)
+          .then((found) => {
+            if (found.length === 0) return;
+            toast.info(`Vaga aberta às ${openSlot.time}: ${found.length} na lista de espera combina${found.length === 1 ? "" : "m"}`, {
+              duration: 15000,
+              action: {
+                label: "Ver lista",
+                onClick: () => {
+                  setWaitlistSlot({ slot: openSlot, exceptPhone: item.phone });
+                  setWaitlistOpen(true);
+                },
+              },
+            });
+          })
+          .catch(() => {});
+      }
       const removesFromAgenda = item.source === "BRIDGE" && (status === "NO_SHOW" || status === "CANCELLED");
       toast.success(status === "AUTO" ? `${name}: voltou ao status do lembrete` : `${name} marcado como ${AGENDA_STATUS_META[status].label}`, {
         description: removesFromAgenda ? "Marcado só no Conecta — ajuste também no sistema da clínica." : undefined,
@@ -298,6 +331,11 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
           onToday={() => setDate(today)}
           onView={setView}
           onRefresh={reload}
+          onWaitlist={() => {
+            setWaitlistSlot(null);
+            setWaitlistOpen(true);
+          }}
+          waitlistCount={waitlistCount}
         />
 
         {view === "mes" && selectedGroups.length > 0 && (
@@ -399,6 +437,14 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
         )}
       </div>
 
+      <WaitlistDialog
+        open={waitlistOpen}
+        onOpenChange={setWaitlistOpen}
+        doctors={doctors}
+        slot={waitlistSlot?.slot ?? null}
+        exceptPhone={waitlistSlot?.exceptPhone ?? null}
+        onChanged={setWaitlistCount}
+      />
       <PatientSheet item={openItem} onClose={() => setOpenItem(null)} onSetStatus={handleSetStatus} onReschedule={handleReschedule} />
 
       {schedule && (

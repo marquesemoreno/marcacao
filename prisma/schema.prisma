@@ -1041,6 +1041,26 @@ model LossReason {
   @@map("loss_reasons")
 }
 
+/// Lista de espera da agenda (/clinic/agenda): paciente que aceita uma vaga que abrir.
+/// status: WAITING | OFFERED | BOOKED | CANCELLED. period: ANY | MORNING | AFTERNOON.
+/// Ver src/lib/waitlist.ts.
+model WaitlistEntry {
+  id          String    @id @default(cuid())
+  clinicId    String    @map("clinic_id")
+  patientName String    @map("patient_name")
+  phone       String
+  doctorName  String?   @map("doctor_name")
+  period      String    @default("ANY")
+  notes       String?
+  status      String    @default("WAITING")
+  offeredAt   DateTime? @map("offered_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@index([clinicId, status])
+  @@map("waitlist_entries")
+}
+
 /// Mensagens enviadas pelas telas de teste da API oficial (/admin/whatsapp/enviar e
 /// /templates) — o status (sent/delivered/read/failed) é atualizado pelo webhook. Base da
 /// gravação da análise do app na Meta.

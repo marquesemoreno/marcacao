@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronLeft, ChevronRight, Loader2, RefreshCw } from "lucide-react";
+import { ChevronLeft, ChevronRight, ListChecks, Loader2, RefreshCw } from "lucide-react";
 
 export type AgendaView = "dia" | "semana" | "mes" | "medico";
 
@@ -24,6 +24,8 @@ export function AgendaToolbar({
   onNext,
   onView,
   onRefresh,
+  onWaitlist,
+  waitlistCount,
 }: {
   label: string;
   view: AgendaView;
@@ -33,6 +35,9 @@ export function AgendaToolbar({
   onNext: () => void;
   onView: (v: AgendaView) => void;
   onRefresh: () => void;
+  onWaitlist: () => void;
+  /** Pacientes aguardando vaga; null enquanto não carregou. */
+  waitlistCount: number | null;
 }) {
   const navBtn = `inline-flex items-center justify-center h-9 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 ${focusRing}`;
   return (
@@ -60,6 +65,15 @@ export function AgendaToolbar({
           {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
         </button>
       </div>
+      <button
+        type="button"
+        onClick={onWaitlist}
+        className={`${navBtn} gap-1.5 px-3 text-sm font-medium`}
+        title="Pacientes esperando uma vaga abrir"
+      >
+        <ListChecks className="w-4 h-4" aria-hidden />
+        Lista de espera{waitlistCount ? <span className="tabular-nums rounded-md bg-emerald-100 dark:bg-emerald-950/60 px-1.5 text-xs font-semibold text-emerald-800 dark:text-emerald-300">{waitlistCount}</span> : null}
+      </button>
       <div role="group" aria-label="Visão da agenda" className="inline-flex rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 p-0.5">
         {AGENDA_VIEWS.map((v) => (
           <button
