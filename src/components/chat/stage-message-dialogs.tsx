@@ -107,7 +107,7 @@ export function StageMessageSettings() {
     listStageMessages()
       .then((v) => {
         setValues(v);
-        setAvailable(true);
+        setAvailable(!!v); // null = admin: sem clínica na sessão
       })
       .catch(() => setAvailable(false)); // admin: sem clínica na sessão
   }, []);

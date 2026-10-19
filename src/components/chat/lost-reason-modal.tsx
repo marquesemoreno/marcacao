@@ -42,6 +42,7 @@ export function LostReasonModal({
     setReasonError(null);
     listLossReasons()
       .then((list) => {
+        if (!list) return setCanManage(false);
         setLost(list);
         setCanManage(true);
       })

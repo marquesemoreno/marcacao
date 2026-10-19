@@ -769,7 +769,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
   useEffect(() => {
     if (!isFinishModalOpen) return;
     listLossReasons()
-      .then((list) => setCustomFinishReasons(list.filter((r) => customLossReasonLabel(r.id)).map((r) => ({ id: r.id, label: `Não fechou — ${r.label}`, negative: true }))))
+      .then((list) => setCustomFinishReasons((list ?? []).filter((r) => customLossReasonLabel(r.id)).map((r) => ({ id: r.id, label: `Não fechou — ${r.label}`, negative: true }))))
       .catch(() => setCustomFinishReasons([]));
   }, [isFinishModalOpen]);
   // Finalizar rápido (crítica 14/10/2026): já abre com o motivo mais provável marcado

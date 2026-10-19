@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { requireClinicSession } from "@/lib/session";
+import { getClinicSessionOrNull, requireClinicSession } from "@/lib/session";
 
 async function ownedConversation(conversationId: string, clinicId: string) {
   const conversation = await prisma.conversation.findUnique({
@@ -15,7 +15,9 @@ async function ownedConversation(conversationId: string, clinicId: string) {
 
 /** CPF/convênio achados nas mensagens do paciente que ainda não estão no cadastro. */
 export async function getPatientSuggestion(conversationId: string) {
-  const { clinicId } = await requireClinicSession();
+  const session = await getClinicSessionOrNull();
+  if (!session) return null;
+  const { clinicId } = session;
   const conversation = await ownedConversation(conversationId, clinicId);
   const suggestion = await prisma.patientDataSuggestion.findUnique({ where: { conversationId } });
   if (!suggestion) return null;
