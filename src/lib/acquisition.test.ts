@@ -85,3 +85,23 @@ describe("detectAcquisition", () => {
     );
   });
 });
+
+describe("campanha (detalhe) além do canal", () => {
+  it("utm_campaign vira o detalhe", () => {
+    const a = detectAcquisition({ text: "Olá utm_source=google&utm_medium=cpc&utm_campaign=vasectomia-outubro" }, []);
+    expect(a).toMatchObject({ channel: "Google Ads", detail: "vasectomia outubro" });
+  });
+  it("código #site-<página> identifica a página do site da clínica", () => {
+    const a = detectAcquisition({ text: "Olá! Vim pelo site e quero agendar. #site-vasectomia" }, []);
+    expect(a).toMatchObject({ channel: "Site da Clínica", detail: "vasectomia" });
+  });
+  it("códigos de campanha por canal: #gads-, #ig-, #fb-, #gmn-", () => {
+    expect(detectAcquisition({ text: "Quero agendar #gads-check-up" }, [])).toMatchObject({ channel: "Google Ads", detail: "check up" });
+    expect(detectAcquisition({ text: "oi #ig-outubro-rosa" }, [])).toMatchObject({ channel: "Instagram Orgânico", detail: "outubro rosa" });
+    expect(detectAcquisition({ text: "oi #fb-promo" }, [])).toMatchObject({ channel: "Facebook Orgânico", detail: "promo" });
+    expect(detectAcquisition({ text: "oi #gmn-centro" }, [])).toMatchObject({ channel: "Google Meu Negócio", detail: "centro" });
+  });
+  it("#site sem página continua só com o canal", () => {
+    expect(detectAcquisition({ text: "vi no site #site" }, [])).toMatchObject({ channel: "Site da Clínica", detail: null });
+  });
+});

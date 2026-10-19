@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { requireClinicSession } from "@/lib/session";
 import { startOfUTCDay, addUTCDays } from "@/lib/date";
 import { periodWindow, type PeriodKey } from "@/lib/report-period";
+import { computeCampaignReport } from "@/lib/crm-campaigns";
 import { computeCampaignStats, phoneKey, type CampaignStats } from "@/lib/campaign-report";
 import { RESCHEDULE_PENDING_TAG as CAMPAIGN_RESCHEDULE_TAG } from "@/lib/conversation-tags";
 import {
@@ -751,4 +752,44 @@ export async function getClinicCampaignReport(period: PeriodKey = "30"): Promise
     createdAt: c.createdAt.toISOString(),
     stats: computeCampaignStats(c.recipients, contactRows),
   }));
+}
+
+/** Relatório "Por campanha" (canal + detalhe da 1ª mensagem). Investimento informado só
+ * existe por mês — com período "Este mês"/"Mês passado" o custo e o retorno aparecem;
+ * nas janelas móveis (7/30/90 dias) a tabela vem sem custo (`month` null). */
+export async function getClinicCampaignBreakdown(period: PeriodKey = "30") {
+  const { clinicId } = await requireClinicSession();
+  const { since, until } = periodWindow(period, false);
+  const month =
+    period === "mes" || period === "mes-anterior"
+      ? new Date(since.getTime() - 3 * 3_600_000).toISOString().slice(0, 7)
+      : null;
+  const [conversations, clinic, spends] = await Promise.all([
+    prisma.conversation.findMany({
+      where: { clinicId, createdAt: { gte: since, ...(until ? { lt: until } : {}) }, AND: [NOT_ADMINISTRATIVE] },
+      select: { acquisitionChannel: true, acquisitionDetail: true, status: true, resolutionReason: true },
+    }),
+    prisma.clinic.findUniqueOrThrow({ where: { id: clinicId }, select: { defaultTicket: true } }),
+    month ? prisma.campaignSpend.findMany({ where: { clinicId, month }, select: { campaign: true, amount: true } }) : Promise.resolve([]),
+  ]);
+  const spendByLabel = Object.fromEntries(spends.map((s) => [s.campaign, Number(s.amount)]));
+  const ticket = clinic.defaultTicket !== null ? Number(clinic.defaultTicket) : null;
+  return { month, rows: computeCampaignReport(conversations, ticket, spendByLabel) };
+}
+
+/** Investimento de uma campanha no mês (R$). Valor vazio/0 apaga. */
+export async function saveCampaignSpend(input: { campaign: string; month: string; amount: number | null }) {
+  const { clinicId } = await requireClinicSession();
+  if (!/^\d{4}-\d{2}$/.test(input.month) || !input.campaign.trim()) return { success: false as const, error: "Dados inválidos." };
+  if (!input.amount || input.amount <= 0) {
+    await prisma.campaignSpend.deleteMany({ where: { clinicId, campaign: input.campaign, month: input.month } });
+  } else {
+    await prisma.campaignSpend.upsert({
+      where: { clinicId_campaign_month: { clinicId, campaign: input.campaign, month: input.month } },
+      create: { clinicId, campaign: input.campaign, month: input.month, amount: input.amount },
+      update: { amount: input.amount },
+    });
+  }
+  revalidatePath("/clinic/relatorio");
+  return { success: true as const };
 }

@@ -21,6 +21,7 @@ import {
   type KanbanStage,
 } from '@/lib/crm-board';
 import { NO_RESPONSE_TAG } from '@/lib/conversation-tags';
+import { campaignLabel, groupByCampaign } from '@/lib/crm-campaigns';
 import {
   Search,
   ArrowRight,
@@ -121,6 +122,9 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
   const [search, setSearch] = useState('');
   const [selectedAgent, setSelectedAgent] = useState<string>('todos');
   const [quick, setQuick] = useState<CrmQuickFilter>('ativos');
+  // Agrupar por etapa (padrão) ou por campanha de origem (pedido de 19/10, ref. Kommo).
+  const [groupBy, setGroupBy] = useState<'etapa' | 'campanha'>('etapa');
+  const [campaign, setCampaign] = useState<string>('todas');
   const [openCardId, setOpenCardId] = useState<string | null>(null);
   const [dragOverStage, setDragOverStage] = useState<KanbanStage | null>(null);
   const [finishing, setFinishing] = useState<Contact | null>(null);
@@ -178,9 +182,10 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
           !q || c.name.toLowerCase().includes(q) || c.phone.includes(search.trim()) || c.tags.some((t) => t.toLowerCase().includes(q));
         const matchesAgent =
           selectedAgent === 'todos' || (selectedAgent === 'unassigned' ? isUnassignedAgent(c.responsibleAgent) : c.responsibleAgent === selectedAgent);
-        return matchesSearch && matchesAgent && matchesQuickFilter(toBoardInput(c), quick, now);
+        const matchesCampaign = campaign === 'todas' || campaignLabel(c.acquisitionChannel, c.acquisitionDetail) === campaign;
+        return matchesSearch && matchesAgent && matchesCampaign && matchesQuickFilter(toBoardInput(c), quick, now);
       }),
-    [contacts, search, selectedAgent, quick, now]
+    [contacts, search, selectedAgent, campaign, quick, now]
   );
 
   const columns = useMemo(
@@ -193,10 +198,13 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
     [filtered, quick, ticket]
   );
 
+  const campaignOptions = useMemo(() => groupByCampaign(contacts).map((col) => col.label), [contacts]);
+  const campaignColumns = useMemo(() => groupByCampaign(filtered), [filtered]);
+
   const openCard = openCardId ? contacts.find((c) => c.id === openCardId) ?? null : null;
   const openColumn = openCard ? columns.find((col) => col.stage.id === stageOf(openCard))?.cards.map((x) => x.contact) ?? [] : [];
   const openIndex = openCard ? openColumn.findIndex((c) => c.id === openCard.id) : -1;
-  const hasActiveFilter = search.trim() !== '' || selectedAgent !== 'todos' || quick !== 'ativos';
+  const hasActiveFilter = search.trim() !== '' || selectedAgent !== 'todos' || quick !== 'ativos' || campaign !== 'todas';
   const finalizedCount = contacts.filter((c) => c.isResolved).length;
   // Primeira carga: não mostra "0 pacientes" nem colunas vazias como se fosse o resultado.
   const loadingEmpty = isLoading && contacts.length === 0;
@@ -241,6 +249,35 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
               ))}
             </select>
           </div>
+          <select
+            aria-label="Filtrar por campanha"
+            value={campaign}
+            onChange={(e) => setCampaign(e.target.value)}
+            className="w-full sm:w-56 h-9 px-3 text-sm bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+          >
+            <option value="todas">Todas as campanhas</option>
+            {campaignOptions.map((label) => (
+              <option key={label} value={label}>
+                {label}
+              </option>
+            ))}
+          </select>
+          <div role="radiogroup" aria-label="Agrupar colunas por" className="inline-flex rounded-lg border border-slate-200 dark:border-slate-700 p-0.5">
+            {(['etapa', 'campanha'] as const).map((g) => (
+              <button
+                key={g}
+                type="button"
+                role="radio"
+                aria-checked={groupBy === g}
+                onClick={() => setGroupBy(g)}
+                className={`h-8 px-3 rounded-md text-sm font-medium ${
+                  groupBy === g ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900' : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
+                }`}
+              >
+                {g === 'etapa' ? 'Por etapa' : 'Por campanha'}
+              </button>
+            ))}
+          </div>
           <StageMessageSettings />
           {hasActiveFilter && (
             <button
@@ -249,6 +286,7 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
                 setSearch('');
                 setSelectedAgent('todos');
                 setQuick('ativos');
+                setCampaign('todas');
               }}
               className="text-sm font-medium text-slate-600 dark:text-slate-300 underline underline-offset-2"
             >
@@ -296,8 +334,82 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
         </div>
       )}
 
+      {groupBy === 'campanha' && (
+        <div className="flex-1 min-h-0 overflow-x-auto overflow-y-hidden p-3 sm:p-4">
+          <div className="grid h-full min-h-0 grid-flow-col auto-cols-[minmax(260px,1fr)] gap-3">
+            {campaignColumns.length === 0 && (
+              <p className="text-sm text-slate-500 dark:text-slate-400">Nenhum paciente com esses filtros.</p>
+            )}
+            {campaignColumns.map((col) => {
+              const scheduled = col.items.filter((c) => stageOf(c) === 'agendado').length;
+              const value = columnValue(col.items.map(toBoardInput), ticket);
+              return (
+                <section
+                  key={col.label}
+                  aria-label={`${col.label}: ${col.items.length} paciente${col.items.length === 1 ? '' : 's'}`}
+                  className="flex h-full min-h-0 flex-col rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50/90 dark:bg-slate-900/60"
+                >
+                  <header className="shrink-0 rounded-t-lg border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 py-2.5">
+                    <div className="flex items-center gap-2">
+                      <h3 className="min-w-0 truncate text-sm font-semibold" title={col.label}>{col.label}</h3>
+                      <span className="ml-auto text-xs font-medium text-slate-500 dark:text-slate-400 tabular-nums">{col.items.length}</span>
+                    </div>
+                    <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400 tabular-nums">
+                      {scheduled} agendado{scheduled === 1 ? '' : 's'}
+                      {value.total > 0 ? ` · ${formatCurrency(value.total)} estimado` : ''}
+                    </p>
+                  </header>
+                  <div className="flex-1 min-h-0 overflow-y-auto p-2 space-y-2">
+                    {sortColumn(col.items.map((c) => Object.assign(toBoardInput(c), { contact: c }))).map(({ contact, estimatedValueNumber }) => {
+                      const name = displayName(contact);
+                      const st = stageOf(contact);
+                      return (
+                        <article key={contact.id} className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-2.5 shadow-xs">
+                          <button
+                            type="button"
+                            onClick={() => setOpenCardId(contact.id)}
+                            className="flex w-full items-center gap-2 text-left rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
+                            aria-label={`Abrir ${name}`}
+                          >
+                            <AvatarBadge name={name} photoUrl={contact.avatar} size={28} className="shrink-0" />
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate text-sm font-semibold">{name}</span>
+                              <span className="block truncate text-xs text-slate-500 dark:text-slate-400">
+                                {isUnassignedAgent(contact.responsibleAgent) ? 'Sem dono' : contact.responsibleAgent.split(' ')[0]}
+                              </span>
+                            </span>
+                            {estimatedValueNumber ? (
+                              <span className="shrink-0 text-xs font-semibold text-emerald-700 dark:text-emerald-400 tabular-nums">{formatCurrency(estimatedValueNumber)}</span>
+                            ) : null}
+                          </button>
+                          <div className="mt-1.5 flex items-center justify-between gap-1">
+                            <span className="rounded-md bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 text-xs text-slate-600 dark:text-slate-300">
+                              {st === 'finalizado' ? contact.statusTag.label : STAGE_TITLE[st]}
+                            </span>
+                            {onOpenContactChat && (
+                              <button
+                                type="button"
+                                onClick={() => onOpenContactChat(contact.id)}
+                                aria-label={`Abrir conversa com ${name}`}
+                                className="inline-flex h-7 items-center gap-1 rounded-md px-2 text-xs font-medium text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/50"
+                              >
+                                <MessageCircle className="w-3.5 h-3.5" aria-hidden /> Chat
+                              </button>
+                            )}
+                          </div>
+                        </article>
+                      );
+                    })}
+                  </div>
+                </section>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Quadro: só ele rola na horizontal; cada coluna rola por dentro na vertical. */}
-      <div className="flex-1 min-h-0 overflow-x-auto overflow-y-hidden p-3 sm:p-4">
+      <div className={`flex-1 min-h-0 overflow-x-auto overflow-y-hidden p-3 sm:p-4 ${groupBy === 'campanha' ? 'hidden' : ''}`}>
         <div className="grid h-full min-h-0 grid-flow-col auto-cols-[minmax(260px,1fr)] gap-3">
           {columns.map(({ stage, cards, value }) => {
             const Icon = STAGE_ICONS[stage.id];

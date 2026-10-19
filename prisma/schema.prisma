@@ -216,6 +216,7 @@ model Clinic {
   cannedResponses      CannedResponse[]
   whatsappInstance     WhatsappInstance?
   whatsappCloudAccount WhatsappCloudAccount?
+  campaignSpends       CampaignSpend[]
   hospitalIntegration  HospitalIntegration?
   aiAttendantConfig    AiAttendantConfig?
   broadcastCampaigns   BroadcastCampaign[]
@@ -1121,4 +1122,21 @@ model CloudTestMessage {
 
   @@index([clinicId, createdAt])
   @@map("cloud_test_messages")
+}
+
+/// Investimento informado pela clínica por campanha e mês (relatório "Por campanha":
+/// custo por lead, custo por agendamento e retorno). `campaign` = rótulo de
+/// campaignLabel (canal + detalhe), `month` = "AAAA-MM".
+model CampaignSpend {
+  id        String   @id @default(cuid())
+  clinicId  String   @map("clinic_id")
+  campaign  String
+  month     String
+  amount    Decimal  @db.Decimal(10, 2)
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  clinic Clinic @relation(fields: [clinicId], references: [id])
+
+  @@unique([clinicId, campaign, month])
+  @@map("campaign_spends")
 }

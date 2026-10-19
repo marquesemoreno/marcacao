@@ -5,6 +5,7 @@ import { Copy, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
+import { CampaignLinkBuilder } from "@/components/clinic/campaign-link-builder";
 
 type TrackedLink = { channel: string; url: string };
 
@@ -40,7 +41,7 @@ function CopyLinkRow({ channel, url }: TrackedLink) {
  * Negócio, na bio do Instagram e no Facebook — o texto de cada um foi desenhado pra bater
  * nas palavras-chave genéricas do classificador (ver src/lib/acquisition.ts), então a
  * conversa já chega com `acquisitionChannel` certo em vez de "Não identificado". */
-export function TrackedLinksCard({ links }: { links: TrackedLink[] }) {
+export function TrackedLinksCard({ links, whatsapp }: { links: TrackedLink[]; whatsapp?: string | null }) {
   return (
     <Card>
       <CardHeader className="pb-2">
@@ -57,6 +58,7 @@ export function TrackedLinksCard({ links }: { links: TrackedLink[] }) {
             <CopyLinkRow key={l.channel} channel={l.channel} url={l.url} />
           ))}
         </div>
+        {whatsapp && <CampaignLinkBuilder whatsapp={whatsapp} />}
       </CardContent>
     </Card>
   );

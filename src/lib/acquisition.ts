@@ -45,6 +45,29 @@ const KEYWORD_CHANNEL_RULES: { keywords: string[]; channel: string }[] = [
   { keywords: ["vim pelo site", "#site"], channel: "Site da Clínica" },
 ];
 
+/** Código de campanha no texto pré-preenchido: `#<canal>-<campanha>` (ex.: `#site-vasectomia`
+ * no botão da página de vasectomia do site, `#gads-check-up` no anúncio do Google). Mais
+ * discreto pro paciente que uma URL com utm. A campanha vira o detalhe da conversa (coluna
+ * do CRM "Por campanha"). */
+const CAMPAIGN_CODE_CHANNELS: Record<string, string> = {
+  site: "Site da Clínica",
+  gads: "Google Ads",
+  gmn: "Google Meu Negócio",
+  ig: "Instagram Orgânico",
+  fb: "Facebook Orgânico",
+};
+
+/** "vasectomia-outubro" / "check_up" → "vasectomia outubro" / "check up". */
+function humanizeCampaign(raw: string): string {
+  return decodeURIComponent(raw).replace(/[-_+]+/g, " ").trim().toLowerCase();
+}
+
+function campaignFromCode(text: string): { channel: string; detail: string } | null {
+  const m = /#(site|gads|gmn|ig|fb)-([\w-]+)/i.exec(text);
+  if (!m) return null;
+  return { channel: CAMPAIGN_CODE_CHANNELS[m[1].toLowerCase()], detail: humanizeCampaign(m[2]) };
+}
+
 function channelFromKeyword(text: string): string | null {
   const normalized = normalize(text);
   for (const rule of KEYWORD_CHANNEL_RULES) {
@@ -95,7 +118,13 @@ export function detectAcquisition(
   }
 
   const utm = channelFromUtm(input.text);
-  if (utm) return { channel: utm, detail: null, adId: null };
+  if (utm) {
+    const campaign = /utm_campaign=([\w.%-]+)/i.exec(input.text)?.[1];
+    return { channel: utm, detail: campaign ? humanizeCampaign(campaign) : null, adId: null };
+  }
+
+  const code = campaignFromCode(input.text);
+  if (code) return { ...code, adId: null };
 
   const text = normalize(input.text);
   const rule = rules.find((r) => r.keyword.trim() && text.includes(normalize(r.keyword)));

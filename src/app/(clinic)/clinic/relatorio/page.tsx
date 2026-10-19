@@ -26,7 +26,9 @@ import {
   getDistinctAcquisitionChannels,
   listClinicProcedures,
   getClinicCampaignReport,
+  getClinicCampaignBreakdown,
 } from "@/actions/clinic";
+import { CampaignBreakdownTable } from "@/components/clinic/campaign-breakdown-table";
 import Link from "next/link";
 import { isProcedureAgenda } from "@/lib/doctor-names";
 import { formatDurationHuman, SLA_CRITICAL_MINUTES, SLA_WARNING_MINUTES } from "@/lib/sla-calculator";
@@ -127,6 +129,7 @@ export default async function ClinicReportPage({
     campaigns,
     prevChat,
     prevManagement,
+    campaignBreakdown,
   ] = await Promise.all([
     getClinicChatReport(period, tags, params.channel),
     isExclusive
@@ -141,6 +144,7 @@ export default async function ClinicReportPage({
     // Janela de comparação ("↑ 8 pts vs setembro").
     getClinicChatReport(period, tags, params.channel, true),
     getClinicManagementReport(period, params.channel, true),
+    getClinicCampaignBreakdown(period),
   ]);
   const rs = chatReport.responseStats;
   const prevRs = prevChat.responseStats;
@@ -724,6 +728,20 @@ export default async function ClinicReportPage({
             conversas anteriores ao rastreamento ou abertas por lembrete/disparo da clínica. Mostra todos os canais, mesmo
             com o filtro de canal ativo.
           </p>
+        </div>
+
+        {/* POR CAMPANHA — canal + campanha da 1ª mensagem (anúncio, utm, #site-…) */}
+        <div className="space-y-3">
+          <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">Por campanha</h3>
+          <p className="text-xs text-slate-600 dark:text-slate-400">
+            Campanha = canal + nome do anúncio, utm_campaign ou código do link (ex.: #site-vasectomia — gere os links em
+            Configurações › Links). {campaignBreakdown.month
+              ? "Informe quanto foi investido no mês para ver custo por lead, por agendamento e retorno."
+              : "Escolha \"Este mês\" ou \"Mês passado\" para informar o investimento e ver custo e retorno."}
+          </p>
+          <div className={`${card} overflow-hidden`}>
+            <CampaignBreakdownTable rows={campaignBreakdown.rows} month={campaignBreakdown.month} />
+          </div>
         </div>
 
         {/* CAMPANHAS DE DISPARO — progresso e retorno (em andamento ou do período) */}

@@ -50,6 +50,7 @@ export default async function ClinicSettingsPage() {
         defaultTicket={clinic.defaultTicket?.toString() ?? null}
         acquisitionRules={acquisitionRules}
         trackedLinks={trackedLinks}
+        whatsapp={clinic.whatsapp}
         />
       </div>
     </div>
