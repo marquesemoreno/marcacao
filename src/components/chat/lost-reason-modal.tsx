@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2 } from "lucide-react";
+import { Loader2, Plus, X } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { addLossReason, listLossReasons, removeLossReason } from "@/actions/loss-reasons";
+import { customLossReasonLabel, resolveLossReasons } from "@/lib/loss-reasons";
 
 /** Desfechos ao mover um card pra "Finalizado" no CRM. Os de perda (PERDA_*) capturam a
  * objeção do paciente — base pro relatório de por que não fechou. */
@@ -10,12 +12,6 @@ const WON = [
   { id: "AGENDAMENTO_CONCLUIDO", label: "Agendou / realizou" },
   { id: "DUVIDA_ESCLARECIDA", label: "Só tirou dúvida" },
   { id: "ADMINISTRATIVO", label: "Administrativo (médico ou equipe)" },
-];
-const LOST = [
-  { id: "PERDA_PRECO", label: "Preço" },
-  { id: "PERDA_CONVENIO", label: "Convênio não atendido" },
-  { id: "PERDA_HORARIO", label: "Horário / agenda" },
-  { id: "PERDA_OUTRO", label: "Outro motivo" },
 ];
 
 export function LostReasonModal({
@@ -32,12 +28,43 @@ export function LostReasonModal({
   const [reason, setReason] = useState<string | null>(null);
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
+  // Padrões + os da clínica. Fora do painel da clínica (admin) a lista não carrega e ficam só os padrões.
+  const [lost, setLost] = useState(resolveLossReasons([]));
+  const [canManage, setCanManage] = useState(false);
+  const [newReason, setNewReason] = useState("");
+  const [reasonError, setReasonError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
     setReason(null);
     setNotes("");
+    setNewReason("");
+    setReasonError(null);
+    listLossReasons()
+      .then((list) => {
+        setLost(list);
+        setCanManage(true);
+      })
+      .catch(() => setCanManage(false));
   }, [open]);
+
+  async function handleAdd() {
+    if (!newReason.trim()) return;
+    setReasonError(null);
+    try {
+      setLost(await addLossReason(newReason));
+      setNewReason("");
+    } catch (e) {
+      setReasonError(e instanceof Error ? e.message : "Não foi possível adicionar.");
+    }
+  }
+
+  async function handleRemove(id: string) {
+    const label = customLossReasonLabel(id);
+    if (!label) return;
+    if (reason === id) setReason(null);
+    setLost(await removeLossReason(label));
+  }
 
   const needsNotes = reason === "PERDA_OUTRO";
   const option = (o: { id: string; label: string }, tone: "won" | "lost") => (
@@ -75,9 +102,57 @@ export function LostReasonModal({
           <div>
             <p className="text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">Não fechou — por quê?</p>
             <div role="radiogroup" aria-label="Motivo da perda" className="grid grid-cols-2 gap-2">
-              {LOST.map((o) => option(o, "lost"))}
+              {lost.map((o) => (
+                <div key={o.id} className="relative">
+                  {option(o, "lost")}
+                  {canManage && customLossReasonLabel(o.id) && (
+                    <button
+                      type="button"
+                      aria-label={`Remover motivo ${o.label}`}
+                      onClick={() => handleRemove(o.id)}
+                      className="absolute right-1.5 top-1.5 rounded p-0.5 text-slate-400 hover:text-rose-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
+                    >
+                      <X className="w-3.5 h-3.5" aria-hidden />
+                    </button>
+                  )}
+                </div>
+              ))}
             </div>
           </div>
+          {canManage && (
+            <div>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  aria-label="Novo motivo de perda"
+                  value={newReason}
+                  maxLength={40}
+                  onChange={(e) => setNewReason(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      handleAdd();
+                    }
+                  }}
+                  placeholder="Novo motivo da clínica (ex.: foi para outra clínica)"
+                  className="h-9 flex-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 px-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+                />
+                <button
+                  type="button"
+                  onClick={handleAdd}
+                  disabled={!newReason.trim()}
+                  className="inline-flex h-9 items-center gap-1 rounded-lg px-3 text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-50"
+                >
+                  <Plus className="w-4 h-4" aria-hidden /> Adicionar
+                </button>
+              </div>
+              {reasonError && (
+                <p role="alert" className="mt-1 text-xs text-rose-600">
+                  {reasonError}
+                </p>
+              )}
+            </div>
+          )}
           {(needsNotes || reason?.startsWith("PERDA_")) && (
             <div>
               <label htmlFor="lost-notes" className="text-xs font-medium text-slate-600 dark:text-slate-400">

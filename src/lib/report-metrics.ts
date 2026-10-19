@@ -2,6 +2,7 @@
  * tipo de atendimento e horário de pico) — separadas das queries em
  * src/actions/clinic.ts pra dar pra testar sem banco. */
 import { toTitleCaseName } from "./format";
+import { customLossReasonLabel } from "./loss-reasons";
 import { computeBusinessMinutesElapsed, SLA_WARNING_MINUTES } from "./sla-calculator";
 import type { BusinessHours } from "./schemas/clinic";
 
@@ -97,7 +98,8 @@ const OUTCOME_LABELS: Record<string, { label: string; group: OutcomeGroup }> = {
 };
 /** Rótulo curto do motivo de finalização (relatório e filtro "motivo" de Pacientes). */
 export function outcomeLabel(reason: string) {
-  return OUTCOME_LABELS[reason]?.label ?? reason;
+  const custom = customLossReasonLabel(reason);
+  return OUTCOME_LABELS[reason]?.label ?? (custom ? `Perdido — ${custom}` : reason);
 }
 
 const GROUP_ORDER: OutcomeGroup[] = ["agendou", "perdido", "outro", "sem_desfecho"];
@@ -114,7 +116,10 @@ export function computeOutcomes(conversations: { status: string; resolutionReaso
     counts.set(key, (counts.get(key) ?? 0) + 1);
   }
   const rows: OutcomeRow[] = [...counts.entries()].map(([reason, count]) => {
-    const meta = OUTCOME_LABELS[reason] ?? { label: "Outro motivo", group: "outro" as const };
+    const custom = customLossReasonLabel(reason);
+    const meta =
+      OUTCOME_LABELS[reason] ??
+      (custom ? { label: `Perdido — ${custom}`, group: "perdido" as const } : { label: "Outro motivo", group: "outro" as const });
     return { reason, label: meta.label, group: meta.group, count, pct: pct(count, resolved.length) };
   });
   rows.sort((a, b) => GROUP_ORDER.indexOf(a.group) - GROUP_ORDER.indexOf(b.group) || b.count - a.count);

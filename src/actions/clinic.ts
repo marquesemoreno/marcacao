@@ -15,7 +15,9 @@ import {
   businessHoursSchema,
   type BusinessHours,
 } from "@/lib/schemas/clinic";
-import { notifyAppointmentStatus } from "@/lib/whatsapp";
+import { notifyAppointmentStatus, formatToWhatsAppNumber, toggleNinthDigit } from "@/lib/whatsapp";
+import { notifyInboxRealtime } from "@/lib/supabase-server";
+import { rebookingConversationUpdate } from "@/lib/rebooking";
 import {
   computeAttendantPerformance,
   computeConfirmationStats,
@@ -352,6 +354,38 @@ export async function getClinicManagementReport(period: PeriodKey = "30", channe
   };
 }
 
+/** A mensagem de cancelamento/falta convida o paciente a responder pedindo novo horário:
+ * a conversa dele nesta clínica precisa estar na fila da recepção quando ele responder.
+ * Nunca derruba a mudança de status. */
+async function reopenConversationForRebooking(clinicId: string, patientPhone: string, status: "CANCELLED" | "NO_SHOW") {
+  try {
+    const full = formatToWhatsAppNumber(patientPhone);
+    const phones = [full, toggleNinthDigit(full)].filter((p): p is string => !!p);
+    const conversation = await prisma.conversation.findFirst({
+      where: { clinicId, channel: "WHATSAPP", contact: { phone: { in: phones } } },
+      orderBy: { createdAt: "desc" },
+    });
+    if (!conversation) return;
+
+    await prisma.conversation.update({ where: { id: conversation.id }, data: rebookingConversationUpdate(conversation) });
+    await prisma.message.create({
+      data: {
+        conversationId: conversation.id,
+        direction: "OUTBOUND",
+        type: "INTERNAL_NOTE",
+        content:
+          status === "CANCELLED"
+            ? "🔄 Agendamento cancelado — paciente convidado a remarcar. Conversa marcada como Remarcação Pendente."
+            : "🔄 Paciente faltou — convidado a remarcar. Conversa marcada como Remarcação Pendente.",
+        status: "SENT",
+      },
+    });
+    notifyInboxRealtime(clinicId).catch(() => {});
+  } catch (error) {
+    console.error("Falha ao reabrir conversa para remarcação:", error);
+  }
+}
+
 export async function updateAppointmentStatus(appointmentId: string, status: AppointmentStatus) {
   const { clinicId } = await requireClinicSession();
   const { status: validStatus } = updateAppointmentStatusSchema.parse({ status });
@@ -408,6 +442,10 @@ export async function updateAppointmentStatus(appointmentId: string, status: App
     await notifyAppointmentStatus(validStatus, updated);
   } catch (error) {
     console.error("Falha ao notificar mudança de status via WhatsApp:", error);
+  }
+
+  if (validStatus === "CANCELLED" || validStatus === "NO_SHOW") {
+    await reopenConversationForRebooking(clinicId, updated.patientPhone, validStatus);
   }
 
   revalidatePath("/clinic/agendamentos");

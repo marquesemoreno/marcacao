@@ -1,3 +1,4 @@
+import { customLossReasonLabel } from "@/lib/loss-reasons";
 /** Linha do tempo única da ficha do paciente (N1) — junta fontes que hoje ficam
  * espalhadas: primeiro contato, mudanças de etapa (com autor), notas do sistema/equipe,
  * campanhas, lembretes do bridge e respostas, agendamentos e finalização. Puro. */
@@ -78,7 +79,7 @@ export function buildPatientTimeline(input: {
       kind: "resolved",
       at: input.resolved.at,
       title: "Atendimento finalizado",
-      ...(input.resolved.reason ? { detail: RESOLUTION_LABELS[input.resolved.reason] ?? input.resolved.reason } : {}),
+      ...(input.resolved.reason ? { detail: RESOLUTION_LABELS[input.resolved.reason] ?? (customLossReasonLabel(input.resolved.reason) ? `Perdido — ${customLossReasonLabel(input.resolved.reason)}` : input.resolved.reason) } : {}),
     });
   }
   return events.sort((a, b) => b.at.getTime() - a.at.getTime());

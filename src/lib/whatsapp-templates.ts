@@ -71,13 +71,22 @@ function confirmedAppointmentMessage(data: AppointmentNotificationData) {
   return lines.join("\n");
 }
 
+function firstName(fullName: string) {
+  return fullName.trim().split(/\s+/)[0] ?? fullName;
+}
+
+/** Cancelou ou faltou: em vez de mandar o paciente refazer a busca no site, convida a
+ * remarcar respondendo no próprio WhatsApp — a conversa volta pra fila da recepção
+ * (ver reopenForRebooking em src/actions/clinic.ts). */
+const REBOOK_INVITE = "Quer um novo horário? Responda esta mensagem e nossa equipe encontra a melhor data pra você. 😊";
+
 function cancelledAppointmentMessage(data: AppointmentNotificationData) {
   return [
-    "❌ Seu agendamento foi *cancelado*.",
+    `❌ ${firstName(data.patientName)}, seu agendamento foi *cancelado*.`,
     "",
     summaryLines(data),
     "",
-    "Se quiser reagendar, é só fazer uma nova busca na plataforma.",
+    REBOOK_INVITE,
   ].join("\n");
 }
 
@@ -95,7 +104,7 @@ function noShowAppointmentMessage(data: AppointmentNotificationData) {
     "",
     summaryLines(data),
     "",
-    "Se foi um engano ou imprevisto, entre em contato com a clínica para reagendar.",
+    "Se foi um engano ou imprevisto, tudo bem! " + REBOOK_INVITE,
   ].join("\n");
 }
 

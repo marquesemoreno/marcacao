@@ -1028,6 +1028,19 @@ model Marcador {
   @@map("marcadores")
 }
 
+/// Motivos de perda que a clínica acrescenta aos padrões do CRM (ver src/lib/loss-reasons.ts).
+/// Conversation.resolutionReason guarda "PERDA_CUSTOM:<rótulo>", então remover o motivo
+/// daqui não apaga o histórico dos relatórios.
+model LossReason {
+  id        String   @id @default(cuid())
+  clinicId  String   @map("clinic_id")
+  label     String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([clinicId, label])
+  @@map("loss_reasons")
+}
+
 /// Mensagens enviadas pelas telas de teste da API oficial (/admin/whatsapp/enviar e
 /// /templates) — o status (sent/delivered/read/failed) é atualizado pelo webhook. Base da
 /// gravação da análise do app na Meta.

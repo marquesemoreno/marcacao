@@ -10,6 +10,7 @@ import type {
   User,
 } from "@prisma/client";
 import { formatCurrency } from "@/lib/format";
+import { customLossReasonLabel } from "@/lib/loss-reasons";
 import { isMediaDownloadFailedNotice, isAutoSystemMessage, type InvoiceData } from "@/lib/chat-messages";
 import type { DocumentReviewData } from "@/lib/documents/document-validator";
 import { canEditMessage } from "@/lib/message-edit";
@@ -243,7 +244,7 @@ export function toChatContact(conversation: ConversationWithRelations, viewerUse
           pinned: Boolean(conversation.pinned),
         }) ?? undefined),
     statusTag: isResolved
-      ? { label: conversation.resolutionReason ? (REASON_SHORT_LABELS[conversation.resolutionReason] || conversation.resolutionReason) : "Finalizado", variant: "slate" }
+      ? { label: conversation.resolutionReason ? (REASON_SHORT_LABELS[conversation.resolutionReason] || (customLossReasonLabel(conversation.resolutionReason) ? `Perdido · ${customLossReasonLabel(conversation.resolutionReason)}` : conversation.resolutionReason)) : "Finalizado", variant: "slate" }
       : { label: funnelStageLabels[funnelStageFromDb[conversation.funnelStage]], variant: funnelStageBadgeVariant[funnelStageFromDb[conversation.funnelStage]] },
     funnelStage: funnelStageFromDb[conversation.funnelStage],
     tags: conversation.tags,

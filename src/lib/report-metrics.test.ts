@@ -11,6 +11,7 @@ import {
   computeChannelConversion,
   computeResponseStats,
   computeOutcomes,
+  outcomeLabel,
   topConverter,
 } from "./report-metrics";
 
@@ -68,6 +69,19 @@ describe("computeOutcomes", () => {
     expect(out.rows.map((x) => x.reason)).toEqual([
       "AGENDAMENTO_CONCLUIDO", "PERDA_PRECO", "PERDA_HORARIO", "DUVIDA_ESCLARECIDA", "INATIVIDADE",
     ]);
+  });
+
+  it("motivo de perda personalizado da clínica entra como perdido, com o rótulo dela", () => {
+    const r = (resolutionReason: string) => ({ status: "RESOLVED", resolutionReason });
+    const out = computeOutcomes([r("PERDA_CUSTOM:Foi para outra clínica"), r("PERDA_CUSTOM:Foi para outra clínica"), r("PERDA_PRECO")]);
+    expect(out.lostTotal).toBe(3);
+    expect(out.topLossReason).toMatchObject({
+      reason: "PERDA_CUSTOM:Foi para outra clínica",
+      label: "Perdido — Foi para outra clínica",
+      group: "perdido",
+      count: 2,
+    });
+    expect(outcomeLabel("PERDA_CUSTOM:Sem vaga")).toBe("Perdido — Sem vaga");
   });
 });
 

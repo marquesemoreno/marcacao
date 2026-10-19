@@ -2,6 +2,9 @@
 
 import { formatPhone } from "@/lib/format";
 import { ACQUISITION_CHANNELS } from "@/lib/acquisition";
+import { CANNED_VARIABLES, fillCannedVariables } from "@/lib/canned-variables";
+import { customLossReasonLabel } from "@/lib/loss-reasons";
+import { listLossReasons } from "@/actions/loss-reasons";
 import { AcquisitionBadge } from "@/components/chat/acquisition-badge";
 import { InstagramGlyph } from "@/components/chat/instagram-glyph";
 import { messagingWindowState } from "@/lib/messaging-window";
@@ -759,6 +762,15 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
   const [isFinishModalOpen, setIsFinishModalOpen] = useState(false);
   const [selectedReason, setSelectedReason] = useState<string | null>(null);
   const [showAllReasons, setShowAllReasons] = useState(false);
+  // Motivos de perda cadastrados pela clínica (aparecem em "Outros motivos"). Fora do painel da
+  // clínica (admin) a ação recusa e a lista fica vazia.
+  const [customFinishReasons, setCustomFinishReasons] = useState<{ id: string; label: string; negative?: boolean }[]>([]);
+  useEffect(() => {
+    if (!isFinishModalOpen) return;
+    listLossReasons()
+      .then((list) => setCustomFinishReasons(list.filter((r) => customLossReasonLabel(r.id)).map((r) => ({ id: r.id, label: `Não fechou — ${r.label}`, negative: true }))))
+      .catch(() => setCustomFinishReasons([]));
+  }, [isFinishModalOpen]);
   // Finalizar rápido (crítica 14/10/2026): já abre com o motivo mais provável marcado
   // pela intenção do paciente (Jev) — a atendente só confirma ou troca.
   useEffect(() => {
@@ -2244,7 +2256,13 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                           key={reply.id}
                           type="button"
                           onClick={() => {
-                            setInputText(reply.content);
+                            setInputText(
+                              fillCannedVariables(reply.content, {
+                                nome: selectedContact.name,
+                                medico: selectedContact.preferredDoctor,
+                                clinica: selectedContact.clinicName,
+                              })
+                            );
                             setIsQuickReplyOpen(false);
                           }}
                           className="w-full px-3.5 py-2 text-left hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors border-b border-slate-50 dark:border-slate-800 last:border-0"
@@ -3187,6 +3205,14 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                   onChange={(e) => setNewShortcutContent(e.target.value)}
                   className="w-full px-3 py-2 text-xs border border-slate-200 dark:border-slate-800 rounded-lg bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 mt-1 resize-none"
                 />
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                  Variáveis trocadas ao usar o atalho:{' '}
+                  {CANNED_VARIABLES.map((v) => (
+                    <code key={v.key} title={v.label} className="mr-1.5">
+                      {`{{${v.key}}}`}
+                    </code>
+                  ))}
+                </p>
               </div>
             </div>
 
@@ -3365,7 +3391,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                 ).slice(0, 3);
                 // "Administrativo" sempre à vista: é um caso frequente (mensagem de médico ou da equipe).
                 const shown = common.includes('ADMINISTRATIVO') ? common : [...common, 'ADMINISTRATIVO'];
-                const visible = showAllReasons ? FINISH_REASONS : FINISH_REASONS.filter((r) => shown.includes(r.id)).sort((x, y) => shown.indexOf(x.id) - shown.indexOf(y.id));
+                const visible = showAllReasons ? [...FINISH_REASONS, ...customFinishReasons] : FINISH_REASONS.filter((r) => shown.includes(r.id)).sort((x, y) => shown.indexOf(x.id) - shown.indexOf(y.id));
                 const focusId = selectedReason && visible.some((r) => r.id === selectedReason) ? selectedReason : visible[0]?.id;
                 return (
                   <>

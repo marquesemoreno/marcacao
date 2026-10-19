@@ -2,6 +2,7 @@
 
 import { sortPatientList, type PatientSort } from "@/lib/patient-list";
 import { CHAT_LIMIT_ENABLED } from "@/lib/chat-limit";
+import { customLossReasonLabel } from "@/lib/loss-reasons";
 import { getAttendantLoad } from "@/lib/attendant-load-server";
 
 import { parseNewContactExtra, type NewContactExtra } from "@/lib/new-contact-extra";
@@ -1567,7 +1568,8 @@ export async function resolveConversation(
   });
   const userName = currentUser?.name || "Atendente";
   const reasonKey = resolutionData?.reason || "DUVIDA_ESCLARECIDA";
-  const reasonLabel = REASON_LABELS[reasonKey] || reasonKey;
+  const customLoss = customLossReasonLabel(reasonKey);
+  const reasonLabel = REASON_LABELS[reasonKey] || (customLoss ? `❌ Perdido — ${customLoss}` : reasonKey);
 
   await prisma.conversation.update({
     where: { id: conversationId },
