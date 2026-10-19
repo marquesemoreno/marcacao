@@ -198,6 +198,8 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
   const openIndex = openCard ? openColumn.findIndex((c) => c.id === openCard.id) : -1;
   const hasActiveFilter = search.trim() !== '' || selectedAgent !== 'todos' || quick !== 'ativos';
   const finalizedCount = contacts.filter((c) => c.isResolved).length;
+  // Primeira carga: não mostra "0 pacientes" nem colunas vazias como se fosse o resultado.
+  const loadingEmpty = isLoading && contacts.length === 0;
 
   return (
     <div className="flex-1 flex flex-col h-full min-h-0 bg-slate-100/90 dark:bg-slate-950/90 overflow-hidden text-slate-900 dark:text-slate-100" data-od-id="crm-kanban-view">
@@ -208,7 +210,7 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
             <KanbanSquare className="w-4 h-4 text-emerald-600 dark:text-emerald-400" aria-hidden />
             CRM
             <span className="text-sm font-normal text-slate-500 dark:text-slate-400 tabular-nums">
-              {filtered.length} paciente{filtered.length === 1 ? '' : 's'}
+              {loadingEmpty ? 'carregando…' : `${filtered.length} paciente${filtered.length === 1 ? '' : 's'}`}
             </span>
           </h2>
           <div className="relative w-full sm:w-60">
@@ -302,7 +304,8 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
             return (
               <section
                 key={stage.id}
-                aria-label={`${stage.title}: ${cards.length} paciente${cards.length === 1 ? '' : 's'}`}
+                aria-label={loadingEmpty ? `${stage.title}: carregando` : `${stage.title}: ${cards.length} paciente${cards.length === 1 ? '' : 's'}`}
+                aria-busy={loadingEmpty}
                 className={`flex h-full min-h-0 flex-col rounded-lg border bg-slate-50/90 dark:bg-slate-900/60 ${
                   dragOverStage === stage.id ? 'border-emerald-400 ring-2 ring-emerald-400/40' : 'border-slate-200 dark:border-slate-800'
                 }`}
@@ -324,7 +327,7 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
                     <span className={`size-2 rounded-full ${stage.accent}`} aria-hidden />
                     <Icon className="w-4 h-4 text-slate-500 dark:text-slate-400" aria-hidden />
                     <h3 className="text-sm font-semibold">{stage.title}</h3>
-                    <span className="ml-auto text-xs font-medium text-slate-500 dark:text-slate-400 tabular-nums">{cards.length}</span>
+                    <span className="ml-auto text-xs font-medium text-slate-500 dark:text-slate-400 tabular-nums">{loadingEmpty ? '–' : cards.length}</span>
                   </div>
                   {value.total > 0 && stage.id !== 'finalizado' && (
                     <p
@@ -337,7 +340,13 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
                 </header>
 
                 <div className="flex-1 min-h-0 overflow-y-auto p-2 space-y-2">
-                  {cards.length === 0 ? (
+                  {loadingEmpty ? (
+                    <div aria-hidden className="space-y-2">
+                      {[0, 1, 2].map((i) => (
+                        <div key={i} className="h-16 animate-pulse rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-800/60" />
+                      ))}
+                    </div>
+                  ) : cards.length === 0 ? (
                     <p className="rounded-lg border border-dashed border-slate-200 dark:border-slate-800 py-6 text-center text-sm text-slate-500 dark:text-slate-400">
                       Nenhum paciente aqui
                     </p>

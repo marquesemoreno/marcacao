@@ -131,6 +131,7 @@ import {
 } from "@/actions/admin-inbox";
 import { toast } from "sonner";
 import { useInboxRealtime } from "@/hooks/use-inbox-realtime";
+import { shouldRefreshFinalized } from "@/lib/crm-load";
 import { playNotificationSound } from "@/lib/notification-sound";
 import { formatFileSize } from "@/lib/format";
 import {
@@ -331,6 +332,12 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
     if (scope === "clinic" && view === "crm") getClinicDefaultTicket().then(setClinicTicket).catch(() => {});
   }, [scope, view]);
   const [contactsLoadError, setContactsLoadError] = useState(false);
+  // CRM: as finalizadas são ~1.600 conversas (~4 MB) — ficam em cache e só recarregam de tempos em
+  // tempos, ao mudar a busca/clínica ou depois de finalizar/reabrir um card (ver crm-load.ts).
+  const finalizedCacheRef = useRef<Contact[]>([]);
+  const finalizedLoadedAtRef = useRef<number | null>(null);
+  const finalizedKeyRef = useRef<string | null>(null);
+  const forceFinalizedRef = useRef(false);
   const [pendingCount, setPendingCount] = useState(0);
   const [outboundFromDeviceStats, setOutboundFromDeviceStats] = useState<{
     total: number;
@@ -387,15 +394,39 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
     // deixava o quadro do CRM zerado sem aviso nenhum.
     let result: Contact[];
     try {
-      result =
-        view === "crm"
-          ? (
-              await Promise.all([
-                actions.listChatContacts("todas", searchQuery || undefined, clinicIdArg),
-                actions.listChatContacts("finalizadas", searchQuery || undefined, clinicIdArg),
-              ])
-            ).flat()
-          : await actions.listChatContacts(filterTab, searchQuery || undefined, clinicIdArg, agentFilter || undefined);
+      if (view === "crm") {
+        const key = `${clinicIdArg ?? ""}|${searchQuery}`;
+        const reloadFinalized = shouldRefreshFinalized({
+          lastLoadedAt: finalizedLoadedAtRef.current,
+          lastKey: finalizedKeyRef.current,
+          key,
+          force: forceFinalizedRef.current,
+          now: Date.now(),
+        });
+        forceFinalizedRef.current = false;
+        // As ativas (poucas) aparecem logo; as finalizadas chegam em segundo plano.
+        const active = await actions.listChatContacts("todas", searchQuery || undefined, clinicIdArg);
+        // Só depois das ativas: a consulta pesada não disputa conexão com a que o usuário está esperando.
+        const finalizedPromise = reloadFinalized ? actions.listChatContacts("finalizadas", searchQuery || undefined, clinicIdArg) : null;
+        const activeIds = new Set(active.map((c) => c.id));
+        result = [...active, ...finalizedCacheRef.current.filter((c) => !activeIds.has(c.id))];
+        finalizedPromise
+          ?.then((list) => {
+            finalizedCacheRef.current = list;
+            finalizedLoadedAtRef.current = Date.now();
+            finalizedKeyRef.current = key;
+            setContacts((current) => {
+              const ids = new Set(current.filter((c) => !c.isResolved).map((c) => c.id));
+              return [...current.filter((c) => !c.isResolved), ...list.filter((c) => !ids.has(c.id))];
+            });
+          })
+          .catch((error) => {
+            console.error("Falha ao carregar finalizadas:", error);
+            forceFinalizedRef.current = true; // tenta de novo na próxima atualização
+          });
+      } else {
+        result = await actions.listChatContacts(filterTab, searchQuery || undefined, clinicIdArg, agentFilter || undefined);
+      }
     } catch (error) {
       console.error("Falha ao carregar conversas:", error);
       setContactsLoadError(true);
@@ -908,11 +939,13 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
 
   async function handleFinish(contactId: string, resolution?: { reason: string; notes?: string }) {
     await actions.resolveConversation(contactId, resolution);
+    forceFinalizedRef.current = true;
     await refreshContacts();
   }
 
   async function handleReopen(contactId: string) {
     await actions.reopenConversation(contactId);
+    forceFinalizedRef.current = true;
     await refreshContacts();
   }
 
