@@ -67,8 +67,8 @@ export function Logo({
     <span className={cn("inline-flex items-center gap-2.5", className)}>
       <LogoIcon size={size} white={isWhite} />
       <span className={cn("font-extrabold tracking-tight", brandTextClasses[size])}>
-        <span className={isWhite ? "text-white" : "text-slate-900"}>Conecta</span>{" "}
-        <span className={isWhite ? "text-white" : "text-teal-700"}>Saúde</span>
+        <span className={isWhite ? "text-white" : "text-slate-900 dark:text-white"}>Conecta</span>{" "}
+        <span className={isWhite ? "text-white" : "text-teal-700 dark:text-teal-300"}>Saúde</span>
       </span>
     </span>
   );

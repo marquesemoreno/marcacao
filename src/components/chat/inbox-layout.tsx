@@ -497,7 +497,7 @@ const ContactListItem = React.memo(function ContactListItem({
 
         <div className="flex items-center justify-between gap-2 mt-1">
           <span className="inline-flex items-center gap-2 min-w-0 text-xs">
-            {c.clinicName && <span className="truncate font-medium text-slate-600 dark:text-slate-300">{c.clinicName}</span>}
+            {c.clinicName && <span className="min-w-0 truncate font-medium text-slate-600 dark:text-slate-300">{c.clinicName}</span>}
             {c.hasUnseenAssignment ? (
               <span className="inline-flex items-center gap-1 font-semibold text-amber-700 dark:text-amber-400">
                 <Zap className="w-3 h-3" aria-hidden /> Transferida pra você
@@ -517,13 +517,14 @@ const ContactListItem = React.memo(function ContactListItem({
               </span>
             )}
             <span
-              className={`inline-flex items-center gap-1 truncate ${
+              className={`inline-flex shrink-0 items-center gap-1 whitespace-nowrap ${
                 c.queueState === 'SEM_DONO' ? 'font-semibold text-amber-800 dark:text-amber-300' : 'text-slate-500 dark:text-slate-400'
               }`}
               title={c.queueState === 'IA_ATENDENDO' ? 'Atendida pela IA' : `Responsável: ${ownerLabel(c)}`}
             >
               {c.queueState === 'IA_ATENDENDO' ? <Bot className="w-3 h-3 shrink-0" aria-hidden /> : <User className="w-3 h-3 shrink-0" aria-hidden />}
-              <span className="truncate">{c.queueState === 'IA_ATENDENDO' ? 'IA' : ownerLabel(c)}</span>
+              {/* "Sem dono" nunca é cortado (é o dado que mais importa na fila); nome longo de atendente sim. */}
+              <span className={c.queueState === 'SEM_DONO' ? '' : 'max-w-[8rem] truncate'}>{c.queueState === 'IA_ATENDENDO' ? 'IA' : ownerLabel(c)}</span>
             </span>
           </span>
           {c.unreadCount > 0 && (
@@ -1409,11 +1410,12 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
       >
         {/* Header & Busca */}
         <div className="p-3.5 sm:p-4 border-b border-slate-100 dark:border-slate-800 space-y-3 bg-white dark:bg-slate-900">
-          <div className="flex items-center justify-between gap-1">
+          <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-2">
             <h2 className="font-bold text-slate-900 dark:text-slate-100 text-base tracking-tight flex items-center gap-2 whitespace-nowrap">
               Fila de Atendimento
             </h2>
-            <div className="flex flex-wrap items-center justify-end gap-1.5">
+            {/* Celular: título numa linha e botão + contadores na de baixo, alinhados à esquerda. */}
+            <div className="flex w-full flex-wrap items-center justify-start gap-1.5 sm:w-auto sm:justify-end">
               {onCreateContact && (
                 <button
                   type="button"

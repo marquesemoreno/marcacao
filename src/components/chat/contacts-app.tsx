@@ -480,7 +480,68 @@ export function ContactsApp({ scope, basePath }: { scope: Scope; basePath: strin
           onChanged={fetchContacts}
         />
       ) : (
-      <div className="overflow-hidden rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs">
+      <>
+      {/* Celular: um card por paciente (a tabela de 7 colunas exigia rolar na horizontal). */}
+      <ul className="md:hidden space-y-2" aria-label="Contatos">
+        {isLoading ? (
+          <li className="rounded-lg border border-slate-200 dark:border-slate-800 p-6 text-center text-sm text-slate-400">Carregando contatos...</li>
+        ) : filteredContacts.length === 0 ? (
+          <li className="rounded-lg border border-slate-200 dark:border-slate-800 p-6 text-center text-sm text-slate-400 italic">
+            {search || convenioFilter || doctorFilter ? "Nenhum contato encontrado para esse filtro." : "Nenhum contato cadastrado ainda."}
+          </li>
+        ) : (
+          filteredContacts.map((contact) => (
+            <li key={contact.conversationId} className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3 space-y-2">
+              <div className="flex items-start justify-between gap-2">
+                <button type="button" onClick={() => handleOpenSheet(contact)} aria-label={`Ver ficha de ${displayName(contact)}`} className="flex min-w-0 items-center gap-2.5 text-left">
+                  <AvatarBadge name={displayName(contact)} size={36} />
+                  <span className="min-w-0">
+                    <span className="block truncate font-semibold text-sm text-slate-900 dark:text-slate-100">{displayName(contact)}</span>
+                    {/* Contato sem nome já mostra o telefone como título — não repete. */}
+                    {displayName(contact) !== formatPhone(contact.phone) && (
+                      <span className="block font-mono text-xs text-slate-600 dark:text-slate-400">{formatPhone(contact.phone)}</span>
+                    )}
+                  </span>
+                </button>
+                <Badge variant="outline" className={`shrink-0 rounded-md ${statusClasses[contact.status]}`}>
+                  {statusLabels[contact.status]}
+                </Badge>
+              </div>
+              <dl className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-slate-600 dark:text-slate-400">
+                <div>
+                  <dt className="text-slate-500">CPF</dt>
+                  <dd className="font-mono">{contact.cpf ? formatCpf(contact.cpf) : "—"}</dd>
+                </div>
+                <div>
+                  <dt className="text-slate-500">Convênio</dt>
+                  <dd>{contact.convenio || "—"}</dd>
+                </div>
+                <div>
+                  <dt className="text-slate-500">Última consulta</dt>
+                  <dd>
+                    {contact.lastAppointment ? `${contact.lastAppointment.date}${contact.lastAppointment.doctorName ? ` · ${toTitleCaseName(contact.lastAppointment.doctorName)}` : ""}` : "—"}
+                  </dd>
+                </div>
+                {scope === "admin" && (
+                  <div>
+                    <dt className="text-slate-500">Clínica</dt>
+                    <dd className="truncate">{contact.clinicName}</dd>
+                  </div>
+                )}
+              </dl>
+              <div className="flex gap-2">
+                <button type="button" onClick={() => handleOpenSheet(contact)} className="inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-sm font-medium text-slate-700 dark:text-slate-200">
+                  <Eye className="size-4" aria-hidden /> Ver ficha
+                </button>
+                <button type="button" onClick={() => router.push(`${basePath}/inbox?c=${contact.conversationId}`)} className="inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-lg bg-slate-900 dark:bg-emerald-600 text-sm font-medium text-white">
+                  <MessageCircle className="size-4" aria-hidden /> Abrir conversa
+                </button>
+              </div>
+            </li>
+          ))
+        )}
+      </ul>
+      <div className="hidden md:block overflow-hidden rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs">
         <Table>
           <TableHeader>
             <TableRow className="bg-slate-50/70 dark:bg-slate-800/40">
@@ -581,6 +642,7 @@ export function ContactsApp({ scope, basePath }: { scope: Scope; basePath: strin
           </TableBody>
         </Table>
       </div>
+      </>
       )}
 
       {total > 0 && (

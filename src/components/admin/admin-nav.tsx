@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -49,12 +50,20 @@ export function AdminNav({
 }) {
   const pathname = usePathname();
   const isHorizontal = orientation === "horizontal";
+  const navRef = useRef<HTMLElement>(null);
 
-  return (
+  // No celular o menu rola na horizontal: mantém o item da página atual à vista.
+  useEffect(() => {
+    if (!isHorizontal) return;
+    navRef.current?.querySelector<HTMLElement>("[aria-current=page]")?.scrollIntoView({ inline: "center", block: "nearest" });
+  }, [isHorizontal, pathname]);
+
+  const nav = (
     <nav
+      ref={navRef}
       className={
         isHorizontal
-          ? "flex items-center gap-1 overflow-x-auto no-scrollbar px-2 py-2"
+          ? "flex items-center gap-1 overflow-x-auto px-2 py-2 pr-8 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
           : "flex flex-col gap-0.5 px-2.5 py-3"
       }
       aria-label="Navegação do painel administrativo"
@@ -87,5 +96,14 @@ export function AdminNav({
         );
       })}
     </nav>
+  );
+
+  if (!isHorizontal) return nav;
+  // Degradê na borda direita: mostra que há mais itens para rolar.
+  return (
+    <div className="relative">
+      {nav}
+      <div aria-hidden className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-slate-900 to-transparent" />
+    </div>
   );
 }
