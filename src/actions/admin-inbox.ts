@@ -30,6 +30,7 @@ import { validateExtractedDocument, type DocumentReviewData } from "@/lib/docume
 import { mentionsInvoiceRequest } from "@/lib/chat-messages";
 import type { Department, FunnelStage, InboxFilter } from "@/types/chat-crm";
 import { sortContactsNamedFirst } from "@/lib/contact-sort";
+import { canAssignTo } from "@/lib/assignment-scope";
 import {
   sendMessageSchema,
   updateTagsSchema,
@@ -1233,8 +1234,22 @@ export async function getPendingCountAdmin() {
   return Number(result[0]?.count ?? 0);
 }
 
+/** Atribuição só para atendente da clínica da conversa (ou admin) — uma clínica nunca
+ * aparece como dona de conversa de outra. */
+async function assertAssigneeBelongsToConversationClinic(conversationId: string, targetUserId: string) {
+  const [conversation, target] = await Promise.all([
+    prisma.conversation.findUnique({ where: { id: conversationId }, select: { clinicId: true } }),
+    prisma.user.findUnique({ where: { id: targetUserId }, select: { role: true, clinicId: true } }),
+  ]);
+  if (!conversation) throw new Error("Conversa não encontrada");
+  if (!canAssignTo(target, conversation.clinicId)) {
+    throw new Error("Esse atendente é de outra clínica. Escolha alguém da clínica da conversa.");
+  }
+}
+
 export async function assignConversationToUserAdmin(conversationId: string, targetUserId: string | null) {
   const { userId } = await requireAdminSession();
+  if (targetUserId) await assertAssigneeBelongsToConversationClinic(conversationId, targetUserId);
   const updated = await prisma.conversation.update({
     where: { id: conversationId },
     data: {
@@ -1308,6 +1323,7 @@ export async function reactivateAiForConversationAdmin(conversationId: string) {
 
 export async function transferConversationAdmin(conversationId: string, targetUserId: string) {
   const { userId } = await requireAdminSession();
+  await assertAssigneeBelongsToConversationClinic(conversationId, targetUserId);
 
   // Mesma regra do lado clínica (ver transferConversation em actions/inbox.ts): a conta
   // genérica "Equipe {nome da clínica}" representa a fila geral, não um atendente de verdade.
@@ -1746,6 +1762,7 @@ export async function getConversationOwnersAdmin(conversationIds: string[]) {
 export async function restoreConversationOwnersAdmin(owners: { id: string; assignedUserId: string | null }[]) {
   await requireAdminSession();
   for (const o of owners) {
+    if (o.assignedUserId) await assertAssigneeBelongsToConversationClinic(o.id, o.assignedUserId);
     await prisma.conversation.update({ where: { id: o.id }, data: { assignedUserId: o.assignedUserId } });
     await prisma.message.create({
       data: {

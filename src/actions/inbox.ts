@@ -3,6 +3,7 @@
 import { sortPatientList, type PatientSort } from "@/lib/patient-list";
 import { CHAT_LIMIT_ENABLED } from "@/lib/chat-limit";
 import { customLossReasonLabel } from "@/lib/loss-reasons";
+import { maskForeignAssignee } from "@/lib/assignment-scope";
 import { getAttendantLoad } from "@/lib/attendant-load-server";
 
 import { parseNewContactExtra, type NewContactExtra } from "@/lib/new-contact-extra";
@@ -289,9 +290,9 @@ export async function listContactsPage(params: ContactsListParams) {
 
   const found = await prisma.conversation.findMany({
     where: { id: { in: ids } },
-    include: { contact: true, assignedUser: { select: { name: true } } },
+    include: { contact: true, assignedUser: { select: { id: true, name: true, role: true, clinicId: true } } },
   });
-  const byId = new Map(found.map((c) => [c.id, c]));
+  const byId = new Map(found.map((c) => [c.id, maskForeignAssignee(c, clinicId)]));
   const conversations = ids.map((id) => byId.get(id)!).filter(Boolean);
 
   // Paciente que está na agenda do sistema da clínica (recebeu lembrete da ponte).
@@ -406,7 +407,7 @@ export async function listConversations(filter: ConversationFilter, search?: str
     },
     include: {
       contact: true,
-      assignedUser: { select: { id: true, name: true } },
+      assignedUser: { select: { id: true, name: true, role: true, clinicId: true } },
       // Expediente da clínica — usado pro cálculo de SLA em minutos úteis (ver
       // sla-calculator.ts); relacionamento de 1 linha, barato (não é o mesmo tipo de
       // custo do include de messages abaixo). Só businessHours: id/tradeName ficam de
@@ -457,8 +458,9 @@ export async function listConversations(filter: ConversationFilter, search?: str
     for (const u of unreadCounts) unreadByConversation.set(u.conversationId, u._count.id);
   }
 
+  // Responsável de outra clínica (dado antigo/erro) some: a conversa aparece sem dono e o nome não vaza.
   return filteredConversations.map((conversation) => ({
-    ...conversation,
+    ...maskForeignAssignee(conversation, clinicId),
     unreadCount: unreadByConversation.get(conversation.id) ?? 0,
   }));
 }
@@ -470,7 +472,7 @@ export async function getConversation(conversationId: string) {
     where: { id: conversationId },
     include: {
       contact: true,
-      assignedUser: { select: { id: true, name: true } },
+      assignedUser: { select: { id: true, name: true, role: true, clinicId: true } },
       messages: {
         orderBy: { createdAt: "asc" },
         include: {
@@ -485,7 +487,7 @@ export async function getConversation(conversationId: string) {
     throw new Error("Conversa não encontrada");
   }
 
-  return conversation;
+  return maskForeignAssignee(conversation, clinicId);
 }
 
 export async function markConversationRead(conversationId: string) {
@@ -1318,15 +1320,17 @@ export async function claimConversation(conversationId: string) {
 
   const conversation = await prisma.conversation.findUnique({
     where: { id: conversationId },
-    include: { assignedUser: { select: { id: true, name: true } } },
+    include: { assignedUser: { select: { id: true, name: true, role: true, clinicId: true } } },
   });
 
   if (!conversation || conversation.clinicId !== clinicId) {
     return { success: false, message: "Conversa não encontrada." };
   }
 
-  if (conversation.assignedUserId && conversation.assignedUserId !== userId) {
-    const assignedName = conversation.assignedUser?.name || "outro atendente";
+  // Responsável de outra clínica não conta: a conversa é tratada como sem dono.
+  const owned = maskForeignAssignee(conversation, clinicId);
+  if (owned.assignedUserId && owned.assignedUserId !== userId) {
+    const assignedName = owned.assignedUser?.name || "outro atendente";
     return {
       success: false,
       message: `Esta conversa já foi assumida por ${assignedName}.`,
