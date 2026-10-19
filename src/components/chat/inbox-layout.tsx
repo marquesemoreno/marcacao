@@ -2498,7 +2498,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                                             onSelect={() => handleShareContact({ name: c.name, phone: c.phone })}
                                             className="justify-between text-xs"
                                           >
-                                            <span className="font-medium truncate">{c.name}</span>
+                                            <span className="font-medium truncate">{displayName(c)}</span>
                                             <span className="text-xs text-slate-500 dark:text-slate-400 shrink-0">{c.phone}</span>
                                           </CommandItem>
                                         ))

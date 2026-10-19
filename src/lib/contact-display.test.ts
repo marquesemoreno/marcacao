@@ -68,3 +68,15 @@ describe("formatPatientName", () => {
     expect(formatPatientName("(77) 99939-5571")).toBe("(77) 99939-5571");
   });
 });
+
+describe("displayName com formatPatientName", () => {
+  it("nome do WhatsApp em caixa alta/baixa aparece como Nome Próprio em qualquer tela", () => {
+    expect(displayName({ name: "MARIA DA SILVA", phone: "5577999990000" })).toBe("Maria da Silva");
+    expect(displayName({ name: "joão pedro", phone: null })).toBe("João Pedro");
+  });
+
+  it("nome misto fica como está; sem nome usável continua mostrando o telefone", () => {
+    expect(displayName({ name: "Bruna cardoso", phone: "5577999990000" })).toBe("Bruna cardoso");
+    expect(displayName({ name: "😊", phone: "5577999990000" })).toBe("(77) 99999-0000");
+  });
+});

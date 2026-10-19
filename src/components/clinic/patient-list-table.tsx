@@ -8,7 +8,7 @@ import { AlertTriangle, CalendarCheck, Clock, Loader2, Megaphone, MessageCircle,
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AvatarBadge } from "@/components/chat/avatar-badge";
-import { displayName, formatPatientName, isUsableContactName } from "@/lib/contact-display";
+import { displayName, isUsableContactName } from "@/lib/contact-display";
 import { formatPhone } from "@/lib/format";
 import { PROCEDURE_INTEREST_TAG_PREFIX } from "@/lib/conversation-tags";
 import { formatDurationHuman } from "@/lib/sla-calculator";
@@ -134,7 +134,7 @@ export function PatientListTable({
     }
     const recipients = withPhone.map((r) => {
       const first = displayName(r).split(/\s+/)[0];
-      const usable = displayName(r) === r.name.trim();
+      const usable = isUsableContactName(r.name);
       return { phone: r.phone, variables: { nome: usable ? first : "", saudacao: usable ? `Oi, ${first}` : "Oi" } };
     });
     sessionStorage.setItem(SELECTION_BROADCAST_KEY, JSON.stringify(recipients));
@@ -259,7 +259,7 @@ export function PatientListTable({
         <ul className="lg:hidden space-y-2" aria-label="Pacientes">
           {rows.map((r) => {
             const hasName = isUsableContactName(r.name);
-            const name = hasName ? formatPatientName(displayName(r)) : displayName(r);
+            const name = displayName(r);
             const waitingMin = r.waitingSince ? (Date.now() - new Date(r.waitingSince).getTime()) / 60000 : null;
             const stage = r.status === "RESOLVED" ? "Finalizado" : STAGE_LABEL[r.funnelStage ?? ""] ?? null;
             return (
@@ -352,7 +352,7 @@ export function PatientListTable({
               rows.map((r) => {
                 // Mesmo tratamento do nome na Agenda: "MARIA DA SILVA" → "Maria da Silva".
                 const hasName = isUsableContactName(r.name);
-                const name = hasName ? formatPatientName(displayName(r)) : displayName(r);
+                const name = displayName(r);
                 const interest = r.tags?.find((t) => t.startsWith(PROCEDURE_INTEREST_TAG_PREFIX))?.slice(PROCEDURE_INTEREST_TAG_PREFIX.length);
                 const waitingMin = r.waitingSince ? (Date.now() - new Date(r.waitingSince).getTime()) / 60000 : null;
                 return (

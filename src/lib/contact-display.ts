@@ -12,7 +12,8 @@ export function isUsableContactName(name: string | null | undefined): boolean {
 }
 
 export function displayName(contact: { name?: string | null; phone?: string | null; instagramUsername?: string | null }): string {
-  if (isUsableContactName(contact.name)) return contact.name!.trim();
+  // Mesmo tratamento do nome na Agenda ("MARIA DA SILVA" → "Maria da Silva") em todas as telas.
+  if (isUsableContactName(contact.name)) return formatPatientName(contact.name!);
   if (contact.phone) return formatPhone(contact.phone);
   if (contact.instagramUsername) return `@${contact.instagramUsername}`;
   return "Contato sem número visível";
