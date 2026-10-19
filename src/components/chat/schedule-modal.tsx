@@ -1,5 +1,6 @@
 "use client";
 
+import { nextSlotAfter } from '@/lib/appointment-slots';
 import React, { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { Contact } from '@/types/chat-crm';
@@ -94,6 +95,10 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
   const [time, setTime] = useState('');
   const [notes, setNotes] = useState('');
   const [timeMode, setTimeMode] = useState<'scheduled' | 'arrival'>('scheduled');
+  // Horário sugerido (último da agenda do médico + 10 min) — só vale enquanto a atendente não
+  // digitou nem veio da grade da agenda com um horário já escolhido.
+  const [timeTouched, setTimeTouched] = useState(false);
+  const [suggestedTime, setSuggestedTime] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false);
@@ -119,6 +124,8 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
     setPhone(contact.phone || '');
     setDate(initialDate ?? '');
     setTime(initialTime ?? '');
+    setTimeTouched(!!initialTime);
+    setSuggestedTime(null);
     setNotes('');
     setTimeMode('scheduled');
     setIsSuccess(false);
@@ -199,6 +206,19 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
     };
   }, [isOpen, fetchAgenda, doctorId, date]);
 
+  // Horário marcado: com médico e data escolhidos, sugere o último horário do dia + 10 min
+  // (08:00 → 08:10 → 08:20…). Sem marcação ainda, a atendente digita o primeiro.
+  useEffect(() => {
+    if (!isOpen || timeMode !== 'scheduled' || loadingAgenda || !doctorId || !date) {
+      setSuggestedTime(null);
+      return;
+    }
+    const next = nextSlotAfter(occupiedTimes);
+    setSuggestedTime(next);
+    // Sem marcação no dia: limpa a sugestão antiga (de outra data/médico) até ela digitar.
+    if (!timeTouched) setTime(next ?? '');
+  }, [isOpen, timeMode, loadingAgenda, doctorId, date, occupiedTimes, timeTouched]);
+
   // Cada procedimento já vem com um jeito padrão de atender (horário marcado ou ordem de
   // chegada) — troca o toggle sozinho quando o atendente escolhe outro procedimento, sem
   // travar: ele ainda pode alternar manualmente depois se preferir o outro modo.
@@ -265,6 +285,7 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
     !date && "data",
     phone.replace(/\D/g, '').length < 10 && "telefone",
     requiresDoctor && !doctorId && "médico",
+    timeMode === 'scheduled' && !time && "horário",
   ].filter((field): field is string => Boolean(field));
 
   // Campo pendente só ganha destaque de erro depois da primeira tentativa de
@@ -274,6 +295,7 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
   const doctorError = hasAttemptedSubmit && requiresDoctor && !doctorId;
   const procedureError = hasAttemptedSubmit && !procedureId;
   const dateError = hasAttemptedSubmit && !date;
+  const timeError = hasAttemptedSubmit && timeMode === 'scheduled' && !time;
 
   const labelClass = "block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5";
   const inputClass = (hasError: boolean) =>
@@ -647,6 +669,7 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
                       onClick={() => {
                         setTimeMode('arrival');
                         setTime('');
+                        setTimeTouched(false);
                       }}
                       className={`px-2 py-1 rounded text-[10px] font-semibold transition-colors ${
                         timeMode === 'arrival'
@@ -663,9 +686,22 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
                     <input
                       type="time"
                       value={time}
-                      onChange={(e) => setTime(e.target.value)}
-                      className={inputClass(false)}
+                      onChange={(e) => {
+                        setTime(e.target.value);
+                        setTimeTouched(true);
+                      }}
+                      aria-required="true"
+                      className={inputClass(timeError)}
                     />
+                    {suggestedTime && time === suggestedTime ? (
+                      <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                        Sugerido: 10 min depois do último paciente desse médico. Pode trocar.
+                      </p>
+                    ) : !suggestedTime && doctorId && date && !loadingAgenda ? (
+                      <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                        Sem marcação nesse dia: digite o primeiro horário. Os próximos entram de 10 em 10 minutos.
+                      </p>
+                    ) : null}
                     {time && occupiedTimes.includes(time) && (
                       <p className="mt-1 text-xs text-amber-600 dark:text-amber-400 font-medium">
                         ⚠️ Esse médico já tem uma marcação às {time} nesse dia.
