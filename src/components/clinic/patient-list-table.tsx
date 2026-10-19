@@ -4,12 +4,11 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { AlertTriangle, CalendarCheck, Clock, Loader2, Megaphone, MessageCircle, RefreshCw, UserCheck, X } from "lucide-react";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { AlertTriangle, CalendarCheck, Clock, Loader2, Megaphone, MessageCircle, RefreshCw, User, UserCheck, X } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { AvatarBadge } from "@/components/chat/avatar-badge";
 import { displayName, isUsableContactName } from "@/lib/contact-display";
 import { formatPhone } from "@/lib/format";
+import { initialsOf } from "@/lib/agenda-ui";
 import { PROCEDURE_INTEREST_TAG_PREFIX } from "@/lib/conversation-tags";
 import { formatDurationHuman } from "@/lib/sla-calculator";
 import {
@@ -186,7 +185,6 @@ export function PatientListTable({
     onChanged();
   }
 
-  const colSpan = 7;
   const agentName = agents.find((a) => a.id === assignTo)?.name;
 
   return (
@@ -254,183 +252,133 @@ export function PatientListTable({
         </div>
       )}
 
-      {/* Celular/tablet estreito: um card por paciente (a tabela de 7 colunas exigia rolar na horizontal). */}
-      {!loadError && !isLoading && rows.length > 0 && (
-        <ul className="lg:hidden space-y-2" aria-label="Pacientes">
-          {rows.map((r) => {
-            const hasName = isUsableContactName(r.name);
-            const name = displayName(r);
-            const waitingMin = r.waitingSince ? (Date.now() - new Date(r.waitingSince).getTime()) / 60000 : null;
-            const stage = r.status === "RESOLVED" ? "Finalizado" : STAGE_LABEL[r.funnelStage ?? ""] ?? null;
-            return (
-              <li key={r.conversationId} className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3" data-state={selected.has(r.conversationId) ? "selected" : undefined}>
-                <div className="flex items-start gap-2.5">
-                  <input type="checkbox" aria-label={`Selecionar ${name}`} checked={selected.has(r.conversationId)} onChange={() => toggle(r)} className="mt-2.5 size-4 shrink-0 accent-emerald-600" />
-                  <Link href={`/clinic/pacientes/${r.conversationId}`} className="flex min-w-0 flex-1 items-center gap-2.5 rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50">
-                    <AvatarBadge name={name} size={36} />
-                    <span className="min-w-0">
-                      <span className="block truncate text-sm font-semibold text-slate-900 dark:text-slate-100">{name}</span>
-                      <span className="block truncate text-xs text-slate-500 dark:text-slate-400">
-                        {hasName ? (r.phone ? formatPhone(r.phone) : r.instagramUsername ? `@${r.instagramUsername}` : "Sem telefone") : <span className="italic">Sem nome salvo</span>}
+      {/* Mesmo layout das marcações da Agenda: cartão com iniciais, nome em Nome Próprio, subtítulo,
+          selos de situação/etapa e um botão de ação. */}
+      {loadError ? (
+        <div role="alert" className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 py-10 px-4 text-center">
+          <p className="flex items-center justify-center gap-2 text-sm font-semibold text-slate-800 dark:text-slate-100">
+            <AlertTriangle className="w-4 h-4 text-amber-600" aria-hidden /> Não foi possível carregar os pacientes.
+          </p>
+          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Pode ser a internet ou uma instabilidade no Conecta. Seus pacientes continuam salvos.</p>
+          <button
+            type="button"
+            onClick={onRetry}
+            className="mt-3 inline-flex h-9 items-center gap-2 rounded-lg border border-slate-200 dark:border-slate-700 px-3 text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800"
+          >
+            <RefreshCw className="w-4 h-4" aria-hidden /> Tentar de novo
+          </button>
+        </div>
+      ) : isLoading ? (
+        <div role="status" className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 py-10 text-center text-sm text-slate-500">
+          <span className="inline-flex items-center gap-2">
+            <Loader2 className="w-4 h-4 animate-spin" aria-hidden /> Carregando pacientes…
+          </span>
+        </div>
+      ) : rows.length === 0 ? (
+        <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 py-10 px-4 text-center text-sm text-slate-500">{emptyMessage}</div>
+      ) : (
+        <>
+          <label className="flex w-fit items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+            <input type="checkbox" aria-label="Selecionar todos desta página" checked={pageAllSelected} onChange={togglePage} className="size-4 accent-emerald-600" />
+            Selecionar todos desta página
+          </label>
+          <ul className="grid gap-2 xl:grid-cols-2" aria-label="Pacientes">
+            {rows.map((r) => {
+              const hasName = isUsableContactName(r.name);
+              const name = displayName(r);
+              const interest = r.tags?.find((t) => t.startsWith(PROCEDURE_INTEREST_TAG_PREFIX))?.slice(PROCEDURE_INTEREST_TAG_PREFIX.length);
+              const waitingMin = r.waitingSince ? (Date.now() - new Date(r.waitingSince).getTime()) / 60000 : null;
+              const stage = r.status === "RESOLVED" ? "Finalizado" : STAGE_LABEL[r.funnelStage ?? ""] ?? null;
+              const contact = r.phone ? formatPhone(r.phone) : r.instagramUsername ? `@${r.instagramUsername}` : "Sem telefone";
+              // Subtítulo como o "procedimento · médico" da Agenda: telefone · atendente · origem.
+              const subtitle = [hasName ? contact : "Sem nome salvo", r.attendant ?? "Sem dono", r.acquisitionChannel].filter(Boolean).join(" · ");
+              const isSelected = selected.has(r.conversationId);
+              const tone =
+                r.status === "RESOLVED"
+                  ? "border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60"
+                  : waitingMin !== null
+                    ? "border-dashed border-amber-300 dark:border-amber-700 bg-white dark:bg-slate-900"
+                    : "border-slate-200 dark:border-slate-700 bg-emerald-50/70 dark:bg-emerald-950/25";
+              const badge = "inline-flex h-6 items-center gap-1 rounded-md border px-1.5 text-xs font-semibold";
+              return (
+                <li
+                  key={r.conversationId}
+                  data-state={isSelected ? "selected" : undefined}
+                  className={`relative rounded-lg border ${tone} shadow-xs transition-colors hover:border-slate-300 dark:hover:border-slate-600 ${isSelected ? "ring-2 ring-emerald-500/40" : ""}`}
+                >
+                  <div className="flex items-start">
+                    <input
+                      type="checkbox"
+                      aria-label={`Selecionar ${name}`}
+                      checked={isSelected}
+                      onChange={() => toggle(r)}
+                      className="ml-2 mt-3 size-4 shrink-0 accent-emerald-600"
+                    />
+                    <Link
+                      href={`/clinic/pacientes/${r.conversationId}`}
+                      aria-label={`Abrir ficha de ${name}`}
+                      className="min-w-0 flex-1 rounded-lg px-2 pt-1.5 pb-1 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
+                    >
+                      <div className="flex min-w-0 items-center gap-2">
+                        <span className="flex size-7 shrink-0 items-center justify-center rounded-full border border-slate-200 dark:border-slate-700 bg-white/80 dark:bg-slate-800 text-[11px] font-semibold text-slate-600 dark:text-slate-300">
+                          {hasName ? initialsOf(name) : <User className="w-3.5 h-3.5" aria-hidden />}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p className="flex min-w-0 items-center gap-1.5 text-sm font-semibold text-slate-900 dark:text-slate-100">
+                            <span className="truncate" title={name}>
+                              {name}
+                            </span>
+                            {r.phone && <MessageCircle className="w-3.5 h-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" aria-hidden />}
+                          </p>
+                          <p className="truncate text-xs text-slate-500 dark:text-slate-400">{subtitle}</p>
+                        </div>
+                      </div>
+                    </Link>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-1 px-2 pb-1.5 pl-9">
+                    {waitingMin !== null ? (
+                      <span
+                        className={`${badge} bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800`}
+                        title={`Mensagem do paciente sem resposta desde ${new Date(r.waitingSince!).toLocaleString("pt-BR")}`}
+                      >
+                        <Clock className="w-3 h-3" aria-hidden /> esperando há {formatDurationHuman(Math.max(1, waitingMin))}
                       </span>
-                    </span>
-                  </Link>
-                  <Link
-                    href={`/clinic/inbox?c=${r.conversationId}`}
-                    aria-label={`Abrir conversa com ${name}`}
-                    className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
-                  >
-                    <MessageCircle className="w-4 h-4" aria-hidden />
-                  </Link>
-                </div>
-                <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 pl-[26px] text-xs text-slate-600 dark:text-slate-300">
-                  {waitingMin !== null ? (
-                    <span className={`inline-flex items-center gap-1 font-semibold ${waitingMin >= 60 ? "text-amber-800 dark:text-amber-300" : ""}`}>
-                      <Clock className="w-3 h-3" aria-hidden /> esperando há {formatDurationHuman(Math.max(1, waitingMin))}
-                    </span>
-                  ) : (
-                    <span>última conversa {relative(r.lastInteractionAt)}</span>
-                  )}
-                  {stage && <span>{stage}</span>}
-                  <span>{r.attendant ?? "Sem dono"}</span>
-                </p>
-              </li>
-            );
-          })}
-        </ul>
+                    ) : (
+                      <span
+                        className={`${badge} bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700`}
+                        title={r.lastInteractionAt ? new Date(r.lastInteractionAt).toLocaleString("pt-BR") : undefined}
+                      >
+                        última conversa {relative(r.lastInteractionAt)}
+                      </span>
+                    )}
+                    {stage && (
+                      <span className={`${badge} bg-slate-100 text-slate-700 border-slate-300 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700`}>{stage}</span>
+                    )}
+                    {interest && (
+                      <span className={`${badge} bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700`}>{interest}</span>
+                    )}
+                    {r.inClinicSystem && (
+                      <span
+                        className={`${badge} bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700`}
+                        title="Está na agenda do sistema da clínica (já recebeu lembrete de consulta)"
+                      >
+                        <CalendarCheck className="w-3 h-3" aria-hidden /> agenda da clínica
+                      </span>
+                    )}
+                    <Link
+                      href={`/clinic/inbox?c=${r.conversationId}`}
+                      aria-label={`Abrir conversa com ${name}`}
+                      className="inline-flex h-6 items-center gap-1 rounded-md border border-sky-300 dark:border-sky-800 bg-white dark:bg-slate-900 px-1.5 text-xs font-semibold text-sky-800 dark:text-sky-300 hover:bg-sky-50 dark:hover:bg-sky-950/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
+                    >
+                      <MessageCircle className="w-3 h-3" aria-hidden /> Abrir conversa
+                    </Link>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </>
       )}
-
-      <div className={`${!loadError && !isLoading && rows.length > 0 ? "hidden lg:block " : ""}overflow-hidden rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs`}>
-        <Table aria-busy={isLoading}>
-          <TableHeader>
-            <TableRow className="bg-slate-50/70 dark:bg-slate-800/40">
-              <TableHead className="w-10">
-                <input type="checkbox" aria-label="Selecionar todos desta página" checked={pageAllSelected} onChange={togglePage} className="size-4 accent-emerald-600" />
-              </TableHead>
-              <TableHead>Paciente</TableHead>
-              <TableHead>Situação</TableHead>
-              <TableHead>Etapa</TableHead>
-              <TableHead>Interesse · origem</TableHead>
-              <TableHead>Atendente</TableHead>
-              <TableHead className="text-right">
-                <span className="sr-only">Chat</span>
-              </TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loadError ? (
-              <TableRow>
-                <TableCell colSpan={colSpan} className="py-10 text-center whitespace-normal" role="alert">
-                  <p className="flex items-center justify-center gap-2 text-sm font-semibold text-slate-800 dark:text-slate-100">
-                    <AlertTriangle className="w-4 h-4 text-amber-600" aria-hidden /> Não foi possível carregar os pacientes.
-                  </p>
-                  <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Pode ser a internet ou uma instabilidade no Conecta. Seus pacientes continuam salvos.</p>
-                  <button
-                    type="button"
-                    onClick={onRetry}
-                    className="mt-3 inline-flex h-9 items-center gap-2 rounded-lg border border-slate-200 dark:border-slate-700 px-3 text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800"
-                  >
-                    <RefreshCw className="w-4 h-4" aria-hidden /> Tentar de novo
-                  </button>
-                </TableCell>
-              </TableRow>
-            ) : isLoading ? (
-              <TableRow>
-                <TableCell colSpan={colSpan} className="py-10 text-center text-sm text-slate-500" role="status">
-                  <span className="inline-flex items-center gap-2">
-                    <Loader2 className="w-4 h-4 animate-spin" aria-hidden /> Carregando pacientes…
-                  </span>
-                </TableCell>
-              </TableRow>
-            ) : rows.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={colSpan} className="py-10 text-center text-sm text-slate-500 whitespace-normal">
-                  {emptyMessage}
-                </TableCell>
-              </TableRow>
-            ) : (
-              rows.map((r) => {
-                // Mesmo tratamento do nome na Agenda: "MARIA DA SILVA" → "Maria da Silva".
-                const hasName = isUsableContactName(r.name);
-                const name = displayName(r);
-                const interest = r.tags?.find((t) => t.startsWith(PROCEDURE_INTEREST_TAG_PREFIX))?.slice(PROCEDURE_INTEREST_TAG_PREFIX.length);
-                const waitingMin = r.waitingSince ? (Date.now() - new Date(r.waitingSince).getTime()) / 60000 : null;
-                return (
-                  <TableRow key={r.conversationId} data-state={selected.has(r.conversationId) ? "selected" : undefined}>
-                    <TableCell>
-                      <input
-                        type="checkbox"
-                        aria-label={`Selecionar ${name}`}
-                        checked={selected.has(r.conversationId)}
-                        onChange={() => toggle(r)}
-                        className="size-4 accent-emerald-600"
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Link
-                        href={`/clinic/pacientes/${r.conversationId}`}
-                        className="flex items-center gap-2.5 rounded-md hover:underline decoration-slate-400 underline-offset-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
-                      >
-                        <AvatarBadge name={name} size={32} />
-                        <span className="min-w-0">
-                          <span className="block font-semibold text-sm text-slate-900 dark:text-slate-100 truncate max-w-[220px]" title={name}>
-                            {name}
-                          </span>
-                          <span className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
-                            {/* Sem nome salvo o título já é o telefone: não repete aqui. */}
-                            {hasName ? (r.phone ? formatPhone(r.phone) : r.instagramUsername ? `@${r.instagramUsername}` : "Sem telefone") : <span className="italic">Sem nome salvo</span>}
-                            {r.inClinicSystem && (
-                              <span className="inline-flex items-center gap-0.5 rounded-md border border-slate-200 dark:border-slate-700 px-1 text-[11px] text-slate-600 dark:text-slate-300" title="Está na agenda do sistema da clínica (já recebeu lembrete de consulta)">
-                                <CalendarCheck className="w-3 h-3" aria-hidden /> agenda da clínica
-                              </span>
-                            )}
-                          </span>
-                        </span>
-                      </Link>
-                    </TableCell>
-                    <TableCell className="text-sm">
-                      {waitingMin !== null ? (
-                        <span
-                          className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-xs font-semibold ${
-                            waitingMin >= 60
-                              ? "border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300"
-                              : "border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200"
-                          }`}
-                          title={`Mensagem do paciente sem resposta desde ${new Date(r.waitingSince!).toLocaleString("pt-BR")}`}
-                        >
-                          <Clock className="w-3 h-3" aria-hidden /> esperando há {formatDurationHuman(Math.max(1, waitingMin))}
-                        </span>
-                      ) : (
-                        <span className="text-slate-600 dark:text-slate-300" title={r.lastInteractionAt ? new Date(r.lastInteractionAt).toLocaleString("pt-BR") : undefined}>
-                          última conversa {relative(r.lastInteractionAt)}
-                        </span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-sm text-slate-700 dark:text-slate-200">
-                      {r.status === "RESOLVED" ? "Finalizado" : STAGE_LABEL[r.funnelStage ?? ""] ?? "—"}
-                    </TableCell>
-                    <TableCell className="text-sm">
-                      <span className="block text-slate-700 dark:text-slate-200">{interest ?? "—"}</span>
-                      {r.acquisitionChannel && <span className="block text-xs text-slate-500 dark:text-slate-400">{r.acquisitionChannel}</span>}
-                    </TableCell>
-                    <TableCell className="text-sm text-slate-600 dark:text-slate-300">{r.attendant ?? "Sem dono"}</TableCell>
-                    <TableCell className="text-right">
-                      <Link
-                        href={`/clinic/inbox?c=${r.conversationId}`}
-                        aria-label={`Abrir conversa com ${name}`}
-                        title="Abrir conversa"
-                        className="inline-flex size-9 items-center justify-center rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900"
-                      >
-                        <MessageCircle className="w-4 h-4" aria-hidden />
-                      </Link>
-                    </TableCell>
-                  </TableRow>
-                );
-              })
-            )}
-          </TableBody>
-        </Table>
-      </div>
 
       <Dialog open={confirmAssign} onOpenChange={(o) => !assigning && setConfirmAssign(o)}>
         <DialogContent className="max-w-sm">
