@@ -13,6 +13,7 @@ import {
   Settings,
   BarChart3,
   Megaphone,
+  Sparkles,
   type LucideIcon,
 } from "lucide-react";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
@@ -46,6 +47,7 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { href: "/clinic/disparos", label: "Disparos", icon: Megaphone },
       { href: "/clinic/relatorio", label: "Relatórios", icon: BarChart3 },
+      { href: "/clinic/ia", label: "Ações da IA", icon: Sparkles },
       // Visível também pras clínicas só-WhatsApp (horários e ticket médio valem pra elas).
       { href: "/clinic/precos", label: "Configurações", icon: Settings },
     ],

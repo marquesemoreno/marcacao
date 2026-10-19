@@ -3,6 +3,8 @@
 import { formatCurrency, formatPhone } from "@/lib/format";
 import { KanbanCardDialog } from "@/components/chat/kanban-card-dialog";
 import { LostReasonModal } from "@/components/chat/lost-reason-modal";
+import { StageMessagePrompt, StageMessageSettings } from "@/components/chat/stage-message-dialogs";
+import type { StageMessageStage } from "@/lib/stage-messages";
 import { displayName } from "@/lib/contact-display";
 import React, { useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -122,6 +124,7 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
   const [openCardId, setOpenCardId] = useState<string | null>(null);
   const [dragOverStage, setDragOverStage] = useState<KanbanStage | null>(null);
   const [finishing, setFinishing] = useState<Contact | null>(null);
+  const [stagePrompt, setStagePrompt] = useState<{ conversationId: string; stage: StageMessageStage; patientName: string } | null>(null);
   const draggingRef = useRef<string | null>(null);
   const now = useMemo(() => new Date(), [contacts]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -144,6 +147,10 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
       return;
     }
     if (!withUndo) return;
+    // Etapas em que a clínica pode ter uma mensagem sugerida (só aparece se houver modelo cadastrado).
+    if (target === "orcamento" || target === "agendado") {
+      setStagePrompt({ conversationId: contactId, stage: target, patientName: displayName(current) });
+    }
     toast.success(`${displayName(current)} → ${STAGE_TITLE[target]}`, {
       action: {
         label: 'Desfazer',
@@ -232,6 +239,7 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
               ))}
             </select>
           </div>
+          <StageMessageSettings />
           {hasActiveFilter && (
             <button
               type="button"
@@ -491,6 +499,7 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
         />
       )}
 
+      <StageMessagePrompt target={stagePrompt} onClose={() => setStagePrompt(null)} />
       <LostReasonModal
         open={!!finishing}
         patientName={finishing ? displayName(finishing) : ''}

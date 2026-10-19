@@ -1061,6 +1061,47 @@ model WaitlistEntry {
   @@map("waitlist_entries")
 }
 
+/// O que a IA decidiu ou respondeu sozinha (tela /clinic/ia). kind: APPT_CONFIRMED |
+/// APPT_CANCELLED | APPT_RESCHEDULE | AI_REPLIED | AI_ESCALATED. Ver src/lib/ai-actions.ts.
+model AiActionLog {
+  id             String   @id @default(cuid())
+  clinicId       String   @map("clinic_id")
+  conversationId String   @map("conversation_id")
+  kind           String
+  summary        String   @db.Text
+  confidence     Float?
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@index([clinicId, createdAt])
+  @@map("ai_action_logs")
+}
+
+/// CPF/convênio achados numa mensagem do paciente (ver src/lib/patient-data-extraction.ts):
+/// só uma sugestão na ficha — a atendente aplica ou descarta, nada vai pro Contact sozinho.
+model PatientDataSuggestion {
+  id             String   @id @default(cuid())
+  conversationId String   @unique @map("conversation_id")
+  cpf            String?
+  convenio       String?
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@map("patient_data_suggestions")
+}
+
+/// Mensagem sugerida ao mover o card no Kanban para uma etapa (orcamento | agendado).
+/// A recepção revisa e envia; ver src/lib/stage-messages.ts.
+model StageMessage {
+  id        String   @id @default(cuid())
+  clinicId  String   @map("clinic_id")
+  stage     String
+  text      String
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([clinicId, stage])
+  @@map("stage_messages")
+}
+
 /// Mensagens enviadas pelas telas de teste da API oficial (/admin/whatsapp/enviar e
 /// /templates) — o status (sent/delivered/read/failed) é atualizado pelo webhook. Base da
 /// gravação da análise do app na Meta.

@@ -3,6 +3,8 @@ import { classifyAndStorePatientIntent } from "@/lib/patient-intent-server";
 import type { AppointmentStatus, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { isWebhookTokenAuthorized } from "@/lib/request-auth";
+import { logAiAction } from "@/lib/ai-action-log-server";
+import { extractPatientData } from "@/lib/patient-data-extraction";
 import { sendAppointmentConfirmation, sendWhatsAppMessage, formatToWhatsAppNumber, getEvolutionConfig, toggleNinthDigit } from "@/lib/whatsapp";
 import { detectAcquisition } from "@/lib/acquisition";
 import { fetchMediaBase64, uploadWhatsAppMedia, formatDuration } from "@/lib/whatsapp-media";
@@ -730,6 +732,23 @@ export async function POST(request: Request) {
         ...(mediaData ?? {}),
       },
     });
+    // CPF/convênio soltos na mensagem viram sugestão na ficha (a atendente aplica ou descarta).
+    if (!mediaData && !failedMediaNotice) {
+      try {
+        const found = extractPatientData(incoming.text);
+        const cpf = found.cpf && !contact.cpf ? found.cpf : undefined;
+        const convenio = found.convenio && !contact.convenio ? found.convenio : undefined;
+        if (cpf || convenio) {
+          await prisma.patientDataSuggestion.upsert({
+            where: { conversationId: conversation.id },
+            create: { conversationId: conversation.id, cpf, convenio },
+            update: { ...(cpf ? { cpf } : {}), ...(convenio ? { convenio } : {}) },
+          });
+        }
+      } catch (error) {
+        console.error("Falha ao registrar sugestão de dados do paciente:", error);
+      }
+    }
     // Intenção do paciente pro Chat (Jev) — roda depois da resposta, nunca atrasa o webhook.
     if (!mediaData && !failedMediaNotice && incoming.text.trim()) {
       const conversationId = conversation.id;
@@ -971,6 +990,7 @@ export async function POST(request: Request) {
           await prisma.aiInteractionLog.create({
             data: { conversationId: conversation.id, userMessage: incoming.text, escalated: true, escalationReason },
           });
+          await logAiAction({ clinicId: conversation.clinicId, conversationId: conversation.id, kind: "AI_ESCALATED", summary: escalationReason });
         } else {
           const reply = await generateAiReply(conversation.id, clinicName, aiConfig.instructions, conversation.clinicId);
           if (reply) {
@@ -981,6 +1001,7 @@ export async function POST(request: Request) {
             await prisma.aiInteractionLog.create({
               data: { conversationId: conversation.id, userMessage: incoming.text, aiResponse: reply },
             });
+            await logAiAction({ clinicId: conversation.clinicId, conversationId: conversation.id, kind: "AI_REPLIED", summary: incoming.text });
           } else {
             // Falha ao gerar resposta (sem API key, erro da OpenAI etc): escala pra
             // humano em vez de deixar o paciente sem nenhuma resposta.
@@ -992,6 +1013,7 @@ export async function POST(request: Request) {
             await prisma.aiInteractionLog.create({
               data: { conversationId: conversation.id, userMessage: incoming.text, escalated: true, escalationReason: "Falha ao gerar resposta da IA" },
             });
+            await logAiAction({ clinicId: conversation.clinicId, conversationId: conversation.id, kind: "AI_ESCALATED", summary: "Falha ao gerar resposta da IA" });
           }
         }
         aiHandled = true;
@@ -1068,6 +1090,9 @@ export async function POST(request: Request) {
   if (rescheduleRequested) {
     if (conversation) {
       await recordBridgeReminderResponse(conversation.clinicId, incoming.phone, "RESCHEDULE");
+      if (classifiedByAi) {
+        await logAiAction({ clinicId: conversation.clinicId, conversationId: conversation.id, kind: "APPT_RESCHEDULE", summary: incoming.text });
+      }
       await prisma.message.create({
         data: {
           conversationId: conversation.id,
@@ -1165,6 +1190,14 @@ export async function POST(request: Request) {
       await prisma.message.create({
         data: { conversationId: conversation.id, direction: "OUTBOUND", type: "INTERNAL_NOTE", content: noteText, status: "SENT" },
       });
+      if (classifiedByAi) {
+        await logAiAction({
+          clinicId: conversation.clinicId,
+          conversationId: conversation.id,
+          kind: newStatus === "CONFIRMED" ? "APPT_CONFIRMED" : "APPT_CANCELLED",
+          summary: incoming.text,
+        });
+      }
       // Confirmado: manda endereço + políticas de prazo/pagamento (mesmo texto
       // que entra depois da confirmação de agendamento feito pelo bridge, ver
       // hospital-bridge.ts) — não a confirmação genérica de antes.
@@ -1227,6 +1260,12 @@ export async function POST(request: Request) {
   // revisão humana antes — registra nota interna pra atendente conseguir
   // auditar o motivo caso o paciente reclame depois.
   if (classifiedByAi && conversation) {
+    await logAiAction({
+      clinicId: conversation.clinicId,
+      conversationId: conversation.id,
+      kind: newStatus === "CONFIRMED" ? "APPT_CONFIRMED" : "APPT_CANCELLED",
+      summary: incoming.text,
+    });
     await prisma.message.create({
       data: {
         conversationId: conversation.id,

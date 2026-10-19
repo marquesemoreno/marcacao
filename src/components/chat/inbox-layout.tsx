@@ -5,6 +5,7 @@ import { ACQUISITION_CHANNELS } from "@/lib/acquisition";
 import { CANNED_VARIABLES, fillCannedVariables } from "@/lib/canned-variables";
 import { customLossReasonLabel } from "@/lib/loss-reasons";
 import { listLossReasons } from "@/actions/loss-reasons";
+import { PatientSuggestionBanner } from "./patient-suggestion-banner";
 import { AcquisitionBadge } from "@/components/chat/acquisition-badge";
 import { InstagramGlyph } from "@/components/chat/instagram-glyph";
 import { messagingWindowState } from "@/lib/messaging-window";
@@ -2274,6 +2275,9 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                     )}
                   </div>
                 )}
+
+                <PatientSuggestionBanner conversationId={selectedContact.id} />
+
 
                 <div
                   className={`rounded-lg border overflow-hidden transition-colors ${
