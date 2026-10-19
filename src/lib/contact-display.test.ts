@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { formatPhone } from "./format";
-import { displayName, isUsableContactName } from "./contact-display";
+import { displayName, isUsableContactName, formatPatientName } from "./contact-display";
 
 describe("formatPhone", () => {
   it("formata número com DDI 55 (formato salvo no banco)", () => {
@@ -40,5 +40,31 @@ describe("displayName", () => {
   });
   it("lead do Instagram sem nome usa o @", () => {
     expect(displayName({ name: "", phone: null, instagramUsername: "maria.s" })).toBe("@maria.s");
+  });
+});
+
+describe("formatPatientName", () => {
+  it("TUDO MAIÚSCULO ou tudo minúsculo vira Nome Próprio, com 'da/de/do/dos/das/e' em minúsculo", () => {
+    expect(formatPatientName("MARIA DA SILVA")).toBe("Maria da Silva");
+    expect(formatPatientName("joão pedro dos santos")).toBe("João Pedro dos Santos");
+    expect(formatPatientName("ANA E PAULO")).toBe("Ana e Paulo");
+  });
+
+  it("nome já com maiúsculas e minúsculas misturadas não é mexido (ex.: McDonald, De Souza)", () => {
+    expect(formatPatientName("Ana McDonald")).toBe("Ana McDonald");
+    expect(formatPatientName("Bruna cardoso")).toBe("Bruna cardoso");
+  });
+
+  it("apara e junta espaços repetidos", () => {
+    expect(formatPatientName("  MARIA   SILVA ")).toBe("Maria Silva");
+  });
+
+  it("mantém emoji e acentos", () => {
+    expect(formatPatientName("IARA SANTOS 💗")).toBe("Iara Santos 💗");
+    expect(formatPatientName("ÁLVARO")).toBe("Álvaro");
+  });
+
+  it("telefone e texto sem letras passam como estão", () => {
+    expect(formatPatientName("(77) 99939-5571")).toBe("(77) 99939-5571");
   });
 });

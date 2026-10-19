@@ -8,7 +8,7 @@ import { AlertTriangle, CalendarCheck, Clock, Loader2, Megaphone, MessageCircle,
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AvatarBadge } from "@/components/chat/avatar-badge";
-import { displayName } from "@/lib/contact-display";
+import { displayName, formatPatientName, isUsableContactName } from "@/lib/contact-display";
 import { formatPhone } from "@/lib/format";
 import { PROCEDURE_INTEREST_TAG_PREFIX } from "@/lib/conversation-tags";
 import { formatDurationHuman } from "@/lib/sla-calculator";
@@ -254,7 +254,53 @@ export function PatientListTable({
         </div>
       )}
 
-      <div className="overflow-hidden rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs">
+      {/* Celular/tablet estreito: um card por paciente (a tabela de 7 colunas exigia rolar na horizontal). */}
+      {!loadError && !isLoading && rows.length > 0 && (
+        <ul className="lg:hidden space-y-2" aria-label="Pacientes">
+          {rows.map((r) => {
+            const hasName = isUsableContactName(r.name);
+            const name = hasName ? formatPatientName(displayName(r)) : displayName(r);
+            const waitingMin = r.waitingSince ? (Date.now() - new Date(r.waitingSince).getTime()) / 60000 : null;
+            const stage = r.status === "RESOLVED" ? "Finalizado" : STAGE_LABEL[r.funnelStage ?? ""] ?? null;
+            return (
+              <li key={r.conversationId} className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3" data-state={selected.has(r.conversationId) ? "selected" : undefined}>
+                <div className="flex items-start gap-2.5">
+                  <input type="checkbox" aria-label={`Selecionar ${name}`} checked={selected.has(r.conversationId)} onChange={() => toggle(r)} className="mt-2.5 size-4 shrink-0 accent-emerald-600" />
+                  <Link href={`/clinic/pacientes/${r.conversationId}`} className="flex min-w-0 flex-1 items-center gap-2.5 rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50">
+                    <AvatarBadge name={name} size={36} />
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm font-semibold text-slate-900 dark:text-slate-100">{name}</span>
+                      <span className="block truncate text-xs text-slate-500 dark:text-slate-400">
+                        {hasName ? (r.phone ? formatPhone(r.phone) : r.instagramUsername ? `@${r.instagramUsername}` : "Sem telefone") : <span className="italic">Sem nome salvo</span>}
+                      </span>
+                    </span>
+                  </Link>
+                  <Link
+                    href={`/clinic/inbox?c=${r.conversationId}`}
+                    aria-label={`Abrir conversa com ${name}`}
+                    className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
+                  >
+                    <MessageCircle className="w-4 h-4" aria-hidden />
+                  </Link>
+                </div>
+                <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 pl-[26px] text-xs text-slate-600 dark:text-slate-300">
+                  {waitingMin !== null ? (
+                    <span className={`inline-flex items-center gap-1 font-semibold ${waitingMin >= 60 ? "text-amber-800 dark:text-amber-300" : ""}`}>
+                      <Clock className="w-3 h-3" aria-hidden /> esperando há {formatDurationHuman(Math.max(1, waitingMin))}
+                    </span>
+                  ) : (
+                    <span>última conversa {relative(r.lastInteractionAt)}</span>
+                  )}
+                  {stage && <span>{stage}</span>}
+                  <span>{r.attendant ?? "Sem dono"}</span>
+                </p>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+
+      <div className={`${!loadError && !isLoading && rows.length > 0 ? "hidden lg:block " : ""}overflow-hidden rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs`}>
         <Table aria-busy={isLoading}>
           <TableHeader>
             <TableRow className="bg-slate-50/70 dark:bg-slate-800/40">
@@ -304,7 +350,9 @@ export function PatientListTable({
               </TableRow>
             ) : (
               rows.map((r) => {
-                const name = displayName(r);
+                // Mesmo tratamento do nome na Agenda: "MARIA DA SILVA" → "Maria da Silva".
+                const hasName = isUsableContactName(r.name);
+                const name = hasName ? formatPatientName(displayName(r)) : displayName(r);
                 const interest = r.tags?.find((t) => t.startsWith(PROCEDURE_INTEREST_TAG_PREFIX))?.slice(PROCEDURE_INTEREST_TAG_PREFIX.length);
                 const waitingMin = r.waitingSince ? (Date.now() - new Date(r.waitingSince).getTime()) / 60000 : null;
                 return (
@@ -329,7 +377,8 @@ export function PatientListTable({
                             {name}
                           </span>
                           <span className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
-                            {r.phone ? formatPhone(r.phone) : r.instagramUsername ? `@${r.instagramUsername}` : "Sem telefone"}
+                            {/* Sem nome salvo o título já é o telefone: não repete aqui. */}
+                            {hasName ? (r.phone ? formatPhone(r.phone) : r.instagramUsername ? `@${r.instagramUsername}` : "Sem telefone") : <span className="italic">Sem nome salvo</span>}
                             {r.inClinicSystem && (
                               <span className="inline-flex items-center gap-0.5 rounded-md border border-slate-200 dark:border-slate-700 px-1 text-[11px] text-slate-600 dark:text-slate-300" title="Está na agenda do sistema da clínica (já recebeu lembrete de consulta)">
                                 <CalendarCheck className="w-3 h-3" aria-hidden /> agenda da clínica

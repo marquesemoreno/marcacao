@@ -17,3 +17,26 @@ export function displayName(contact: { name?: string | null; phone?: string | nu
   if (contact.instagramUsername) return `@${contact.instagramUsername}`;
   return "Contato sem número visível";
 }
+
+const NAME_PARTICLES = new Set(["da", "das", "de", "do", "dos", "e"]);
+
+/** Nome do paciente com cara de nome: "MARIA DA SILVA" / "maria da silva" → "Maria da Silva"
+ * (mesmo tratamento da Agenda). Nome que já mistura maiúsculas e minúsculas é de alguém que
+ * escreveu do jeito que quis (McDonald, De Souza) e não é mexido. */
+export function formatPatientName(name: string): string {
+  const text = name.trim().replace(/\s+/g, " ");
+  const letters = text.replace(/[^\p{L}]/gu, "");
+  if (!letters) return text;
+  const allUpper = letters === letters.toUpperCase();
+  const allLower = letters === letters.toLowerCase();
+  if (!allUpper && !allLower) return text;
+  return text
+    .toLowerCase()
+    .split(" ")
+    .map((word, i) => {
+      if (i > 0 && NAME_PARTICLES.has(word)) return word;
+      const [first, ...rest] = [...word];
+      return (first ?? "").toLocaleUpperCase("pt-BR") + rest.join("");
+    })
+    .join(" ");
+}
