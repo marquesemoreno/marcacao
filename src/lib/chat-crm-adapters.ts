@@ -14,7 +14,7 @@ import { customLossReasonLabel } from "@/lib/loss-reasons";
 import { isMediaDownloadFailedNotice, isAutoSystemMessage, type InvoiceData } from "@/lib/chat-messages";
 import type { DocumentReviewData } from "@/lib/documents/document-validator";
 import { canEditMessage } from "@/lib/message-edit";
-import { RESCHEDULE_PENDING_TAG } from "@/lib/conversation-tags";
+import { RESCHEDULE_PENDING_TAG, URGENCY_TAG } from "@/lib/conversation-tags";
 import { getSlaInfo } from "@/lib/sla-calculator";
 import { PATIENT_INTENTS, visibleIntent } from "@/lib/patient-intent";
 import type { BusinessHours } from "@/lib/schemas/clinic";
@@ -130,12 +130,9 @@ function hasUnseenAssignmentFor(conversation: ConversationWithRelations, viewerU
  * dessincronizado. Deriva de novo a cada leitura, sempre certo.
  */
 function computeQueueState(conversation: ConversationWithRelations): ConversationQueueState {
-  // Destaque de urgência desligado temporariamente (pedido do usuário, 2026-09-25) —
-  // a regra de detecção (matchEscalationTrigger, ver ai-attendant.ts) continua rodando
-  // e gravando a tag "🚨 Urgência Clínica" (URGENCY_TAG em conversation-tags.ts)
-  // normalmente, só a fila parou de mostrar o badge/prioridade até refinar a regra.
-  // Pra reativar: import { URGENCY_TAG } from "@/lib/conversation-tags" e descomentar:
-  // if (conversation.status === "OPEN" && conversation.tags.includes(URGENCY_TAG)) return "URGENCIA_CLINICA";
+  // Destaque religado em 19/10 com a regra refinada (só sintoma grave/emergência, ver
+  // clinical-urgency.ts) — antes qualquer "urgente" acendia e foi desligado em 25/09.
+  if (conversation.status === "OPEN" && conversation.tags.includes(URGENCY_TAG)) return "URGENCIA_CLINICA";
   if (conversation.status === "OPEN" && conversation.tags.includes(RESCHEDULE_PENDING_TAG)) return "REMARCACAO_PENDENTE";
   if (conversation.aiEnabled) return "IA_ATENDENDO";
   const lastMessage = conversation.messages[0];

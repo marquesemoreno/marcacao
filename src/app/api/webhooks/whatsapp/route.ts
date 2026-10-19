@@ -1,3 +1,4 @@
+import { matchClinicalUrgency, EMERGENCY_GUIDANCE_MESSAGE } from "@/lib/clinical-urgency";
 import { NextResponse, after } from "next/server";
 import { classifyAndStorePatientIntent } from "@/lib/patient-intent-server";
 import type { AppointmentStatus, Prisma } from "@prisma/client";
@@ -769,7 +770,9 @@ export async function POST(request: Request) {
     // visual na fila (ver URGENCY_TAG, InboxLayout) e grava histórico em
     // MessageTriage pra auditoria — nunca bloqueia nem muda o resto do fluxo.
     // =========================================================================
-    const urgencyReason = matchEscalationTrigger(incoming.text);
+    // Só urgência CLÍNICA (sintoma grave/emergência) — "remarcar urgente", pedido de
+    // humano e reclamação não acendem o alarme (ver clinical-urgency.ts).
+    const urgencyReason = matchClinicalUrgency(incoming.text);
     if (urgencyReason) {
       await prisma.messageTriage.create({
         data: { conversationId: conversation.id, messageContent: incoming.text, redFlags: [urgencyReason] },
@@ -778,6 +781,12 @@ export async function POST(request: Request) {
         await prisma.conversation.update({
           where: { id: conversation.id },
           data: { tags: { push: URGENCY_TAG } },
+        });
+        // Orientação do 192 uma vez por conversa (enquanto a tag não sai) — fora do
+        // horário ninguém da equipe vê a mensagem a tempo.
+        const guidance = await sendWhatsAppMessage(incoming.phone, EMERGENCY_GUIDANCE_MESSAGE, "clinical_urgency.guidance", resolvedClinicId);
+        await prisma.message.create({
+          data: { conversationId: conversation.id, direction: "OUTBOUND", content: EMERGENCY_GUIDANCE_MESSAGE, status: guidance.success ? "DELIVERED" : "FAILED" },
         });
       }
     }
