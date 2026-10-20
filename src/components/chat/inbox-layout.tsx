@@ -1239,8 +1239,12 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       recordingStreamRef.current = stream;
+      // Ordem pensando na API oficial do WhatsApp, que aceita ogg/opus e mp4 mas NÃO webm:
+      // Firefox grava ogg; Chrome (126+) grava mp4; webm só como último recurso.
       const mimeType = MediaRecorder.isTypeSupported('audio/ogg;codecs=opus')
         ? 'audio/ogg;codecs=opus'
+        : MediaRecorder.isTypeSupported('audio/mp4')
+        ? 'audio/mp4'
         : MediaRecorder.isTypeSupported('audio/webm')
         ? 'audio/webm'
         : '';

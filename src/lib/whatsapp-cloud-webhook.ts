@@ -4,7 +4,7 @@
  * celular (coexistência, `smb_message_echoes`) e status de entrega/leitura. Puro e
  * testado; quem identifica a clínica (pelo phone_number_id) e grava é a rota. */
 
-type MediaFields = { mediaId?: string; mimeType?: string };
+type MediaFields = { mediaId?: string; mimeType?: string; fileName?: string };
 
 export type CloudEvent =
   | ({ kind: "inbound"; phoneNumberId: string; from: string; name?: string; keyId: string; text: string; type: string; at: Date } & MediaFields)
@@ -28,7 +28,12 @@ function readContent(m: RawMsg, direction: "recebid" | "enviad"): { text: string
   const media = m[m.type];
   if (media && MEDIA_LABEL[m.type]) {
     const gender = m.type === "image" ? "a" : "o";
-    return { text: media.caption || `${MEDIA_LABEL[m.type]} ${direction}${gender}`, mediaId: media.id, mimeType: media.mime_type };
+    return {
+      text: media.caption || `${MEDIA_LABEL[m.type]} ${direction}${gender}`,
+      mediaId: media.id,
+      mimeType: media.mime_type,
+      ...(typeof media.filename === "string" && media.filename ? { fileName: media.filename } : {}),
+    };
   }
   return { text: `[${m.type ?? "mensagem"}]` };
 }
@@ -88,7 +93,7 @@ export function toEvolutionPayload(clinicId: string, event: Extract<CloudEvent, 
     if (event.type === "image") message = { imageMessage: { mimetype: mime, caption: event.text } };
     else if (event.type === "audio") message = { audioMessage: { mimetype: mime, seconds: 0 } };
     else if (event.type === "video") message = { documentMessage: { mimetype: mime, fileName: `video.${ext}` } };
-    else message = { documentMessage: { mimetype: mime, fileName: `documento.${ext}` } };
+    else message = { documentMessage: { mimetype: mime, fileName: event.fileName ?? `documento.${ext}` } };
   }
   return {
     event: "messages.upsert",

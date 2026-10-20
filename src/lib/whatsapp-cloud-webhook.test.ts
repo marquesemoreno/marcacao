@@ -93,3 +93,21 @@ describe("toEvolutionPayload com mídia", () => {
     });
   });
 });
+
+describe("nome original do documento", () => {
+  it("parseCloudWebhook guarda o filename e toEvolutionPayload usa no documentMessage", () => {
+    const body = {
+      object: "whatsapp_business_account",
+      entry: [{ changes: [{ field: "messages", value: {
+        metadata: { phone_number_id: "1" },
+        contacts: [{ wa_id: "5577999998888", profile: { name: "Ana" } }],
+        messages: [{ from: "5577999998888", id: "wamid.D", timestamp: "1792584000", type: "document",
+          document: { id: "DOC1", mime_type: "application/pdf", filename: "pedido-exame.pdf" } }],
+      } }] }],
+    };
+    const [ev] = parseCloudWebhook(body);
+    expect(ev).toMatchObject({ kind: "inbound", fileName: "pedido-exame.pdf", mediaId: "DOC1" });
+    const p = toEvolutionPayload("c", ev as Extract<typeof ev, { kind: "inbound" }>);
+    expect(p.data.message).toEqual({ documentMessage: { mimetype: "application/pdf", fileName: "pedido-exame.pdf" } });
+  });
+});

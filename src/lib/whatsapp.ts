@@ -457,7 +457,16 @@ export async function sendWhatsAppAudio(
 ): Promise<{ success: boolean; skipped: boolean; responseCode?: number | null; keyId?: string }> {
   const cloudSend = await import("@/lib/whatsapp-cloud-send");
   const cloud = await cloudSend.activeCloudAccount(clinicId);
-  if (cloud) return cloudSend.cloudSendMedia(cloud, formatToWhatsAppNumber(to), { link: mediaUrl, mimeType: "audio/ogg" }, event);
+  if (cloud) {
+    // API oficial não aceita áudio webm (gravação de Chrome antigo) — falha com motivo claro.
+    if (/\.webm(\?|$)/i.test(mediaUrl)) {
+      await prisma.webhookLog
+        .create({ data: { event, payload: { via: "cloud", phone: to, error: "audio/webm não aceito pela API oficial" }, status: "FAILED", responseCode: null } })
+        .catch(() => {});
+      return { success: false, skipped: false, responseCode: 400 };
+    }
+    return cloudSend.cloudSendMedia(cloud, formatToWhatsAppNumber(to), { link: mediaUrl, mimeType: "audio/ogg" }, event);
+  }
   const { apiUrl, apiKey, instanceName } = await getEvolutionConfig(clinicId);
   const target = formatToWhatsAppNumber(to);
 
