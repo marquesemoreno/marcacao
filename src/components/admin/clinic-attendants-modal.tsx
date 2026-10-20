@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Users, UserPlus, Loader2, Mail, KeyRound, Save, Pencil } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { listClinicUsers, createTeamMember, updateUserMaxConcurrentChats, updateAttendantName, resetAttendantPassword, updateUserIsAttendant } from "@/actions/admin";
+import { listClinicUsers, createTeamMember, updateUserMaxConcurrentChats, updateAttendantName, resetAttendantPassword, updateUserIsAttendant, updateUserIsManager } from "@/actions/admin";
 
 type Attendant = {
   id: string;
@@ -12,6 +12,7 @@ type Attendant = {
   email: string;
   maxConcurrentChats: number;
   isAttendant: boolean;
+  isManager: boolean;
   createdAt: Date | string;
 };
 
@@ -30,6 +31,24 @@ export function ClinicAttendantsModal({ clinicId, clinicName }: { clinicId: stri
   const [resetPasswordForId, setResetPasswordForId] = useState<string | null>(null);
   const [resetPasswordValue, setResetPasswordValue] = useState("");
   const [savingAttendantId, setSavingAttendantId] = useState<string | null>(null);
+
+  async function handleToggleManager(attendant: Attendant) {
+    const next = !attendant.isManager;
+    setSavingAttendantId(attendant.id);
+    try {
+      await updateUserIsManager(attendant.id, next);
+      setAttendants((prev) => prev.map((a) => (a.id === attendant.id ? { ...a, isManager: next } : a)));
+      toast.success(
+        next
+          ? `${attendant.name} agora vê Relatórios e Configurações.`
+          : `${attendant.name} agora é recepção: não vê Relatórios nem Configurações.`
+      );
+    } catch {
+      toast.error("Não foi possível salvar.");
+    } finally {
+      setSavingAttendantId(null);
+    }
+  }
 
   async function handleToggleAttendant(attendant: Attendant) {
     const next = !attendant.isAttendant;
@@ -250,6 +269,17 @@ export function ClinicAttendantsModal({ clinicId, clinicName }: { clinicId: stri
                           />
                           Atende no chat
                           {!attendant.isAttendant && <span className="text-slate-400 dark:text-slate-500">· só gerência</span>}
+                        </label>
+                        <label className="mt-1 ml-3 inline-flex items-center gap-1.5 text-[11px] font-medium text-slate-600 dark:text-slate-300 cursor-pointer" title="Relatórios e Configurações da clínica">
+                          <input
+                            type="checkbox"
+                            checked={attendant.isManager}
+                            disabled={savingAttendantId === attendant.id}
+                            onChange={() => handleToggleManager(attendant)}
+                            className="size-3.5 accent-indigo-600"
+                          />
+                          Gestão
+                          {!attendant.isManager && <span className="text-slate-400 dark:text-slate-500">· recepção</span>}
                         </label>
                       </div>
                       {!isEditingNameThis && (

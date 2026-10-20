@@ -1,3 +1,4 @@
+import { ManagerOnly, currentUserIsManager } from "@/components/clinic/manager-only";
 import {
   getClinicInfo,
   listClinicProcedures,
@@ -17,6 +18,7 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export default async function ClinicSettingsPage() {
+  if (!(await currentUserIsManager())) return <ManagerOnly />;
   const [clinic, clinicProcedures, availableProcedures, acquisitionRules] = await Promise.all([
     getClinicInfo(),
     listClinicProcedures(),

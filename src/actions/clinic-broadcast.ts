@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { requireClinicSession } from "@/lib/session";
+import { requireClinicManager, requireClinicSession } from "@/lib/session";
 import { formatToWhatsAppNumber } from "@/lib/whatsapp";
 import { uploadWhatsAppMedia } from "@/lib/whatsapp-media";
 import { buildBroadcastMessage, type ParsedBroadcastRecipient } from "@/lib/broadcast-csv";
@@ -487,7 +487,7 @@ export async function getCampaignExclusions() {
 
 /** Substitui a lista inteira — aceita códigos separados por vírgula, espaço ou linha. */
 export async function setCampaignExclusions(raw: string) {
-  const { clinicId } = await requireClinicSession();
+  const { clinicId } = await requireClinicManager();
   const ids = [...new Set(raw.split(/[\s,;]+/).map((t) => t.trim()).filter(Boolean).map(Number))];
   if (ids.some((n) => !Number.isInteger(n) || n <= 0)) throw new Error("Use só os códigos numéricos dos pacientes.");
   if (ids.length > 5000) throw new Error("Lista grande demais.");

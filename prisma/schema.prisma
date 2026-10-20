@@ -161,6 +161,9 @@ model User {
   maxConcurrentChats Int      @default(5) @map("max_concurrent_chats")
   /// false = login só de gerência: não aparece pra atribuir/transferir, não recebe conversa automática nem entra no desempenho da equipe.
   isAttendant        Boolean  @default(true) @map("is_attendant")
+  /// Gestão: vê Relatórios e Configurações (preços, horários, ticket, regras, investimento).
+  /// Recepção (false) usa chat, agenda, pacientes, CRM e disparos. Ver requireClinicManager.
+  isManager          Boolean  @default(false) @map("is_manager")
   active             Boolean  @default(true)
   createdAt          DateTime @default(now()) @map("created_at")
   updatedAt          DateTime @updatedAt @map("updated_at")

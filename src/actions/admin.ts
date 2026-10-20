@@ -281,12 +281,21 @@ export async function updateUserIsAttendant(userId: string, isAttendant: boolean
   return { success: true as const };
 }
 
+/** Liga/desliga "Gestão" (User.isManager): com gestão, vê Relatórios e Configurações da
+ * clínica; sem (recepção), usa chat, agenda, pacientes, CRM e disparos. Vale na hora. */
+export async function updateUserIsManager(userId: string, isManager: boolean) {
+  await requireAdminSession();
+  await prisma.user.update({ where: { id: userId }, data: { isManager } });
+  revalidatePath("/admin/clinicas");
+  return { success: true as const };
+}
+
 /** Atendentes (role CLINIC) cadastrados numa clínica — pra exibir/gerenciar no painel admin. */
 export async function listClinicUsers(clinicId: string) {
   await requireAdminSession();
   return prisma.user.findMany({
     where: { clinicId, role: "CLINIC" },
-    select: { id: true, name: true, email: true, maxConcurrentChats: true, isAttendant: true, createdAt: true },
+    select: { id: true, name: true, email: true, maxConcurrentChats: true, isAttendant: true, isManager: true, createdAt: true },
     orderBy: { name: "asc" },
   });
 }

@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import type { AppointmentStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { requireClinicSession } from "@/lib/session";
+import { requireClinicManager, requireClinicSession } from "@/lib/session";
 import { startOfUTCDay, addUTCDays } from "@/lib/date";
 import { periodWindow, type PeriodKey } from "@/lib/report-period";
 import { computeCampaignReport } from "@/lib/crm-campaigns";
@@ -99,7 +99,7 @@ function channelWhere(channel?: string) {
 }
 
 export async function getClinicChatReport(period: PeriodKey = "30", tags?: string[], channel?: string, previous = false) {
-  const { clinicId } = await requireClinicSession();
+  const { clinicId } = await requireClinicManager();
   // `previous` = janela de comparação (mesmo tamanho logo antes, ou o mês anterior).
   const { since, until } = periodWindow(period, previous);
   const inWindow = { gte: since, ...(until ? { lt: until } : {}) };
@@ -196,7 +196,7 @@ export async function getClinicChatReport(period: PeriodKey = "30", tags?: strin
  * sentido aqui (não no relatório de chat): não existe vínculo entre Conversation e
  * Appointment no banco, então médico/procedimento não dá pra filtrar conversas. */
 export async function getClinicAppointmentsReport(period: PeriodKey = "30", doctorName?: string, procedureId?: string) {
-  const { clinicId } = await requireClinicSession();
+  const { clinicId } = await requireClinicManager();
   const { since, until } = periodWindow(period, false);
 
   const appointments = await prisma.appointment.findMany({
@@ -253,7 +253,7 @@ export async function getClinicAppointmentsReport(period: PeriodKey = "30", doct
 const NOT_ADMINISTRATIVE = { OR: [{ resolutionReason: null }, { resolutionReason: { not: "ADMINISTRATIVO" } }] };
 
 export async function getClinicManagementReport(period: PeriodKey = "30", channel?: string, previous = false) {
-  const { clinicId } = await requireClinicSession();
+  const { clinicId } = await requireClinicManager();
   // `previous` = janela de comparação (mesmo tamanho logo antes, ou o mês anterior).
   const { since, until } = periodWindow(period, previous);
   const inWindow = { gte: since, ...(until ? { lt: until } : {}) };
@@ -558,7 +558,7 @@ export async function listProceduresNotOffered() {
 }
 
 export async function updateClinicProcedure(clinicProcedureId: string, formData: FormData) {
-  const { clinicId } = await requireClinicSession();
+  const { clinicId } = await requireClinicManager();
   const data = updateClinicProcedureSchema.parse({
     price: formData.get("price"),
     promotionalPrice: formData.get("promotionalPrice"),
@@ -582,7 +582,7 @@ export async function updateClinicProcedure(clinicProcedureId: string, formData:
  * Estimado / Receita Protegida do /clinic/relatorio quando o procedimento não tem preço.
  * Campo vazio = sem estimativa. */
 export async function updateClinicDefaultTicket(formData: FormData) {
-  const { clinicId } = await requireClinicSession();
+  const { clinicId } = await requireClinicManager();
   const raw = String(formData.get("defaultTicket") ?? "").replace(",", ".").trim();
   const value = raw === "" ? null : Number(raw);
   if (value !== null && (!Number.isFinite(value) || value < 0 || value > 1_000_000)) {
@@ -611,7 +611,7 @@ export async function listAcquisitionRules() {
 
 /** Texto-chave de campanha → canal (ver detectAcquisition em src/lib/acquisition.ts). */
 export async function addAcquisitionRule(formData: FormData) {
-  const { clinicId } = await requireClinicSession();
+  const { clinicId } = await requireClinicManager();
   const keyword = String(formData.get("keyword") ?? "").trim();
   const channel = String(formData.get("channel") ?? "").trim();
   if (keyword.length < 3 || keyword.length > 200 || !channel || channel.length > 60) {
@@ -622,13 +622,13 @@ export async function addAcquisitionRule(formData: FormData) {
 }
 
 export async function deleteAcquisitionRule(ruleId: string) {
-  const { clinicId } = await requireClinicSession();
+  const { clinicId } = await requireClinicManager();
   await prisma.acquisitionRule.deleteMany({ where: { id: ruleId, clinicId } });
   revalidatePath("/clinic/precos");
 }
 
 export async function addClinicProcedure(formData: FormData) {
-  const { clinicId } = await requireClinicSession();
+  const { clinicId } = await requireClinicManager();
   const data = addClinicProcedureSchema.parse({
     procedureId: formData.get("procedureId"),
     price: formData.get("price"),
@@ -646,7 +646,7 @@ export async function addClinicProcedure(formData: FormData) {
 const businessHoursDays = ["seg", "ter", "qua", "qui", "sex", "sab", "dom"] as const;
 
 export async function updateClinicBusinessHours(formData: FormData) {
-  const { clinicId } = await requireClinicSession();
+  const { clinicId } = await requireClinicManager();
 
   const hours: Record<string, { closed?: boolean; open?: string; close?: string }> = {};
   for (const day of businessHoursDays) {
@@ -758,7 +758,7 @@ export async function getClinicCampaignReport(period: PeriodKey = "30"): Promise
  * existe por mês — com período "Este mês"/"Mês passado" o custo e o retorno aparecem;
  * nas janelas móveis (7/30/90 dias) a tabela vem sem custo (`month` null). */
 export async function getClinicCampaignBreakdown(period: PeriodKey = "30") {
-  const { clinicId } = await requireClinicSession();
+  const { clinicId } = await requireClinicManager();
   const { since, until } = periodWindow(period, false);
   const month =
     period === "mes" || period === "mes-anterior"
@@ -779,7 +779,7 @@ export async function getClinicCampaignBreakdown(period: PeriodKey = "30") {
 
 /** Investimento de uma campanha no mês (R$). Valor vazio/0 apaga. */
 export async function saveCampaignSpend(input: { campaign: string; month: string; amount: number | null }) {
-  const { clinicId } = await requireClinicSession();
+  const { clinicId } = await requireClinicManager();
   if (!/^\d{4}-\d{2}$/.test(input.month) || !input.campaign.trim()) return { success: false as const, error: "Dados inválidos." };
   if (!input.amount || input.amount <= 0) {
     await prisma.campaignSpend.deleteMany({ where: { clinicId, campaign: input.campaign, month: input.month } });

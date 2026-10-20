@@ -9,6 +9,7 @@ import { ClinicNav } from "@/components/clinic/clinic-nav";
 import { ClinicSidebar } from "@/components/clinic/clinic-sidebar";
 import { CopilotLauncher } from "@/components/clinic/copilot/copilot-launcher";
 import { getClinicInfo } from "@/actions/clinic";
+import { isClinicManager } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -28,11 +29,12 @@ export default async function ClinicLayout({
 }>) {
   const [clinic, session] = await Promise.all([getClinicInfo(), getServerSession(authOptions)]);
   const isExclusive = Boolean(clinic.whatsappInstance);
+  const isManager = session?.user.id ? await isClinicManager(session.user.id) : false;
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100">
       <PanelDarkDefault />
-      <ClinicSidebar tradeName={clinic.tradeName} userName={session?.user.name} isExclusive={isExclusive} />
+      <ClinicSidebar tradeName={clinic.tradeName} userName={session?.user.name} isExclusive={isExclusive} isManager={isManager} />
 
       {/* Barra superior compacta — só no mobile, onde o trilho fica escondido. */}
       <header className="md:hidden flex h-14 shrink-0 items-center justify-between gap-3 border-b border-slate-200/80 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 px-4 fixed top-0 inset-x-0 z-30">
@@ -45,7 +47,7 @@ export default async function ClinicLayout({
 
       <div className="flex-1 min-w-0 flex flex-col overflow-hidden md:pt-0 pt-14">
         <div className="md:hidden border-b border-slate-800 bg-slate-900">
-          <ClinicNav exclusiveWhatsapp={isExclusive} orientation="horizontal" />
+          <ClinicNav exclusiveWhatsapp={isExclusive} orientation="horizontal" isManager={isManager} />
         </div>
         {/* Conteúdo Principal em Tela Cheia */}
         <main className="flex-1 overflow-hidden flex flex-col">{children}</main>

@@ -19,7 +19,7 @@ import {
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { getMyUnreadCount } from "@/actions/clinic-shell";
 
-type NavItem = { href: string; label: string; icon: LucideIcon; badge?: "unread"; onlyFull?: boolean };
+type NavItem = { href: string; label: string; icon: LucideIcon; badge?: "unread"; onlyFull?: boolean; onlyManager?: boolean };
 type NavGroup = { label: string; items: NavItem[] };
 
 /** N3 — menu agrupado. Itens `onlyFull` não aparecem pra clínicas com WhatsApp exclusivo
@@ -46,10 +46,10 @@ const NAV_GROUPS: NavGroup[] = [
     label: "Administração",
     items: [
       { href: "/clinic/disparos", label: "Disparos", icon: Megaphone },
-      { href: "/clinic/relatorio", label: "Relatórios", icon: BarChart3 },
+      { href: "/clinic/relatorio", label: "Relatórios", icon: BarChart3, onlyManager: true },
       { href: "/clinic/ia", label: "Ações da IA", icon: Sparkles },
       // Visível também pras clínicas só-WhatsApp (horários e ticket médio valem pra elas).
-      { href: "/clinic/precos", label: "Configurações", icon: Settings },
+      { href: "/clinic/precos", label: "Configurações", icon: Settings, onlyManager: true },
     ],
   },
 ];
@@ -60,8 +60,11 @@ export function ClinicNav({
   exclusiveWhatsapp = false,
   orientation = "vertical",
   collapsed = false,
+  isManager = true,
 }: {
   exclusiveWhatsapp?: boolean;
+  /** Recepção (false) não vê Relatórios nem Configurações — ver requireClinicManager. */
+  isManager?: boolean;
   orientation?: "vertical" | "horizontal";
   /** Só vale pra orientation="vertical" — ícone sozinho com tooltip (ver ClinicSidebar). */
   collapsed?: boolean;
@@ -81,7 +84,7 @@ export function ClinicNav({
     };
   }, [pathname]);
 
-  const groups = NAV_GROUPS.map((g) => ({ ...g, items: g.items.filter((i) => !(exclusiveWhatsapp && i.onlyFull)) })).filter(
+  const groups = NAV_GROUPS.map((g) => ({ ...g, items: g.items.filter((i) => !(exclusiveWhatsapp && i.onlyFull) && !(i.onlyManager && !isManager)) })).filter(
     (g) => g.items.length > 0
   );
 
