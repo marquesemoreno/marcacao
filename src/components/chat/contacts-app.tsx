@@ -97,6 +97,8 @@ function rowToPatientRecord(row: ContactRow): PatientRecordData {
     notes: row.notes ?? undefined,
     tags: row.tags ?? [],
     consultationHistory: [],
+    marketingConsentAt: (row as { marketingConsentAt?: string | null }).marketingConsentAt ?? undefined,
+    marketingConsentSource: (row as { marketingConsentSource?: string | null }).marketingConsentSource ?? undefined,
   };
 }
 

@@ -110,6 +110,9 @@ export interface Contact {
    * ajuda pra locomoção") — por PACIENTE, atravessa qualquer conversa/clínica.
    * Diferente de `tags` (rótulos curtos, por atendimento). */
   notes?: string;
+  /** Consentimento para campanhas DESTA clínica (ISO) e de onde veio. */
+  marketingConsentAt?: string;
+  marketingConsentSource?: string;
   neighborhood: string;
   /** Entidade (empresa cliente) do GLPI vinculada a este contato — só relevante pro
    * TIVDC, que usa isso pra abrir chamado na empresa certa (ver Contact.glpiEntityId). */
@@ -194,6 +197,8 @@ export type PatientRecordData = Pick<
   | "notes"
   | "tags"
   | "consultationHistory"
+  | "marketingConsentAt"
+  | "marketingConsentSource"
 >;
 
 /** Payload de onUpdatePatient/updateContactInfo — mesmos campos editáveis da aba
@@ -211,6 +216,8 @@ export interface UpdatePatientData {
   address?: string;
   insuranceCardNumber?: string;
   notes?: string;
+  /** true = paciente aceitou campanhas (marcado pela recepção); false = retirar. */
+  marketingConsent?: boolean;
 }
 
 export interface Agent {

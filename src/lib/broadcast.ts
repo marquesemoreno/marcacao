@@ -1,3 +1,4 @@
+import { marketingSendDecision } from "@/lib/marketing-consent";
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import { sendWhatsAppMessage, sendWhatsAppMedia } from "@/lib/whatsapp";
@@ -71,11 +72,31 @@ export async function dispatchNextBatch(): Promise<{ processed: number }> {
       if (processed > 0) await sleep(randomDelayMs());
       processed++;
 
-      const contact = await prisma.contact.findUnique({ where: { phone: recipient.phone } });
-      if (contact?.optedOutOfBroadcastsAt) {
+      const contact = await prisma.contact.findUnique({
+        where: { phone: recipient.phone },
+        select: {
+          id: true,
+          optedOutOfBroadcastsAt: true,
+          clinicProfiles: { where: { clinicId: campaign.clinicId }, select: { marketingConsentAt: true } },
+        },
+      });
+      const isMarcador = Boolean(
+        await prisma.marcador.findFirst({ where: { clinicId: campaign.clinicId, phone: recipient.phone }, select: { id: true } })
+      );
+      // Marketing só com consentimento da clínica (LGPD); aviso de remarcação é transacional.
+      const decision = marketingSendDecision({
+        optedOut: Boolean(contact?.optedOutOfBroadcastsAt),
+        consentAt: contact?.clinicProfiles[0]?.marketingConsentAt ?? null,
+        isMarcador,
+        isTransactional: campaign.tagOnSend === RESCHEDULE_PENDING_TAG,
+      });
+      if (decision !== "ENVIAR") {
         await prisma.broadcastRecipient.update({
           where: { id: recipient.id },
-          data: { status: "SKIPPED_OPT_OUT" },
+          data: {
+            status: "SKIPPED_OPT_OUT",
+            errorMessage: decision === "SEM_CONSENTIMENTO" ? "Sem consentimento para campanhas" : "Pediu para não receber",
+          },
         });
         continue;
       }

@@ -204,6 +204,8 @@ export function toChatContact(conversation: ConversationWithRelations, viewerUse
     address: profile.address ?? undefined,
     insuranceCardNumber: profile.insuranceCardNumber ?? undefined,
     notes: profile.notes ?? undefined,
+    marketingConsentAt: profile.marketingConsentAt?.toISOString(),
+    marketingConsentSource: profile.marketingConsentSource ?? undefined,
     neighborhood: "",
     glpiEntityId: conversation.contact.glpiEntityId,
     avatar: conversation.contact.photoUrl ?? "",

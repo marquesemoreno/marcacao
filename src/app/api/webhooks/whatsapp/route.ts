@@ -1,3 +1,4 @@
+import { isMarketingOptInReply, MARKETING_OPT_IN_REPLY } from "@/lib/marketing-consent";
 import { matchClinicalUrgency, EMERGENCY_GUIDANCE_MESSAGE } from "@/lib/clinical-urgency";
 import { NextResponse, after } from "next/server";
 import { classifyAndStorePatientIntent } from "@/lib/patient-intent-server";
@@ -648,6 +649,22 @@ export async function POST(request: Request) {
   // campanha nenhuma enquanto isso não for revertido manualmente. isBroadcastOptOutReply
   // nunca usa "1"/"2"/"cancelar" sozinho — esses já significam confirmar/cancelar
   // consulta no fluxo mais abaixo (resolveStatusFromReply), usar aqui roubaria essa resposta.
+  // Opt-in de campanhas ("QUERO RECEBER") — consentimento registrado só para ESTA clínica.
+  if (conversation && isMarketingOptInReply(incoming.text)) {
+    await prisma.contactClinicProfile.upsert({
+      where: { contactId_clinicId: { contactId: contact.id, clinicId: conversation.clinicId } },
+      create: { contactId: contact.id, clinicId: conversation.clinicId, marketingConsentAt: new Date(), marketingConsentSource: "whatsapp" },
+      update: { marketingConsentAt: new Date(), marketingConsentSource: "whatsapp" },
+    });
+    if (contact.optedOutOfBroadcastsAt) await prisma.contact.update({ where: { id: contact.id }, data: { optedOutOfBroadcastsAt: null } });
+    const optInResult = await sendWhatsAppMessage(incoming.phone, MARKETING_OPT_IN_REPLY, "broadcast.opt_in", resolvedClinicId);
+    await prisma.message.create({
+      data: { conversationId: conversation.id, direction: "OUTBOUND", content: MARKETING_OPT_IN_REPLY, status: optInResult.success ? "DELIVERED" : "FAILED" },
+    });
+    notifyInboxRealtime(conversation.clinicId).catch(() => {});
+    return NextResponse.json({ ok: true, status: "opted_in" }, { status: 200 });
+  }
+
   if (isBroadcastOptOutReply(incoming.text)) {
     if (!contact.optedOutOfBroadcastsAt) {
       await prisma.contact.update({ where: { id: contact.id }, data: { optedOutOfBroadcastsAt: new Date() } });

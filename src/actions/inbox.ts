@@ -178,6 +178,8 @@ async function buildContactRows(conversations: ContactConversation[], clinicId: 
       address: profile.address,
       insuranceCardNumber: profile.insuranceCardNumber,
       notes: profile.notes,
+      marketingConsentAt: profile.marketingConsentAt?.toISOString() ?? null,
+      marketingConsentSource: profile.marketingConsentSource,
       tags: conversation.tags,
       status: conversation.status,
       lastAppointment: lastAppointment
@@ -1687,6 +1689,7 @@ export async function updateContactInfo(
     address?: string;
     insuranceCardNumber?: string;
     notes?: string;
+    marketingConsent?: boolean;
   }
 ) {
   const { clinicId, userId } = await requireClinicSession();
@@ -1729,6 +1732,11 @@ export async function updateContactInfo(
       address: opt(data.address),
       insuranceCardNumber: opt(data.insuranceCardNumber),
       notes: opt(data.notes),
+      ...(data.marketingConsent === undefined
+        ? {}
+        : data.marketingConsent
+          ? { marketingConsentAt: new Date(), marketingConsentSource: "recepcao" }
+          : { marketingConsentAt: null, marketingConsentSource: null }),
     });
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {

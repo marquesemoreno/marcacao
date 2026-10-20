@@ -13,6 +13,8 @@ export type ProfileFields = {
   convenio: string | null;
   preferredDoctor: string | null;
   notes: string | null;
+  marketingConsentAt: Date | null;
+  marketingConsentSource: string | null;
 };
 
 export const EMPTY_PROFILE: ProfileFields = {
@@ -24,6 +26,8 @@ export const EMPTY_PROFILE: ProfileFields = {
   convenio: null,
   preferredDoctor: null,
   notes: null,
+  marketingConsentAt: null,
+  marketingConsentSource: null,
 };
 
 /** `include`/`select` do perfil da clínica dentro de um contact. */
@@ -43,8 +47,11 @@ export function profileOf(
   const list = contact.clinicProfiles ?? [];
   const p = clinicId ? list.find((x) => x.clinicId === clinicId) : list[0];
   if (!p) return EMPTY_PROFILE;
-  const { cpf, rg, birthDate, address, insuranceCardNumber, convenio, preferredDoctor, notes } = { ...EMPTY_PROFILE, ...p };
-  return { cpf, rg, birthDate, address, insuranceCardNumber, convenio, preferredDoctor, notes };
+  const { cpf, rg, birthDate, address, insuranceCardNumber, convenio, preferredDoctor, notes, marketingConsentAt, marketingConsentSource } = {
+    ...EMPTY_PROFILE,
+    ...p,
+  };
+  return { cpf, rg, birthDate, address, insuranceCardNumber, convenio, preferredDoctor, notes, marketingConsentAt, marketingConsentSource };
 }
 
 /** Filtro de busca por CPF (dígitos) e/ou convênio no perfil da clínica. */

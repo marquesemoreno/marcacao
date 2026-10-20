@@ -70,6 +70,7 @@ export function PatientRecordSheet({ contact, open, onOpenChange, onUpdatePatien
   const [birthDate, setBirthDate] = useState(contact.birthDate ?? "");
   const [address, setAddress] = useState(contact.address ?? "");
   const [insuranceCardNumber, setInsuranceCardNumber] = useState(contact.insuranceCardNumber ?? "");
+  const [marketingConsent, setMarketingConsent] = useState(Boolean(contact.marketingConsentAt));
   const [isSavingResumo, setIsSavingResumo] = useState(false);
 
   const [notes, setNotes] = useState(contact.notes ?? "");
@@ -92,6 +93,7 @@ export function PatientRecordSheet({ contact, open, onOpenChange, onUpdatePatien
         birthDate,
         address,
         insuranceCardNumber,
+        ...(marketingConsent !== Boolean(contact.marketingConsentAt) ? { marketingConsent } : {}),
       });
       if (result && "success" in result && !result.success) {
         toast.error(result.error || "Não foi possível salvar.");
@@ -217,6 +219,18 @@ export function PatientRecordSheet({ contact, open, onOpenChange, onUpdatePatien
                   <Input value={insuranceCardNumber} onChange={(e) => setInsuranceCardNumber(e.target.value)} className="h-9" placeholder="Não informado" />
                 </div>
               </div>
+
+              <label className="flex items-start gap-2 rounded-md border border-slate-200 dark:border-slate-700 p-2.5 text-sm">
+                <input type="checkbox" checked={marketingConsent} onChange={(e) => setMarketingConsent(e.target.checked)} className="mt-0.5 size-4 accent-emerald-600" />
+                <span>
+                  <span className="font-medium">Aceita receber campanhas desta clínica</span>
+                  <span className="block text-xs text-slate-500 dark:text-slate-400">
+                    {contact.marketingConsentAt
+                      ? `Consentiu em ${new Date(contact.marketingConsentAt).toLocaleDateString("pt-BR")}${contact.marketingConsentSource === "whatsapp" ? " pelo WhatsApp (QUERO RECEBER)" : " na recepção"}.`
+                      : "Marque só se o paciente disse que aceita. Ele também pode mandar QUERO RECEBER no WhatsApp."}
+                  </span>
+                </span>
+              </label>
 
               <div className="space-y-1">
                 <Label className="text-xs flex items-center gap-1.5">
