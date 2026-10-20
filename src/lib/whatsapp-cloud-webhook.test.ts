@@ -51,7 +51,7 @@ describe("parseCloudWebhook", () => {
 
 describe("toEvolutionPayload", () => {
   it("converte mensagem recebida para o formato messages.upsert da Evolution", () => {
-    const p = toEvolutionPayload({
+    const p = toEvolutionPayload("clinic1", {
       kind: "inbound",
       phoneNumberId: "1",
       from: "5577999998888",
@@ -70,6 +70,26 @@ describe("toEvolutionPayload", () => {
         message: { conversation: "1" },
         messageTimestamp: 1792584000,
       },
+    });
+  });
+});
+
+describe("toEvolutionPayload com mídia", () => {
+  const base = { kind: "inbound" as const, phoneNumberId: "1", from: "5577999998888", keyId: "wamid.M", at: new Date("2026-10-21T12:00:00Z") };
+  it("imagem vira imageMessage com o id da mídia e a clínica na key", () => {
+    const p = toEvolutionPayload("clinic1", { ...base, type: "image", text: "olha o exame", mediaId: "MID", mimeType: "image/jpeg" });
+    expect(p.data.key).toEqual({ remoteJid: "5577999998888@s.whatsapp.net", fromMe: false, id: "wamid.M", cloudMediaId: "MID", cloudClinicId: "clinic1" });
+    expect(p.data.message).toEqual({ imageMessage: { mimetype: "image/jpeg", caption: "olha o exame" } });
+  });
+  it("áudio vira audioMessage; documento e vídeo viram documentMessage", () => {
+    expect(toEvolutionPayload("c", { ...base, type: "audio", text: "🎤 Áudio recebido", mediaId: "A", mimeType: "audio/ogg" }).data.message).toEqual({
+      audioMessage: { mimetype: "audio/ogg", seconds: 0 },
+    });
+    expect(toEvolutionPayload("c", { ...base, type: "document", text: "📄 Documento recebido", mediaId: "D", mimeType: "application/pdf" }).data.message).toEqual({
+      documentMessage: { mimetype: "application/pdf", fileName: "documento.pdf" },
+    });
+    expect(toEvolutionPayload("c", { ...base, type: "video", text: "🎬 Vídeo recebido", mediaId: "V", mimeType: "video/mp4" }).data.message).toEqual({
+      documentMessage: { mimetype: "video/mp4", fileName: "video.mp4" },
     });
   });
 });

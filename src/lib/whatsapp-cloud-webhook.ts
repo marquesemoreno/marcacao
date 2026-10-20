@@ -74,15 +74,29 @@ export function parseCloudWebhook(body: unknown): CloudEvent[] {
 
 /** Mensagem recebida pela API oficial no formato da Evolution ("messages.upsert"), pra
  * passar pela mesma automação do webhook da Evolution (lembretes, Jev, IA, urgência…).
- * Só texto/botões — mídia segue gravada direto pela rota da API oficial. */
-export function toEvolutionPayload(event: Extract<CloudEvent, { kind: "inbound" }>) {
+ * Mídia: a key leva cloudMediaId + cloudClinicId, e fetchMediaBase64 (whatsapp-media.ts)
+ * baixa da Graph API em vez da Evolution. Vídeo vai como documento (a automação só trata
+ * imagem, documento e áudio). */
+export function toEvolutionPayload(clinicId: string, event: Extract<CloudEvent, { kind: "inbound" }>) {
+  const media = event.mediaId
+    ? { cloudMediaId: event.mediaId, cloudClinicId: clinicId }
+    : {};
+  const mime = event.mimeType ?? "application/octet-stream";
+  const ext = mime.split("/")[1]?.split(";")[0] || "bin";
+  let message: Record<string, unknown> = { conversation: event.text };
+  if (event.mediaId) {
+    if (event.type === "image") message = { imageMessage: { mimetype: mime, caption: event.text } };
+    else if (event.type === "audio") message = { audioMessage: { mimetype: mime, seconds: 0 } };
+    else if (event.type === "video") message = { documentMessage: { mimetype: mime, fileName: `video.${ext}` } };
+    else message = { documentMessage: { mimetype: mime, fileName: `documento.${ext}` } };
+  }
   return {
     event: "messages.upsert",
     instance: "cloud-api",
     data: {
-      key: { remoteJid: `${event.from}@s.whatsapp.net`, fromMe: false, id: event.keyId },
+      key: { remoteJid: `${event.from}@s.whatsapp.net`, fromMe: false, id: event.keyId, ...media },
       ...(event.name ? { pushName: event.name } : {}),
-      message: { conversation: event.text },
+      message,
       messageTimestamp: Math.floor(event.at.getTime() / 1000),
     },
   };

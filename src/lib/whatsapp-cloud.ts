@@ -37,6 +37,21 @@ export function sendCloudText(phoneNumberId: string, token: string, to: string, 
   });
 }
 
+/** Baixa mídia recebida: GET /{media-id} dá uma URL temporária, que também exige o token. */
+export async function downloadCloudMedia(mediaId: string, token: string): Promise<CloudResult<{ base64: string; mimeType?: string }>> {
+  const meta = await graph<{ url?: string; mime_type?: string }>(mediaId, { token });
+  if (!meta.success) return meta;
+  if (!meta.data.url) return { success: false, error: "Meta não devolveu a URL da mídia" };
+  try {
+    const res = await fetch(meta.data.url, { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(30000) });
+    if (!res.ok) return { success: false, error: `HTTP ${res.status} ao baixar mídia` };
+    const base64 = Buffer.from(await res.arrayBuffer()).toString("base64");
+    return { success: true, data: { base64, mimeType: meta.data.mime_type } };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
 /** Mídia por link público (URL assinada do storage) — dentro da janela de 24 h. */
 export function sendCloudMedia(
   phoneNumberId: string,

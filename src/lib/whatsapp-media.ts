@@ -17,6 +17,12 @@ export async function fetchMediaBase64(
   messageKey: Record<string, unknown>,
   config: EvolutionConfig
 ): Promise<FetchMediaResult> {
+  // Mensagem vinda da API oficial (encaminhada pela rota whatsapp-cloud): a key carrega o
+  // id da mídia na Meta e a clínica — baixa direto da Graph API.
+  if (typeof messageKey.cloudMediaId === "string" && typeof messageKey.cloudClinicId === "string") {
+    const { fetchCloudMediaBase64 } = await import("@/lib/whatsapp-cloud-send");
+    return fetchCloudMediaBase64(messageKey.cloudClinicId, messageKey.cloudMediaId);
+  }
   const { apiUrl, apiKey, instanceName } = config;
   if (!apiUrl || !apiKey || !instanceName) {
     return { success: false, error: "Configuração da Evolution API ausente para esta instância." };

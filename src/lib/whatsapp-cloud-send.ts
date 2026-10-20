@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { decryptToken } from "@/lib/token-crypto";
-import { sendCloudMedia, sendCloudTemplate, sendCloudText } from "@/lib/whatsapp-cloud";
+import { downloadCloudMedia, sendCloudMedia, sendCloudTemplate, sendCloudText } from "@/lib/whatsapp-cloud";
 import { cloudMediaKind } from "@/lib/cloud-media-kind";
 
 /** Envio pela API oficial quando a clínica tem WhatsappCloudAccount ATIVA — os
@@ -81,4 +81,12 @@ export async function cloudReminderSetup(clinicId: string) {
     name: a.reminderTemplateName,
     language: a.reminderTemplateLanguage || "pt_BR",
   };
+}
+
+/** Mídia recebida pela API oficial, em base64 (mesmo formato do fetchMediaBase64 da Evolution). */
+export async function fetchCloudMediaBase64(clinicId: string, mediaId: string): Promise<{ success: true; base64: string } | { success: false; error: string }> {
+  const a = await prisma.whatsappCloudAccount.findUnique({ where: { clinicId }, select: { accessToken: true } });
+  if (!a) return { success: false, error: "Clínica sem conta da API oficial" };
+  const r = await downloadCloudMedia(mediaId, decryptToken(a.accessToken));
+  return r.success ? { success: true, base64: r.data.base64 } : { success: false, error: r.error };
 }
