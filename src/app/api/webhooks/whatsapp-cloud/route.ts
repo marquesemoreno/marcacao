@@ -3,7 +3,7 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { notifyInboxRealtime } from "@/lib/supabase-server";
 import { verifyMetaSignature } from "@/lib/instagram-webhook";
-import { parseCloudWebhook, type CloudEvent } from "@/lib/whatsapp-cloud-webhook";
+import { parseCloudWebhook, toEvolutionPayload, type CloudEvent } from "@/lib/whatsapp-cloud-webhook";
 
 /** Webhook único da API oficial do WhatsApp (app "chat" da TIVDC na Meta) pra TODAS as
  * clínicas: identifica a clínica pelo phone_number_id (WhatsappCloudAccount). Grava no
@@ -69,6 +69,30 @@ async function handle(event: CloudEvent, clinicId: string) {
   });
 }
 
+/** Encaminha pro webhook da Evolution (mesmo deploy) com a clínica no cabeçalho e o
+ * segredo interno. false = não deu (sem CRON_SECRET ou erro) → grava direto via handle. */
+async function forwardToAutomation(event: Extract<CloudEvent, { kind: "inbound" }>, clinicId: string, request: Request) {
+  const secret = process.env.CRON_SECRET;
+  if (!secret) return false;
+  try {
+    const res = await fetch(new URL("/api/webhooks/whatsapp", request.url), {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-internal-secret": secret,
+        "x-cloud-clinic-id": clinicId,
+        ...(process.env.WHATSAPP_WEBHOOK_SECRET ? { "x-webhook-token": process.env.WHATSAPP_WEBHOOK_SECRET } : {}),
+      },
+      body: JSON.stringify(toEvolutionPayload(event)),
+      signal: AbortSignal.timeout(25000),
+    });
+    return res.ok;
+  } catch (error) {
+    console.error("Falha ao encaminhar mensagem da API oficial para a automação:", error);
+    return false;
+  }
+}
+
 function templateStatusUpdates(body: unknown): { name?: string; language?: string; event?: string; reason?: string }[] {
   const entries = (body as { entry?: { changes?: { field?: string; value?: Record<string, string> }[] }[] })?.entry ?? [];
   return entries.flatMap((e) =>
@@ -120,6 +144,12 @@ export async function POST(request: Request) {
     const clinicId = clinicByPhone.get(event.phoneNumberId);
     if (!clinicId) continue;
     try {
+      // Texto recebido passa pela automação completa do webhook da Evolution (lembretes,
+      // Jev, IA, urgência, opt-in/out) — as respostas saem pela API oficial (whatsapp.ts).
+      if (event.kind === "inbound" && !event.mediaId && (await forwardToAutomation(event, clinicId, request))) {
+        touched.add(clinicId);
+        continue;
+      }
       await handle(event, clinicId);
       touched.add(clinicId);
     } catch (error) {

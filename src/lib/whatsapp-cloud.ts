@@ -37,6 +37,22 @@ export function sendCloudText(phoneNumberId: string, token: string, to: string, 
   });
 }
 
+/** Mídia por link público (URL assinada do storage) — dentro da janela de 24 h. */
+export function sendCloudMedia(
+  phoneNumberId: string,
+  token: string,
+  to: string,
+  media: { kind: "image" | "video" | "audio" | "document"; link: string; caption?: string; filename?: string }
+) {
+  const payload: Record<string, string> = { link: media.link };
+  if (media.caption && media.kind !== "audio") payload.caption = media.caption;
+  if (media.filename && media.kind === "document") payload.filename = media.filename;
+  return graph<{ messages?: { id: string }[] }>(`${phoneNumberId}/messages`, {
+    token,
+    body: { messaging_product: "whatsapp", recipient_type: "individual", to, type: media.kind, [media.kind]: payload },
+  });
+}
+
 /** Modelo aprovado — o único jeito de iniciar conversa (lembrete D-1 etc.). */
 export function sendCloudTemplate(
   phoneNumberId: string,

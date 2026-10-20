@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseCloudWebhook } from "./whatsapp-cloud-webhook";
+import { parseCloudWebhook, toEvolutionPayload } from "./whatsapp-cloud-webhook";
 
 const entry = (field: string, value: object) => ({ object: "whatsapp_business_account", entry: [{ id: "WABA1", changes: [{ field, value }] }] });
 
@@ -46,5 +46,30 @@ describe("parseCloudWebhook", () => {
     expect(events[0]).toMatchObject({ kind: "inbound", type: "image", text: "exame", mediaId: "MEDIA1", mimeType: "image/jpeg" });
     expect(parseCloudWebhook({ object: "page" })).toEqual([]);
     expect(parseCloudWebhook(null)).toEqual([]);
+  });
+});
+
+describe("toEvolutionPayload", () => {
+  it("converte mensagem recebida para o formato messages.upsert da Evolution", () => {
+    const p = toEvolutionPayload({
+      kind: "inbound",
+      phoneNumberId: "1",
+      from: "5577999998888",
+      name: "Maria",
+      keyId: "wamid.X",
+      text: "1",
+      type: "text",
+      at: new Date("2026-10-21T12:00:00Z"),
+    });
+    expect(p).toEqual({
+      event: "messages.upsert",
+      instance: "cloud-api",
+      data: {
+        key: { remoteJid: "5577999998888@s.whatsapp.net", fromMe: false, id: "wamid.X" },
+        pushName: "Maria",
+        message: { conversation: "1" },
+        messageTimestamp: 1792584000,
+      },
+    });
   });
 });

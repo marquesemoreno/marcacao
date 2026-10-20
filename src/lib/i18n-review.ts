@@ -147,6 +147,25 @@ const DICT = {
   "connect.removeCancel": ["Cancelar", "Cancel"],
   "connect.removeConfirmButton": ["Remover {phone}", "Disconnect {phone}"],
   "connect.removed": ["Conexão de {clinic} removida.", "{clinic} disconnected."],
+  "live.title": ["Chat e lembretes pela API oficial", "Inbox and reminders on the Cloud API"],
+  "live.hint": [
+    "Ligado: chat, lembretes, avisos e IA desta clínica saem e entram por este número. Desconecte antes o WhatsApp Web (Evolution) da clínica.",
+    "On: this clinic's inbox, reminders, notices and AI go through this number. Disconnect the clinic's WhatsApp Web (Evolution) first.",
+  ],
+  "live.on": ["Ativar no Chat", "Go live in inbox"],
+  "live.off": ["Desativar no Chat", "Turn off in inbox"],
+  "live.confirmOn": [
+    "Ativar a API oficial no Chat desta clínica? Confirme que o WhatsApp Web (Evolution) dela já foi desconectado.",
+    "Go live with the Cloud API for this clinic? Make sure its WhatsApp Web (Evolution) is already disconnected.",
+  ],
+  "live.saved": ["Salvo.", "Saved."],
+  "live.template": ["Modelo do lembrete D-1", "D-1 reminder template"],
+  "live.templateHint": [
+    "Nome do modelo aprovado. Variáveis: {{1}} nome, {{2}} data, {{3}} horário, {{4}} médico. Sem modelo, os lembretes não saem.",
+    "Approved template name. Variables: {{1}} name, {{2}} date, {{3}} time, {{4}} doctor. Without it, reminders are not sent.",
+  ],
+  "live.language": ["Idioma", "Language"],
+  "live.save": ["Salvar modelo", "Save template"],
   "common.loading": ["Carregando…", "Loading…"],
   "common.error": ["Erro", "Error"],
 } as const;

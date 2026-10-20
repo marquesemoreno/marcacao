@@ -174,6 +174,10 @@ export async function sendWhatsAppMessage(
   clinicId?: string,
   quoted?: QuotedMessageRef
 ): Promise<{ success: boolean; skipped: boolean; responseCode?: number | null; keyId?: string }> {
+  // Clínica na API oficial (conta ativa): sai por lá, nunca pela Evolution.
+  const cloudSend = await import("@/lib/whatsapp-cloud-send");
+  const cloud = await cloudSend.activeCloudAccount(clinicId);
+  if (cloud) return cloudSend.cloudSendText(cloud, formatToWhatsAppNumber(to), text, event);
   const { apiUrl, apiKey, instanceName } = await getEvolutionConfig(clinicId);
   const target = formatToWhatsAppNumber(to);
   console.log('[WhatsApp Envio] Disparando para:', target);
@@ -353,6 +357,9 @@ export async function sendWhatsAppMedia(
   clinicId?: string,
   quoted?: QuotedMessageRef
 ): Promise<{ success: boolean; skipped: boolean; responseCode?: number | null; keyId?: string }> {
+  const cloudSend = await import("@/lib/whatsapp-cloud-send");
+  const cloud = await cloudSend.activeCloudAccount(clinicId);
+  if (cloud) return cloudSend.cloudSendMedia(cloud, formatToWhatsAppNumber(to), { link: mediaUrl, mimeType, caption, fileName }, event);
   const { apiUrl, apiKey, instanceName } = await getEvolutionConfig(clinicId);
   const target = formatToWhatsAppNumber(to);
 
@@ -448,6 +455,9 @@ export async function sendWhatsAppAudio(
   event: string = "whatsapp.send_audio",
   clinicId?: string
 ): Promise<{ success: boolean; skipped: boolean; responseCode?: number | null; keyId?: string }> {
+  const cloudSend = await import("@/lib/whatsapp-cloud-send");
+  const cloud = await cloudSend.activeCloudAccount(clinicId);
+  if (cloud) return cloudSend.cloudSendMedia(cloud, formatToWhatsAppNumber(to), { link: mediaUrl, mimeType: "audio/ogg" }, event);
   const { apiUrl, apiKey, instanceName } = await getEvolutionConfig(clinicId);
   const target = formatToWhatsAppNumber(to);
 

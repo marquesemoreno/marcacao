@@ -32,6 +32,8 @@ export type CloudAccountRow = {
     coexistence: boolean;
     active: boolean;
     connectedAt: string;
+    reminderTemplateName: string | null;
+    reminderTemplateLanguage: string | null;
   } | null;
 };
 
@@ -51,7 +53,7 @@ export async function listCloudAccounts(): Promise<CloudAccountRow[]> {
       id: true,
       tradeName: true,
       whatsappCloudAccount: {
-        select: { wabaId: true, phoneNumberId: true, displayPhoneNumber: true, verifiedName: true, coexistence: true, active: true, createdAt: true },
+        select: { wabaId: true, phoneNumberId: true, displayPhoneNumber: true, verifiedName: true, coexistence: true, active: true, createdAt: true, reminderTemplateName: true, reminderTemplateLanguage: true },
       },
     },
   });
@@ -66,6 +68,8 @@ export async function listCloudAccounts(): Promise<CloudAccountRow[]> {
           verifiedName: c.whatsappCloudAccount.verifiedName,
           coexistence: c.whatsappCloudAccount.coexistence,
           active: c.whatsappCloudAccount.active,
+          reminderTemplateName: c.whatsappCloudAccount.reminderTemplateName,
+          reminderTemplateLanguage: c.whatsappCloudAccount.reminderTemplateLanguage,
           connectedAt: c.whatsappCloudAccount.createdAt.toISOString(),
         }
       : null,
@@ -138,6 +142,28 @@ export async function connectWhatsappCloud(input: {
 
   revalidatePath("/admin/whatsapp");
   return { success: true, displayPhoneNumber, warnings };
+}
+
+/** Liga/desliga a API oficial no Chat da clínica: ligada, tudo (chat, lembretes, avisos,
+ * IA) sai e entra por ela; a Evolution da clínica deve estar desconectada antes, senão cada
+ * mensagem chega duas vezes. */
+export async function setCloudAccountActive(clinicId: string, active: boolean) {
+  await requireAdminSession();
+  await prisma.whatsappCloudAccount.update({ where: { clinicId }, data: { active } });
+  revalidatePath("/admin/whatsapp");
+  return { success: true as const };
+}
+
+/** Modelo aprovado do lembrete D-1 ({{1}} nome, {{2}} data, {{3}} horário, {{4}} médico). */
+export async function setCloudReminderTemplate(clinicId: string, name: string, language: string) {
+  await requireAdminSession();
+  const n = name.trim();
+  await prisma.whatsappCloudAccount.update({
+    where: { clinicId },
+    data: { reminderTemplateName: n || null, reminderTemplateLanguage: n ? language.trim() || "pt_BR" : null },
+  });
+  revalidatePath("/admin/whatsapp");
+  return { success: true as const };
 }
 
 /** Teste rápido da conexão: modelo "hello_world" (existe em toda conta nova da Meta). */

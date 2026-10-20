@@ -267,23 +267,27 @@ model WhatsappInstance {
 /// Signup / coexistência — separado da WhatsappInstance (Evolution) pra migração ser
 /// gradual. `active` só liga depois de testado; enquanto false, a clínica segue na Evolution.
 model WhatsappCloudAccount {
-  id                 String   @id @default(cuid())
-  clinicId           String   @unique @map("clinic_id")
-  wabaId             String   @map("waba_id")
-  phoneNumberId      String   @unique @map("phone_number_id")
-  displayPhoneNumber String?  @map("display_phone_number")
+  id                       String   @id @default(cuid())
+  clinicId                 String   @unique @map("clinic_id")
+  wabaId                   String   @map("waba_id")
+  phoneNumberId            String   @unique @map("phone_number_id")
+  displayPhoneNumber       String?  @map("display_phone_number")
   /// Token de integração do negócio (troca do código do Embedded Signup) — só servidor,
   /// criptografado em repouso ("enc:v1:…", ver src/lib/token-crypto.ts).
-  accessToken        String   @map("access_token")
+  accessToken              String   @map("access_token")
   /// Nome verificado do número na Meta (verified_name).
-  verifiedName       String?  @map("verified_name")
+  verifiedName             String?  @map("verified_name")
   /// PIN de 6 dígitos da verificação em duas etapas usado no /register (número novo,
   /// sem coexistência) — criptografado, necessário pra registrar de novo.
-  twoStepPin         String?  @map("two_step_pin")
-  coexistence        Boolean  @default(false)
-  active             Boolean  @default(false)
-  createdAt          DateTime @default(now()) @map("created_at")
-  updatedAt          DateTime @updatedAt @map("updated_at")
+  twoStepPin               String?  @map("two_step_pin")
+  /// Modelo aprovado usado no lembrete D-1 (fora da janela de 24 h só modelo sai).
+  /// Variáveis na ordem: {{1}} nome, {{2}} data, {{3}} horário, {{4}} médico/procedimento.
+  reminderTemplateName     String?  @map("reminder_template_name")
+  reminderTemplateLanguage String?  @map("reminder_template_language")
+  coexistence              Boolean  @default(false)
+  active                   Boolean  @default(false)
+  createdAt                DateTime @default(now()) @map("created_at")
+  updatedAt                DateTime @updatedAt @map("updated_at")
 
   clinic Clinic @relation(fields: [clinicId], references: [id])
 

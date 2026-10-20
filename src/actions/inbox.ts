@@ -2293,6 +2293,8 @@ export async function restoreConversationOwners(owners: { id: string; assignedUs
  * melhor não alarmar por falha de checagem. */
 export async function getWhatsappChannelStatus(): Promise<"open" | "down" | "unknown"> {
   const { clinicId } = await requireClinicSession();
+  // Clínica na API oficial: o número não depende de celular conectado.
+  if (await prisma.whatsappCloudAccount.findFirst({ where: { clinicId, active: true }, select: { id: true } })) return "open";
   const { apiUrl, apiKey, instanceName } = await getEvolutionConfig(clinicId);
   if (!apiUrl || !apiKey || !instanceName) return "unknown";
   try {

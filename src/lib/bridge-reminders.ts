@@ -1,3 +1,5 @@
+import { cloudReminderSetup, cloudSendTemplate } from "@/lib/whatsapp-cloud-send";
+import { reminderTemplateParams } from "@/lib/reminder-template";
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import { formatToWhatsAppNumber, sendWhatsAppMessage, sendWhatsAppMedia } from "@/lib/whatsapp";
@@ -115,10 +117,24 @@ export async function dispatchBridgeReminders(options?: { clinicId?: string; dat
         ? buildUrolaserLaraReminderMessage(reminderInput)
         : buildBridgeReminderMessage(reminderInput);
 
+      // API oficial: lembrete só por modelo aprovado. Conta ativa sem modelo → não envia
+      // (fica pra quando configurarem; não consome o paciente).
+      const cloudSetup = await cloudReminderSetup(clinic.id);
+      if (cloudSetup === "missing") {
+        skipped++;
+        continue;
+      }
       // Urolaser pediu pra recriar a persona "Lara" (atendente virtual deles num
       // sistema anterior) com a imagem/mascote original — as outras clínicas com
       // bridge continuam só com texto (ver buildBridgeReminderMessage).
-      const result = isUrolaser
+      const result = cloudSetup
+        ? await cloudSendTemplate(
+            cloudSetup.account,
+            phone,
+            { name: cloudSetup.name, language: cloudSetup.language, bodyParams: reminderTemplateParams(reminderInput) },
+            "appointment.bridge_reminder_d1"
+          )
+        : isUrolaser
         ? await sendWhatsAppMedia(
             phone,
             `${getBaseUrl()}${UROLASER_LARA_IMAGE_PATH}`,

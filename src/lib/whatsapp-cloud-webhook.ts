@@ -71,3 +71,19 @@ export function parseCloudWebhook(body: unknown): CloudEvent[] {
   }
   return events;
 }
+
+/** Mensagem recebida pela API oficial no formato da Evolution ("messages.upsert"), pra
+ * passar pela mesma automação do webhook da Evolution (lembretes, Jev, IA, urgência…).
+ * Só texto/botões — mídia segue gravada direto pela rota da API oficial. */
+export function toEvolutionPayload(event: Extract<CloudEvent, { kind: "inbound" }>) {
+  return {
+    event: "messages.upsert",
+    instance: "cloud-api",
+    data: {
+      key: { remoteJid: `${event.from}@s.whatsapp.net`, fromMe: false, id: event.keyId },
+      ...(event.name ? { pushName: event.name } : {}),
+      message: { conversation: event.text },
+      messageTimestamp: Math.floor(event.at.getTime() / 1000),
+    },
+  };
+}

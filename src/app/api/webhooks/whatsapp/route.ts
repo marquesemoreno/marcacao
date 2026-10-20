@@ -500,7 +500,18 @@ export async function POST(request: Request) {
   if (!body) {
     return NextResponse.json({ error: "invalid body" }, { status: 400 });
   }
+  // Encaminhamento interno da API oficial (webhooks/whatsapp-cloud): a clínica vem no
+  // cabeçalho, aceito só com o segredo interno (CRON_SECRET).
+  const internal = process.env.CRON_SECRET && request.headers.get("x-internal-secret") === process.env.CRON_SECRET;
+  const forcedClinicId = internal ? request.headers.get("x-cloud-clinic-id") ?? undefined : undefined;
+  return processWhatsappWebhook(body, forcedClinicId);
+}
 
+/** Processamento do evento no formato da Evolution — também usado pela API oficial
+ * (webhooks/whatsapp-cloud), que converte a mensagem recebida pra esse formato e passa a
+ * clínica direto (`forcedClinicId`), reaproveitando toda a automação (lembretes, Jev, IA,
+ * urgência, opt-in/out). Os envios saem pela API oficial via sendWhatsApp* (whatsapp.ts). */
+async function processWhatsappWebhook(body: Prisma.InputJsonValue, forcedClinicId?: string) {
   const bodyRec = body as Record<string, unknown>;
   const dataPayload = bodyRec?.data as Record<string, unknown> | undefined;
 
@@ -515,7 +526,7 @@ export async function POST(request: Request) {
   const dedicatedInstance = instanceNameFromPayload
     ? await prisma.whatsappInstance.findUnique({ where: { instanceName: instanceNameFromPayload } })
     : null;
-  const resolvedClinicId = dedicatedInstance?.clinicId;
+  const resolvedClinicId = forcedClinicId ?? dedicatedInstance?.clinicId;
   const evolutionConfig = dedicatedInstance
     ? { apiUrl: dedicatedInstance.apiUrl, apiKey: dedicatedInstance.apiKey, instanceName: dedicatedInstance.instanceName }
     : await getEvolutionConfig();

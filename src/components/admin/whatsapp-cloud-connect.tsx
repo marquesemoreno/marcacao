@@ -8,6 +8,8 @@ import {
   connectWhatsappCloud,
   disconnectWhatsappCloud,
   sendCloudTestMessage,
+  setCloudAccountActive,
+  setCloudReminderTemplate,
   type CloudAccountRow,
 } from "@/actions/admin-whatsapp-cloud";
 import { META_APP_ID, META_ES_CONFIG_ID, META_GRAPH_VERSION } from "@/lib/meta-config";
@@ -370,6 +372,8 @@ export function WhatsappCloudConnect({ rows, lang }: { rows: CloudAccountRow[]; 
                   </span>
                 </div>
 
+                <LiveControls row={row} lang={lang} />
+
                 {/* Ativo selecionado, legível no vídeo: rótulo + valor + copiar. */}
                 <dl className="grid gap-x-6 gap-y-2 sm:grid-cols-2">
                   {fields.map(([label, value]) => (
@@ -470,6 +474,73 @@ export function WhatsappCloudConnect({ rows, lang }: { rows: CloudAccountRow[]; 
         </DialogContent>
       </Dialog>
     </div>
+    </div>
+  );
+}
+
+/** Ativar no Chat + modelo do lembrete D-1 (entrega 3 da migração para a API oficial). */
+function LiveControls({ row, lang }: { row: CloudAccountRow; lang: Lang }) {
+  const a = row.account!;
+  const [name, setName] = useState(a.reminderTemplateName ?? "");
+  const [language, setLanguage] = useState(a.reminderTemplateLanguage ?? "pt_BR");
+  const [busy, setBusy] = useState(false);
+  const tt = (k: Parameters<typeof t>[1]) => t(lang, k);
+
+  async function toggle() {
+    if (!a.active && !confirm(tt("live.confirmOn"))) return;
+    setBusy(true);
+    try {
+      await setCloudAccountActive(row.clinicId, !a.active);
+      toast.success(tt("live.saved"));
+    } catch {
+      toast.error(tt("err.unexpected"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function saveTemplate() {
+    setBusy(true);
+    try {
+      await setCloudReminderTemplate(row.clinicId, name, language);
+      toast.success(tt("live.saved"));
+    } catch {
+      toast.error(tt("err.unexpected"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="space-y-2 rounded-md border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 p-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">{tt("live.title")}</p>
+        <button
+          type="button"
+          onClick={toggle}
+          disabled={busy}
+          className={`h-8 rounded-md px-3 text-xs font-semibold disabled:opacity-50 ${
+            a.active ? "border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200" : "bg-emerald-600 hover:bg-emerald-700 text-white"
+          }`}
+        >
+          {a.active ? tt("live.off") : tt("live.on")}
+        </button>
+      </div>
+      <p className="text-xs text-slate-600 dark:text-slate-400">{tt("live.hint")}</p>
+      <div className="flex flex-wrap items-end gap-2">
+        <label className="text-xs font-medium text-slate-600 dark:text-slate-400">
+          {tt("live.template")}
+          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="lembrete_consulta" className="mt-1 block h-8 w-56 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2 text-sm" />
+        </label>
+        <label className="text-xs font-medium text-slate-600 dark:text-slate-400">
+          {tt("live.language")}
+          <input value={language} onChange={(e) => setLanguage(e.target.value)} className="mt-1 block h-8 w-24 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2 text-sm" />
+        </label>
+        <button type="button" onClick={saveTemplate} disabled={busy} className="h-8 rounded-md border border-slate-300 dark:border-slate-600 px-3 text-xs font-semibold disabled:opacity-50">
+          {tt("live.save")}
+        </button>
+      </div>
+      <p className="text-xs text-slate-500 dark:text-slate-400">{tt("live.templateHint")}</p>
     </div>
   );
 }
