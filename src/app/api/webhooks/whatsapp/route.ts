@@ -1074,6 +1074,7 @@ export async function POST(request: Request) {
   let newStatus: AppointmentStatus | null = isConfirmationContext ? resolveStatusFromReply(incoming.text) : null;
   let rescheduleRequested = Boolean(!newStatus && isConfirmationContext && isRescheduleReply(incoming.text));
   let classifiedByAi = false;
+  let aiCancelReview = false;
 
   // Function calling fluido (item 6 do roadmap): o match determinístico acima só
   // reconhece uma lista fixa de frases (ver appointment-reply.ts) — qualquer coisa
@@ -1084,13 +1085,39 @@ export async function POST(request: Request) {
   // agendamento), sem revisão humana antes — ver aviso de auditoria abaixo.
   if (isConfirmationContext && !newStatus && !rescheduleRequested) {
     const aiAction = await classifyAppointmentReply(incoming.text, lastOutbound?.content);
-    if (aiAction === "CONFIRMED" || aiAction === "CANCELLED") {
+    if (aiAction === "CONFIRMED") {
       newStatus = aiAction;
       classifiedByAi = true;
+    } else if (aiAction === "CANCELLED") {
+      // Auditoria de saúde (19/10): cancelamento entendido pela IA NÃO cancela sozinho —
+      // um erro aqui faz o paciente perder a consulta. Vai pra recepção confirmar.
+      aiCancelReview = true;
     } else if (aiAction === "RESCHEDULE") {
       rescheduleRequested = true;
       classifiedByAi = true;
     }
+  }
+
+  if (aiCancelReview && conversation) {
+    await logAiAction({ clinicId: conversation.clinicId, conversationId: conversation.id, kind: "AI_ESCALATED", summary: `Cancelamento para revisão da recepção: ${incoming.text}` });
+    await prisma.message.create({
+      data: {
+        conversationId: conversation.id,
+        direction: "OUTBOUND",
+        type: "INTERNAL_NOTE",
+        content: `🤖 IA entendeu que o paciente quer CANCELAR: "${incoming.text}" — confirme com ele e cancele na agenda (nada foi cancelado automaticamente).`,
+        status: "SENT",
+      },
+    });
+    await prisma.conversation.update({ where: { id: conversation.id }, data: { assignedUserId: null, status: "OPEN" } });
+    const ackText = "Recebemos sua mensagem! Nossa equipe vai falar com você em instantes para confirmar.";
+    const ack = await sendWhatsAppMessage(incoming.phone, ackText, "appointment.cancel_review_ack", resolvedClinicId);
+    await prisma.message.create({
+      data: { conversationId: conversation.id, direction: "OUTBOUND", content: ackText, status: ack.success ? "DELIVERED" : "FAILED" },
+    });
+    notifyInboxRealtime(conversation.clinicId).catch(() => {});
+    await logInbound({ phone: incoming.phone, text: incoming.text, reason: "IA entendeu cancelamento — revisão da recepção" }, "SUCCESS");
+    return NextResponse.json({ ok: true, status: "cancel_review" }, { status: 200 });
   }
 
   // "Remarcar" não muda o status do agendamento (não temos automação de

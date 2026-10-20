@@ -1,3 +1,4 @@
+import { allowsNinthDigitFallback } from "@/lib/ninth-digit-policy";
 import type { AppointmentStatus, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getBaseUrl } from "@/lib/format";
@@ -238,7 +239,7 @@ export async function sendWhatsAppMessage(
   // com fixo cadastrado, 8 tentativas falhando até identificar a causa). Só tenta
   // depois de esgotar as tentativas normais, e só se o toggle fizer sentido pro número.
   let fallbackNumber: string | null = null;
-  if (!result.success && result.responseCode === 400) {
+  if (!result.success && result.responseCode === 400 && allowsNinthDigitFallback(event)) {
     fallbackNumber = toggleNinthDigit(target);
     if (fallbackNumber) {
       result = await attemptSend(fallbackNumber);
@@ -404,7 +405,7 @@ export async function sendWhatsAppMedia(
   // Mesmo fallback de sendWhatsAppMessage (ver toggleNinthDigit) — número que só
   // existe no WhatsApp com o 9º dígito trocado do formato que a gente assume.
   let fallbackNumber: string | null = null;
-  if (!result.success && result.responseCode === 400) {
+  if (!result.success && result.responseCode === 400 && allowsNinthDigitFallback(event)) {
     fallbackNumber = toggleNinthDigit(target);
     if (fallbackNumber) {
       result = await attemptSend(fallbackNumber);
@@ -493,7 +494,7 @@ export async function sendWhatsAppAudio(
 
   // Mesmo fallback de sendWhatsAppMessage/sendWhatsAppMedia (ver toggleNinthDigit).
   let fallbackNumber: string | null = null;
-  if (!result.success && result.responseCode === 400) {
+  if (!result.success && result.responseCode === 400 && allowsNinthDigitFallback(event)) {
     fallbackNumber = toggleNinthDigit(target);
     if (fallbackNumber) {
       result = await attemptSend(fallbackNumber);

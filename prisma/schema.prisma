@@ -1140,3 +1140,14 @@ model CampaignSpend {
   @@unique([clinicId, campaign, month])
   @@map("campaign_spends")
 }
+
+/// Tentativa de login com senha errada — base do bloqueio de 15 min após 5 erros
+/// (ver src/lib/login-guard.ts). Só falhas; limpas pelo cron de retenção.
+model LoginFailure {
+  id        String   @id @default(cuid())
+  email     String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([email, createdAt])
+  @@map("login_failures")
+}
