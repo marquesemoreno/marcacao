@@ -550,11 +550,11 @@ model Contact {
   createdAt              DateTime       @default(now()) @map("created_at")
   updatedAt              DateTime       @updatedAt @map("updated_at")
 
-  conversations Conversation[]
+  conversations  Conversation[]
+  clinicProfiles ContactClinicProfile[]
 
   @@unique([channel, externalId])
   @@map("contacts")
-  clinicProfiles         ContactClinicProfile[]
 }
 
 model Conversation {
@@ -1197,4 +1197,20 @@ model PatientAccessLog {
   @@index([clinicId, createdAt])
   @@index([conversationId, userId, createdAt])
   @@map("patient_access_logs")
+}
+
+/// Exclusão de dados a pedido do titular (LGPD art. 18) — registro do que foi feito, sem
+/// dado pessoal (só ids, telefone mascarado e o motivo). Ver anonymizePatientAdmin.
+model DataDeletionRecord {
+  id                String   @id @default(cuid())
+  clinicId          String   @map("clinic_id")
+  conversationId    String   @map("conversation_id")
+  maskedPhone       String?  @map("masked_phone")
+  reason            String
+  messagesDeleted   Int      @map("messages_deleted")
+  contactAnonymized Boolean  @map("contact_anonymized")
+  performedByUserId String   @map("performed_by_user_id")
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  @@map("data_deletion_records")
 }

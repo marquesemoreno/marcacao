@@ -13,6 +13,7 @@ import {
   TrendingUp,
   Share2,
   BarChart3,
+  ShieldX,
   Megaphone,
   Wrench,
   PlugZap,
@@ -32,6 +33,7 @@ const navItems: { href: string; label: string; icon: LucideIcon; exact?: boolean
   { href: "/admin/leads-msp", label: "Leads MSP", icon: Wrench },
   { href: "/admin/afiliados", label: "Marcadores", icon: Share2 },
   { href: "/admin/relatorio", label: "Relatórios", icon: BarChart3 },
+  { href: "/admin/lgpd", label: "Exclusão de dados", icon: ShieldX },
 ];
 
 /** Trilho de navegação, sempre escuro independente do tema claro/escuro do resto
