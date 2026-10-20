@@ -1,5 +1,6 @@
 "use server";
 
+import { recordPatientAccess } from "@/lib/access-log-server";
 import { CONTACT_WITH_PROFILES, profileOf, profileWhere, upsertProfile } from "@/lib/contact-profile";
 import { sortPatientList, type PatientSort } from "@/lib/patient-list";
 import { CHAT_LIMIT_ENABLED } from "@/lib/chat-limit";
@@ -1688,7 +1689,7 @@ export async function updateContactInfo(
     notes?: string;
   }
 ) {
-  const { clinicId } = await requireClinicSession();
+  const { clinicId, userId } = await requireClinicSession();
 
   const trimmedName = data.name.trim();
   if (trimmedName.length < 2) {
@@ -1702,6 +1703,7 @@ export async function updateContactInfo(
   if (!conversation || conversation.clinicId !== clinicId) {
     return { success: false as const, error: "Conversa não encontrada" };
   }
+  await recordPatientAccess({ clinicId, userId, conversationId, action: "EDITOU_CADASTRO" });
 
   let fullPhone: string | undefined;
   if (data.phone !== undefined) {
@@ -1923,8 +1925,9 @@ async function assertClinicOwnsConversation(conversationId: string, clinicId: st
  * conversas antigas pode ter milhares de linhas, carregar tudo a cada poll de
  * 5s é o gargalo que motivou essa paginação. Mais antigas via getOlderChatMessages. */
 export async function getChatMessages(conversationId: string) {
-  const { clinicId } = await requireClinicSession();
+  const { clinicId, userId } = await requireClinicSession();
   await assertClinicOwnsConversation(conversationId, clinicId);
+  await recordPatientAccess({ clinicId, userId, conversationId, action: "ABRIU_CONVERSA" });
 
   const latest = await prisma.message.findMany({
     where: { conversationId },

@@ -1,5 +1,6 @@
 "use server";
 
+import { recordPatientAccess } from "@/lib/access-log-server";
 import { profileInclude, profileOf } from "@/lib/contact-profile";
 import { prisma } from "@/lib/prisma";
 import { requireClinicSession } from "@/lib/session";
@@ -16,7 +17,7 @@ const MESSAGE_LIMIT = 150;
  * o bridge não expõe histórico por paciente, então marcações feitas direto na recepção
  * do sistema da clínica não aparecem — não criamos cadastro duplicado. */
 export async function getPatientProfile(conversationId: string) {
-  const { clinicId } = await requireClinicSession();
+  const { clinicId, userId } = await requireClinicSession();
   const conversation = await prisma.conversation.findUnique({
     where: { id: conversationId },
     include: {
@@ -26,6 +27,7 @@ export async function getPatientProfile(conversationId: string) {
     },
   });
   if (!conversation || conversation.clinicId !== clinicId) return null;
+  await recordPatientAccess({ clinicId, userId, conversationId, action: "ABRIU_FICHA" });
   const phone = conversation.contact.phone;
   const phones = phone ? [phone, toggleNinthDigit(phone)].filter((p): p is string => !!p) : [];
 

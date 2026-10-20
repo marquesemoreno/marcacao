@@ -1182,3 +1182,19 @@ model ContactClinicProfile {
   @@index([clinicId])
   @@map("contact_clinic_profiles")
 }
+
+/// Quem acessou dados de qual paciente (auditoria de saúde/LGPD, 20/10/2026): abrir a
+/// conversa, abrir a ficha, editar o cadastro. Leitura repetida do mesmo usuário na mesma
+/// conversa só conta 1× por hora (ver src/lib/access-log.ts). Tela: /clinic/acessos (gestão).
+model PatientAccessLog {
+  id             String   @id @default(cuid())
+  clinicId       String   @map("clinic_id")
+  userId         String   @map("user_id")
+  conversationId String   @map("conversation_id")
+  action         String
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@index([clinicId, createdAt])
+  @@index([conversationId, userId, createdAt])
+  @@map("patient_access_logs")
+}
