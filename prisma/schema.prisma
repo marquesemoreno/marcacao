@@ -205,6 +205,10 @@ model Clinic {
   /// Ticket médio de consulta particular — usado no Faturamento Estimado / Receita
   /// Protegida do /clinic/relatorio quando o procedimento não tem preço (ex: agendamentos
   /// do Firebird, que caem num procedimento genérico). Null = sem estimativa.
+  /// Responsável técnico (CFM: publicidade médica identifica nome + CRM) — vai no rodapé
+  /// das campanhas de marketing; sem ele a campanha não inicia.
+  technicalDirectorName      String?  @map("technical_director_name")
+  technicalDirectorCrm       String?  @map("technical_director_crm")
   defaultTicket              Decimal? @map("default_ticket") @db.Decimal(10, 2)
   /// Códigos de paciente do sistema da clínica (PACIENTE.CODIGOPAC no Firebird) que nunca
   /// entram em campanha pelo público "Pacientes do sistema da clínica" — ex: cadastro com

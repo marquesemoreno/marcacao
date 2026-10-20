@@ -22,6 +22,8 @@ export function PrecosPageTabs({
   acquisitionRules,
   trackedLinks,
   whatsapp,
+  technicalDirectorName = null,
+  technicalDirectorCrm = null,
 }: {
   businessHours: Partial<BusinessHours>;
   clinicProcedures: PlainClinicProcedureItem[];
@@ -30,6 +32,8 @@ export function PrecosPageTabs({
   acquisitionRules: { id: string; keyword: string; channel: string }[];
   trackedLinks: { channel: string; url: string }[];
   whatsapp: string | null;
+  technicalDirectorName?: string | null;
+  technicalDirectorCrm?: string | null;
 }) {
   return (
     <Tabs defaultValue="horarios" className="gap-4 min-w-0">
@@ -49,7 +53,7 @@ export function PrecosPageTabs({
       </TabsContent>
 
       <TabsContent value="parametros" className="min-w-0 space-y-3">
-        <ReportSettingsForm defaultTicket={defaultTicket} rules={acquisitionRules} />
+        <ReportSettingsForm defaultTicket={defaultTicket} rules={acquisitionRules} technicalDirectorName={technicalDirectorName} technicalDirectorCrm={technicalDirectorCrm} />
         {trackedLinks.length > 0 && <TrackedLinksCard links={trackedLinks} whatsapp={whatsapp} />}
         <CampaignExclusionsCard />
       </TabsContent>

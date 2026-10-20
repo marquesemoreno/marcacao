@@ -3,7 +3,7 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { sendWhatsAppMessage, sendWhatsAppMedia } from "@/lib/whatsapp";
 import { getSignedMediaUrl } from "@/lib/whatsapp-media";
-import { buildBroadcastMessage } from "@/lib/broadcast-csv";
+import { technicalDirectorLine, buildBroadcastMessage } from "@/lib/broadcast-csv";
 import { RESCHEDULE_PENDING_TAG } from "@/lib/conversation-tags";
 import { lastAutomatedSend } from "@/lib/automated-pacing-server";
 import { isWithinReminderWindow, lowPriorityMustYield } from "@/lib/automated-pacing";
@@ -22,7 +22,10 @@ function sleep(ms: number) {
  * (src/app/api/cron/broadcast-dispatch), nunca manda a lista inteira de uma vez: é
  * justamente esse throttling que reduz o risco de o número ser banido por spam. */
 export async function dispatchNextBatch(): Promise<{ processed: number }> {
-  const campaigns = await prisma.broadcastCampaign.findMany({ where: { status: "RUNNING" } });
+  const campaigns = await prisma.broadcastCampaign.findMany({
+    where: { status: "RUNNING" },
+    include: { clinic: { select: { technicalDirectorName: true, technicalDirectorCrm: true } } },
+  });
   let processed = 0;
 
   const now = new Date();
@@ -102,7 +105,12 @@ export async function dispatchNextBatch(): Promise<{ processed: number }> {
       }
 
       const variables = recipient.variables as Record<string, string>;
-      const text = buildBroadcastMessage(campaign.messageTemplate, variables);
+      const text = buildBroadcastMessage(campaign.messageTemplate, variables, {
+        technicalDirector:
+          campaign.tagOnSend === RESCHEDULE_PENDING_TAG
+            ? null
+            : technicalDirectorLine(campaign.clinic.technicalDirectorName, campaign.clinic.technicalDirectorCrm),
+      });
 
       let result: { success: boolean; skipped: boolean };
       let failureReason = "Falha ao enviar via WhatsApp";

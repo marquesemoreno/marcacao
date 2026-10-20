@@ -53,6 +53,8 @@ export default async function ClinicSettingsPage() {
         acquisitionRules={acquisitionRules}
         trackedLinks={trackedLinks}
         whatsapp={clinic.whatsapp}
+        technicalDirectorName={clinic.technicalDirectorName}
+        technicalDirectorCrm={clinic.technicalDirectorCrm}
         />
       </div>
     </div>

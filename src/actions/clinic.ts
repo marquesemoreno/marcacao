@@ -593,6 +593,16 @@ export async function updateClinicDefaultTicket(formData: FormData) {
   revalidatePath("/clinic/relatorio");
 }
 
+/** Responsável técnico (CFM) — rodapé das campanhas de marketing. */
+export async function updateClinicTechnicalDirector(formData: FormData) {
+  const { clinicId } = await requireClinicManager();
+  const name = String(formData.get("technicalDirectorName") ?? "").trim().slice(0, 120) || null;
+  const crm = String(formData.get("technicalDirectorCrm") ?? "").trim().slice(0, 40) || null;
+  await prisma.clinic.update({ where: { id: clinicId }, data: { technicalDirectorName: name, technicalDirectorCrm: crm } });
+  revalidatePath("/clinic/precos");
+  revalidatePath("/clinic/disparos");
+}
+
 /** Ticket médio (soma em R$ das colunas do CRM — N2). null = não configurado. */
 export async function getClinicDefaultTicket() {
   const { clinicId } = await requireClinicSession();

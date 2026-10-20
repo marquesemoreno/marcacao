@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { requireClinicManager, requireClinicSession } from "@/lib/session";
 import { formatToWhatsAppNumber } from "@/lib/whatsapp";
 import { uploadWhatsAppMedia } from "@/lib/whatsapp-media";
-import { buildBroadcastMessage, type ParsedBroadcastRecipient } from "@/lib/broadcast-csv";
+import { technicalDirectorLine, buildBroadcastMessage, type ParsedBroadcastRecipient } from "@/lib/broadcast-csv";
 import { campaignSituation, estimateCampaignFinish, patientsNeedingCall, startOfBrazilDay, unfilledPlaceholders, unknownTemplateVariables, urgentSendTimes } from "@/lib/broadcast-schedule";
 import { RESCHEDULE_PENDING_TAG } from "@/lib/conversation-tags";
 import { formatDate } from "@/lib/format";
@@ -131,9 +131,10 @@ export async function getClinicCampaignStartPreview(campaignId: string) {
   await assertClinicOwnsCampaign(campaignId, clinicId);
   const campaign = await prisma.broadcastCampaign.findUnique({
     where: { id: campaignId },
-    select: { messageTemplate: true, imagePath: true, lowPriority: true, tagOnSend: true },
+    select: { messageTemplate: true, imagePath: true, lowPriority: true, tagOnSend: true, clinic: { select: { technicalDirectorName: true, technicalDirectorCrm: true } } },
   });
   const isReschedule = campaign?.tagOnSend === RESCHEDULE_PENDING_TAG;
+  const rt = isReschedule ? null : technicalDirectorLine(campaign?.clinic.technicalDirectorName, campaign?.clinic.technicalDirectorCrm);
   const otherActive = await prisma.broadcastCampaign.count({
     where: {
       clinicId,
@@ -153,7 +154,8 @@ export async function getClinicCampaignStartPreview(campaignId: string) {
   return {
     pending,
     samplePhone: first?.phone ?? null,
-    sampleMessage: campaign ? buildBroadcastMessage(campaign.messageTemplate, vars) : "",
+    sampleMessage: campaign ? buildBroadcastMessage(campaign.messageTemplate, vars, { technicalDirector: rt }) : "",
+    missingTechnicalDirector: !isReschedule && !rt,
     unknownVariables: campaign ? unknownTemplateVariables(campaign.messageTemplate, vars) : [],
     unfilled: campaign ? unfilledPlaceholders(campaign.messageTemplate) : [],
     hasImage: Boolean(campaign?.imagePath),
@@ -322,6 +324,14 @@ async function assertClinicOwnsCampaign(campaignId: string, clinicId: string) {
 export async function startClinicBroadcastCampaign(campaignId: string) {
   const { clinicId } = await requireClinicSession();
   await assertClinicOwnsCampaign(campaignId, clinicId);
+  // CFM: campanha de marketing sem responsável técnico (nome + CRM) não inicia.
+  const c = await prisma.broadcastCampaign.findUnique({
+    where: { id: campaignId },
+    select: { tagOnSend: true, clinic: { select: { technicalDirectorName: true, technicalDirectorCrm: true } } },
+  });
+  if (c && c.tagOnSend !== RESCHEDULE_PENDING_TAG && !technicalDirectorLine(c.clinic.technicalDirectorName, c.clinic.technicalDirectorCrm)) {
+    return { success: false as const, error: "Cadastre o responsável técnico (nome e CRM) em Configurações antes de iniciar a campanha." };
+  }
   await prisma.broadcastCampaign.update({ where: { id: campaignId }, data: { status: "RUNNING" } });
   revalidatePath("/clinic/disparos");
   return { success: true as const };

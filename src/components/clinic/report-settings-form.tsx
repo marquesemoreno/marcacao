@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { updateClinicDefaultTicket, addAcquisitionRule, deleteAcquisitionRule } from "@/actions/clinic";
+import { updateClinicDefaultTicket, updateClinicTechnicalDirector, addAcquisitionRule, deleteAcquisitionRule } from "@/actions/clinic";
 import { useActionFeedback } from "@/hooks/use-action-feedback";
 import { ACQUISITION_CHANNELS, DIRECT_CHANNEL } from "@/lib/acquisition";
 
@@ -15,9 +15,13 @@ import { ACQUISITION_CHANNELS, DIRECT_CHANNEL } from "@/lib/acquisition";
 export function ReportSettingsForm({
   defaultTicket,
   rules,
+  technicalDirectorName = null,
+  technicalDirectorCrm = null,
 }: {
   defaultTicket: string | null;
   rules: { id: string; keyword: string; channel: string }[];
+  technicalDirectorName?: string | null;
+  technicalDirectorCrm?: string | null;
 }) {
   const { isPending, run } = useActionFeedback();
   const ruleFormRef = useRef<HTMLFormElement>(null);
@@ -45,6 +49,38 @@ export function ReportSettingsForm({
             <div className="space-y-1 flex-1">
               <Label htmlFor="default-ticket" className="text-xs">Valor (R$)</Label>
               <Input id="default-ticket" type="number" step="0.01" min="0" name="defaultTicket" defaultValue={defaultTicket ?? ""} placeholder="Ex: 250" className="h-9" />
+            </div>
+            <Button type="submit" size="sm" disabled={isPending}>
+              Salvar
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">Responsável técnico</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          <p className="text-xs text-muted-foreground">
+            Exigência do CFM para publicidade médica: nome e CRM aparecem no fim de toda campanha de marketing. Sem isso a campanha não inicia
+            (aviso de remarcação não precisa).
+          </p>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              const fd = new FormData(e.currentTarget);
+              run(() => updateClinicTechnicalDirector(fd), { successMessage: "Responsável técnico salvo." });
+            }}
+            className="grid gap-2 sm:grid-cols-[1fr_10rem_auto] items-end"
+          >
+            <div className="space-y-1">
+              <Label htmlFor="rt-name" className="text-xs">Nome</Label>
+              <Input id="rt-name" name="technicalDirectorName" defaultValue={technicalDirectorName ?? ""} placeholder="Dr. Fulano de Tal" className="h-9" />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="rt-crm" className="text-xs">CRM</Label>
+              <Input id="rt-crm" name="technicalDirectorCrm" defaultValue={technicalDirectorCrm ?? ""} placeholder="CRM-BA 12345" className="h-9" />
             </div>
             <Button type="submit" size="sm" disabled={isPending}>
               Salvar

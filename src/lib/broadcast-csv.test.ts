@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  technicalDirectorLine,
   parseBroadcastCsv,
   buildBroadcastMessage,
   isBroadcastOptOutReply,
@@ -93,5 +94,23 @@ describe("isBroadcastOptOutReply", () => {
   it("ignora mensagens sem relação", () => {
     expect(isBroadcastOptOutReply("Olá, tudo bem?")).toBe(false);
     expect(isBroadcastOptOutReply("")).toBe(false);
+  });
+});
+
+describe("rodapé do responsável técnico (CFM)", () => {
+  it("campanha de marketing leva nome e CRM antes do opt-out", () => {
+    const text = buildBroadcastMessage("Check-up com condição especial.", {}, { technicalDirector: "Dr. João Silva — CRM-BA 12345" });
+    expect(text).toBe(`Check-up com condição especial.\n\nResponsável técnico: Dr. João Silva — CRM-BA 12345\n${BROADCAST_OPT_OUT_FOOTER}`);
+  });
+  it("sem responsável técnico, mantém só o opt-out", () => {
+    expect(buildBroadcastMessage("Aviso.", {})).toBe(`Aviso.\n\n${BROADCAST_OPT_OUT_FOOTER}`);
+  });
+});
+
+describe("technicalDirectorLine", () => {
+  it("monta a linha só com nome e CRM preenchidos", () => {
+    expect(technicalDirectorLine("Dr. João Silva", "CRM-BA 12345")).toBe("Dr. João Silva — CRM-BA 12345");
+    expect(technicalDirectorLine("Dr. João Silva", null)).toBeNull();
+    expect(technicalDirectorLine(null, "CRM-BA 1")).toBeNull();
   });
 });

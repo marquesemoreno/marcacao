@@ -266,7 +266,11 @@ export function BroadcastManagement() {
     const { campaign } = confirming;
     setBusyId(campaign.id);
     try {
-      await startClinicBroadcastCampaign(campaign.id);
+      const started = await startClinicBroadcastCampaign(campaign.id);
+      if (!started.success) {
+        toast.error(started.error);
+        return;
+      }
       toast.success(`“${campaign.name}” iniciada. O envio segue o ritmo seguro, sem precisar ficar na tela.`);
       setConfirming(null);
       await loadCampaigns(true);
@@ -775,6 +779,12 @@ export function BroadcastManagement() {
                   </button>
                 </div>
               )}
+              {confirming.preview.missingTechnicalDirector && (
+                <div role="alert" className="rounded-lg border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 p-3 text-sm text-amber-900 dark:text-amber-200">
+                  Falta o responsável técnico (nome e CRM), exigido pelo CFM em campanhas. A gestão cadastra em{" "}
+                  <a href="/clinic/precos" className="font-semibold underline underline-offset-2">Configurações</a>.
+                </div>
+              )}
               <div className="flex justify-end gap-2">
                 <button
                   type="button"
@@ -789,7 +799,8 @@ export function BroadcastManagement() {
                     busyId === confirming.campaign.id ||
                     confirming.preview.pending === 0 ||
                     confirming.preview.unknownVariables.length > 0 ||
-                    confirming.preview.unfilled.length > 0
+                    confirming.preview.unfilled.length > 0 ||
+                    confirming.preview.missingTechnicalDirector
                   }
                   onClick={confirmStart}
                   className="inline-flex h-9 items-center gap-1.5 px-4 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 rounded-lg"

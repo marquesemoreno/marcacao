@@ -30,10 +30,22 @@ export function isBroadcastOptOutReply(text: string): boolean {
 
 /** Monta o texto final enviado ao destinatário: aplica as variáveis do CSV e acrescenta
  * o rodapé de opt-out (a menos que já esteja presente no template). */
-export function buildBroadcastMessage(template: string, vars: Record<string, string>): string {
+export function buildBroadcastMessage(
+  template: string,
+  vars: Record<string, string>,
+  opts?: { technicalDirector?: string | null }
+): string {
   const withVariables = applyBroadcastVariables(template, vars);
-  if (withVariables.includes(BROADCAST_OPT_OUT_FOOTER)) return withVariables;
-  return `${withVariables}\n\n${BROADCAST_OPT_OUT_FOOTER}`;
+  // CFM (publicidade médica): identifica o responsável técnico (nome + CRM).
+  const rt = opts?.technicalDirector ? `Responsável técnico: ${opts.technicalDirector}` : null;
+  const body = rt && !withVariables.includes(rt) ? `${withVariables}\n\n${rt}` : withVariables;
+  if (body.includes(BROADCAST_OPT_OUT_FOOTER)) return body;
+  return rt ? `${body}\n${BROADCAST_OPT_OUT_FOOTER}` : `${body}\n\n${BROADCAST_OPT_OUT_FOOTER}`;
+}
+
+/** "Dr. Fulano — CRM-BA 12345", ou null se faltar nome ou CRM. */
+export function technicalDirectorLine(name: string | null | undefined, crm: string | null | undefined): string | null {
+  return name?.trim() && crm?.trim() ? `${name.trim()} — ${crm.trim()}` : null;
 }
 
 /** Ordem assumida quando o CSV não tem cabeçalho — mesmo exemplo mostrado no formulário
