@@ -710,7 +710,7 @@ export async function getClinicCampaignReport(period: PeriodKey = "30"): Promise
       status: true,
       tagOnSend: true,
       createdAt: true,
-      recipients: { select: { phone: true, status: true, sentAt: true } },
+      recipients: { select: { phone: true, status: true, sentAt: true, errorMessage: true } },
     },
   });
   if (campaigns.length === 0) return [];

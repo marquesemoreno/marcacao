@@ -875,7 +875,7 @@ function CampaignCard({
   }
   const pendingCalls = calls.filter((x) => !x.called).length;
   // Falha não conta como progresso (não chegou ao paciente).
-  const progress = c.total ? Math.round(((c.sent + c.skipped) / c.total) * 100) : 0;
+  const progress = c.total ? Math.round(((c.sent + c.skipped + c.noConsent) / c.total) * 100) : 0;
   const actionBtn =
     "inline-flex h-8 items-center gap-1.5 px-3 text-xs font-medium rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50";
   return (
@@ -979,6 +979,7 @@ function CampaignCard({
           {c.sent} de {c.total} enviadas
           {c.pending > 0 && c.status !== "DRAFT" && ` · ${c.pending} na fila`}
           {c.skipped > 0 && ` · ${c.skipped} ${c.skipped === 1 ? "pediu" : "pediram"} para não receber`}
+          {c.noConsent > 0 && ` · ${c.noConsent} sem consentimento para campanhas`}
           {c.failed > 0 && <span className="text-red-700 dark:text-red-400"> · {plural(c.failed, "falha", "falhas")}</span>}
         </p>
         {c.failed > 0 && (

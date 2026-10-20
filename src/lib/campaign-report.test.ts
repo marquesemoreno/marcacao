@@ -34,6 +34,7 @@ describe("computeCampaignStats", () => {
       pending: 1,
       failed: 1,
       optedOut: 2,
+      noConsent: 0,
       replied: 2,
       replyRate: 67,
       scheduled: 1,
@@ -42,5 +43,19 @@ describe("computeCampaignStats", () => {
 
   it("sem envios, taxa 0", () => {
     expect(computeCampaignStats([recipients[3]], []).replyRate).toBe(0);
+  });
+});
+
+describe("sem consentimento separado de 'pediram para sair'", () => {
+  it("SKIPPED_OPT_OUT com o motivo de consentimento conta em noConsent, não em optedOut", () => {
+    const stats = computeCampaignStats(
+      [
+        { phone: "5577911110007", status: "SKIPPED_OPT_OUT", sentAt: null, errorMessage: "Sem consentimento para campanhas" },
+        { phone: "5577911110008", status: "SKIPPED_OPT_OUT", sentAt: null, errorMessage: null },
+      ],
+      []
+    );
+    expect(stats.noConsent).toBe(1);
+    expect(stats.optedOut).toBe(1);
   });
 });

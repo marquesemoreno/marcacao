@@ -1,4 +1,4 @@
-import { marketingSendDecision } from "@/lib/marketing-consent";
+import { marketingSendDecision, NO_CONSENT_MESSAGE } from "@/lib/marketing-consent";
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import { sendWhatsAppMessage, sendWhatsAppMedia } from "@/lib/whatsapp";
@@ -98,7 +98,7 @@ export async function dispatchNextBatch(): Promise<{ processed: number }> {
           where: { id: recipient.id },
           data: {
             status: "SKIPPED_OPT_OUT",
-            errorMessage: decision === "SEM_CONSENTIMENTO" ? "Sem consentimento para campanhas" : "Pediu para não receber",
+            errorMessage: decision === "SEM_CONSENTIMENTO" ? NO_CONSENT_MESSAGE : "Pediu para não receber",
           },
         });
         continue;

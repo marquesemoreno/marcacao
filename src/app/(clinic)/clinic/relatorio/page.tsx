@@ -754,7 +754,7 @@ export default async function ClinicReportPage({
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               {campaigns.map((c) => {
                 const s = c.stats;
-                const progress = s.total > 0 ? Math.round(((s.sent + s.failed + s.optedOut) / s.total) * 100) : 0;
+                const progress = s.total > 0 ? Math.round(((s.sent + s.failed + s.optedOut + s.noConsent) / s.total) * 100) : 0;
                 return (
                   <div key={c.id} className={`${card} p-5 space-y-4`}>
                     <div className="flex items-start justify-between gap-3">
@@ -795,6 +795,13 @@ export default async function ClinicReportPage({
                         <dt className="text-xs text-slate-600 dark:text-slate-400">Pediram para sair</dt>
                         <dd className="text-lg font-semibold tabular-nums">{s.optedOut}</dd>
                       </div>
+                      {s.noConsent > 0 && (
+                        <div>
+                          <dt className="text-xs text-slate-600 dark:text-slate-400">Sem consentimento</dt>
+                          <dd className="text-lg font-semibold tabular-nums">{s.noConsent}</dd>
+                          <dd className="text-xs text-slate-600 dark:text-slate-400">não receberam (LGPD)</dd>
+                        </div>
+                      )}
                       <div>
                         <dt className="text-xs text-slate-600 dark:text-slate-400">Não entregues</dt>
                         <dd className="text-lg font-semibold tabular-nums">{s.failed}</dd>

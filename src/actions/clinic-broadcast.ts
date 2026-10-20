@@ -1,5 +1,6 @@
 "use server";
 
+import { NO_CONSENT_MESSAGE } from "@/lib/marketing-consent";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireClinicManager, requireClinicSession } from "@/lib/session";
@@ -46,7 +47,8 @@ export async function listClinicBroadcastCampaigns() {
   return campaigns.map((c) => {
     const sent = c.recipients.filter((r) => r.status === "SENT").length;
     const failedList = c.recipients.filter((r) => r.status === "FAILED");
-    const skipped = c.recipients.filter((r) => r.status === "SKIPPED_OPT_OUT").length;
+    const noConsent = c.recipients.filter((r) => r.status === "SKIPPED_OPT_OUT" && r.errorMessage === NO_CONSENT_MESSAGE).length;
+    const skipped = c.recipients.filter((r) => r.status === "SKIPPED_OPT_OUT").length - noConsent;
     const pending = c.recipients.filter((r) => r.status === "PENDING").length;
     const sentToday = c.recipients.filter((r) => r.status === "SENT" && r.sentAt && r.sentAt >= dayStart).length;
     const yielding = c.lowPriority && highPriorityPending;
@@ -71,6 +73,7 @@ export async function listClinicBroadcastCampaigns() {
       failureReasons: [...new Set(failedList.map((r) => r.errorMessage).filter((m): m is string => !!m))].slice(0, 3),
       failures: failedList.slice(0, 30).map((r) => ({ phone: r.phone, reason: r.errorMessage })),
       skipped,
+      noConsent,
       pending,
       situation: isReschedule && c.status === "RUNNING" && pending > 0
         ? { tone: "ok" as const, text: "Enviando aviso de remarcação — 1 a cada 4–6 min, das 8h às 18h" }

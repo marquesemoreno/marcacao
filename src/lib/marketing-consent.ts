@@ -26,3 +26,7 @@ export function isMarketingOptInReply(text: string): boolean {
 
 export const MARKETING_OPT_IN_REPLY =
   "Pronto! Você vai receber novidades e campanhas da clínica por aqui. Para sair a qualquer momento, digite 9.";
+
+/** errorMessage do destinatário pulado por falta de consentimento (relatórios separam de
+ * "pediram para sair"). */
+export const NO_CONSENT_MESSAGE = "Sem consentimento para campanhas";
