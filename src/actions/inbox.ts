@@ -180,6 +180,9 @@ async function buildContactRows(conversations: ContactConversation[], clinicId: 
       notes: profile.notes,
       marketingConsentAt: profile.marketingConsentAt?.toISOString() ?? null,
       marketingConsentSource: profile.marketingConsentSource,
+      guardianName: profile.guardianName,
+      guardianRelationship: profile.guardianRelationship,
+      guardianPhone: profile.guardianPhone,
       tags: conversation.tags,
       status: conversation.status,
       lastAppointment: lastAppointment
@@ -1690,6 +1693,9 @@ export async function updateContactInfo(
     insuranceCardNumber?: string;
     notes?: string;
     marketingConsent?: boolean;
+    guardianName?: string;
+    guardianRelationship?: string;
+    guardianPhone?: string;
   }
 ) {
   const { clinicId, userId } = await requireClinicSession();
@@ -1732,6 +1738,9 @@ export async function updateContactInfo(
       address: opt(data.address),
       insuranceCardNumber: opt(data.insuranceCardNumber),
       notes: opt(data.notes),
+      guardianName: opt(data.guardianName),
+      guardianRelationship: opt(data.guardianRelationship),
+      guardianPhone: data.guardianPhone === undefined ? undefined : data.guardianPhone.replace(/\D/g, "") || null,
       ...(data.marketingConsent === undefined
         ? {}
         : data.marketingConsent

@@ -1181,6 +1181,10 @@ model ContactClinicProfile {
   marketingConsentAt     DateTime? @map("marketing_consent_at")
   /// De onde veio: "whatsapp" (paciente mandou QUERO RECEBER) | "recepcao" (marcado na ficha).
   marketingConsentSource String?   @map("marketing_consent_source")
+  /// Responsável legal (paciente menor de idade): nome, parentesco e telefone.
+  guardianName           String?   @map("guardian_name")
+  guardianRelationship   String?   @map("guardian_relationship")
+  guardianPhone          String?   @map("guardian_phone")
   updatedAt              DateTime  @updatedAt @map("updated_at")
 
   contact Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)

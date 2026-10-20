@@ -113,6 +113,10 @@ export interface Contact {
   /** Consentimento para campanhas DESTA clínica (ISO) e de onde veio. */
   marketingConsentAt?: string;
   marketingConsentSource?: string;
+  /** Responsável legal (menor de idade). */
+  guardianName?: string;
+  guardianRelationship?: string;
+  guardianPhone?: string;
   neighborhood: string;
   /** Entidade (empresa cliente) do GLPI vinculada a este contato — só relevante pro
    * TIVDC, que usa isso pra abrir chamado na empresa certa (ver Contact.glpiEntityId). */
@@ -199,6 +203,9 @@ export type PatientRecordData = Pick<
   | "consultationHistory"
   | "marketingConsentAt"
   | "marketingConsentSource"
+  | "guardianName"
+  | "guardianRelationship"
+  | "guardianPhone"
 >;
 
 /** Payload de onUpdatePatient/updateContactInfo — mesmos campos editáveis da aba
@@ -218,6 +225,9 @@ export interface UpdatePatientData {
   notes?: string;
   /** true = paciente aceitou campanhas (marcado pela recepção); false = retirar. */
   marketingConsent?: boolean;
+  guardianName?: string;
+  guardianRelationship?: string;
+  guardianPhone?: string;
 }
 
 export interface Agent {

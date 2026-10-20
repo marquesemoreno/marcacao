@@ -99,6 +99,9 @@ function rowToPatientRecord(row: ContactRow): PatientRecordData {
     consultationHistory: [],
     marketingConsentAt: (row as { marketingConsentAt?: string | null }).marketingConsentAt ?? undefined,
     marketingConsentSource: (row as { marketingConsentSource?: string | null }).marketingConsentSource ?? undefined,
+    guardianName: (row as { guardianName?: string | null }).guardianName ?? undefined,
+    guardianRelationship: (row as { guardianRelationship?: string | null }).guardianRelationship ?? undefined,
+    guardianPhone: (row as { guardianPhone?: string | null }).guardianPhone ?? undefined,
   };
 }
 

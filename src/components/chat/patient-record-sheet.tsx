@@ -1,5 +1,6 @@
 "use client";
 
+import { isMinor } from "@/lib/minor";
 import { formatPhone } from "@/lib/format";
 import { useState } from "react";
 import { Plus, X, Phone, IdCard, Stethoscope, ShieldCheck, Calendar, MapPin, CreditCard, FileText, Download, File as FileIcon } from "lucide-react";
@@ -71,6 +72,10 @@ export function PatientRecordSheet({ contact, open, onOpenChange, onUpdatePatien
   const [address, setAddress] = useState(contact.address ?? "");
   const [insuranceCardNumber, setInsuranceCardNumber] = useState(contact.insuranceCardNumber ?? "");
   const [marketingConsent, setMarketingConsent] = useState(Boolean(contact.marketingConsentAt));
+  const [guardianName, setGuardianName] = useState(contact.guardianName ?? "");
+  const [guardianRelationship, setGuardianRelationship] = useState(contact.guardianRelationship ?? "");
+  const [guardianPhone, setGuardianPhone] = useState(contact.guardianPhone ?? "");
+  const minor = isMinor(birthDate);
   const [isSavingResumo, setIsSavingResumo] = useState(false);
 
   const [notes, setNotes] = useState(contact.notes ?? "");
@@ -94,6 +99,9 @@ export function PatientRecordSheet({ contact, open, onOpenChange, onUpdatePatien
         address,
         insuranceCardNumber,
         ...(marketingConsent !== Boolean(contact.marketingConsentAt) ? { marketingConsent } : {}),
+        guardianName,
+        guardianRelationship,
+        guardianPhone,
       });
       if (result && "success" in result && !result.success) {
         toast.error(result.error || "Não foi possível salvar.");
@@ -219,6 +227,22 @@ export function PatientRecordSheet({ contact, open, onOpenChange, onUpdatePatien
                   <Input value={insuranceCardNumber} onChange={(e) => setInsuranceCardNumber(e.target.value)} className="h-9" placeholder="Não informado" />
                 </div>
               </div>
+
+              {(minor || guardianName || guardianPhone) && (
+                <div className={`space-y-2 rounded-md border p-2.5 ${minor && !guardianName ? "border-amber-300 dark:border-amber-700 bg-amber-50/60 dark:bg-amber-950/30" : "border-slate-200 dark:border-slate-700"}`}>
+                  <p className="text-sm font-medium">
+                    Responsável legal{minor && <span className="ml-1.5 rounded-md bg-amber-100 dark:bg-amber-900/50 px-1.5 py-0.5 text-xs font-semibold text-amber-900 dark:text-amber-200">Menor de idade</span>}
+                  </p>
+                  {minor && !guardianName && (
+                    <p className="text-xs text-amber-900 dark:text-amber-200">Paciente menor de idade: registre quem é o responsável legal.</p>
+                  )}
+                  <div className="grid grid-cols-2 gap-2">
+                    <Input value={guardianName} onChange={(e) => setGuardianName(e.target.value)} className="h-9 col-span-2" placeholder="Nome do responsável" aria-label="Nome do responsável legal" />
+                    <Input value={guardianRelationship} onChange={(e) => setGuardianRelationship(e.target.value)} className="h-9" placeholder="Parentesco (mãe, pai…)" aria-label="Parentesco" />
+                    <Input value={guardianPhone} onChange={(e) => setGuardianPhone(e.target.value)} className="h-9" placeholder="Telefone" inputMode="tel" aria-label="Telefone do responsável" />
+                  </div>
+                </div>
+              )}
 
               <label className="flex items-start gap-2 rounded-md border border-slate-200 dark:border-slate-700 p-2.5 text-sm">
                 <input type="checkbox" checked={marketingConsent} onChange={(e) => setMarketingConsent(e.target.checked)} className="mt-0.5 size-4 accent-emerald-600" />
