@@ -1,3 +1,4 @@
+import { profileInclude, profileOf } from "@/lib/contact-profile";
 import "server-only";
 import type OpenAI from "openai";
 import { prisma } from "@/lib/prisma";
@@ -124,7 +125,7 @@ async function runCriarPreAgendamento(
 ) {
   const conversation = await prisma.conversation.findUnique({
     where: { id: context.conversationId },
-    select: { contact: { select: { name: true, phone: true, cpf: true } } },
+    select: { contact: { select: { name: true, phone: true, ...profileInclude(context.clinicId) } } },
   });
   if (!conversation) return { erro: "Conversa não encontrada." };
   if (!conversation.contact.phone) {
@@ -140,7 +141,7 @@ async function runCriarPreAgendamento(
   try {
     const appointment = await createAppointment({
       patientName: conversation.contact.name,
-      patientCpf: conversation.contact.cpf ?? undefined,
+      patientCpf: profileOf(conversation.contact, context.clinicId).cpf ?? undefined,
       patientPhone,
       clinicProcedureId,
       date: args.data,

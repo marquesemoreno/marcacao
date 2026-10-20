@@ -1,3 +1,4 @@
+import { CONTACT_WITH_PROFILES, profileOf, upsertProfile } from "@/lib/contact-profile";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { checkClinicBusinessHours } from "@/lib/business-hours";
@@ -56,7 +57,7 @@ export async function processInboundChatbotTriage(
     where: { id: conversationId },
     include: {
       clinic: true,
-      contact: true,
+      contact: CONTACT_WITH_PROFILES,
       messages: {
         orderBy: { createdAt: "desc" },
         take: 5,
@@ -98,11 +99,8 @@ export async function processInboundChatbotTriage(
     );
 
     // Atualiza CPF do contato se localizado
-    if (foundCpf && (!contact.cpf || contact.cpf === "")) {
-      await prisma.contact.update({
-        where: { id: contact.id },
-        data: { cpf: foundCpf },
-      });
+    if (foundCpf && !profileOf(contact, conversation.clinicId).cpf) {
+      await upsertProfile(prisma, contact.id, conversation.clinicId, { cpf: foundCpf });
     }
 
     // Atualiza etapa do funil da conversa

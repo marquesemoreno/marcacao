@@ -1,5 +1,6 @@
 "use server";
 
+import { profileInclude, profileOf } from "@/lib/contact-profile";
 import { prisma } from "@/lib/prisma";
 import { requireClinicSession } from "@/lib/session";
 import { attachSignedUrls } from "@/lib/whatsapp-media";
@@ -19,7 +20,7 @@ export async function getPatientProfile(conversationId: string) {
   const conversation = await prisma.conversation.findUnique({
     where: { id: conversationId },
     include: {
-      contact: true,
+      contact: { include: profileInclude(clinicId) },
       assignedUser: { select: { name: true } },
       clinic: { select: { tradeName: true, hospitalIntegration: { select: { active: true } } } },
     },
@@ -90,6 +91,7 @@ export async function getPatientProfile(conversationId: string) {
 
   const withUrls = await attachSignedUrls(messages);
   const c = conversation.contact;
+  const pf = profileOf(c, clinicId);
   return {
     conversationId: conversation.id,
     clinicName: conversation.clinic.tradeName,
@@ -99,14 +101,14 @@ export async function getPatientProfile(conversationId: string) {
       phone: c.phone,
       instagramUsername: c.instagramUsername,
       photoUrl: c.photoUrl,
-      cpf: c.cpf,
-      rg: c.rg,
-      birthDate: c.birthDate ? c.birthDate.toISOString().slice(0, 10) : null,
-      address: c.address,
-      convenio: c.convenio,
-      insuranceCardNumber: c.insuranceCardNumber,
-      preferredDoctor: c.preferredDoctor,
-      notes: c.notes,
+      cpf: pf.cpf,
+      rg: pf.rg,
+      birthDate: pf.birthDate ? pf.birthDate.toISOString().slice(0, 10) : null,
+      address: pf.address,
+      convenio: pf.convenio,
+      insuranceCardNumber: pf.insuranceCardNumber,
+      preferredDoctor: pf.preferredDoctor,
+      notes: pf.notes,
       patientSince: c.createdAt.toISOString(),
     },
     stage: conversation.funnelStage,

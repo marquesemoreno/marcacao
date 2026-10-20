@@ -1,5 +1,6 @@
 "use server";
 
+import { CONTACT_WITH_PROFILES, profileOf, upsertProfile } from "@/lib/contact-profile";
 import { getAttendantLoad } from "@/lib/attendant-load-server";
 
 import { parseNewContactExtra, type NewContactExtra } from "@/lib/new-contact-extra";
@@ -55,12 +56,12 @@ export async function listAllContactsAdmin(search?: string) {
             OR: [
               { name: { contains: search, mode: "insensitive" } },
               { phone: { contains: search } },
-              { cpf: { contains: search } },
+              { clinicProfiles: { some: { cpf: { contains: search } } } },
             ],
           },
         }
       : {},
-    include: { contact: true, clinic: { select: { tradeName: true } } },
+    include: { contact: CONTACT_WITH_PROFILES, clinic: { select: { tradeName: true } } },
     orderBy: { contact: { name: "asc" } },
   });
 
@@ -68,7 +69,7 @@ export async function listAllContactsAdmin(search?: string) {
     conversationId: conversation.id,
     name: conversation.contact.name,
     phone: conversation.contact.phone ?? "",
-    cpf: conversation.contact.cpf,
+    cpf: profileOf(conversation.contact, conversation.clinicId).cpf,
     status: conversation.status,
     clinicName: conversation.clinic.tradeName,
   }));
@@ -88,7 +89,7 @@ export async function listContactsPageAdmin(search: string | undefined, page: nu
           OR: [
             { name: { contains: search, mode: "insensitive" as const } },
             { phone: { contains: search } },
-            { cpf: { contains: search } },
+            { clinicProfiles: { some: { cpf: { contains: search } } } },
           ],
         },
       }
@@ -100,7 +101,7 @@ export async function listContactsPageAdmin(search: string | undefined, page: nu
 
   const conversations = await prisma.conversation.findMany({
     where: { id: { in: ids } },
-    include: { contact: true, clinic: { select: { tradeName: true } } },
+    include: { contact: CONTACT_WITH_PROFILES, clinic: { select: { tradeName: true } } },
   });
   const byId = new Map(conversations.map((c) => [c.id, c]));
   const rows = ids.flatMap((id) => {
@@ -111,7 +112,7 @@ export async function listContactsPageAdmin(search: string | undefined, page: nu
         conversationId: conversation.id,
         name: conversation.contact.name,
         phone: conversation.contact.phone ?? "",
-        cpf: conversation.contact.cpf,
+        cpf: profileOf(conversation.contact, conversation.clinicId).cpf,
         status: conversation.status,
         clinicName: conversation.clinic.tradeName,
       },
@@ -146,7 +147,7 @@ export async function listForwardTargetsAdmin(sourceConversationId: string, sear
           }
         : {}),
     },
-    include: { contact: true },
+    include: { contact: CONTACT_WITH_PROFILES },
     orderBy: { contact: { name: "asc" } },
     take: 30,
   });
@@ -164,7 +165,7 @@ export async function getChatContactAdmin(conversationId: string) {
   const conversation = await prisma.conversation.findUnique({
     where: { id: conversationId },
     include: {
-      contact: true,
+      contact: CONTACT_WITH_PROFILES,
       clinic: { select: { id: true, tradeName: true, businessHours: true } },
       assignedUser: { select: { id: true, name: true } },
       messages: {
@@ -209,14 +210,14 @@ export async function listChatContactsAdmin(filter: InboxFilter, search?: string
               OR: [
                 { name: { contains: search, mode: "insensitive" } },
                 { phone: { contains: search } },
-                { cpf: { contains: search } },
+                { clinicProfiles: { some: { cpf: { contains: search } } } },
               ],
             },
           }
         : {}),
     },
     include: {
-      contact: true,
+      contact: CONTACT_WITH_PROFILES,
       clinic: { select: { id: true, tradeName: true, businessHours: true } },
       assignedUser: { select: { id: true, name: true } },
       // take: 3 (não 1) — a prévia da lista pula nota interna e mostra a última
@@ -309,14 +310,15 @@ export async function createContactAdmin(name: string, phone: string, clinicId: 
 
   const existingContact = await prisma.contact.findUnique({
     where: { phone: fullPhone },
-    select: { cpf: true, birthDate: true, convenio: true },
+    select: { clinicProfiles: { where: { clinicId }, select: { cpf: true, birthDate: true, convenio: true } } },
   });
-  const extraData = parseNewContactExtra(extra, existingContact ?? undefined);
+  const extraData = parseNewContactExtra(extra, existingContact?.clinicProfiles[0] ?? undefined);
   const contact = await prisma.contact.upsert({
     where: { phone: fullPhone },
-    update: extraData,
-    create: { phone: fullPhone, name: trimmedName, ...extraData },
+    update: {},
+    create: { phone: fullPhone, name: trimmedName },
   });
+  await upsertProfile(prisma, contact.id, clinicId, extraData);
 
   let conversation = await prisma.conversation.findFirst({
     where: { contactId: contact.id, clinicId },
@@ -371,11 +373,12 @@ export async function importContactsAdmin(
       continue;
     }
 
-    await prisma.contact.upsert({
+    const imported_ = await prisma.contact.upsert({
       where: { phone: fullPhone },
-      update: row.cpf?.trim() ? { cpf: row.cpf.trim() } : {},
-      create: { phone: fullPhone, name: trimmedName, cpf: row.cpf?.trim() || null },
+      update: {},
+      create: { phone: fullPhone, name: trimmedName },
     });
+    if (row.cpf?.trim()) await upsertProfile(prisma, imported_.id, clinicId, { cpf: row.cpf.trim() });
     imported++;
   }
 
@@ -546,7 +549,7 @@ export async function sendMessageAdmin(
 
   const conversation = await prisma.conversation.findUnique({
     where: { id: data.conversationId },
-    include: { contact: true },
+    include: { contact: CONTACT_WITH_PROFILES },
   });
 
   if (!conversation) {
@@ -630,7 +633,7 @@ export async function sendMediaMessageAdmin(conversationId: string, formData: Fo
 
   const conversation = await prisma.conversation.findUnique({
     where: { id: conversationId },
-    include: { contact: true },
+    include: { contact: CONTACT_WITH_PROFILES },
   });
   if (!conversation) {
     throw new Error("Conversa não encontrada");
@@ -699,7 +702,7 @@ export async function sendAudioMessageAdmin(conversationId: string, formData: Fo
 
   const conversation = await prisma.conversation.findUnique({
     where: { id: conversationId },
-    include: { contact: true },
+    include: { contact: CONTACT_WITH_PROFILES },
   });
   if (!conversation) {
     throw new Error("Conversa não encontrada");
@@ -756,7 +759,7 @@ export async function shareContactAdmin(conversationId: string, target?: { name:
 
   const conversation = await prisma.conversation.findUnique({
     where: { id: conversationId },
-    include: { contact: true, clinic: true },
+    include: { contact: CONTACT_WITH_PROFILES, clinic: true },
   });
   if (!conversation) {
     throw new Error("Conversa não encontrada");
@@ -813,7 +816,7 @@ export async function toggleReactionAdmin(messageId: string, emoji: string) {
 
   const message = await prisma.message.findUnique({
     where: { id: messageId },
-    include: { conversation: { include: { contact: true } } },
+    include: { conversation: { include: { contact: CONTACT_WITH_PROFILES } } },
   });
   if (!message) {
     throw new Error("Mensagem não encontrada");
@@ -919,7 +922,7 @@ export async function resendMessageAdmin(messageId: string) {
 
   const message = await prisma.message.findUnique({
     where: { id: messageId },
-    include: { conversation: { include: { contact: true } } },
+    include: { conversation: { include: { contact: CONTACT_WITH_PROFILES } } },
   });
   if (!message) return { success: false as const, error: "Mensagem não encontrada" };
   if (message.direction !== "OUTBOUND" || message.type === "INTERNAL_NOTE") {
@@ -986,7 +989,7 @@ export async function editMessageAdmin(messageId: string, newText: string) {
 
   const message = await prisma.message.findUnique({
     where: { id: messageId },
-    include: { conversation: { include: { contact: true } } },
+    include: { conversation: { include: { contact: CONTACT_WITH_PROFILES } } },
   });
   if (!message) {
     return { success: false as const, error: "Mensagem não encontrada." };
@@ -1151,7 +1154,7 @@ export async function openGlpiTicketAdmin(conversationId: string) {
   const conversation = await prisma.conversation.findUnique({
     where: { id: conversationId },
     include: {
-      contact: true,
+      contact: CONTACT_WITH_PROFILES,
       messages: {
         where: { type: { not: "INTERNAL_NOTE" }, direction: "INBOUND", deletedAt: null },
         orderBy: { createdAt: "desc" },
@@ -1485,7 +1488,7 @@ export async function updateContactInfoAdmin(
 
   const conversation = await prisma.conversation.findUnique({
     where: { id: conversationId },
-    select: { contactId: true },
+    select: { contactId: true, clinicId: true },
   });
   if (!conversation) {
     return { success: false as const, error: "Conversa não encontrada" };
@@ -1502,18 +1505,19 @@ export async function updateContactInfoAdmin(
   try {
     await prisma.contact.update({
       where: { id: conversation.contactId },
-      data: {
-        name: trimmedName,
-        cpf: data.cpf?.trim() || null,
-        ...(fullPhone ? { phone: fullPhone } : {}),
-        ...(data.convenio !== undefined ? { convenio: data.convenio.trim() || null } : {}),
-        ...(data.preferredDoctor !== undefined ? { preferredDoctor: data.preferredDoctor.trim() || null } : {}),
-        ...(data.rg !== undefined ? { rg: data.rg.trim() || null } : {}),
-        ...(data.birthDate !== undefined ? { birthDate: data.birthDate ? new Date(`${data.birthDate}T00:00:00.000Z`) : null } : {}),
-        ...(data.address !== undefined ? { address: data.address.trim() || null } : {}),
-        ...(data.insuranceCardNumber !== undefined ? { insuranceCardNumber: data.insuranceCardNumber.trim() || null } : {}),
-        ...(data.notes !== undefined ? { notes: data.notes.trim() || null } : {}),
-      },
+      data: { name: trimmedName, ...(fullPhone ? { phone: fullPhone } : {}) },
+    });
+    // Dados cadastrais no perfil da clínica DESTA conversa.
+    const opt = (v: string | undefined) => (v === undefined ? undefined : v.trim() || null);
+    await upsertProfile(prisma, conversation.contactId, conversation.clinicId, {
+      cpf: data.cpf === undefined ? null : data.cpf.trim() || null,
+      convenio: opt(data.convenio),
+      preferredDoctor: opt(data.preferredDoctor),
+      rg: opt(data.rg),
+      birthDate: data.birthDate === undefined ? undefined : data.birthDate ? new Date(`${data.birthDate}T00:00:00.000Z`) : null,
+      address: opt(data.address),
+      insuranceCardNumber: opt(data.insuranceCardNumber),
+      notes: opt(data.notes),
     });
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {

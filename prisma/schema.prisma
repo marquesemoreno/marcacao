@@ -217,6 +217,7 @@ model Clinic {
   whatsappInstance     WhatsappInstance?
   whatsappCloudAccount WhatsappCloudAccount?
   campaignSpends       CampaignSpend[]
+  contactProfiles      ContactClinicProfile[]
   hospitalIntegration  HospitalIntegration?
   aiAttendantConfig    AiAttendantConfig?
   broadcastCampaigns   BroadcastCampaign[]
@@ -550,6 +551,7 @@ model Contact {
 
   @@unique([channel, externalId])
   @@map("contacts")
+  clinicProfiles         ContactClinicProfile[]
 }
 
 model Conversation {
@@ -1150,4 +1152,30 @@ model LoginFailure {
 
   @@index([email, createdAt])
   @@map("login_failures")
+}
+
+/// Dados cadastrais do paciente POR CLÍNICA (auditoria de saúde/LGPD, 20/10/2026): antes
+/// ficavam em Contact, compartilhados entre todas as clínicas que falam com o mesmo
+/// telefone — uma clínica via CPF, endereço e observações cadastrados por outra. Contact
+/// continua com nome/telefone (identidade do WhatsApp); o resto vive aqui.
+model ContactClinicProfile {
+  id                  String    @id @default(cuid())
+  contactId           String    @map("contact_id")
+  clinicId            String    @map("clinic_id")
+  cpf                 String?
+  rg                  String?
+  birthDate           DateTime? @map("birth_date") @db.Date
+  address             String?
+  insuranceCardNumber String?   @map("insurance_card_number")
+  convenio            String?
+  preferredDoctor     String?   @map("preferred_doctor")
+  notes               String?
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+
+  contact Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  clinic  Clinic  @relation(fields: [clinicId], references: [id])
+
+  @@unique([contactId, clinicId])
+  @@index([clinicId])
+  @@map("contact_clinic_profiles")
 }

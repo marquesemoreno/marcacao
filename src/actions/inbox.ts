@@ -1,5 +1,6 @@
 "use server";
 
+import { CONTACT_WITH_PROFILES, profileOf, profileWhere, upsertProfile } from "@/lib/contact-profile";
 import { sortPatientList, type PatientSort } from "@/lib/patient-list";
 import { CHAT_LIMIT_ENABLED } from "@/lib/chat-limit";
 import { customLossReasonLabel } from "@/lib/loss-reasons";
@@ -65,14 +66,16 @@ export async function createContact(name: string, phone: string, extra?: NewCont
 
   const existingContact = await prisma.contact.findUnique({
     where: { phone: fullPhone },
-    select: { cpf: true, birthDate: true, convenio: true },
+    select: { clinicProfiles: { where: { clinicId }, select: { cpf: true, birthDate: true, convenio: true } } },
   });
-  const extraData = parseNewContactExtra(extra, existingContact ?? undefined);
+  // CPF/nascimento/convênio vão pro perfil DESTA clínica (ContactClinicProfile).
+  const extraData = parseNewContactExtra(extra, existingContact?.clinicProfiles[0] ?? undefined);
   const contact = await prisma.contact.upsert({
     where: { phone: fullPhone },
-    update: extraData,
-    create: { phone: fullPhone, name: trimmedName, ...extraData },
+    update: {},
+    create: { phone: fullPhone, name: trimmedName },
   });
+  await upsertProfile(prisma, contact.id, clinicId, extraData);
 
   // Trava consultiva por contactId dentro da transação: sem ela, duas requisições quase
   // simultâneas pro mesmo contato podiam ambas passar pelo "findFirst" antes de qualquer
@@ -122,20 +125,20 @@ export async function listAllContacts(search?: string) {
               OR: [
                 { name: { contains: search, mode: "insensitive" } },
                 { phone: { contains: search } },
-                { cpf: { contains: search } },
-                { convenio: { contains: search, mode: "insensitive" } },
+                profileWhere(clinicId, { cpf: { contains: search } }),
+                profileWhere(clinicId, { convenio: { contains: search, mode: "insensitive" } }),
               ],
             },
           }
         : {}),
     },
-    include: { contact: true },
+    include: { contact: CONTACT_WITH_PROFILES },
     orderBy: { contact: { name: "asc" } },
   });
   return buildContactRows(conversations, clinicId);
 }
 
-type ContactConversation = Prisma.ConversationGetPayload<{ include: { contact: true } }>;
+type ContactConversation = Prisma.ConversationGetPayload<{ include: { contact: typeof CONTACT_WITH_PROFILES } }>;
 
 /** Linhas da tabela de Contatos — "Última Consulta" (data + médico) em 1 query só, pra
  * não virar N+1. Usado pela lista completa (busca do chat) e pela paginada (F3). */
@@ -161,18 +164,19 @@ async function buildContactRows(conversations: ContactConversation[], clinicId: 
 
   return conversations.map((conversation) => {
     const lastAppointment = conversation.contact.phone ? lastAppointmentByPhone.get(conversation.contact.phone) : undefined;
+    const profile = profileOf(conversation.contact, clinicId);
     return {
       conversationId: conversation.id,
       name: conversation.contact.name,
       phone: conversation.contact.phone ?? "",
-      cpf: conversation.contact.cpf,
-      convenio: conversation.contact.convenio,
-      preferredDoctor: conversation.contact.preferredDoctor,
-      rg: conversation.contact.rg,
-      birthDate: conversation.contact.birthDate ? conversation.contact.birthDate.toISOString().slice(0, 10) : null,
-      address: conversation.contact.address,
-      insuranceCardNumber: conversation.contact.insuranceCardNumber,
-      notes: conversation.contact.notes,
+      cpf: profile.cpf,
+      convenio: profile.convenio,
+      preferredDoctor: profile.preferredDoctor,
+      rg: profile.rg,
+      birthDate: profile.birthDate ? profile.birthDate.toISOString().slice(0, 10) : null,
+      address: profile.address,
+      insuranceCardNumber: profile.insuranceCardNumber,
+      notes: profile.notes,
       tags: conversation.tags,
       status: conversation.status,
       lastAppointment: lastAppointment
@@ -226,12 +230,12 @@ async function filteredSortedConversations(clinicId: string, params: ContactsLis
     contactFilters.push({
       OR: [
         { name: { contains: q, mode: "insensitive" } },
-        ...(qDigits && qDigits.length >= 3 ? [{ phone: { contains: qDigits } }, { cpf: { contains: qDigits } }] : []),
-        { convenio: { contains: q, mode: "insensitive" } },
+        ...(qDigits && qDigits.length >= 3 ? [{ phone: { contains: qDigits } }, profileWhere(clinicId, { cpf: { contains: qDigits } })] : []),
+        profileWhere(clinicId, { convenio: { contains: q, mode: "insensitive" } }),
       ],
     });
   }
-  if (params.convenio) contactFilters.push({ convenio: { equals: params.convenio, mode: "insensitive" } });
+  if (params.convenio) contactFilters.push(profileWhere(clinicId, { convenio: { equals: params.convenio, mode: "insensitive" } }));
   if (doctorPhones) contactFilters.push({ phone: { in: doctorPhones } });
 
   const stageFilter: Prisma.ConversationWhereInput =
@@ -290,7 +294,7 @@ export async function listContactsPage(params: ContactsListParams) {
 
   const found = await prisma.conversation.findMany({
     where: { id: { in: ids } },
-    include: { contact: true, assignedUser: { select: { id: true, name: true, role: true, clinicId: true } } },
+    include: { contact: CONTACT_WITH_PROFILES, assignedUser: { select: { id: true, name: true, role: true, clinicId: true } } },
   });
   const byId = new Map(found.map((c) => [c.id, maskForeignAssignee(c, clinicId)]));
   const conversations = ids.map((id) => byId.get(id)!).filter(Boolean);
@@ -356,7 +360,7 @@ export async function listForwardTargets(sourceConversationId: string, search?: 
           }
         : {}),
     },
-    include: { contact: true },
+    include: { contact: CONTACT_WITH_PROFILES },
     orderBy: { contact: { name: "asc" } },
     take: 30,
   });
@@ -399,14 +403,14 @@ export async function listConversations(filter: ConversationFilter, search?: str
               OR: [
                 { name: { contains: search, mode: "insensitive" } },
                 { phone: { contains: search } },
-                { cpf: { contains: search } },
+                profileWhere(clinicId, { cpf: { contains: search } }),
               ],
             },
           }
         : {}),
     },
     include: {
-      contact: true,
+      contact: CONTACT_WITH_PROFILES,
       assignedUser: { select: { id: true, name: true, role: true, clinicId: true } },
       // Expediente da clínica — usado pro cálculo de SLA em minutos úteis (ver
       // sla-calculator.ts); relacionamento de 1 linha, barato (não é o mesmo tipo de
@@ -472,7 +476,7 @@ export async function getChatContact(conversationId: string) {
   const conversation = await prisma.conversation.findUnique({
     where: { id: conversationId },
     include: {
-      contact: true,
+      contact: CONTACT_WITH_PROFILES,
       assignedUser: { select: { id: true, name: true, role: true, clinicId: true } },
       clinic: { select: { businessHours: true } },
       messages: {
@@ -493,7 +497,7 @@ export async function getConversation(conversationId: string) {
   const conversation = await prisma.conversation.findUnique({
     where: { id: conversationId },
     include: {
-      contact: true,
+      contact: CONTACT_WITH_PROFILES,
       assignedUser: { select: { id: true, name: true, role: true, clinicId: true } },
       messages: {
         orderBy: { createdAt: "asc" },
@@ -630,7 +634,7 @@ export async function sendMessage(
 
   const conversation = await prisma.conversation.findUnique({
     where: { id: data.conversationId },
-    include: { contact: true },
+    include: { contact: CONTACT_WITH_PROFILES },
   });
   if (!conversation || conversation.clinicId !== clinicId) {
     throw new Error("Conversa não encontrada");
@@ -715,7 +719,7 @@ export async function sendMediaMessage(conversationId: string, formData: FormDat
 
   const conversation = await prisma.conversation.findUnique({
     where: { id: conversationId },
-    include: { contact: true },
+    include: { contact: CONTACT_WITH_PROFILES },
   });
   if (!conversation || conversation.clinicId !== clinicId) {
     throw new Error("Conversa não encontrada");
@@ -786,7 +790,7 @@ export async function sendAudioMessage(conversationId: string, formData: FormDat
 
   const conversation = await prisma.conversation.findUnique({
     where: { id: conversationId },
-    include: { contact: true },
+    include: { contact: CONTACT_WITH_PROFILES },
   });
   if (!conversation || conversation.clinicId !== clinicId) {
     throw new Error("Conversa não encontrada");
@@ -847,7 +851,7 @@ export async function shareContact(conversationId: string, target?: { name: stri
 
   const conversation = await prisma.conversation.findUnique({
     where: { id: conversationId },
-    include: { contact: true, clinic: true },
+    include: { contact: CONTACT_WITH_PROFILES, clinic: true },
   });
   if (!conversation || conversation.clinicId !== clinicId) {
     throw new Error("Conversa não encontrada");
@@ -906,7 +910,7 @@ export async function toggleReaction(messageId: string, emoji: string) {
 
   const message = await prisma.message.findUnique({
     where: { id: messageId },
-    include: { conversation: { include: { contact: true } } },
+    include: { conversation: { include: { contact: CONTACT_WITH_PROFILES } } },
   });
   if (!message || message.conversation.clinicId !== clinicId) {
     throw new Error("Mensagem não encontrada");
@@ -1018,7 +1022,7 @@ export async function resendMessage(messageId: string) {
 
   const message = await prisma.message.findUnique({
     where: { id: messageId },
-    include: { conversation: { include: { contact: true } } },
+    include: { conversation: { include: { contact: CONTACT_WITH_PROFILES } } },
   });
   if (!message || message.conversation.clinicId !== clinicId) {
     return { success: false as const, error: "Mensagem não encontrada" };
@@ -1089,7 +1093,7 @@ export async function editMessage(messageId: string, newText: string) {
 
   const message = await prisma.message.findUnique({
     where: { id: messageId },
-    include: { conversation: { include: { contact: true } } },
+    include: { conversation: { include: { contact: CONTACT_WITH_PROFILES } } },
   });
   if (!message || message.conversation.clinicId !== clinicId) {
     return { success: false as const, error: "Mensagem não encontrada." };
@@ -1710,20 +1714,19 @@ export async function updateContactInfo(
   try {
     await prisma.contact.update({
       where: { id: conversation.contactId },
-      data: {
-        name: trimmedName,
-        cpf: data.cpf?.trim() || null,
-        ...(fullPhone ? { phone: fullPhone } : {}),
-        // undefined = campo não veio nesse submit, não mexe (ex: form de nome/CPF/telefone
-        // não manda convenio/preferredDoctor — só o form da ficha do paciente manda).
-        ...(data.convenio !== undefined ? { convenio: data.convenio.trim() || null } : {}),
-        ...(data.preferredDoctor !== undefined ? { preferredDoctor: data.preferredDoctor.trim() || null } : {}),
-        ...(data.rg !== undefined ? { rg: data.rg.trim() || null } : {}),
-        ...(data.birthDate !== undefined ? { birthDate: data.birthDate ? new Date(`${data.birthDate}T00:00:00.000Z`) : null } : {}),
-        ...(data.address !== undefined ? { address: data.address.trim() || null } : {}),
-        ...(data.insuranceCardNumber !== undefined ? { insuranceCardNumber: data.insuranceCardNumber.trim() || null } : {}),
-        ...(data.notes !== undefined ? { notes: data.notes.trim() || null } : {}),
-      },
+      data: { name: trimmedName, ...(fullPhone ? { phone: fullPhone } : {}) },
+    });
+    // Dados cadastrais: só no perfil DESTA clínica. undefined = campo não veio nesse submit.
+    const opt = (v: string | undefined) => (v === undefined ? undefined : v.trim() || null);
+    await upsertProfile(prisma, conversation.contactId, clinicId, {
+      cpf: data.cpf === undefined ? null : data.cpf.trim() || null,
+      convenio: opt(data.convenio),
+      preferredDoctor: opt(data.preferredDoctor),
+      rg: opt(data.rg),
+      birthDate: data.birthDate === undefined ? undefined : data.birthDate ? new Date(`${data.birthDate}T00:00:00.000Z`) : null,
+      address: opt(data.address),
+      insuranceCardNumber: opt(data.insuranceCardNumber),
+      notes: opt(data.notes),
     });
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
@@ -2083,7 +2086,7 @@ export async function updateConversationFunnelStage(conversationId: string, stag
 
   const conversation = await prisma.conversation.findUnique({
     where: { id: conversationId },
-    include: { contact: true, clinic: true },
+    include: { contact: CONTACT_WITH_PROFILES, clinic: true },
   });
   if (!conversation || conversation.clinicId !== clinicId) {
     throw new Error("Conversa não encontrada");

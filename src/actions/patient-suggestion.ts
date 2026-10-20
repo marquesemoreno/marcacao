@@ -1,5 +1,6 @@
 "use server";
 
+import { profileInclude, profileOf, upsertProfile } from "@/lib/contact-profile";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { getClinicSessionOrNull, requireClinicSession } from "@/lib/session";
@@ -7,10 +8,10 @@ import { getClinicSessionOrNull, requireClinicSession } from "@/lib/session";
 async function ownedConversation(conversationId: string, clinicId: string) {
   const conversation = await prisma.conversation.findUnique({
     where: { id: conversationId },
-    select: { clinicId: true, contactId: true, contact: { select: { cpf: true, convenio: true } } },
+    select: { clinicId: true, contactId: true, contact: { select: profileInclude(clinicId) } },
   });
   if (!conversation || conversation.clinicId !== clinicId) throw new Error("Conversa não encontrada");
-  return conversation;
+  return { ...conversation, contact: profileOf(conversation.contact, clinicId) };
 }
 
 /** CPF/convênio achados nas mensagens do paciente que ainda não estão no cadastro. */
@@ -36,7 +37,7 @@ export async function applyPatientSuggestion(conversationId: string) {
       ...(suggestion.cpf && !conversation.contact.cpf ? { cpf: suggestion.cpf } : {}),
       ...(suggestion.convenio && !conversation.contact.convenio ? { convenio: suggestion.convenio } : {}),
     };
-    if (Object.keys(data).length > 0) await prisma.contact.update({ where: { id: conversation.contactId }, data });
+    if (Object.keys(data).length > 0) await upsertProfile(prisma, conversation.contactId, clinicId, data);
     await prisma.patientDataSuggestion.delete({ where: { conversationId } });
   }
   revalidatePath("/clinic/inbox");

@@ -1,5 +1,6 @@
 "use server";
 
+import { profileInclude, profileOf } from "@/lib/contact-profile";
 import { prisma } from "@/lib/prisma";
 import { getClinicSessionOrNull, requireClinicSession } from "@/lib/session";
 import { STAGE_MESSAGE_STAGES, normalizeStageMessageTemplate, stageMessageText, type StageMessageStage } from "@/lib/stage-messages";
@@ -41,7 +42,7 @@ export async function getStageMessageDraft(conversationId: string, stage: string
   const [conversation, template, clinic] = await Promise.all([
     prisma.conversation.findUnique({
       where: { id: conversationId },
-      select: { clinicId: true, channel: true, contact: { select: { name: true, preferredDoctor: true } } },
+      select: { clinicId: true, channel: true, contact: { select: { name: true, ...profileInclude(clinicId) } } },
     }),
     prisma.stageMessage.findUnique({ where: { clinicId_stage: { clinicId, stage: parsed.stage } } }),
     prisma.clinic.findUnique({ where: { id: clinicId }, select: { tradeName: true } }),
@@ -49,7 +50,7 @@ export async function getStageMessageDraft(conversationId: string, stage: string
   if (!conversation || conversation.clinicId !== clinicId) throw new Error("Conversa não encontrada");
   return stageMessageText(template?.text, {
     nome: conversation.contact.name,
-    medico: conversation.contact.preferredDoctor,
+    medico: profileOf(conversation.contact, clinicId).preferredDoctor,
     clinica: clinic?.tradeName,
   });
 }

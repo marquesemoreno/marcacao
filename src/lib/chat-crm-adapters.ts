@@ -1,6 +1,7 @@
 import { autoCloseHint } from "@/lib/conversation-auto-close";
 import type {
   Contact as PrismaContact,
+  ContactClinicProfile,
   Conversation,
   ConversationChannel,
   ConversationDepartment,
@@ -10,6 +11,7 @@ import type {
   User,
 } from "@prisma/client";
 import { formatCurrency } from "@/lib/format";
+import { profileOf } from "@/lib/contact-profile";
 import { customLossReasonLabel } from "@/lib/loss-reasons";
 import { isMediaDownloadFailedNotice, isAutoSystemMessage, type InvoiceData } from "@/lib/chat-messages";
 import type { DocumentReviewData } from "@/lib/documents/document-validator";
@@ -102,7 +104,7 @@ function formatMessageTimestamp(date: Date) {
 type ConversationPreviewMessage = Pick<PrismaMessage, "type" | "content" | "mimeType" | "createdAt" | "direction">;
 
 type ConversationWithRelations = Conversation & {
-  contact: PrismaContact;
+  contact: PrismaContact & { clinicProfiles?: (ContactClinicProfile)[] };
   assignedUser: Pick<User, "id" | "name"> | null;
   messages: ConversationPreviewMessage[];
   unreadCount?: number;
@@ -178,6 +180,7 @@ const REASON_SHORT_LABELS: Record<string, string> = {
  * opera em cima da conversa, não do contato bruto.
  */
 export function toChatContact(conversation: ConversationWithRelations, viewerUserId?: string): Contact {
+  const profile = profileOf(conversation.contact, conversation.clinicId);
   // Prévia da lista: pula nota interna se houver mensagem de verdade mais recente
   // no lote buscado (ver `take: 3` na query) — sem isso, finalizar/transferir um
   // atendimento fazia a prévia mostrar "🔒 Nota: ..." em cima do texto real do
@@ -192,14 +195,15 @@ export function toChatContact(conversation: ConversationWithRelations, viewerUse
     name: conversation.contact.name,
     phone: conversation.contact.phone ?? "",
     instagramUsername: conversation.contact.instagramUsername ?? undefined,
-    cpf: conversation.contact.cpf ?? "",
-    convenio: conversation.contact.convenio ?? undefined,
-    preferredDoctor: conversation.contact.preferredDoctor ?? undefined,
-    rg: conversation.contact.rg ?? undefined,
-    birthDate: conversation.contact.birthDate ? conversation.contact.birthDate.toISOString().slice(0, 10) : undefined,
-    address: conversation.contact.address ?? undefined,
-    insuranceCardNumber: conversation.contact.insuranceCardNumber ?? undefined,
-    notes: conversation.contact.notes ?? undefined,
+    // Dados cadastrais = perfil da clínica DESTA conversa (nunca o de outra clínica).
+    cpf: profile.cpf ?? "",
+    convenio: profile.convenio ?? undefined,
+    preferredDoctor: profile.preferredDoctor ?? undefined,
+    rg: profile.rg ?? undefined,
+    birthDate: profile.birthDate ? profile.birthDate.toISOString().slice(0, 10) : undefined,
+    address: profile.address ?? undefined,
+    insuranceCardNumber: profile.insuranceCardNumber ?? undefined,
+    notes: profile.notes ?? undefined,
     neighborhood: "",
     glpiEntityId: conversation.contact.glpiEntityId,
     avatar: conversation.contact.photoUrl ?? "",

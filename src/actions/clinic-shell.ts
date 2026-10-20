@@ -1,5 +1,6 @@
 "use server";
 
+import { profileWhere } from "@/lib/contact-profile";
 import { prisma } from "@/lib/prisma";
 import { requireClinicSession } from "@/lib/session";
 import { displayName } from "@/lib/contact-display";
@@ -46,7 +47,7 @@ export async function globalSearch(query: string): Promise<GlobalSearchResult[]>
         contact: {
           OR: [
             { name: { contains: q, mode: "insensitive" } },
-            ...(digits.length >= 4 ? [{ phone: { contains: digits } }, { cpf: { contains: digits } }] : []),
+            ...(digits.length >= 4 ? [{ phone: { contains: digits } }, profileWhere(clinicId, { cpf: { contains: digits } })] : []),
             { instagramUsername: { contains: q.replace(/^@/, ""), mode: "insensitive" } },
           ],
         },

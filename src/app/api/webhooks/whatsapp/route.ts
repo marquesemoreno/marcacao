@@ -737,8 +737,14 @@ export async function POST(request: Request) {
     if (!mediaData && !failedMediaNotice) {
       try {
         const found = extractPatientData(incoming.text);
-        const cpf = found.cpf && !contact.cpf ? found.cpf : undefined;
-        const convenio = found.convenio && !contact.convenio ? found.convenio : undefined;
+        const pf = found.cpf || found.convenio
+          ? await prisma.contactClinicProfile.findUnique({
+              where: { contactId_clinicId: { contactId: contact.id, clinicId: conversation.clinicId } },
+              select: { cpf: true, convenio: true },
+            })
+          : null;
+        const cpf = found.cpf && !pf?.cpf ? found.cpf : undefined;
+        const convenio = found.convenio && !pf?.convenio ? found.convenio : undefined;
         if (cpf || convenio) {
           await prisma.patientDataSuggestion.upsert({
             where: { conversationId: conversation.id },

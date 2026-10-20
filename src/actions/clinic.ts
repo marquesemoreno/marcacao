@@ -509,8 +509,8 @@ export async function getDistinctDoctorNames() {
  * conversas que essa clínica tem com cada um. */
 export async function getDistinctConvenios() {
   const { clinicId } = await requireClinicSession();
-  const rows = await prisma.contact.findMany({
-    where: { conversations: { some: { clinicId } }, convenio: { not: null } },
+  const rows = await prisma.contactClinicProfile.findMany({
+    where: { clinicId, convenio: { not: null } },
     select: { convenio: true },
     distinct: ["convenio"],
     orderBy: { convenio: "asc" },
