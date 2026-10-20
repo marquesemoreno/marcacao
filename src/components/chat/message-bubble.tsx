@@ -486,6 +486,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry, 
           <div className="min-w-0 flex-1">
             <p className="text-xs leading-snug font-medium text-emerald-800 dark:text-emerald-300">{message.text}</p>
             <div className="mt-0.5 flex items-center gap-1 text-xs text-emerald-700/70 dark:text-emerald-400/70 font-mono">
+              {isAgent && message.senderName && <span className="truncate max-w-[10rem]" title="Quem enviou (só a equipe vê)">{message.senderName === "Enviada pelo celular" ? "pelo celular" : message.senderName.split(" ")[0]} ·</span>}
               <span>{message.timestamp}</span>
               {isAgent && <MessageStatusTicks status={message.deliveryStatus} />}
             </div>
@@ -585,6 +586,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry, 
                 </div>
 
                 <span className="flex items-center gap-1">
+                  {isAgent && message.senderName && <span className="truncate max-w-[10rem]" title="Quem enviou (só a equipe vê)">{message.senderName === "Enviada pelo celular" ? "pelo celular" : message.senderName.split(" ")[0]} ·</span>}
                   {message.timestamp}
                   {isAgent && <MessageStatusTicks status={message.deliveryStatus} />}
                 </span>
@@ -720,6 +722,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry, 
             )}
 
             <div className="flex items-center justify-end gap-1 text-xs text-slate-400 mt-1">
+              {isAgent && message.senderName && <span className="truncate max-w-[10rem]" title="Quem enviou (só a equipe vê)">{message.senderName === "Enviada pelo celular" ? "pelo celular" : message.senderName.split(" ")[0]} ·</span>}
               <span>{message.timestamp}</span>
               {isAgent && <MessageStatusTicks status={message.deliveryStatus} />}
             </div>
@@ -927,6 +930,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry, 
                 </button>
               )}
               {message.isEdited && <span className="italic opacity-80">editada</span>}
+              {isAgent && message.senderName && <span className="truncate max-w-[10rem]" title="Quem enviou (só a equipe vê)">{message.senderName === "Enviada pelo celular" ? "pelo celular" : message.senderName.split(" ")[0]} ·</span>}
               <span>{message.timestamp}</span>
               {isAgent && <MessageStatusTicks status={message.deliveryStatus} />}
             </div>
