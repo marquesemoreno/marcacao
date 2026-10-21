@@ -1,3 +1,4 @@
+import { reminderRecipient, guardianReminderIntro } from "@/lib/reminder-recipient";
 import { cloudReminderSetup, cloudSendTemplate } from "@/lib/whatsapp-cloud-send";
 import { reminderTemplateParams } from "@/lib/reminder-template";
 import "server-only";
@@ -103,7 +104,20 @@ export async function dispatchBridgeReminders(options?: { clinicId?: string; dat
       if (attempted > 0) await sleep(randomDelayMs());
       attempted++;
 
-      const phone = formatToWhatsAppNumber(item.telefone);
+      // Paciente menor de idade com responsável na ficha da clínica → lembrete pro responsável
+      // (auditoria de saúde, item 10). A resposta dele cai na conversa do próprio telefone.
+      const patientPhone = formatToWhatsAppNumber(item.telefone);
+      const profile = await prisma.contactClinicProfile.findFirst({
+        where: { clinicId: clinic.id, contact: { phone: patientPhone } },
+        select: { birthDate: true, guardianName: true, guardianPhone: true },
+      });
+      const recipient = reminderRecipient({
+        patientPhone,
+        birthDate: profile?.birthDate ?? null,
+        guardianName: profile?.guardianName ?? null,
+        guardianPhone: profile?.guardianPhone ?? null,
+      });
+      const phone = recipient.toGuardian ? formatToWhatsAppNumber(recipient.phone) : patientPhone;
       const isUrolaser = (clinic.tradeName || clinic.name).includes("Urolaser");
       const reminderInput = {
         patientName: item.paciente || "Paciente",
@@ -113,9 +127,12 @@ export async function dispatchBridgeReminders(options?: { clinicId?: string; dat
         time: item.hora,
         dateFormatted,
       };
-      const messageText = isUrolaser
+      const baseText = isUrolaser
         ? buildUrolaserLaraReminderMessage(reminderInput)
         : buildBridgeReminderMessage(reminderInput);
+      const messageText = recipient.toGuardian
+        ? `${guardianReminderIntro(recipient.guardianFirstName, reminderInput.patientName)}\n\n${baseText}`
+        : baseText;
 
       // API oficial: lembrete só por modelo aprovado. Conta ativa sem modelo → não envia
       // (fica pra quando configurarem; não consome o paciente).
@@ -150,7 +167,9 @@ export async function dispatchBridgeReminders(options?: { clinicId?: string; dat
       // "Falha ao enviar" no inbox e pode reenviar por lá (ver resendMessage).
       let contact = await prisma.contact.findUnique({ where: { phone } });
       if (!contact) {
-        contact = await prisma.contact.create({ data: { name: item.paciente || "Paciente", phone } });
+        contact = await prisma.contact.create({
+          data: { name: recipient.toGuardian ? recipient.guardianFirstName ?? "Responsável" : item.paciente || "Paciente", phone },
+        });
       }
       let conversation = await prisma.conversation.findFirst({ where: { clinicId: clinic.id, contactId: contact.id } });
       if (!conversation) {
