@@ -52,6 +52,28 @@ export async function downloadCloudMedia(mediaId: string, token: string): Promis
   }
 }
 
+/** Cartão de contato (vCard) — dentro da janela de 24 h. */
+export function sendCloudContact(phoneNumberId: string, token: string, to: string, contact: { name: string; phone: string }) {
+  const first = contact.name.trim().split(/\s+/)[0] || contact.name;
+  return graph<{ messages?: { id: string }[] }>(`${phoneNumberId}/messages`, {
+    token,
+    body: {
+      messaging_product: "whatsapp",
+      to,
+      type: "contacts",
+      contacts: [{ name: { formatted_name: contact.name, first_name: first }, phones: [{ phone: `+${contact.phone}`, type: "CELL", wa_id: contact.phone }] }],
+    },
+  });
+}
+
+/** Reação (emoji) numa mensagem pelo wamid; emoji "" remove a reação. */
+export function sendCloudReaction(phoneNumberId: string, token: string, to: string, messageId: string, emoji: string) {
+  return graph<{ messages?: { id: string }[] }>(`${phoneNumberId}/messages`, {
+    token,
+    body: { messaging_product: "whatsapp", recipient_type: "individual", to, type: "reaction", reaction: { message_id: messageId, emoji } },
+  });
+}
+
 /** Mídia por link público (URL assinada do storage) — dentro da janela de 24 h. */
 export function sendCloudMedia(
   phoneNumberId: string,

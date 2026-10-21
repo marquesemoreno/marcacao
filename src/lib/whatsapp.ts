@@ -554,6 +554,9 @@ export async function sendWhatsAppContact(
   event: string = "whatsapp.send_contact",
   clinicId?: string
 ): Promise<{ success: boolean; skipped: boolean; responseCode?: number | null; keyId?: string }> {
+  const cloudSend = await import("@/lib/whatsapp-cloud-send");
+  const cloud = await cloudSend.activeCloudAccount(clinicId);
+  if (cloud) return cloudSend.cloudSendContact(cloud, formatToWhatsAppNumber(to), { name: contactName, phone: formatToWhatsAppNumber(contactPhone) }, event);
   const { apiUrl, apiKey, instanceName } = await getEvolutionConfig(clinicId);
   const target = formatToWhatsAppNumber(to);
   const contactWuid = formatToWhatsAppNumber(contactPhone);
@@ -618,6 +621,9 @@ export async function sendWhatsAppReaction(
   event: string = "whatsapp.send_reaction",
   clinicId?: string
 ): Promise<{ success: boolean; skipped: boolean; responseCode?: number | null }> {
+  const cloudSend = await import("@/lib/whatsapp-cloud-send");
+  const cloud = await cloudSend.activeCloudAccount(clinicId);
+  if (cloud) return cloudSend.cloudSendReaction(cloud, formatToWhatsAppNumber(target.remoteJid), target.keyId, emoji, event);
   const { apiUrl, apiKey, instanceName } = await getEvolutionConfig(clinicId);
 
   if (!apiUrl || !apiKey || !instanceName) {

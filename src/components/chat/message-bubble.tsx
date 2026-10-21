@@ -304,6 +304,7 @@ const MessageStatusTicks: React.FC<{ status?: Message['deliveryStatus'] }> = ({ 
 export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry, onRequestResend, onEditMessage, onTranscribeAudio, onExtractInvoiceData, onProcessDocument, onOpenScheduleWithProcedure, onReply, onReact, onToggleStar, onForward, onSearchForwardTargets }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [loadedDuration, setLoadedDuration] = useState<string | null>(null);
   const [playbackSpeed, setPlaybackSpeed] = useState<'1x' | '1.5x' | '2x'>('1x');
   const [copied, setCopied] = useState(false);
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
@@ -531,6 +532,10 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry, 
               ref={audioRef}
               src={message.mediaUrl}
               preload="metadata"
+              onLoadedMetadata={(e) => {
+                const d = e.currentTarget.duration;
+                if (Number.isFinite(d) && d > 0) setLoadedDuration(`${Math.floor(d / 60)}:${String(Math.round(d % 60)).padStart(2, "0")}`);
+              }}
               onPlay={() => setIsPlaying(true)}
               onPause={() => setIsPlaying(false)}
               onEnded={() => {
@@ -573,7 +578,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry, 
 
               <div className="flex justify-between items-center text-xs opacity-85 font-mono">
                 <div className="flex items-center gap-2">
-                  <span>{message.audioDuration || '--:--'}</span>
+                  <span>{(message.audioDuration && message.audioDuration !== '0:00' ? message.audioDuration : loadedDuration) || '--:--'}</span>
                   {/* Seletor de Velocidade */}
                   <button
                     onClick={cycleSpeed}

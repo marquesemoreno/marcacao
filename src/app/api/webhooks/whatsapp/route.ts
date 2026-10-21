@@ -724,6 +724,7 @@ async function processWhatsappWebhook(body: Prisma.InputJsonValue, forcedClinicI
                 type: "AUDIO",
                 mediaPath: uploaded.path,
                 mimeType: incoming.media.mimeType,
+                // API oficial não informa a duração (0:00) — o player lê do próprio arquivo.
                 audioDuration: formatDuration(incoming.media.seconds),
               }
             : {

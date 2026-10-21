@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { decryptToken } from "@/lib/token-crypto";
-import { downloadCloudMedia, sendCloudMedia, sendCloudTemplate, sendCloudText } from "@/lib/whatsapp-cloud";
+import { downloadCloudMedia, sendCloudContact, sendCloudMedia, sendCloudReaction, sendCloudTemplate, sendCloudText } from "@/lib/whatsapp-cloud";
 import { cloudMediaKind } from "@/lib/cloud-media-kind";
 
 /** Envio pela API oficial quando a clínica tem WhatsappCloudAccount ATIVA — os
@@ -89,4 +89,16 @@ export async function fetchCloudMediaBase64(clinicId: string, mediaId: string): 
   if (!a) return { success: false, error: "Clínica sem conta da API oficial" };
   const r = await downloadCloudMedia(mediaId, decryptToken(a.accessToken));
   return r.success ? { success: true, base64: r.data.base64 } : { success: false, error: r.error };
+}
+
+export async function cloudSendContact(account: { phoneNumberId: string; token: string }, to: string, contact: { name: string; phone: string }, event: string) {
+  const r = await sendCloudContact(account.phoneNumberId, account.token, to, contact);
+  await log(event, { phone: to, contact: contact.name }, r.success, r.success ? undefined : r.error);
+  return toResult(r);
+}
+
+export async function cloudSendReaction(account: { phoneNumberId: string; token: string }, to: string, messageId: string, emoji: string, event: string) {
+  const r = await sendCloudReaction(account.phoneNumberId, account.token, to, messageId, emoji);
+  await log(event, { phone: to, messageId, emoji }, r.success, r.success ? undefined : r.error);
+  return toResult(r);
 }
