@@ -31,6 +31,7 @@ import { AGENDA_VIEWS, AgendaToolbar, type AgendaView } from "./agenda-toolbar";
 import { AgendaGrid, type AgendaColumn } from "./agenda-grid";
 import { AgendaMonth } from "./agenda-month";
 import { AgendaSummary } from "./agenda-summary";
+import { ArrivalQueue } from "./arrival-queue";
 import { PatientSheet } from "./patient-sheet";
 import { WaitlistDialog } from "./waitlist-dialog";
 
@@ -159,7 +160,8 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
         setOpenItem(null);
         return;
       }
-      setData((d) => (d ? { ...d, items: d.items.map((i) => (i.key === item.key ? { ...i, status, isManual: true } : i)) } : d));
+      const arrivedAt = status === "IN_SERVICE" ? new Date().toISOString() : undefined;
+      setData((d) => (d ? { ...d, items: d.items.map((i) => (i.key === item.key ? { ...i, status, isManual: true, arrivedAt } : i)) } : d));
       setOpenItem((o) => (o && o.key === item.key ? { ...o, status, isManual: true } : o));
     },
     [reload]
@@ -358,6 +360,10 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
             activeGroups={selectedGroups}
             onToggle={(id) => setSelectedGroups((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))}
           />
+        )}
+
+        {current && date === today && (
+          <ArrivalQueue items={doctorItems} date={today} onDone={(item) => void handleSetStatus(item, "COMPLETED")} onOpen={setOpenItem} />
         )}
 
         {failed.length > 0 && (

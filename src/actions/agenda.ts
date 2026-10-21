@@ -66,6 +66,10 @@ export async function getAgenda(from: string, to: string): Promise<AgendaResult>
     prisma.agendaMark.findMany({ where: { clinicId, date: { gte: fromDate, lte: toDate } } }),
   ]);
   const markOf = new Map(marks.map((m) => [`${m.source}:${m.externalId}`, m.status]));
+  // Hora em que a recepção marcou "Chegou" (o último update da marcação IN_SERVICE).
+  const arrivedOf = new Map(
+    marks.filter((m) => m.status === "IN_SERVICE").map((m) => [`${m.source}:${m.externalId}`, m.updatedAt.toISOString()])
+  );
 
   const numeros = [...bridgeByDay.values()].flatMap((list) => (list ?? []).map((a) => a.numero));
   const reminders = numeros.length
@@ -99,6 +103,7 @@ export async function getAgenda(from: string, to: string): Promise<AgendaResult>
         doctor: a.medico,
         bridgeNumero: a.numero,
         isManual: markOf.has(`BRIDGE:${a.numero}`),
+        arrivedAt: arrivedOf.get(`BRIDGE:${a.numero}`),
         status: resolveAgendaStatus({
           manual: markOf.get(`BRIDGE:${a.numero}`),
           reminderResponse: reminder?.response,
@@ -120,6 +125,7 @@ export async function getAgenda(from: string, to: string): Promise<AgendaResult>
     doctor: a.doctorName,
     bridgeNumero: extractBridgeNumeroFromNotes(a.notes),
     isManual: markOf.has(`LOCAL:${a.id}`),
+    arrivedAt: arrivedOf.get(`LOCAL:${a.id}`),
     status: resolveAgendaStatus({
       manual: markOf.get(`LOCAL:${a.id}`),
       local: a.status,

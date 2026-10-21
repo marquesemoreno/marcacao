@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  arrivalQueue,
   agendaDoctors,
   daySummary,
   visibleRowRange,
@@ -122,5 +123,37 @@ describe("visibleRowRange", () => {
   });
   it("sem pacientes: horário comercial 08–18h", () => {
     expect(visibleRowRange([])).toEqual([4, 43]);
+  });
+});
+
+describe("arrivalQueue", () => {
+  const qi = (key: string, status: AgendaItem["status"], arrivedAt?: string, doctor = "Dr. A"): AgendaItem => ({
+    key, source: "BRIDGE", externalId: key, date: "2026-10-21", time: "09:00", patientName: key, phone: null,
+    procedure: null, doctor, status, bridgeNumero: null, arrivedAt,
+  });
+  const now = new Date("2026-10-21T13:00:00Z"); // 10:00 em Brasília
+  it("só quem chegou (IN_SERVICE) hoje, por ordem de chegada, com minutos de espera", () => {
+    const q = arrivalQueue(
+      [
+        qi("b", "IN_SERVICE", "2026-10-21T12:40:00Z"),
+        qi("a", "IN_SERVICE", "2026-10-21T12:15:00Z"),
+        qi("c", "CONFIRMED"),
+        qi("d", "COMPLETED", "2026-10-21T12:00:00Z"),
+      ],
+      "2026-10-21",
+      now
+    );
+    expect(q.map((x) => [x.item.key, x.position, x.waitingMin])).toEqual([
+      ["a", 1, 45],
+      ["b", 2, 20],
+    ]);
+  });
+  it("posição conta por médico", () => {
+    const q = arrivalQueue(
+      [qi("a", "IN_SERVICE", "2026-10-21T12:15:00Z", "Dr. A"), qi("b", "IN_SERVICE", "2026-10-21T12:20:00Z", "Dr. B")],
+      "2026-10-21",
+      now
+    );
+    expect(q.map((x) => x.position)).toEqual([1, 1]);
   });
 });

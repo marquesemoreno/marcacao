@@ -31,6 +31,8 @@ export type AgendaItem = {
   bridgeNumero: number | null;
   /** Status veio de marcação manual da recepção (dá pra "voltar ao automático"). */
   isManual?: boolean;
+  /** ISO de quando a recepção marcou "Chegou" (IN_SERVICE) — base da fila de chegada. */
+  arrivedAt?: string;
 };
 
 /** O que a recepção pode escolher no card: um status manual ou voltar ao automático. */
@@ -155,4 +157,21 @@ export function visibleRowRange(items: AgendaItem[], nowTime?: string | null): [
   if (now != null) rows.push(now);
   if (rows.length === 0) return [slotRowFor("08:00")!, slotRowFor("17:45")!];
   return [Math.max(0, Math.min(...rows) - 1), Math.min(AGENDA_ROWS - 1, Math.max(...rows) + 1)];
+}
+
+export type ArrivalEntry = { item: AgendaItem; position: number; waitingMin: number };
+
+/** Fila de chegada do dia: quem a recepção marcou "Chegou" (IN_SERVICE), em ordem de
+ * chegada, com minutos de espera e posição na fila do próprio médico. */
+export function arrivalQueue(items: AgendaItem[], date: string, now: Date = new Date()): ArrivalEntry[] {
+  const waiting = items
+    .filter((i) => i.date === date && i.status === "IN_SERVICE" && i.arrivedAt)
+    .sort((a, b) => a.arrivedAt!.localeCompare(b.arrivedAt!));
+  const perDoctor = new Map<string, number>();
+  return waiting.map((item) => {
+    const doctor = item.doctor ?? NO_DOCTOR;
+    const position = (perDoctor.get(doctor) ?? 0) + 1;
+    perDoctor.set(doctor, position);
+    return { item, position, waitingMin: Math.max(0, Math.round((now.getTime() - new Date(item.arrivedAt!).getTime()) / 60_000)) };
+  });
 }
