@@ -8,7 +8,7 @@ import { startOfUTCDay, addUTCDays } from "@/lib/date";
 import { periodWindow, type PeriodKey } from "@/lib/report-period";
 import { computeCampaignReport } from "@/lib/crm-campaigns";
 import { computeCampaignStats, phoneKey, type CampaignStats } from "@/lib/campaign-report";
-import { RESCHEDULE_PENDING_TAG as CAMPAIGN_RESCHEDULE_TAG } from "@/lib/conversation-tags";
+import { NON_PATIENT_TAG, RESCHEDULE_PENDING_TAG as CAMPAIGN_RESCHEDULE_TAG } from "@/lib/conversation-tags";
 import {
   updateClinicProcedureSchema,
   addClinicProcedureSchema,
@@ -250,7 +250,11 @@ export async function getClinicAppointmentsReport(period: PeriodKey = "30", doct
  * uma conversa é quem a resolveu (resolvedByUserId), senão quem está atribuído. */
 /** Conversa "Administrativo" (médico/equipe) fica fora dos números de atendimento. OR com
  * null porque NOT sozinho também excluiria as conversas ainda sem motivo (abertas). */
-const NOT_ADMINISTRATIVE = { OR: [{ resolutionReason: null }, { resolutionReason: { not: "ADMINISTRATIVO" } }] };
+const NOT_ADMINISTRATIVE = {
+  OR: [{ resolutionReason: null }, { resolutionReason: { not: "ADMINISTRATIVO" } }],
+  // Conversa marcada "Não é paciente" (parceiro, propaganda, feedback) também fica fora.
+  NOT: { tags: { has: NON_PATIENT_TAG } },
+};
 
 export async function getClinicManagementReport(period: PeriodKey = "30", channel?: string, previous = false) {
   const { clinicId } = await requireClinicManager();

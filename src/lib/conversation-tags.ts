@@ -64,3 +64,7 @@ export function nextTagsForOutcome(currentTags: string[], outcomeTag: string): s
   const withoutOtherOutcomes = currentTags.filter((t) => !OUTCOME_TAGS.includes(t) || t === outcomeTag);
   return withoutOtherOutcomes.includes(outcomeTag) ? withoutOtherOutcomes : [...withoutOtherOutcomes, outcomeTag];
 }
+
+/** Conversa que não é de paciente (parceiro, fornecedor, propaganda, feedback): some do CRM
+ * e fica fora dos relatórios de atendimento. Aplicada à mão pela recepção. */
+export const NON_PATIENT_TAG = "🚫 Não é paciente";

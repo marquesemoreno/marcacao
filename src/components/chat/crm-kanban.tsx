@@ -19,6 +19,9 @@ import {
   type CrmCardInput,
   type CrmQuickFilter,
   type KanbanStage,
+  isNonPatient,
+  matchesTags,
+  tagCounts,
 } from '@/lib/crm-board';
 import { NO_RESPONSE_TAG } from '@/lib/conversation-tags';
 import { campaignLabel, groupByCampaign } from '@/lib/crm-campaigns';
@@ -125,6 +128,11 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
   // Agrupar por etapa (padrão) ou por campanha de origem (pedido de 19/10, ref. Kommo).
   const [groupBy, setGroupBy] = useState<'etapa' | 'campanha'>('etapa');
   const [campaign, setCampaign] = useState<string>('todas');
+  // Chips de tag (tipo de serviço/origem) em vez de uma coluna por tag; "Não é paciente"
+  // fica escondido até pedir (pedido de 21/10, ref. Kommo da Acurae).
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [showAllTags, setShowAllTags] = useState(false);
+  const [showNonPatients, setShowNonPatients] = useState(false);
   const [openCardId, setOpenCardId] = useState<string | null>(null);
   const [dragOverStage, setDragOverStage] = useState<KanbanStage | null>(null);
   const [finishing, setFinishing] = useState<Contact | null>(null);
@@ -183,9 +191,17 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
         const matchesAgent =
           selectedAgent === 'todos' || (selectedAgent === 'unassigned' ? isUnassignedAgent(c.responsibleAgent) : c.responsibleAgent === selectedAgent);
         const matchesCampaign = campaign === 'todas' || campaignLabel(c.acquisitionChannel, c.acquisitionDetail) === campaign;
-        return matchesSearch && matchesAgent && matchesCampaign && matchesQuickFilter(toBoardInput(c), quick, now);
+        const patientOk = showNonPatients || !isNonPatient(c.tags);
+        return (
+          patientOk &&
+          matchesSearch &&
+          matchesAgent &&
+          matchesCampaign &&
+          matchesTags(c, selectedTags) &&
+          matchesQuickFilter(toBoardInput(c), quick, now)
+        );
       }),
-    [contacts, search, selectedAgent, campaign, quick, now]
+    [contacts, search, selectedAgent, campaign, selectedTags, showNonPatients, quick, now]
   );
 
   const columns = useMemo(
@@ -198,13 +214,15 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
     [filtered, quick, ticket]
   );
 
+  const tagChips = useMemo(() => tagCounts(contacts.filter((c) => !isNonPatient(c.tags))), [contacts]);
+  const nonPatientCount = useMemo(() => contacts.filter((c) => isNonPatient(c.tags)).length, [contacts]);
   const campaignOptions = useMemo(() => groupByCampaign(contacts).map((col) => col.label), [contacts]);
   const campaignColumns = useMemo(() => groupByCampaign(filtered), [filtered]);
 
   const openCard = openCardId ? contacts.find((c) => c.id === openCardId) ?? null : null;
   const openColumn = openCard ? columns.find((col) => col.stage.id === stageOf(openCard))?.cards.map((x) => x.contact) ?? [] : [];
   const openIndex = openCard ? openColumn.findIndex((c) => c.id === openCard.id) : -1;
-  const hasActiveFilter = search.trim() !== '' || selectedAgent !== 'todos' || quick !== 'ativos' || campaign !== 'todas';
+  const hasActiveFilter = search.trim() !== '' || selectedAgent !== 'todos' || quick !== 'ativos' || campaign !== 'todas' || selectedTags.length > 0;
   const finalizedCount = contacts.filter((c) => c.isResolved).length;
   // Primeira carga: não mostra "0 pacientes" nem colunas vazias como se fosse o resultado.
   const loadingEmpty = isLoading && contacts.length === 0;
@@ -287,6 +305,7 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
                 setSelectedAgent('todos');
                 setQuick('ativos');
                 setCampaign('todas');
+                setSelectedTags([]);
               }}
               className="text-sm font-medium text-slate-600 dark:text-slate-300 underline underline-offset-2"
             >
@@ -314,6 +333,40 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
             </button>
           ))}
         </div>
+        {(tagChips.length > 0 || nonPatientCount > 0) && (
+          <div className="flex flex-wrap items-center gap-1.5" aria-label="Filtrar por tag">
+            <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Tags:</span>
+            {(showAllTags ? tagChips : tagChips.slice(0, 10)).map(({ tag, count }) => {
+              const on = selectedTags.includes(tag);
+              return (
+                <button
+                  key={tag}
+                  type="button"
+                  aria-pressed={on}
+                  onClick={() => setSelectedTags((prev) => (on ? prev.filter((t) => t !== tag) : [...prev, tag]))}
+                  className={`h-7 rounded-full border px-2.5 text-xs font-medium ${
+                    on
+                      ? 'border-emerald-600 bg-emerald-600 text-white'
+                      : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
+                  }`}
+                >
+                  {tag} <span className="tabular-nums opacity-70">{count}</span>
+                </button>
+              );
+            })}
+            {tagChips.length > 10 && (
+              <button type="button" onClick={() => setShowAllTags((v) => !v)} className="h-7 px-2 text-xs font-medium text-slate-600 dark:text-slate-300 underline underline-offset-2">
+                {showAllTags ? 'menos' : `+${tagChips.length - 10} tags`}
+              </button>
+            )}
+            {nonPatientCount > 0 && (
+              <label className="ml-auto inline-flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-400">
+                <input type="checkbox" checked={showNonPatients} onChange={(e) => setShowNonPatients(e.target.checked)} className="size-3.5 accent-emerald-600" />
+                Mostrar não pacientes ({nonPatientCount})
+              </label>
+            )}
+          </div>
+        )}
       </div>
 
       {(isLoading || loadError) && (

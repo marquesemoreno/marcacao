@@ -1,5 +1,6 @@
 "use client";
 
+import { NON_PATIENT_TAG } from "@/lib/conversation-tags";
 import { formatPhone } from "@/lib/format";
 import { ACQUISITION_CHANNELS } from "@/lib/acquisition";
 import { CANNED_VARIABLES, fillCannedVariables } from "@/lib/canned-variables";
@@ -2929,6 +2930,17 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                   </span>
                 ))}
               </div>
+
+              {!selectedContact.tags.includes(NON_PATIENT_TAG) && (
+                <button
+                  type="button"
+                  onClick={() => void onAddTag(NON_PATIENT_TAG)}
+                  title="Parceiro, fornecedor, propaganda ou feedback: some do CRM e fica fora dos relatórios"
+                  className="text-xs font-medium text-slate-500 dark:text-slate-400 underline underline-offset-2 hover:text-slate-800 dark:hover:text-slate-200"
+                >
+                  Marcar como não é paciente
+                </button>
+              )}
 
               {isAddingTag && (
                 <div className="flex items-center gap-1.5 pt-1">

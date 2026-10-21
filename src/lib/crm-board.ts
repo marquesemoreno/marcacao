@@ -1,6 +1,6 @@
 /** Regras do quadro do CRM (/clinic/crm) — coluna de cada card, filtros rápidos, alerta
  * do card, valor da coluna e ordem. Puro (crítica + pedido de 15/10/2026). */
-import { NO_RESPONSE_TAG } from "./conversation-tags";
+import { NO_RESPONSE_TAG, NON_PATIENT_TAG } from "./conversation-tags";
 
 export type KanbanStage = "novos" | "triagem" | "orcamento" | "agendado" | "finalizado";
 export type CrmQuickFilter = "todos" | "ativos" | "aguardando" | "frios";
@@ -64,4 +64,25 @@ export function sortColumn<T extends CrmCardInput>(cards: T[]): T[] {
     if (wa !== wb) return wb - wa;
     return new Date(b.lastMessageAt ?? 0).getTime() - new Date(a.lastMessageAt ?? 0).getTime();
   });
+}
+
+/** Tags que o sistema põe sozinho (status, origem, urgência) — não viram chip de filtro. */
+const AUTO_TAG_PREFIXES = ["⏳", "✅", "❌", "🔁", "⚠️", "🚨", "📢", "💰", "🎯", "🤝", "⚡", "🔬", "🚫"];
+const isAutoTag = (t: string) => AUTO_TAG_PREFIXES.some((p) => t.startsWith(p));
+
+/** Chips de filtro do CRM: tags da clínica nos cards, mais usadas primeiro. */
+export function tagCounts(cards: Pick<CrmCardInput, "tags">[]): { tag: string; count: number }[] {
+  const counts = new Map<string, number>();
+  for (const c of cards) for (const t of new Set(c.tags)) if (!isAutoTag(t)) counts.set(t, (counts.get(t) ?? 0) + 1);
+  return [...counts].map(([tag, count]) => ({ tag, count })).sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag, "pt-BR"));
+}
+
+/** Sem tag selecionada passa tudo; com seleção, basta ter UMA das tags escolhidas. */
+export function matchesTags(c: Pick<CrmCardInput, "tags">, selected: string[]): boolean {
+  return selected.length === 0 || c.tags.some((t) => selected.includes(t));
+}
+
+/** Conversa marcada como "não é paciente" (parceiro, propaganda, feedback). */
+export function isNonPatient(tags: string[]): boolean {
+  return tags.includes(NON_PATIENT_TAG);
 }

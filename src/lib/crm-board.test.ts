@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { columnValue, crmAlert, kanbanStageOf, matchesQuickFilter, sortColumn, type CrmCardInput } from "./crm-board";
+import { columnValue, crmAlert, isNonPatient, kanbanStageOf, matchesQuickFilter, matchesTags, sortColumn, tagCounts, type CrmCardInput } from "./crm-board";
+import { NO_RESPONSE_TAG, NON_PATIENT_TAG } from "./conversation-tags";
 
 const now = new Date("2026-10-15T15:00:00-03:00");
 const card = (over: Partial<CrmCardInput>): CrmCardInput => ({
@@ -59,5 +60,24 @@ describe("sortColumn", () => {
     const c = card({ lastMessageAt: "2026-10-15T12:00:00-03:00" });
     const d = card({ lastMessageAt: "2026-10-15T09:00:00-03:00" });
     expect(sortColumn([d, a, c, b])).toEqual([b, a, c, d]);
+  });
+});
+
+describe("filtro por tag e não-paciente", () => {
+  const c = (tags: string[]) => ({ isResolved: false, funnelStage: "novos" as const, waitingMinutes: null, tags });
+  it("tagCounts conta as tags dos cards, mais usadas primeiro, sem as tags automáticas", () => {
+    expect(tagCounts([c(["Fisioterapia", "Gympass"]), c(["Fisioterapia"]), c([NO_RESPONSE_TAG])])).toEqual([
+      { tag: "Fisioterapia", count: 2 },
+      { tag: "Gympass", count: 1 },
+    ]);
+  });
+  it("matchesTags: sem seleção passa tudo; com seleção, basta ter uma das tags", () => {
+    expect(matchesTags(c(["Exames"]), [])).toBe(true);
+    expect(matchesTags(c(["Exames"]), ["Fisioterapia", "Exames"])).toBe(true);
+    expect(matchesTags(c(["Gympass"]), ["Fisioterapia"])).toBe(false);
+  });
+  it("isNonPatient", () => {
+    expect(isNonPatient([NON_PATIENT_TAG])).toBe(true);
+    expect(isNonPatient(["Fisioterapia"])).toBe(false);
   });
 });
