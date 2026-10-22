@@ -1,7 +1,7 @@
 import { marketingSendDecision, NO_CONSENT_MESSAGE } from "@/lib/marketing-consent";
 import "server-only";
 import { prisma } from "@/lib/prisma";
-import { sendWhatsAppMessage, sendWhatsAppMedia } from "@/lib/whatsapp";
+import { sendWhatsAppMessage, sendWhatsAppMedia, toggleNinthDigit } from "@/lib/whatsapp";
 import { getSignedMediaUrl } from "@/lib/whatsapp-media";
 import { technicalDirectorLine, buildBroadcastMessage } from "@/lib/broadcast-csv";
 import { RESCHEDULE_PENDING_TAG } from "@/lib/conversation-tags";
@@ -84,7 +84,11 @@ export async function dispatchNextBatch(): Promise<{ processed: number }> {
         },
       });
       const isMarcador = Boolean(
-        await prisma.marcador.findFirst({ where: { clinicId: campaign.clinicId, phone: recipient.phone }, select: { id: true } })
+        await prisma.marcador.findFirst({
+          // Cadastro de marcadores pode estar com ou sem o 9º dígito (importação de 15/10).
+          where: { clinicId: campaign.clinicId, phone: { in: [recipient.phone, toggleNinthDigit(recipient.phone)].filter((p): p is string => !!p) } },
+          select: { id: true },
+        })
       );
       // Marketing só com consentimento da clínica (LGPD); aviso de remarcação é transacional.
       const decision = marketingSendDecision({
