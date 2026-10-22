@@ -1,5 +1,7 @@
 "use server";
 
+import { normalizeTestRecipient } from "@/lib/test-recipient";
+import { parseCloudWebhook } from "@/lib/whatsapp-cloud-webhook";
 import { randomInt } from "crypto";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
@@ -233,8 +235,7 @@ export async function listCloudAssets(): Promise<CloudAssets[]> {
 }
 
 function onlyDigits(to: string): string | null {
-  const digits = to.replace(/\D/g, "");
-  return digits.length >= 12 && digits.length <= 15 ? digits : null;
+  return normalizeTestRecipient(to);
 }
 
 async function logAndSend(
@@ -300,6 +301,25 @@ export async function sendCloudTestTemplate(input: {
 }
 
 /** Últimos envios de teste com o status atualizado pelo webhook. */
+/** Mensagens RECEBIDAS no número (webhook), pra tela de envio mostrar a conversa nos dois
+ * sentidos — funciona mesmo com a conta desligada no Chat (vem do log do webhook). */
+export async function listCloudInbound(phoneNumberId: string) {
+  await requireAdminSession();
+  const logs = await prisma.webhookLog.findMany({
+    where: { event: "whatsapp_cloud.inbound", status: "SUCCESS", createdAt: { gte: new Date(Date.now() - 3 * 86_400_000) } },
+    orderBy: { createdAt: "desc" },
+    take: 80,
+    select: { payload: true },
+  });
+  const out: { id: string; from: string; name?: string; text: string; at: string }[] = [];
+  for (const l of logs) {
+    for (const e of parseCloudWebhook(l.payload)) {
+      if (e.kind === "inbound" && e.phoneNumberId === phoneNumberId) out.push({ id: e.keyId, from: e.from, name: e.name, text: e.text, at: e.at.toISOString() });
+    }
+  }
+  return out.slice(0, 10);
+}
+
 export async function listCloudTestMessages(clinicId: string) {
   await requireAdminSession();
   const rows = await prisma.cloudTestMessage.findMany({ where: { clinicId }, orderBy: { createdAt: "desc" }, take: 20 });

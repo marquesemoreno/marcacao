@@ -166,6 +166,9 @@ const DICT = {
   ],
   "live.language": ["Idioma", "Language"],
   "live.save": ["Salvar modelo", "Save template"],
+  "send.inbox": ["Mensagens recebidas", "Received messages"],
+  "send.inboxTip": ["O que os clientes mandaram para este número (chega pelo webhook).", "What customers sent to this number (delivered by the webhook)."],
+  "send.inboxEmpty": ["Nenhuma mensagem recebida nos últimos 3 dias.", "No messages received in the last 3 days."],
   "common.loading": ["Carregando…", "Loading…"],
   "common.error": ["Erro", "Error"],
 } as const;

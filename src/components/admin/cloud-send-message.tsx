@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { CheckCheck, Check, Clock, Loader2, Send, XCircle } from "lucide-react";
-import { listCloudTestMessages, sendCloudTestText, type CloudAssets } from "@/actions/admin-whatsapp-cloud";
+import { listCloudInbound, listCloudTestMessages, sendCloudTestText, type CloudAssets } from "@/actions/admin-whatsapp-cloud";
 import { t, type I18nKey, type Lang } from "@/lib/i18n-review";
 import { CloudTabs } from "@/components/admin/cloud-tabs";
 
@@ -29,10 +29,12 @@ export function CloudSendMessage({ assets, lang }: { assets: CloudAssets[]; lang
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const [rows, setRows] = useState<Row[]>([]);
+  const [inbound, setInbound] = useState<Awaited<ReturnType<typeof listCloudInbound>>>([]);
 
   const refresh = useCallback(() => {
     if (clinicId) listCloudTestMessages(clinicId).then(setRows).catch(() => {});
-  }, [clinicId]);
+    if (phoneNumberId) listCloudInbound(phoneNumberId).then(setInbound).catch(() => {});
+  }, [clinicId, phoneNumberId]);
 
   useEffect(() => {
     refresh();
@@ -132,6 +134,25 @@ export function CloudSendMessage({ assets, lang }: { assets: CloudAssets[]; lang
           </button>
         </section>
       )}
+
+      <section className="space-y-2">
+        <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">{tt("send.inbox")}</h2>
+        <p className="text-xs text-slate-500 dark:text-slate-400">{tt("send.inboxTip")}</p>
+        {inbound.length === 0 ? (
+          <p className="text-sm text-slate-600 dark:text-slate-400">{tt("send.inboxEmpty")}</p>
+        ) : (
+          <ul className={`${panel} divide-y divide-slate-100 dark:divide-slate-800`} aria-live="polite">
+            {inbound.map((m) => (
+              <li key={m.id} className="px-4 py-2.5 text-sm">
+                <p className="text-slate-900 dark:text-slate-100 whitespace-pre-wrap break-words">{m.text}</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 tabular-nums">
+                  ← {m.name ? `${m.name} · ` : ""}{m.from} · {new Date(m.at).toLocaleTimeString(lang === "en" ? "en-US" : "pt-BR")}
+                </p>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
 
       <section className="space-y-2">
         <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100" title={tt("send.historyTip")}>
