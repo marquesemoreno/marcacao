@@ -5,7 +5,9 @@ import { parseCloudWebhook } from "@/lib/whatsapp-cloud-webhook";
 import { randomInt } from "crypto";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { requireAdminSession } from "@/lib/session";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
+import { isClinicManager } from "@/lib/session";
 import { decryptToken, encryptToken } from "@/lib/token-crypto";
 import { t, type Lang } from "@/lib/i18n-review";
 import {
@@ -39,6 +41,24 @@ export type CloudAccountRow = {
   } | null;
 };
 
+/** Quem pode mexer na API oficial: equipe TIVDC (todas as clínicas) ou a gestão da própria
+ * clínica (tela /clinic/whatsapp). Devolve a clínica a que o usuário está preso (null = admin).
+ * Com `clinicId`, recusa clínica alheia. */
+async function requireCloudAccess(clinicId?: string): Promise<{ scope: string | null }> {
+  const session = await getServerSession(authOptions);
+  if (session?.user.role === "ADMIN") return { scope: null };
+  if (session?.user.role === "CLINIC" && session.user.clinicId && (await isClinicManager(session.user.id))) {
+    if (clinicId && clinicId !== session.user.clinicId) throw new Error("Não autorizado");
+    return { scope: session.user.clinicId };
+  }
+  throw new Error("Não autorizado");
+}
+
+function revalidateCloud() {
+  revalidateCloud();
+  revalidatePath("/clinic/whatsapp");
+}
+
 /** Conta da clínica com o token já aberto (só no servidor — nunca sai daqui nem vai pra log). */
 async function accountFor(clinicId: string) {
   const account = await prisma.whatsappCloudAccount.findUnique({ where: { clinicId } });
@@ -48,8 +68,9 @@ async function accountFor(clinicId: string) {
 
 /** Clínicas e a conta da API oficial de cada uma (tela /admin/whatsapp). */
 export async function listCloudAccounts(): Promise<CloudAccountRow[]> {
-  await requireAdminSession();
+  const { scope } = await requireCloudAccess();
   const clinics = await prisma.clinic.findMany({
+    where: scope ? { id: scope } : undefined,
     orderBy: { tradeName: "asc" },
     select: {
       id: true,
@@ -91,7 +112,7 @@ export async function connectWhatsappCloud(input: {
   /** Idioma das mensagens devolvidas (a gravação da análise da Meta é em inglês). */
   lang?: Lang;
 }): Promise<{ success: true; displayPhoneNumber: string | null; warnings: string[] } | { success: false; error: string }> {
-  await requireAdminSession();
+  await requireCloudAccess(input.clinicId);
   const lang = input.lang ?? "pt";
   if (!input.code || !input.wabaId) return { success: false, error: t(lang, "err.missingIds") };
   if (!input.phoneNumberId) return { success: false, error: t(lang, "err.onlyWaba") };
@@ -142,7 +163,7 @@ export async function connectWhatsappCloud(input: {
     }
   }
 
-  revalidatePath("/admin/whatsapp");
+  revalidateCloud();
   return { success: true, displayPhoneNumber, warnings };
 }
 
@@ -150,27 +171,27 @@ export async function connectWhatsappCloud(input: {
  * IA) sai e entra por ela; a Evolution da clínica deve estar desconectada antes, senão cada
  * mensagem chega duas vezes. */
 export async function setCloudAccountActive(clinicId: string, active: boolean) {
-  await requireAdminSession();
+  await requireCloudAccess(clinicId);
   await prisma.whatsappCloudAccount.update({ where: { clinicId }, data: { active } });
-  revalidatePath("/admin/whatsapp");
+  revalidateCloud();
   return { success: true as const };
 }
 
 /** Modelo aprovado do lembrete D-1 ({{1}} nome, {{2}} data, {{3}} horário, {{4}} médico). */
 export async function setCloudReminderTemplate(clinicId: string, name: string, language: string) {
-  await requireAdminSession();
+  await requireCloudAccess(clinicId);
   const n = name.trim();
   await prisma.whatsappCloudAccount.update({
     where: { clinicId },
     data: { reminderTemplateName: n || null, reminderTemplateLanguage: n ? language.trim() || "pt_BR" : null },
   });
-  revalidatePath("/admin/whatsapp");
+  revalidateCloud();
   return { success: true as const };
 }
 
 /** Teste rápido da conexão: modelo "hello_world" (existe em toda conta nova da Meta). */
 export async function sendCloudTestMessage(clinicId: string, to: string, lang: Lang = "pt"): Promise<{ success: boolean; error?: string }> {
-  await requireAdminSession();
+  await requireCloudAccess(clinicId);
   const r = await sendTemplateLogged(clinicId, to, { name: "hello_world", language: "en_US", bodyParams: [] }, "Hello World");
   if (r.success) return { success: true };
   // Erros nossos vêm em pt — traduz os conhecidos; os da Meta já vêm em inglês.
@@ -184,9 +205,9 @@ export async function sendCloudTestMessage(clinicId: string, to: string, lang: L
 /** Desconecta no nosso lado (apaga a conta e o token). Em coexistência, a clínica
  * desconecta no app: Configurações > Conta > Plataforma Business. */
 export async function disconnectWhatsappCloud(clinicId: string): Promise<{ success: boolean }> {
-  await requireAdminSession();
+  await requireCloudAccess(clinicId);
   await prisma.whatsappCloudAccount.deleteMany({ where: { clinicId } });
-  revalidatePath("/admin/whatsapp");
+  revalidateCloud();
   return { success: true };
 }
 
@@ -205,8 +226,8 @@ export type CloudAssets = {
 
 /** Contas conectadas com a WABA e os números dela (seletor visível na tela de envio). */
 export async function listCloudAssets(): Promise<CloudAssets[]> {
-  await requireAdminSession();
-  const accounts = await prisma.whatsappCloudAccount.findMany({ include: { clinic: { select: { tradeName: true } } } });
+  const { scope } = await requireCloudAccess();
+  const accounts = await prisma.whatsappCloudAccount.findMany({ where: scope ? { clinicId: scope } : undefined, include: { clinic: { select: { tradeName: true } } } });
   return Promise.all(
     accounts.map(async (a) => {
       // Token ilegível (chave WHATSAPP_TOKEN_ENCRYPTION_KEY ausente ou diferente da usada
@@ -276,7 +297,7 @@ async function sendTemplateLogged(
 
 /** Envio de texto livre pela tela "Send message" (vale na janela de 24 h do destinatário). */
 export async function sendCloudTestText(input: { clinicId: string; phoneNumberId: string; to: string; text: string }) {
-  await requireAdminSession();
+  await requireCloudAccess(input.clinicId);
   const digits = onlyDigits(input.to);
   if (!digits) return { success: false as const, error: "Informe o número com DDI e DDD (ex: 5577999998888)." };
   if (!input.text.trim()) return { success: false as const, error: "Escreva a mensagem." };
@@ -295,7 +316,7 @@ export async function sendCloudTestTemplate(input: {
   bodyText: string;
   params: string[];
 }) {
-  await requireAdminSession();
+  await requireCloudAccess(input.clinicId);
   const preview = input.bodyText.replace(/\{\{(\d+)\}\}/g, (_, n: string) => input.params[Number(n) - 1] ?? `{{${n}}}`);
   return sendTemplateLogged(input.clinicId, input.to, { name: input.name, language: input.language, bodyParams: input.params }, preview, input.phoneNumberId);
 }
@@ -304,7 +325,11 @@ export async function sendCloudTestTemplate(input: {
 /** Mensagens RECEBIDAS no número (webhook), pra tela de envio mostrar a conversa nos dois
  * sentidos — funciona mesmo com a conta desligada no Chat (vem do log do webhook). */
 export async function listCloudInbound(phoneNumberId: string) {
-  await requireAdminSession();
+  const { scope } = await requireCloudAccess();
+  if (scope) {
+    const own = await prisma.whatsappCloudAccount.findUnique({ where: { clinicId: scope }, select: { phoneNumberId: true } });
+    if (own?.phoneNumberId !== phoneNumberId) return [];
+  }
   const logs = await prisma.webhookLog.findMany({
     where: { event: "whatsapp_cloud.inbound", status: "SUCCESS", createdAt: { gte: new Date(Date.now() - 3 * 86_400_000) } },
     orderBy: { createdAt: "desc" },
@@ -321,7 +346,7 @@ export async function listCloudInbound(phoneNumberId: string) {
 }
 
 export async function listCloudTestMessages(clinicId: string) {
-  await requireAdminSession();
+  await requireCloudAccess(clinicId);
   const rows = await prisma.cloudTestMessage.findMany({ where: { clinicId }, orderBy: { createdAt: "desc" }, take: 20 });
   return rows.map((r) => ({
     id: r.id,
@@ -340,7 +365,7 @@ export type TemplateRow = CloudTemplate & { bodyText: string; variableCount: num
 
 /** Modelos da WABA (nome, categoria, idioma, status) com o texto do corpo. */
 export async function listClinicCloudTemplates(clinicId: string): Promise<{ success: true; templates: TemplateRow[] } | { success: false; error: string }> {
-  await requireAdminSession();
+  await requireCloudAccess(clinicId);
   const account = await accountFor(clinicId);
   if (!account) return { success: false, error: "Clínica sem conta da API oficial." };
   const r = await listCloudTemplates(account.wabaId, account.token);
@@ -363,7 +388,7 @@ export async function createClinicCloudTemplate(input: {
   body: string;
   examples: string[];
 }) {
-  await requireAdminSession();
+  await requireCloudAccess(input.clinicId);
   const account = await accountFor(input.clinicId);
   if (!account) return { success: false as const, error: "Clínica sem conta da API oficial." };
   const name = input.name.trim().toLowerCase().replace(/[^a-z0-9_]+/g, "_").replace(/^_|_$/g, "");

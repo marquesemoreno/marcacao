@@ -20,7 +20,7 @@ const STATUS_ICON: Record<string, React.ReactNode> = {
 /** Tela /admin/whatsapp/enviar — envio pela Cloud API com a conta (WABA) e o número
  * visíveis e o status ao vivo (webhook). Feita pra gravação da análise do app pela Meta
  * (whatsapp_business_messaging): escolher o ativo, enviar, ver chegar no celular. */
-export function CloudSendMessage({ assets, lang }: { assets: CloudAssets[]; lang: Lang }) {
+export function CloudSendMessage({ assets, lang, base = "/admin/whatsapp" }: { assets: CloudAssets[]; lang: Lang; base?: string }) {
   const tt = (k: I18nKey) => t(lang, k);
   const [clinicId, setClinicId] = useState(assets[0]?.clinicId ?? "");
   const asset = useMemo(() => assets.find((a) => a.clinicId === clinicId), [assets, clinicId]);
@@ -62,7 +62,7 @@ export function CloudSendMessage({ assets, lang }: { assets: CloudAssets[]; lang
 
   return (
     <div className="flex-1 min-h-0 overflow-y-auto"><div className="space-y-6 p-4 sm:p-6 max-w-4xl">
-      <CloudTabs lang={lang} active="/admin/whatsapp/enviar" />
+      <CloudTabs lang={lang} active="/admin/whatsapp/enviar" base={base} />
       <div>
         <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">{tt("send.title")}</h1>
         <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">{tt("send.subtitle")}</p>

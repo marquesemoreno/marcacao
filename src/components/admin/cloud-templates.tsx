@@ -25,7 +25,7 @@ type TestRow = Awaited<ReturnType<typeof listCloudTestMessages>>[number];
 /** Tela /admin/whatsapp/templates — modelos da WABA da clínica (whatsapp_business_management):
  * listar com status, criar (vai pra análise da Meta), atualizar status, abrir no WhatsApp
  * Manager e enviar um modelo aprovado preenchendo as variáveis. */
-export function CloudTemplates({ assets, lang }: { assets: CloudAssets[]; lang: Lang }) {
+export function CloudTemplates({ assets, lang, base = "/admin/whatsapp" }: { assets: CloudAssets[]; lang: Lang; base?: string }) {
   const tt = (k: I18nKey) => t(lang, k);
   const [clinicId, setClinicId] = useState(assets[0]?.clinicId ?? "");
   const asset = useMemo(() => assets.find((a) => a.clinicId === clinicId), [assets, clinicId]);
@@ -109,7 +109,7 @@ export function CloudTemplates({ assets, lang }: { assets: CloudAssets[]; lang: 
 
   return (
     <div className="flex-1 min-h-0 overflow-y-auto"><div className="space-y-6 p-4 sm:p-6 max-w-5xl">
-      <CloudTabs lang={lang} active="/admin/whatsapp/templates" />
+      <CloudTabs lang={lang} active="/admin/whatsapp/templates" base={base} />
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">{tt("tpl.title")}</h1>

@@ -80,7 +80,7 @@ const panel = "rounded-lg border border-slate-200 dark:border-slate-800 bg-white
  * coexistência (o número continua no app WhatsApp Business). Textos pt/en (?lang=en).
  * Depois de conectar, a conta e o número ficam em destaque (a análise da Meta precisa
  * ver o ativo selecionado no vídeo). */
-export function WhatsappCloudConnect({ rows, lang }: { rows: CloudAccountRow[]; lang: Lang }) {
+export function WhatsappCloudConnect({ rows, lang, base = "/admin/whatsapp" }: { rows: CloudAccountRow[]; lang: Lang; base?: string }) {
   const [clinicId, setClinicId] = useState("");
   const [coexistence, setCoexistence] = useState(false);
   const [connecting, setConnecting] = useState(false);
@@ -236,7 +236,7 @@ export function WhatsappCloudConnect({ rows, lang }: { rows: CloudAccountRow[]; 
 
   return (
     <div lang={lang === "en" ? "en" : "pt-BR"} className="flex-1 min-h-0 overflow-y-auto"><div className="space-y-6 p-4 sm:p-6 max-w-4xl">
-      <CloudTabs lang={lang} active="/admin/whatsapp" />
+      <CloudTabs lang={lang} active="/admin/whatsapp" base={base} />
       <div>
         <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">{tt("connect.title")}</h1>
         <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">{tt("connect.subtitle")}</p>
@@ -321,7 +321,7 @@ export function WhatsappCloudConnect({ rows, lang }: { rows: CloudAccountRow[]; 
           <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-700 dark:text-emerald-400" aria-hidden />
           <div className="flex-1 space-y-1">
             <p className="text-sm font-semibold text-emerald-900 dark:text-emerald-200">{tt("connect.successBanner")}</p>
-            <Link href={`/admin/whatsapp/enviar?lang=${lang}`} className="text-sm font-semibold text-emerald-800 dark:text-emerald-300 underline underline-offset-2">
+            <Link href={`${base}/enviar?lang=${lang}`} className="text-sm font-semibold text-emerald-800 dark:text-emerald-300 underline underline-offset-2">
               {tt("connect.nextSend")}
             </Link>
           </div>

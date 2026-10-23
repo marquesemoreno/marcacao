@@ -15,6 +15,7 @@ import {
   Megaphone,
   Sparkles,
   ShieldCheck,
+  Smartphone,
   type LucideIcon,
 } from "lucide-react";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
@@ -50,6 +51,7 @@ const NAV_GROUPS: NavGroup[] = [
       { href: "/clinic/relatorio", label: "Relatórios", icon: BarChart3, onlyManager: true },
       { href: "/clinic/ia", label: "Ações da IA", icon: Sparkles },
       { href: "/clinic/acessos", label: "Acessos", icon: ShieldCheck, onlyManager: true },
+      { href: "/clinic/whatsapp", label: "WhatsApp", icon: Smartphone, onlyManager: true },
       // Visível também pras clínicas só-WhatsApp (horários e ticket médio valem pra elas).
       { href: "/clinic/precos", label: "Configurações", icon: Settings, onlyManager: true },
     ],
