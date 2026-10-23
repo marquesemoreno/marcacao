@@ -121,7 +121,7 @@ export async function POST(request: Request) {
   for (const event of events) {
     if (event.kind !== "status") continue;
     const status = STATUS_MAP[event.status];
-    if (status) await prisma.cloudTestMessage.updateMany({ where: { wamid: event.keyId }, data: { status } }).catch(() => {});
+    if (status) await prisma.cloudTestMessage.updateMany({ where: { wamid: event.keyId }, data: { status, ...(event.error ? { error: event.error } : {}) } }).catch(() => {});
   }
   // Mudança de status de modelo (message_template_status_update) — a tela de modelos lê
   // o status direto da Meta; aqui só registra no log com um evento próprio.

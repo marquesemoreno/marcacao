@@ -9,7 +9,7 @@ type MediaFields = { mediaId?: string; mimeType?: string; fileName?: string };
 export type CloudEvent =
   | ({ kind: "inbound"; phoneNumberId: string; from: string; name?: string; keyId: string; text: string; type: string; at: Date } & MediaFields)
   | ({ kind: "device_outbound"; phoneNumberId: string; to: string; keyId: string; text: string; type: string; at: Date } & MediaFields)
-  | { kind: "status"; phoneNumberId: string; keyId: string; status: string; at: Date };
+  | { kind: "status"; phoneNumberId: string; keyId: string; status: string; at: Date; error?: string };
 
 const MEDIA_LABEL: Record<string, string> = {
   image: "📷 Imagem",
@@ -65,7 +65,9 @@ export function parseCloudWebhook(body: unknown): CloudEvent[] {
           });
         }
         for (const s of v.statuses ?? []) {
-          events.push({ kind: "status", phoneNumberId, keyId: s.id, status: s.status, at: toDate(s.timestamp) });
+          const err = s.errors?.[0];
+          const error = err ? `${err.code ?? ""} ${err.error_data?.details ?? err.message ?? err.title ?? ""}`.trim() : undefined;
+          events.push({ kind: "status", phoneNumberId, keyId: s.id, status: s.status, at: toDate(s.timestamp), ...(error ? { error } : {}) });
         }
       } else if (change.field === "smb_message_echoes") {
         for (const m of v.message_echoes ?? []) {
