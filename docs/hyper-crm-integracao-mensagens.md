@@ -187,3 +187,50 @@ partir daí.
   (como em `WhatsappCloudAccount`) em vez de uma credencial global.
 - **Agenda do CRM (`appointment/*`) não tem médico/procedimento** — não substitui a
   agenda do MARCACAO; fora do escopo deste documento.
+
+## Mapa do CRM (telas e funções, só leitura, 2026-10-24)
+
+Conta de teste vazia (tenant 128): sem filas, fluxos, campanhas, agentes, funis,
+agendamentos nem motivos de fechamento — só o canal Telegram #248. Menu (≈50 telas):
+
+- **Atendimento:** Atendimentos, Chat Privado (equipe), Contatos, Painel de Atendimentos
+  (tempo real), Protocolos, Avaliações, Log de Ligações, WaVoIP.
+- **Comunicação e marketing:** Campanhas, E-mail Marketing, Envio em Massa (Template WABA,
+  Template/Texto com variável, WaVoIP, SMS, E-mail, Relatório; intervalo mín/máx em
+  segundos, filtros por etiqueta/kanban/carteira, importa CSV), Galeria, Grupos,
+  Mensagens Rápidas, Google Calendar, comentários de Facebook/Instagram/TikTok/YouTube,
+  Rocket.Chat.
+- **Gestão comercial:** Funil (dashboard, kanban, pipelines, calendário, ações), Kanban,
+  Tarefas, Agenda (consultas, calendário, lembretes), Catálogo, Cobranças, Nuvemshop,
+  WooCommerce.
+- **Automação:** Chat Flow (fluxos), Agentes de IA (com servidores MCP e modelos
+  prontos), Agendamentos (mensagens agendadas), Agendamento Público (páginas públicas),
+  Aniversários, Instagram automação.
+- **Administração:** Canais, Equipes, Usuários, Filas, Etiquetas, Horário de Atendimento
+  (por dia, feriados, mensagem fora do horário), Motivos de Pausa, Motivos de Fechamento,
+  Notas, Relatórios (atendimentos, contatos, funil por atendente, pausas, produtividade),
+  Log de Auditoria.
+- **Configuração:** API (token, sandbox, "216 endpoints" — a spec pública tem ~200),
+  Configurações (94 opções gerais; Integrações: Meta, BSP, Webhooks, Webchat, Google
+  Calendar, Z-API, UazAPI, Evolution API/Go, WuzAPI, Hub, Rocket.Chat, SMS, Groq, VAPI),
+  Integrações Meta (app Meta, versão da API, ID de configuração, Login com Facebook),
+  Meu Perfil.
+
+Pontos relevantes para a integração:
+
+- **O CRM aceita webhooks de entrada de várias APIs não oficiais** (Evolution, Z-API,
+  UazAPI, WuzAPI). Não reaproveitar essas conexões para as clínicas: mesmo risco de
+  bloqueio já visto.
+- **Log de Auditoria** (`/audit-log`) lista cada ação da interface com método e caminho
+  internos, por exemplo `PUT /tickets/{id}` (fechar/atualizar ticket),
+  `POST /messages/{ticketId}` (resposta do atendente), `PUT /settings/webhook*` e
+  `PUT /whatsapp/{id}`. Confirma que resposta e fechamento acontecem na API interna
+  (sessão do usuário) e **não geram webhook**. Serve também para rastrear quem
+  alterou webhook ou canal.
+- **Disparo em massa** pula contatos que já têm atendimento aberto/pendente em outro
+  canal quando "Verificar conversa em outros canais" está ligado (Configurações).
+- **Horário de atendimento** e feriados estão no CRM; a mensagem automática fora do
+  horário é do CRM e chega ao webhook como `ticket.lastMessage` (não como mensagem
+  recebida) — ver armadilha acima.
+- **Agentes de IA** aceitam servidores MCP; é um possível ponto de ligação futuro
+  (CRM chamando ferramentas do MARCACAO), não avaliado.
