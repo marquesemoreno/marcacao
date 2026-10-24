@@ -369,3 +369,27 @@ prefixo "TESTE" e telefone fictício (+55 11 90000-0001):
 
 Não há regra de lembrete ativa, então a consulta não dispara mensagem. Remover antes de
 conectar um canal real, principalmente a etiqueta com palavra-chave gatilho.
+
+## Testes com os dados (2026-10-24)
+
+- **Dashboard do funil:** reflete a oportunidade na hora (criadas, abertas, ticket médio,
+  valor por etapa). Ganho/perdido entram em "Ganhas"/"Perdidas" e na conversão.
+- **Mover de etapa:** arrastar o cartão **não funcionou** pelo navegador automatizado;
+  funciona pela ficha da oportunidade (clicar no título → Editar → campo Etapa) e há
+  um seletor de etapa no topo da ficha ("equivale a arrastar") que só habilita fora do
+  modo de edição. Status: Aberto, Ganho, Perdido.
+- **Ficha da oportunidade:** abas Dados, Conversa e **Linha do tempo**. A linha do tempo
+  registra cada mudança com horário, usuário e **origem** ("via tela"; é de se esperar
+  "via API"/automação para outras origens) — útil para auditar integrações.
+- **Calendário do funil** usa a **previsão de fechamento** da oportunidade; sem ela a
+  oportunidade não aparece no mês.
+- **Perfil do contato** (`/contatos/{id}`): atendimentos, vendas, oportunidades em
+  aberto, valor perdido, etiquetas, carteira; abas Perfil, Timeline e Relacionamento.
+- **Motivo de fechamento** ("Mensagens de fechamento") tem nome, **mensagem enviada ao
+  fechar o atendimento** e demanda: fechar um ticket com ele manda mensagem ao
+  contato (cuidado em canal real).
+- **Campanhas só aceitam canal WhatsApp:** com apenas o Telegram conectado, a lista
+  de sessões do formulário fica vazia ("Nenhum resultado"); não foi possível criar
+  rascunho. Testar depois de conectar o WhatsApp.
+- Criados além da lista anterior: motivo de fechamento **TESTE - Consulta realizada**;
+  oportunidade #7472 movida para "Consulta marcada", previsão 28/10, status Ganho.
