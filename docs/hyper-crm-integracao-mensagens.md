@@ -210,7 +210,7 @@ agendamentos nem motivos de fechamento — só o canal Telegram #248. Menu (≈5
   (por dia, feriados, mensagem fora do horário), Motivos de Pausa, Motivos de Fechamento,
   Notas, Relatórios (atendimentos, contatos, funil por atendente, pausas, produtividade),
   Log de Auditoria.
-- **Configuração:** API (token, sandbox, "216 endpoints" — a spec pública tem ~200),
+- **Configuração:** API (token, sandbox, "216 endpoints" = spec pública + 2 rotas + variantes repetidas, ver abaixo),
   Configurações (94 opções gerais; Integrações: Meta, BSP, Webhooks, Webchat, Google
   Calendar, Z-API, UazAPI, Evolution API/Go, WuzAPI, Hub, Rocket.Chat, SMS, Groq, VAPI),
   Integrações Meta (app Meta, versão da API, ID de configuração, Login com Facebook),
@@ -260,5 +260,44 @@ Pontos relevantes para a integração:
   explorar, não digitar nada nelas.
 
 **API externa:** não há rotas de disparo de SMS nem de e-mail em massa na spec pública
-(só o `createTicket` de webmail). Se existirem, estão entre os endpoints que a tela de
-API conta a mais (216 × ~200).
+(só o `createTicket` de webmail). A tela de API do CRM não esconde mais nada: ver
+"Rotas da tela de API" abaixo.
+
+### Rotas da tela de API × spec pública (comparadas por hash, 2026-10-24)
+
+A tela `/api-service` lista 216 linhas = 209 rotas únicas + 7 variantes repetidas da
+mesma rota (`sendMessageByTicket` ×4, `createTicket` ×3 etc.). Comparadas com a spec
+pública (207 rotas): **só 2 rotas existem na tela e não na spec** —
+`POST /telegramInvite` e `POST /group/revokeInviteLink`. Nenhuma rota de SMS nem de
+e-mail em massa. (Uma versão anterior deste documento dizia "~16 endpoints a mais":
+estava errada.)
+
+### Agenda e lembretes do CRM
+
+- Lembretes (Agenda → Lembretes; API `scheduleReminder/*`): regra com nome, **horas
+  antes do evento** (24 por padrão), tipo de mensagem (texto ou outros), mensagem,
+  **canal WhatsApp** e ativo/inativo. Variáveis: `{{nome}}`, `{{primeiroNome}}`,
+  `{{telefone}}`, `{{data}}`, `{{hora}}`, `{{titulo}}` — **sem médico, procedimento nem
+  convênio**, e sem botão de confirmar/reagendar. O D-1 do MARCACAO (nome, data,
+  horário, médico, resposta com a Jev) continua melhor; o CRM serviria só para
+  lembrete simples.
+- Consultas (`appointment/*`): título, contato (id/nome/telefone), canal, `startAt`,
+  `endAt`, status (`pending`/`confirmed`/`cancelled`/`completed`), notas. Listagem por
+  `page`, `limit`, `status`. Não há campo de profissional/médico.
+
+### Conexão do WhatsApp oficial (Integrações Meta e tipos de canal)
+
+- **WhatsApp Oficial**: conecta pelo login da Meta usando um **Aplicativo Meta** (o
+  proxy OAuth do provedor, na conta de teste). A tela Integrações Meta → Login/OAuth
+  tem os campos *Aplicativo*, *App ID*, *Versão da API* (v19.0) e *ID de Configuração*:
+  indica que dá para cadastrar o **app Meta próprio** da empresa em vez do app do
+  provedor. Não testado.
+- **WABA** (manual): tipo de canal à parte, "Conectar conta WABA — cole suas
+  credenciais em uma janela segura". É o caminho para um número que **já está na API
+  oficial**, sem o proxy OAuth; as credenciais (token, ids) ficam no CRM. Não
+  testado: não clicamos em Conectar.
+- **Dialog360 e Gupshup (BSP)**, ambos beta: para números que já estão nesses
+  provedores (Configurações → Integrações → BSP).
+- Atenção: a Meta entrega os eventos de um número ao webhook do app ligado ao WABA.
+  Se o mesmo número for usado no MARCACAO, só um dos dois recebe — não conectar
+  o número do MARCACAO (ex.: TIVDC) ao CRM sem decidir quem fica com o webhook.
