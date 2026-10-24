@@ -234,3 +234,31 @@ Pontos relevantes para a integração:
   recebida) — ver armadilha acima.
 - **Agentes de IA** aceitam servidores MCP; é um possível ponto de ligação futuro
   (CRM chamando ferramentas do MARCACAO), não avaliado.
+
+### E-mail e SMS (só leitura das telas, 2026-10-24; nada foi enviado)
+
+**E-mail**
+- Disparo em massa (Envio em Massa → E-mail): exige um **canal de e-mail** criado em
+  Canais (Webmail/Gmail ou IMAP/SMTP). Campos: lista de destinatários (um por linha ou
+  separados por vírgula), intervalo mín/máx entre envios (aleatório, para evitar spam),
+  **rodapé de descadastro** opcional, modelo ou conteúdo livre (assunto + corpo, editor
+  visual), variáveis preenchidas com dados do contato cadastrado, até 10 anexos de 25 MB.
+- **E-mail Marketing** guarda modelos e a lista de **descadastrados**.
+- Configurações → SMTP (global): host, porta, usuário, senha, remetente, nome, SSL/TLS.
+- O descadastro é opcional no disparo ("rodapé de descadastro" é um interruptor):
+  para as clínicas, ligar sempre (LGPD, e o MARCACAO já exige consentimento de
+  marketing).
+
+**SMS**
+- Envio em Massa → SMS: escolher o **serviço**, intervalo mín/máx, números (ou CSV) e
+  mensagem de **até 160 caracteres** (sem variáveis nessa tela).
+- Provedores suportados, em Configurações → Integrações → SMS: **Comtele**,
+  **ConectaStartup** e **Livson/BHI**. Cada um exige um token do próprio provedor
+  (contrato e saldo à parte); o CRM não vende SMS. O Hub (Notificame) também tem token
+  próprio e aparece como canal.
+- Essas telas **salvam automaticamente** as alterações (aviso na própria página): ao
+  explorar, não digitar nada nelas.
+
+**API externa:** não há rotas de disparo de SMS nem de e-mail em massa na spec pública
+(só o `createTicket` de webmail). Se existirem, estão entre os endpoints que a tela de
+API conta a mais (216 × ~200).
