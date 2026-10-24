@@ -353,3 +353,19 @@ Conta de teste sem campanhas, pipelines, ações nem lanes: o que segue vem dos 
 - Comparado ao MARCACAO: o equivalente é o CRM de leads (etiquetas automáticas, "sem
   retorno", motivos de perda). O funil do CRM tem valor monetário por oportunidade; o
   MARCACAO tem faturamento estimado por procedimento. Não há ponte entre os dois.
+
+## Dados de teste criados no CRM (2026-10-24, tenant 128)
+
+Criados pela interface, sem enviar nenhuma mensagem nem iniciar campanha. Todos com
+prefixo "TESTE" e telefone fictício (+55 11 90000-0001):
+
+- Fila **TESTE - Recepção** (id 96)
+- Etiqueta **TESTE - Quer agendar** (id 189, palavra-chave gatilho "agendar")
+- Pipeline **TESTE - Consultas** (id 38) com 3 etapas: Novo contato, Consulta marcada,
+  Compareceu
+- Contato **TESTE Maria Souza** (5511900000001)
+- Oportunidade **#7472** "TESTE - Consulta urologia Maria", R$ 350, etapa Novo contato
+- Consulta na agenda **TESTE - Consulta urologia**, 28/10/2026 09:00, status pendente
+
+Não há regra de lembrete ativa, então a consulta não dispara mensagem. Remover antes de
+conectar um canal real, principalmente a etiqueta com palavra-chave gatilho.
