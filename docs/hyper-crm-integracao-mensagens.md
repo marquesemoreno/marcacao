@@ -301,3 +301,55 @@ estava errada.)
 - Atenção: a Meta entrega os eventos de um número ao webhook do app ligado ao WABA.
   Se o mesmo número for usado no MARCACAO, só um dos dois recebe — não conectar
   o número do MARCACAO (ex.: TIVDC) ao CRM sem decidir quem fica com o webhook.
+
+## Campanhas e funis (telas e API, só leitura, 2026-10-24)
+
+Conta de teste sem campanhas, pipelines, ações nem lanes: o que segue vem dos formulários
+(abertos e cancelados sem salvar) e da spec pública.
+
+### Campanhas
+
+- Formulário "Nova Campanha": nome, **sessão/WhatsApp**, data/hora de início, **delay
+  entre mensagens** (segundos, padrão 20), **janela de envio** (liga/desliga),
+  **exibir mensagem original ao receber resposta** (a mensagem enviada aparece no ticket
+  acima da resposta, dentro da janela), **limite diário de mensagens** (desligado = sem
+  limite), mídia opcional e **3 mensagens obrigatórias**.
+- As 3 mensagens são **variações, não sequência**: cada contato recebe só uma, sorteada,
+  para não mandar texto idêntico a todos e reduzir risco de bloqueio. Cada uma tem botão
+  de IA (reescrita) e variáveis, e a tela mostra preview por contato.
+- API (`/campaign/*`, 15 rotas): `create` (`name`, `start`, `message1..3`, `sessionId`,
+  `delay`), `update`, `duplicate`, `start`, `pause`, `resume`, `cancel`, `skip`, `delete`,
+  `report/{id}`, e contatos (`contacts/add|remove|removeAll`, `contacts/{id}`). A
+  spec não documenta o corpo de `contacts/add` nem a janela de envio/limite diário
+  por API.
+- Envio em lote simples (`bulkSendMessageWithVariable`: `whatsappId`, `message`,
+  `dataInput`, `min`, `max`). Com "Verificar conversa em outros canais" ligado, quem tem
+  ticket aberto ou pendente em qualquer canal **não recebe** o disparo; a resposta traz
+  `skipped` e `skippedNumbers`.
+- Comparado ao MARCACAO: o CRM tem limite diário, janela e variações, mas **não tem**
+  o consentimento por clínica, o rodapé de responsável técnico (CFM), o ritmo de 4–6
+  minutos nem a prioridade abaixo dos lembretes. Para as clínicas, manter os disparos
+  no MARCACAO.
+
+### Funis (pipelines, oportunidades, kanban)
+
+- Telas: Dashboard (criadas, abertas, ganhas, perdidas, ticket médio, conversão, valor
+  total), Kanban, Pipelines, Calendário, Ações e Ações de Ticket. Menu separado
+  "Kanban" (quadros por **etiqueta/status**; "carteira" é o kanban do contato).
+- API: `pipeline/*` (`name`, `description`), `stage/*` (`name`, `pipelineId`, `order`,
+  `color`), oportunidades: `createOpportunity` (`number`, `contactName`, `email`, `name`,
+  `value`, `status` = `open`|`win`|`lose`, `pipelineId`, `stageId`, `responsibleId`,
+  `closingForecast`, `description`, `validateNumber`), `updateOpportunity`,
+  `deleteOpportunity`, `listOpportunities` (`page`, `limit`), e `updateContactKanban`
+  (`contactId`, `kanban`).
+- **Ações de Ticket** (automação por tempo sem resposta): nome, **horas sem resposta**
+  (24), data de início opcional (só tickets criados depois), ativo e tipo de ação:
+  *Enviar Mensagem, Enviar Mídia, Enviar Template WABA, Adicionar Etiqueta, Adicionar
+  Carteira, Fluxo*. Exige canal WhatsApp. **Não há ação "chamar webhook"**, então não
+  resolve o aviso de fechamento/resposta ao MARCACAO.
+- **Ações do Pipeline** (por etapa): tela com filtros por pipeline, etapa e tipo, "Logs
+  de Ações" e "Novo Fluxo"; o botão de criação não aparece sem pipeline cadastrado,
+  então os tipos de ação não foram vistos.
+- Comparado ao MARCACAO: o equivalente é o CRM de leads (etiquetas automáticas, "sem
+  retorno", motivos de perda). O funil do CRM tem valor monetário por oportunidade; o
+  MARCACAO tem faturamento estimado por procedimento. Não há ponte entre os dois.
