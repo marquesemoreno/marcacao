@@ -228,6 +228,7 @@ model Clinic {
   hospitalIntegration  HospitalIntegration?
   aiAttendantConfig    AiAttendantConfig?
   broadcastCampaigns   BroadcastCampaign[]
+  channelConsents      ChannelConsent[]
   bridgeReminderLogs   BridgeReminderLog[]
   knowledgeEntries     ClinicKnowledgeEntry[]
   acquisitionRules     AcquisitionRule[]
@@ -879,6 +880,37 @@ enum BroadcastCampaignStatus {
   @@map("broadcast_campaign_status")
 }
 
+enum BroadcastChannel {
+  WHATSAPP
+  SMS
+  EMAIL
+
+  @@map("broadcast_channel")
+}
+
+/// Consentimento de marketing por SMS ou e-mail, por clínica e por endereço (decisão de
+/// 25/10/2026: o aceite de WhatsApp não vale para esses canais). Só quem tem consentimento
+/// e não saiu recebe (src/lib/channel-consent.ts). O link "não quero mais receber" usa o id
+/// desta linha assinado (src/lib/unsubscribe-token.ts) e preenche revokedAt.
+model ChannelConsent {
+  id        String           @id @default(cuid())
+  clinicId  String           @map("clinic_id")
+  channel   BroadcastChannel
+  /// Endereço canônico: e-mail em minúsculas ou 55DDD9XXXXXXXX (ver consentAddress).
+  address   String
+  consentAt DateTime         @map("consent_at")
+  /// De onde veio o aceite (ex.: "ficha de papel 10/2026", "formulário do site").
+  source    String?
+  revokedAt DateTime?        @map("revoked_at")
+  createdAt DateTime         @default(now()) @map("created_at")
+  updatedAt DateTime         @updatedAt @map("updated_at")
+
+  clinic Clinic @relation(fields: [clinicId], references: [id])
+
+  @@unique([clinicId, channel, address])
+  @@map("channel_consents")
+}
+
 enum BroadcastRecipientStatus {
   PENDING
   SENT
@@ -900,6 +932,12 @@ model BroadcastCampaign {
   /// Até 2 variações além de messageTemplate; cada destinatário recebe uma, sorteada
   /// (pickBroadcastVariant em src/lib/broadcast-variants.ts) — contra bloqueio de número.
   messageVariants String[]                @default([]) @map("message_variants")
+  /// Canal de envio. WHATSAPP é o fluxo original (src/lib/broadcast.ts); SMS e EMAIL são
+  /// despachados por src/lib/channel-broadcast.ts e, nesses dois, BroadcastRecipient.phone
+  /// guarda o ENDEREÇO do destinatário (número com DDI 55 no SMS, e-mail no EMAIL).
+  channel         BroadcastChannel        @default(WHATSAPP)
+  /// Assunto do e-mail (só EMAIL); aceita {{variaveis}} como o texto.
+  subject         String?
   /// Caminho no bucket privado do Supabase Storage (mesmo bucket do inbox, ver
   /// src/lib/whatsapp-media.ts) — null quando a campanha é só texto.
   imagePath       String?                 @map("image_path")

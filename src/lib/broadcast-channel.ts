@@ -1,4 +1,4 @@
-import { detectDelimiter } from "@/lib/broadcast-csv";
+import { detectDelimiter, parseBroadcastCsv } from "@/lib/broadcast-csv";
 
 /** Funções puras (cliente e servidor) dos canais de disparo além do WhatsApp: SMS e
  * e-mail. O envio em si fica em comtele.ts / resend.ts; a regra de quem pode receber,
@@ -78,4 +78,32 @@ export function parseEmailCsv(csv: string): ParsedEmailRecipient[] {
     });
     return { email: normalizeEmail(cells[emailIndex] ?? ""), variables };
   });
+}
+
+/** Lista de destinatários pronta para gravar: endereço canônico (e-mail minúsculo ou
+ * 55DDD9XXXXXXXX), sem repetidos e sem inválidos — com a contagem do que foi descartado, pra
+ * a tela avisar. SMS lê o CSV de telefones já usado no WhatsApp; e-mail, o CSV de e-mails. */
+export function prepareChannelRecipients(
+  channel: "SMS" | "EMAIL",
+  csv: string
+): { recipients: { address: string; variables: Record<string, string> }[]; invalid: number; duplicates: number } {
+  const rows =
+    channel === "EMAIL"
+      ? parseEmailCsv(csv).map((r) => ({ raw: r.email, variables: r.variables }))
+      : parseBroadcastCsv(csv).map((r) => ({ raw: r.phone, variables: r.variables }));
+
+  const seen = new Set<string>();
+  const recipients: { address: string; variables: Record<string, string> }[] = [];
+  let invalid = 0;
+  let duplicates = 0;
+  for (const row of rows) {
+    const address = channel === "EMAIL" ? (isValidEmail(row.raw) ? normalizeEmail(row.raw) : null) : toSmsNumber(row.raw);
+    if (!address) invalid++;
+    else if (seen.has(address)) duplicates++;
+    else {
+      seen.add(address);
+      recipients.push({ address, variables: row.variables });
+    }
+  }
+  return { recipients, invalid, duplicates };
 }

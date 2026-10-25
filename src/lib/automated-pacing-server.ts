@@ -13,7 +13,9 @@ export async function lastAutomatedSend(clinicId: string): Promise<{ at: Date | 
       where: {
         status: "SENT",
         sentAt: { not: null },
-        campaign: { clinicId },
+        // SMS e e-mail não contam: o intervalo único existe por causa do risco de bloqueio do
+        // número de WhatsApp.
+        campaign: { clinicId, channel: "WHATSAPP" },
       },
       orderBy: { sentAt: "desc" },
       select: { sentAt: true },
@@ -42,7 +44,7 @@ export async function marketingCampaignReady(clinicId: string, now: Date): Promi
   if (!isWithinMarketingWindow(now)) return false;
   const campaigns = await prisma.broadcastCampaign.findMany({
     // Campanha de baixa prioridade não disputa a vez com os lembretes (eles vêm antes).
-    where: { clinicId, status: "RUNNING", lowPriority: false, OR: [{ tagOnSend: null }, { tagOnSend: { not: RESCHEDULE_PENDING_TAG } }] },
+    where: { clinicId, channel: "WHATSAPP", status: "RUNNING", lowPriority: false, OR: [{ tagOnSend: null }, { tagOnSend: { not: RESCHEDULE_PENDING_TAG } }] },
     select: { id: true },
   });
   for (const c of campaigns) {

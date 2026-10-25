@@ -24,7 +24,7 @@ function sleep(ms: number) {
  * justamente esse throttling que reduz o risco de o número ser banido por spam. */
 export async function dispatchNextBatch(): Promise<{ processed: number }> {
   const campaigns = await prisma.broadcastCampaign.findMany({
-    where: { status: "RUNNING" },
+    where: { status: "RUNNING", channel: "WHATSAPP" },
     include: { clinic: { select: { technicalDirectorName: true, technicalDirectorCrm: true } } },
   });
   let processed = 0;
@@ -56,7 +56,7 @@ export async function dispatchNextBatch(): Promise<{ processed: number }> {
         const otherCampaignPending = await prisma.broadcastRecipient.count({
           where: {
             status: "PENDING",
-            campaign: { clinicId: campaign.clinicId, status: "RUNNING", lowPriority: false, id: { not: campaign.id } },
+            campaign: { clinicId: campaign.clinicId, channel: "WHATSAPP", status: "RUNNING", lowPriority: false, id: { not: campaign.id } },
           },
         });
         if (lowPriorityMustYield({ lowPriority: true, otherCampaignPending: otherCampaignPending > 0, remindersPending: false })) continue;

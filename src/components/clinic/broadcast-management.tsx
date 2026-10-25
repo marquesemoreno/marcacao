@@ -128,6 +128,13 @@ export function BroadcastManagement() {
     }
   }, []);
 
+  // O painel de SMS/e-mail (channel-broadcast-panel.tsx) avisa quando cria uma campanha.
+  useEffect(() => {
+    const onChanged = () => loadCampaigns(true);
+    window.addEventListener("broadcast:changed", onChanged);
+    return () => window.removeEventListener("broadcast:changed", onChanged);
+  }, [loadCampaigns]);
+
   useEffect(() => {
     loadCampaigns();
     clinicHasBridgeAudience().then(setHasBridge).catch(() => {});
@@ -777,6 +784,26 @@ export function BroadcastManagement() {
                     </p>
                   )}
                 </div>
+              ) : confirming.preview.channel !== "WHATSAPP" ? (
+                <div className="space-y-2 text-sm text-slate-700 dark:text-slate-200">
+                  <p>
+                    Vai para <strong>{plural(confirming.preview.pending, "endereço", "endereços")}</strong> por{" "}
+                    {confirming.preview.channel === "SMS" ? "SMS" : "e-mail"}, em lotes, de segunda a sexta das 9h às 17h.
+                    {confirming.preview.smsCredits ? ` Cada SMS consome ${confirming.preview.smsCredits} ${confirming.preview.smsCredits === 1 ? "crédito" : "créditos"}.` : ""}
+                  </p>
+                  <p
+                    className={
+                      (confirming.preview.withConsent ?? 0) < confirming.preview.pending
+                        ? "rounded-md border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 p-2 text-amber-900 dark:text-amber-200"
+                        : ""
+                    }
+                  >
+                    <strong>{plural(confirming.preview.withConsent ?? 0, "tem", "têm")}</strong> consentimento para este canal.
+                    {(confirming.preview.withConsent ?? 0) < confirming.preview.pending
+                      ? " Os demais serão pulados e aparecem como “Sem consentimento”. A gestão registra os aceites em “Disparos por SMS e e-mail”."
+                      : ""}
+                  </p>
+                </div>
               ) : (
               <p className="text-sm text-slate-700 dark:text-slate-200">
                 Vai para <strong>{plural(confirming.preview.pending, "pessoa", "pessoas")}</strong>, uma a cada 4–6 min, de segunda a sexta das 9h às 17h, até 100 por dia —{" "}
@@ -849,6 +876,7 @@ export function BroadcastManagement() {
                   disabled={
                     busyId === confirming.campaign.id ||
                     confirming.preview.pending === 0 ||
+                    (confirming.preview.channel !== "WHATSAPP" && (confirming.preview.withConsent ?? 0) === 0) ||
                     confirming.preview.unknownVariables.length > 0 ||
                     confirming.preview.unfilled.length > 0 ||
                     confirming.preview.missingTechnicalDirector
@@ -941,6 +969,11 @@ function CampaignCard({
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 truncate">{c.name}</h3>
             <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border ${STATUS_CLASS[c.status]}`}>{STATUS_LABEL[c.status]}</span>
+            {c.channel !== "WHATSAPP" && (
+              <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border border-sky-300 dark:border-sky-800 bg-sky-50 dark:bg-sky-950/40 text-sky-800 dark:text-sky-300">
+                {c.channel === "SMS" ? "SMS" : "E-mail"}
+              </span>
+            )}
             {c.hasImage && <ImageIcon className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 shrink-0" aria-label="Com imagem" />}
           </div>
           {c.status === "RUNNING" && (

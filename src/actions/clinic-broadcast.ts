@@ -11,10 +11,13 @@ import { uploadWhatsAppMedia } from "@/lib/whatsapp-media";
 import { technicalDirectorLine, buildBroadcastMessage, type ParsedBroadcastRecipient } from "@/lib/broadcast-csv";
 import { campaignSituation, estimateCampaignFinish, patientsNeedingCall, startOfBrazilDay, unfilledPlaceholders, unknownTemplateVariables, urgentSendTimes } from "@/lib/broadcast-schedule";
 import { RESCHEDULE_PENDING_TAG } from "@/lib/conversation-tags";
-import { formatDate } from "@/lib/format";
+import { formatDate, getBaseUrl } from "@/lib/format";
 import { fetchBridgeCampaignPatients } from "@/lib/hospital-bridge";
 import { lastAutomatedSend } from "@/lib/automated-pacing-server";
 import { buildCampaignAudience } from "@/lib/campaign-audience";
+import { missingChannelConfig } from "@/lib/channel-config";
+import { channelSendDecision } from "@/lib/channel-consent";
+import { buildEmailContent, buildSmsContent } from "@/lib/channel-content";
 
 const ALLOWED_IMAGE_MIME_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 const MAX_IMAGE_SIZE_BYTES = 15 * 1024 * 1024; // mesmo limite já usado pra mídia do inbox
@@ -55,12 +58,14 @@ export async function listClinicBroadcastCampaigns() {
     const sentToday = c.recipients.filter((r) => r.status === "SENT" && r.sentAt && r.sentAt >= dayStart).length;
     const yielding = c.lowPriority && highPriorityPending;
     const isReschedule = c.tagOnSend === RESCHEDULE_PENDING_TAG;
+    // SMS e e-mail não seguem o ritmo de 4–6 min do WhatsApp: sem previsão baseada nele.
+    const isWhatsapp = c.channel === "WHATSAPP";
     // Campanhas normais ativas se revezam no mesmo ritmo da clínica (ver automated-pacing).
     const sharing = c.lowPriority ? 1 : Math.max(1, highPriorityActive);
-    const estimate = isReschedule ? { businessDays: 0, finishIso: null } : estimateCampaignFinish({ pending, sentToday, now, sharing });
+    const estimate = isReschedule || !isWhatsapp ? { businessDays: 0, finishIso: null } : estimateCampaignFinish({ pending, sentToday, now, sharing });
     // Com lembretes de confirmação ativos, nas manhãs eles têm a vez — o fim real pode
     // cair mais tarde: a tela mostra uma faixa ("entre X e Y") em vez de uma data só.
-    const late = !isReschedule && remindersOn && !c.lowPriority
+    const late = !isReschedule && isWhatsapp && remindersOn && !c.lowPriority
       ? estimateCampaignFinish({ pending, sentToday, now, sharing: sharing + 1 })
       : null;
     return {
@@ -79,9 +84,12 @@ export async function listClinicBroadcastCampaigns() {
       // Quantos receberam cada texto — só faz sentido com variações.
       sentByVariant: c.messageVariants.length ? countSentByVariant(c.recipients, 1 + c.messageVariants.length) : null,
       pending,
+      channel: c.channel,
       situation: isReschedule && c.status === "RUNNING" && pending > 0
         ? { tone: "ok" as const, text: "Enviando aviso de remarcação — 1 a cada 4–6 min, das 8h às 18h" }
-        : campaignSituation({ status: c.status, pending, sentToday, yielding, now, sharing }),
+        : !isWhatsapp && c.status === "RUNNING" && pending > 0
+          ? { tone: "ok" as const, text: `Enviando por ${c.channel === "SMS" ? "SMS" : "e-mail"} em lotes, de segunda a sexta das 9h às 17h` }
+          : campaignSituation({ status: c.status, pending, sentToday, yielding, now, sharing }),
       isReschedule,
       urgentLastAt: isReschedule && pending > 0 ? urgentSendTimes(pending, now).at(-1)?.toISOString() ?? null : null,
       needsCall: isReschedule ? buildCallList(c.recipients, now) : [],
@@ -138,13 +146,14 @@ export async function getClinicCampaignStartPreview(campaignId: string) {
   await assertClinicOwnsCampaign(campaignId, clinicId);
   const campaign = await prisma.broadcastCampaign.findUnique({
     where: { id: campaignId },
-    select: { messageTemplate: true, messageVariants: true, imagePath: true, lowPriority: true, tagOnSend: true, clinic: { select: { technicalDirectorName: true, technicalDirectorCrm: true } } },
+    select: { messageTemplate: true, messageVariants: true, imagePath: true, lowPriority: true, tagOnSend: true, channel: true, subject: true, clinic: { select: { technicalDirectorName: true, technicalDirectorCrm: true } } },
   });
   const isReschedule = campaign?.tagOnSend === RESCHEDULE_PENDING_TAG;
   const rt = isReschedule ? null : technicalDirectorLine(campaign?.clinic.technicalDirectorName, campaign?.clinic.technicalDirectorCrm);
   const otherActive = await prisma.broadcastCampaign.count({
     where: {
       clinicId,
+      channel: "WHATSAPP",
       status: "RUNNING",
       lowPriority: false,
       id: { not: campaignId },
@@ -159,12 +168,42 @@ export async function getClinicCampaignStartPreview(campaignId: string) {
   ]);
   const vars = (first?.variables ?? {}) as Record<string, string>;
   const previews = campaign ? previewBroadcastVariants([campaign.messageTemplate, ...campaign.messageVariants], vars, { technicalDirector: rt }) : [];
+
+  // SMS e e-mail: mensagem como sairá (com link de sair e RT), créditos de SMS e quantos dos
+  // pendentes têm consentimento ativo — os demais são pulados no envio.
+  const channel = campaign?.channel ?? "WHATSAPP";
+  let variantMessages = previews.map((p) => p.text);
+  let withConsent: number | null = null;
+  let smsCredits: number | null = null;
+  if (campaign && channel !== "WHATSAPP") {
+    const sampleUrl = `${getBaseUrl()}/api/u/<link-individual>`;
+    const templates = [campaign.messageTemplate, ...campaign.messageVariants];
+    if (channel === "EMAIL") {
+      variantMessages = templates.map((t) => {
+        const built = buildEmailContent({ subject: campaign.subject ?? "", template: t, variables: vars, technicalDirector: rt, unsubscribeUrl: sampleUrl });
+        return `Assunto: ${built.subject}\n\n${built.text}`;
+      });
+    } else {
+      const built = templates.map((t) => buildSmsContent({ template: t, variables: vars, technicalDirector: rt, unsubscribeUrl: sampleUrl }));
+      variantMessages = built.map((b) => b.text);
+      smsCredits = Math.max(...built.map((b) => b.credits));
+    }
+    const pendingAddresses = await prisma.broadcastRecipient.findMany({ where: { campaignId, status: "PENDING" }, select: { phone: true } });
+    const consents = await prisma.channelConsent.findMany({
+      where: { clinicId, channel, address: { in: pendingAddresses.map((r) => r.phone) } },
+      select: { consentAt: true, revokedAt: true },
+    });
+    withConsent = consents.filter((c) => channelSendDecision({ consentAt: c.consentAt, revokedAt: c.revokedAt }) === "ENVIAR").length;
+  }
   return {
     pending,
+    channel,
+    withConsent,
+    smsCredits,
     samplePhone: first?.phone ?? null,
-    sampleMessage: previews[0]?.text ?? "",
+    sampleMessage: variantMessages[0] ?? "",
     /** Todas as variações montadas (a 1ª é a principal). */
-    variantMessages: previews.map((p) => p.text),
+    variantMessages,
     missingTechnicalDirector: !isReschedule && !rt,
     unknownVariables: [...new Set(previews.flatMap((p) => p.unknownVariables))],
     unfilled: [...new Set(previews.flatMap((p) => p.unfilled))],
@@ -343,10 +382,18 @@ export async function startClinicBroadcastCampaign(campaignId: string) {
   // CFM: campanha de marketing sem responsável técnico (nome + CRM) não inicia.
   const c = await prisma.broadcastCampaign.findUnique({
     where: { id: campaignId },
-    select: { tagOnSend: true, clinic: { select: { technicalDirectorName: true, technicalDirectorCrm: true } } },
+    select: { tagOnSend: true, channel: true, clinic: { select: { technicalDirectorName: true, technicalDirectorCrm: true } } },
   });
   if (c && c.tagOnSend !== RESCHEDULE_PENDING_TAG && !technicalDirectorLine(c.clinic.technicalDirectorName, c.clinic.technicalDirectorCrm)) {
     return { success: false as const, error: "Cadastre o responsável técnico (nome e CRM) em Configurações antes de iniciar a campanha." };
+  }
+  // SMS e e-mail dependem de chaves do provedor no servidor: sem elas a campanha ficaria
+  // "em andamento" sem enviar nada.
+  if (c && c.channel !== "WHATSAPP") {
+    const missing = missingChannelConfig(c.channel);
+    if (missing.length > 0) {
+      return { success: false as const, error: `O envio por ${c.channel === "SMS" ? "SMS" : "e-mail"} ainda não está configurado no servidor (faltam: ${missing.join(", ")}). Peça ao administrador.` };
+    }
   }
   await prisma.broadcastCampaign.update({ where: { id: campaignId }, data: { status: "RUNNING" } });
   revalidatePath("/clinic/disparos");

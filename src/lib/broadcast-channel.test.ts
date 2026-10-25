@@ -75,3 +75,33 @@ describe("parseEmailCsv", () => {
     expect(parseEmailCsv("  \n ")).toEqual([]);
   });
 });
+
+import { prepareChannelRecipients } from "./broadcast-channel";
+
+describe("prepareChannelRecipients", () => {
+  it("e-mail: normaliza, tira duplicados e conta endereços inválidos", () => {
+    const out = prepareChannelRecipients("EMAIL", "email,nome\na@x.com,Ana\nA@X.COM,Ana2\nruim,Bia\nb@x.com,Bia");
+    expect(out.recipients).toEqual([
+      { address: "a@x.com", variables: { nome: "Ana" } },
+      { address: "b@x.com", variables: { nome: "Bia" } },
+    ]);
+    expect(out.invalid).toBe(1);
+    expect(out.duplicates).toBe(1);
+  });
+
+  it("SMS: usa 55+DDD+celular, descarta fixo e vazio, tira duplicados", () => {
+    const out = prepareChannelRecipients("SMS", "telefone,nome\n(77) 99999-1234,Ana\n77999991234,Dup\n7733221234,Fixo\n,Vazio");
+    expect(out.recipients).toEqual([{ address: "5577999991234", variables: { nome: "Ana" } }]);
+    expect(out.duplicates).toBe(1);
+    expect(out.invalid).toBe(2);
+  });
+
+  it("SMS sem cabeçalho: 1ª coluna telefone", () => {
+    const out = prepareChannelRecipients("SMS", "77999991234,Ana,Retorno");
+    expect(out.recipients).toEqual([{ address: "5577999991234", variables: { nome: "Ana", procedimento: "Retorno" } }]);
+  });
+
+  it("CSV vazio: nada a enviar", () => {
+    expect(prepareChannelRecipients("EMAIL", " ").recipients).toEqual([]);
+  });
+});

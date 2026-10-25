@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { dispatchNextBatch } from "@/lib/broadcast";
+import { dispatchNextChannelBatch } from "@/lib/channel-broadcast";
 import { dispatchReminderTick } from "@/lib/bridge-reminders";
 import { isCronAuthorized } from "@/lib/request-auth";
 
@@ -15,5 +16,7 @@ export async function GET(request: Request) {
   // campanhas; o intervalo único por clínica impede que os dois saiam no mesmo minuto.
   const reminders = await dispatchReminderTick();
   const result = await dispatchNextBatch();
-  return NextResponse.json({ ok: true, reminders: reminders.sent, ...result });
+  // SMS e e-mail têm despacho próprio (sem o intervalo de 4–6 min do WhatsApp).
+  const channels = await dispatchNextChannelBatch();
+  return NextResponse.json({ ok: true, reminders: reminders.sent, ...result, channelProcessed: channels.processed });
 }
