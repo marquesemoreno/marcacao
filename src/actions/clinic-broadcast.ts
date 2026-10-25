@@ -1,5 +1,7 @@
 "use server";
 
+import { normalizeBroadcastVariants, previewBroadcastVariants, countSentByVariant } from "@/lib/broadcast-variants";
+
 import { NO_CONSENT_MESSAGE } from "@/lib/marketing-consent";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
@@ -30,7 +32,7 @@ export async function listClinicBroadcastCampaigns() {
     include: {
       _count: { select: { recipients: true } },
       recipients: {
-        select: { id: true, status: true, sentAt: true, errorMessage: true, phone: true, variables: true, calledAt: true },
+        select: { id: true, status: true, sentAt: true, errorMessage: true, phone: true, variables: true, calledAt: true, variantIndex: true },
         orderBy: { createdAt: "asc" },
       },
     },
@@ -74,6 +76,8 @@ export async function listClinicBroadcastCampaigns() {
       failures: failedList.slice(0, 30).map((r) => ({ phone: r.phone, reason: r.errorMessage })),
       skipped,
       noConsent,
+      // Quantos receberam cada texto — só faz sentido com variações.
+      sentByVariant: c.messageVariants.length ? countSentByVariant(c.recipients, 1 + c.messageVariants.length) : null,
       pending,
       situation: isReschedule && c.status === "RUNNING" && pending > 0
         ? { tone: "ok" as const, text: "Enviando aviso de remarcação — 1 a cada 4–6 min, das 8h às 18h" }
@@ -134,7 +138,7 @@ export async function getClinicCampaignStartPreview(campaignId: string) {
   await assertClinicOwnsCampaign(campaignId, clinicId);
   const campaign = await prisma.broadcastCampaign.findUnique({
     where: { id: campaignId },
-    select: { messageTemplate: true, imagePath: true, lowPriority: true, tagOnSend: true, clinic: { select: { technicalDirectorName: true, technicalDirectorCrm: true } } },
+    select: { messageTemplate: true, messageVariants: true, imagePath: true, lowPriority: true, tagOnSend: true, clinic: { select: { technicalDirectorName: true, technicalDirectorCrm: true } } },
   });
   const isReschedule = campaign?.tagOnSend === RESCHEDULE_PENDING_TAG;
   const rt = isReschedule ? null : technicalDirectorLine(campaign?.clinic.technicalDirectorName, campaign?.clinic.technicalDirectorCrm);
@@ -154,13 +158,16 @@ export async function getClinicCampaignStartPreview(campaignId: string) {
     prisma.broadcastRecipient.count({ where: { campaignId, status: "SENT", sentAt: { gte: startOfBrazilDay(new Date()) } } }),
   ]);
   const vars = (first?.variables ?? {}) as Record<string, string>;
+  const previews = campaign ? previewBroadcastVariants([campaign.messageTemplate, ...campaign.messageVariants], vars, { technicalDirector: rt }) : [];
   return {
     pending,
     samplePhone: first?.phone ?? null,
-    sampleMessage: campaign ? buildBroadcastMessage(campaign.messageTemplate, vars, { technicalDirector: rt }) : "",
+    sampleMessage: previews[0]?.text ?? "",
+    /** Todas as variações montadas (a 1ª é a principal). */
+    variantMessages: previews.map((p) => p.text),
     missingTechnicalDirector: !isReschedule && !rt,
-    unknownVariables: campaign ? unknownTemplateVariables(campaign.messageTemplate, vars) : [],
-    unfilled: campaign ? unfilledPlaceholders(campaign.messageTemplate) : [],
+    unknownVariables: [...new Set(previews.flatMap((p) => p.unknownVariables))],
+    unfilled: [...new Set(previews.flatMap((p) => p.unfilled))],
     hasImage: Boolean(campaign?.imagePath),
     lowPriority: Boolean(campaign?.lowPriority),
     ...estimateCampaignFinish({ pending, sentToday, now: new Date(), sharing: campaign?.lowPriority ? 1 : 1 + otherActive }),
@@ -215,12 +222,13 @@ export async function getClinicCampaignForDuplicate(campaignId: string) {
   await assertClinicOwnsCampaign(campaignId, clinicId);
   const c = await prisma.broadcastCampaign.findUnique({
     where: { id: campaignId },
-    select: { name: true, messageTemplate: true, recipients: { select: { phone: true, variables: true } } },
+    select: { name: true, messageTemplate: true, messageVariants: true, recipients: { select: { phone: true, variables: true } } },
   });
   if (!c) throw new Error("Campanha não encontrada");
   return {
     name: `${c.name} (cópia)`,
     template: c.messageTemplate,
+    variants: c.messageVariants,
     recipients: c.recipients.map((r) => ({ phone: r.phone, variables: (r.variables ?? {}) as Record<string, string> })),
   };
 }
@@ -241,7 +249,9 @@ export async function createClinicBroadcastCampaign(
   name: string,
   messageTemplate: string,
   recipients: ParsedBroadcastRecipient[],
-  imageFormData?: FormData
+  imageFormData?: FormData,
+  /** Até 2 variações além da mensagem principal (sorteadas por destinatário). */
+  extraVariants: string[] = []
 ) {
   const { clinicId, userId } = await requireClinicSession();
 
@@ -250,6 +260,8 @@ export async function createClinicBroadcastCampaign(
   if (!trimmedName || !trimmedTemplate) {
     throw new Error("Preencha o nome da campanha e o texto da mensagem.");
   }
+  const checked = normalizeBroadcastVariants(trimmedTemplate, extraVariants);
+  if (!checked.ok) throw new Error(checked.error);
   if (recipients.length === 0) {
     throw new Error("A lista de destinatários está vazia — confira o CSV.");
   }
@@ -289,6 +301,7 @@ export async function createClinicBroadcastCampaign(
       clinicId,
       name: trimmedName,
       messageTemplate: trimmedTemplate,
+      messageVariants: checked.variants.slice(1),
       createdByUserId: userId,
       recipients: {
         create: normalized.map((r) => ({

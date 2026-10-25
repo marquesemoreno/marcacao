@@ -897,6 +897,9 @@ model BroadcastCampaign {
   clinicId        String                  @map("clinic_id")
   name            String
   messageTemplate String                  @map("message_template") @db.Text
+  /// Até 2 variações além de messageTemplate; cada destinatário recebe uma, sorteada
+  /// (pickBroadcastVariant em src/lib/broadcast-variants.ts) — contra bloqueio de número.
+  messageVariants String[]                @default([]) @map("message_variants")
   /// Caminho no bucket privado do Supabase Storage (mesmo bucket do inbox, ver
   /// src/lib/whatsapp-media.ts) — null quando a campanha é só texto.
   imagePath       String?                 @map("image_path")
@@ -933,6 +936,8 @@ model BroadcastRecipient {
   /// Aviso urgente: a recepção marcou que ligou pro paciente (quem não receberia a
   /// mensagem antes da consulta — ver "Precisam de ligação" em /clinic/disparos).
   calledAt     DateTime?                @map("called_at")
+  /// Variação enviada (0 = messageTemplate, 1–2 = messageVariants); null = não enviado.
+  variantIndex Int?                     @map("variant_index")
   createdAt    DateTime                 @default(now()) @map("created_at")
 
   campaign BroadcastCampaign @relation(fields: [campaignId], references: [id])

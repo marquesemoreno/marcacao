@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { sendWhatsAppMessage, sendWhatsAppMedia, toggleNinthDigit } from "@/lib/whatsapp";
 import { getSignedMediaUrl } from "@/lib/whatsapp-media";
 import { technicalDirectorLine, buildBroadcastMessage } from "@/lib/broadcast-csv";
+import { pickBroadcastVariant } from "@/lib/broadcast-variants";
 import { RESCHEDULE_PENDING_TAG } from "@/lib/conversation-tags";
 import { lastAutomatedSend } from "@/lib/automated-pacing-server";
 import { isWithinReminderWindow, lowPriorityMustYield } from "@/lib/automated-pacing";
@@ -109,7 +110,9 @@ export async function dispatchNextBatch(): Promise<{ processed: number }> {
       }
 
       const variables = recipient.variables as Record<string, string>;
-      const text = buildBroadcastMessage(campaign.messageTemplate, variables, {
+      // Até 3 textos por campanha: cada destinatário recebe um (fixo por destinatário).
+      const variant = pickBroadcastVariant([campaign.messageTemplate, ...campaign.messageVariants], recipient.id);
+      const text = buildBroadcastMessage(variant.text, variables, {
         technicalDirector:
           campaign.tagOnSend === RESCHEDULE_PENDING_TAG
             ? null
@@ -143,7 +146,7 @@ export async function dispatchNextBatch(): Promise<{ processed: number }> {
         where: { id: recipient.id },
         data:
           result.success || result.skipped
-            ? { status: "SENT", sentAt: new Date() }
+            ? { status: "SENT", sentAt: new Date(), variantIndex: variant.index }
             : { status: "FAILED", errorMessage: failureReason },
       });
 

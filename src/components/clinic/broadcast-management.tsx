@@ -1,5 +1,6 @@
 "use client";
 
+import { normalizeBroadcastVariants, previewBroadcastVariants } from "@/lib/broadcast-variants";
 import { PageHeader } from "@/components/clinic/page-header";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { CalendarClock, Copy, Image as ImageIcon, Loader2, MoreHorizontal, Pause, Phone, Play, Plus, Trash2, Upload, X } from "lucide-react";
@@ -97,6 +98,8 @@ export function BroadcastManagement() {
 
   const [name, setName] = useState("");
   const [template, setTemplate] = useState("");
+  // Variações 2 e 3 (opcionais): cada paciente recebe um dos textos, contra bloqueio.
+  const [extraVariants, setExtraVariants] = useState<string[]>(["", ""]);
   const [csvText, setCsvText] = useState("");
   const [recipients, setRecipients] = useState<ParsedBroadcastRecipient[]>([]);
   const [csvError, setCsvError] = useState<string | null>(null);
@@ -198,6 +201,7 @@ export function BroadcastManagement() {
   function resetForm() {
     setName("");
     setTemplate("");
+    setExtraVariants(["", ""]);
     setCsvText("");
     setCsvError(null);
     setRecipients([]);
@@ -238,7 +242,7 @@ export function BroadcastManagement() {
         imageFormData = new FormData();
         imageFormData.set("image", image);
       }
-      await createClinicBroadcastCampaign(name, template, recipients, imageFormData);
+      await createClinicBroadcastCampaign(name, template, recipients, imageFormData, extraVariants);
       toast.success("Campanha criada como rascunho. Confira e clique em Iniciar quando estiver pronto.");
       resetForm();
       setFormOpen(false);
@@ -315,6 +319,7 @@ export function BroadcastManagement() {
       resetForm();
       setName(copy.name);
       setTemplate(copy.template);
+      setExtraVariants([copy.variants[0] ?? "", copy.variants[1] ?? ""]);
       setAudienceSource("csv");
       setRecipients(copy.recipients);
       setCsvText("");
@@ -363,9 +368,13 @@ export function BroadcastManagement() {
 
   const sampleVars = recipients[0]?.variables ?? {};
   const columns = Object.keys(sampleVars);
-  const unknownVars = template.trim() && recipients.length ? unknownTemplateVariables(template, sampleVars) : [];
-  const unfilled = unfilledPlaceholders(template);
-  const livePreview = template.trim() ? buildBroadcastMessage(template, sampleVars) : "";
+  const variantCheck = template.trim() ? normalizeBroadcastVariants(template, extraVariants) : null;
+  const allTexts = variantCheck?.ok ? variantCheck.variants : template.trim() ? [template] : [];
+  const variantPreviews = previewBroadcastVariants(allTexts, sampleVars);
+  const unknownVars = recipients.length ? [...new Set(variantPreviews.flatMap((p) => p.unknownVariables))] : [];
+  const unfilled = [...new Set(variantPreviews.flatMap((p) => p.unfilled))];
+  const variantError = variantCheck && !variantCheck.ok ? variantCheck.error : null;
+  const livePreview = variantPreviews[0]?.text ?? "";
   const formEstimate = recipients.length ? estimateCampaignFinish({ pending: recipients.length, sentToday: 0, now: new Date() }) : null;
   const sourceOptions: [Source, string][] = [
     ...(audienceSource === "selecao" ? ([["selecao", `Seleção da lista de pacientes`]] as [Source, string][]) : []),
@@ -544,6 +553,31 @@ export function BroadcastManagement() {
               placeholder={"Ex.: Olá {{nome}}, temos novidades para você…"}
               className="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 resize-y"
             />
+            <details className="rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2" open={extraVariants.some((v) => v.trim() !== "")}>
+              <summary className="cursor-pointer text-sm font-medium text-slate-700 dark:text-slate-200">
+                Variações da mensagem (opcional) — cada paciente recebe um dos textos, sorteado
+              </summary>
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                Textos diferentes para o mesmo recado reduzem o risco de bloqueio do número. Use as mesmas variáveis da mensagem principal.
+              </p>
+              {extraVariants.map((v, i) => (
+                <label key={i} className="mt-2 block text-xs font-medium text-slate-600 dark:text-slate-400">
+                  Variação {i + 2}
+                  <textarea
+                    rows={4}
+                    value={v}
+                    onChange={(e) => setExtraVariants((prev) => prev.map((p, j) => (j === i ? e.target.value : p)))}
+                    placeholder="Mesmo recado, com outras palavras…"
+                    className="mt-1 w-full px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 resize-y"
+                  />
+                </label>
+              ))}
+            </details>
+            {variantError && (
+              <p aria-live="polite" className="text-sm text-red-600 dark:text-red-400">
+                {variantError}
+              </p>
+            )}
             {columns.length > 0 && (
               <div className="flex flex-wrap items-center gap-1.5 text-xs">
                 <span className="text-slate-500 dark:text-slate-400">Inserir:</span>
@@ -573,14 +607,18 @@ export function BroadcastManagement() {
             <p className="text-xs text-slate-500 dark:text-slate-400">
               Toda mensagem termina com “{BROADCAST_OPT_OUT_FOOTER}” — quem responder 9 não recebe mais campanhas.
             </p>
-            {livePreview && (
-              <div>
-                <p className={labelClass}>Prévia{recipients[0] ? " (1º destinatário)" : ""}</p>
-                <div className="mt-1 max-h-60 overflow-y-auto whitespace-pre-wrap rounded-lg border border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/40 p-3 text-sm text-slate-900 dark:text-slate-100">
-                  {livePreview}
+            {livePreview &&
+              variantPreviews.map((p, i) => (
+                <div key={i}>
+                  <p className={labelClass}>
+                    Prévia{variantPreviews.length > 1 ? ` — ${i === 0 ? "mensagem principal" : `variação ${i + 1}`}` : ""}
+                    {recipients[0] ? " (1º destinatário)" : ""}
+                  </p>
+                  <div className="mt-1 max-h-60 overflow-y-auto whitespace-pre-wrap rounded-lg border border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/40 p-3 text-sm text-slate-900 dark:text-slate-100">
+                    {p.text}
+                  </div>
                 </div>
-              </div>
-            )}
+              ))}
           </fieldset>
 
           {/* 3. Imagem */}
@@ -619,7 +657,7 @@ export function BroadcastManagement() {
             </p>
             <button
               type="button"
-              disabled={creating || unknownVars.length > 0 || unfilled.length > 0 || !name.trim() || !template.trim()}
+              disabled={creating || unknownVars.length > 0 || unfilled.length > 0 || Boolean(variantError) || !name.trim() || !template.trim()}
               title={!name.trim() ? "Dê um nome à campanha" : !template.trim() ? "Escreva a mensagem" : undefined}
               onClick={handleCreate}
               className="inline-flex h-9 items-center gap-1.5 px-4 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 rounded-lg"
@@ -759,6 +797,19 @@ export function BroadcastManagement() {
                   {confirming.preview.sampleMessage}
                 </div>
               </div>
+              {confirming.preview.variantMessages.length > 1 && (
+                <details className="text-sm">
+                  <summary className="cursor-pointer font-medium text-slate-700 dark:text-slate-200">
+                    Ver as {confirming.preview.variantMessages.length} variações (cada paciente recebe uma)
+                  </summary>
+                  {confirming.preview.variantMessages.slice(1).map((m, i) => (
+                    <div key={i} className="mt-2 max-h-48 overflow-y-auto whitespace-pre-wrap rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 p-3 text-slate-900 dark:text-slate-100">
+                      <p className="mb-1 text-xs font-semibold text-slate-500 dark:text-slate-400">Variação {i + 2}</p>
+                      {m}
+                    </div>
+                  ))}
+                </details>
+              )}
               {(confirming.preview.unknownVariables.length > 0 || confirming.preview.unfilled.length > 0) && (
                 <div role="alert" className="rounded-lg border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/40 p-3 text-sm text-red-800 dark:text-red-300 space-y-2">
                   <p>
@@ -982,6 +1033,11 @@ function CampaignCard({
           {c.noConsent > 0 && ` · ${c.noConsent} sem consentimento para campanhas`}
           {c.failed > 0 && <span className="text-red-700 dark:text-red-400"> · {plural(c.failed, "falha", "falhas")}</span>}
         </p>
+        {c.sentByVariant && (
+          <p className="mt-0.5 text-xs text-slate-600 dark:text-slate-400 tabular-nums">
+            Por texto: {c.sentByVariant.map((n, i) => `${i === 0 ? "principal" : `variação ${i + 1}`} ${n}`).join(" · ")}
+          </p>
+        )}
         {c.failed > 0 && (
           <details className="mt-2 text-xs">
             <summary className="cursor-pointer font-medium text-red-700 dark:text-red-400">Ver falhas</summary>
