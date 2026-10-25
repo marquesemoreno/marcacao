@@ -393,3 +393,41 @@ conectar um canal real, principalmente a etiqueta com palavra-chave gatilho.
   rascunho. Testar depois de conectar o WhatsApp.
 - Criados além da lista anterior: motivo de fechamento **TESTE - Consulta realizada**;
   oportunidade #7472 movida para "Consulta marcada", previsão 28/10, status Ganho.
+
+## Relatórios do CRM (abertos e gerados, 2026-10-25)
+
+13 relatórios em `/relatorios/*`, todos com atalhos de período (hoje, 7, 30, 90 dias) e
+botão Imprimir. Exportação: os mais novos oferecem **XLSX e CSV**; os mais antigos só
+**Excel**. Não clicamos em exportar (download). **Não há rota de relatórios na API
+externa**; a saída é exportar pela tela ou usar `dash/*`, `listTickets` e
+`showAllMessages`.
+
+| Relatório | Caminho | Conteúdo / filtros |
+|---|---|---|
+| Atendimentos | `atendimentos-por-parametros` | status, conexões, filas, usuário, tipo, canal, demanda, valor mín/máx |
+| Lista de contatos | `lista-contatos` | período; exporta Excel |
+| Contatos por carteira / estado (DDD) / etiqueta / kanban | `contatos-por-*` | seleção de carteira, UF, etiqueta ou kanban |
+| Funil por atendente | `funil-por-atendente` | ganhas, perdidas, valor vendido/perdido, conversão por atendente |
+| Produtividade diária | `produtividade-diaria` | atendimentos, iniciados, resolvidos, mensagens manuais, dias ativos, média/dia |
+| Resumo por usuário | `estatisticas-atendimentos-usuarios` | atendimentos por usuário e período |
+| Pausas dos atendentes | `pausas` | histórico e tempo de pausa |
+| Relacionamento por tipo | `relacionamento-por-tipo` | ações de relacionamento por tipo e atendente |
+| Ações até a venda | `acoes-ate-venda` | ações de relacionamento antes de cada venda |
+| Tarefas por atendente | `tarefas-por-atendente` | pendentes, concluídas, atrasadas (período pela criação) |
+
+**Relatório de Atendimentos (gerado, 30 dias, 4 tickets de teste):** colunas ID, Status,
+Tipo (Receptivo/Ativo), Nome, Número, Conexão, Última mensagem, Msgs não lidas, Demanda,
+Fila, Usuário, Canal, Valor, Notas, Data de criação, Início do atendimento, Data de
+fechamento, **Tempo até atribuição**, **Tempo até 1ª resposta** e **Tempo de
+atendimento**, com médias no rodapé (nos testes: 1min27 / 1min57 / 2min24). Equivale
+ao que o MARCACAO calcula em `response-timings.ts` (FRT/TTR). O **tempo até a 1ª
+resposta é do atendente**, não conta a resposta automática do CRM (no teste, a
+resposta automática chegou antes e não zerou o contador).
+
+**Produtividade diária:** a nota da própria tela avisa que conta pela data em que o
+atendimento *aconteceu* e que um atendimento respondido por dois atendentes conta para
+os dois, por isso difere do Resumo por Usuário.
+
+Comparado ao MARCACAO (/clinic/relatorio): o CRM não tem conversão por origem do
+paciente, motivos de perda, faturamento estimado, confirmações de consulta nem pico de
+horário. Tem o que o MARCACAO não tem: pausas de atendente e ações até a venda.
