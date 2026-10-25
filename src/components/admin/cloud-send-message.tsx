@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { CheckCheck, Check, Clock, Loader2, Send, XCircle } from "lucide-react";
-import { listCloudInbound, listCloudTestMessages, sendCloudTestText, type CloudAssets } from "@/actions/admin-whatsapp-cloud";
+import { CheckCheck, Check, Clock, Loader2, Send, Trash2, XCircle } from "lucide-react";
+import { clearCloudTestMessages, listCloudInbound, listCloudTestMessages, sendCloudTestText, type CloudAssets } from "@/actions/admin-whatsapp-cloud";
 import { t, type I18nKey, type Lang } from "@/lib/i18n-review";
 import { CloudTabs } from "@/components/admin/cloud-tabs";
 
@@ -30,6 +30,17 @@ export function CloudSendMessage({ assets, lang, base = "/admin/whatsapp" }: { a
   const [sending, setSending] = useState(false);
   const [rows, setRows] = useState<Row[]>([]);
   const [inbound, setInbound] = useState<Awaited<ReturnType<typeof listCloudInbound>>>([]);
+  // Recebidas vêm do log do webhook (não se apaga) — "apagar" esconde as anteriores a este instante.
+  const cutoffKey = `cloud-inbound-cutoff:${phoneNumberId}`;
+  const [cutoff, setCutoff] = useState(0);
+  useEffect(() => {
+    try {
+      setCutoff(Number(localStorage.getItem(cutoffKey)) || 0);
+    } catch {
+      setCutoff(0);
+    }
+  }, [cutoffKey]);
+  const visibleInbound = inbound.filter((m) => new Date(m.at).getTime() > cutoff);
 
   const refresh = useCallback(() => {
     if (clinicId) listCloudTestMessages(clinicId).then(setRows).catch(() => {});
@@ -41,6 +52,18 @@ export function CloudSendMessage({ assets, lang, base = "/admin/whatsapp" }: { a
     const timer = setInterval(refresh, 3000);
     return () => clearInterval(timer);
   }, [refresh]);
+
+  async function clearAll() {
+    if (!clinicId || !window.confirm(tt("send.clearConfirm"))) return;
+    const now = Date.now();
+    try {
+      localStorage.setItem(cutoffKey, String(now));
+    } catch {}
+    setCutoff(now);
+    await clearCloudTestMessages(clinicId);
+    setRows([]);
+    toast.success(tt("send.cleared"));
+  }
 
   async function send() {
     if (!asset) return;
@@ -135,14 +158,27 @@ export function CloudSendMessage({ assets, lang, base = "/admin/whatsapp" }: { a
         </section>
       )}
 
+      {assets.length > 0 && (
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={clearAll}
+            className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-200 dark:border-slate-700 px-3 text-sm font-medium text-rose-700 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40"
+          >
+            <Trash2 className="w-4 h-4" aria-hidden />
+            {tt("send.clear")}
+          </button>
+        </div>
+      )}
+
       <section className="space-y-2">
         <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">{tt("send.inbox")}</h2>
         <p className="text-xs text-slate-500 dark:text-slate-400">{tt("send.inboxTip")}</p>
-        {inbound.length === 0 ? (
+        {visibleInbound.length === 0 ? (
           <p className="text-sm text-slate-600 dark:text-slate-400">{tt("send.inboxEmpty")}</p>
         ) : (
           <ul className={`${panel} divide-y divide-slate-100 dark:divide-slate-800`} aria-live="polite">
-            {inbound.map((m) => (
+            {visibleInbound.map((m) => (
               <li key={m.id} className="px-4 py-2.5 text-sm">
                 <p className="text-slate-900 dark:text-slate-100 whitespace-pre-wrap break-words">{m.text}</p>
                 <p className="text-xs text-slate-500 dark:text-slate-400 tabular-nums">

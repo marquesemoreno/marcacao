@@ -345,6 +345,13 @@ export async function listCloudInbound(phoneNumberId: string) {
   return out.slice(0, 10);
 }
 
+/** Apaga o histórico de envios de teste da clínica (pra regravar a tela limpa). */
+export async function clearCloudTestMessages(clinicId: string) {
+  await requireCloudAccess(clinicId);
+  const r = await prisma.cloudTestMessage.deleteMany({ where: { clinicId } });
+  return { success: true as const, count: r.count };
+}
+
 export async function listCloudTestMessages(clinicId: string) {
   await requireCloudAccess(clinicId);
   const rows = await prisma.cloudTestMessage.findMany({ where: { clinicId }, orderBy: { createdAt: "desc" }, take: 20 });
