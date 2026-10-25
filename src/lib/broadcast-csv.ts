@@ -56,7 +56,7 @@ const DEFAULT_HEADERS = ["telefone", "nome", "procedimento", "data"];
  * pela linha que tiver mais ocorrências, em vez de assumir vírgula sempre. Colar
  * direto de uma planilha vem com \t entre colunas, não , nem ; — sem checar tab
  * antes, isso quebrava a detecção de cabeçalho. */
-function detectDelimiter(firstLine: string): "," | ";" | "\t" {
+export function detectDelimiter(firstLine: string): "," | ";" | "\t" {
   if (firstLine.includes("\t")) return "\t";
   const semicolons = (firstLine.match(/;/g) ?? []).length;
   const commas = (firstLine.match(/,/g) ?? []).length;
