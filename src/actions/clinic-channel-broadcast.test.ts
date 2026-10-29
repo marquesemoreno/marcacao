@@ -47,6 +47,25 @@ describe("createClinicChannelCampaign", () => {
     expect(prismaMock.broadcastCampaign.create).not.toHaveBeenCalled();
   });
 
+  it("SMS aceita público pronto (sem CSV), limpando inválidos e repetidos", async () => {
+    const out = await createClinicChannelCampaign({
+      ...base,
+      channel: "SMS",
+      csv: "",
+      recipients: [
+        { phone: "77999991234", variables: { nome: "Ana" } },
+        { phone: "(77) 99999-1234", variables: { nome: "Ana de novo" } },
+        { phone: "123", variables: {} },
+      ],
+    });
+    expect(out).toMatchObject({ success: true, total: 1, invalid: 1, duplicates: 1 });
+  });
+
+  it("e-mail não aceita público pronto", async () => {
+    const out = await createClinicChannelCampaign({ ...base, csv: "", recipients: [{ phone: "77999991234", variables: {} }] });
+    expect(out).toMatchObject({ success: false });
+  });
+
   it("canal WhatsApp não passa por aqui", async () => {
     expect(await createClinicChannelCampaign({ ...base, channel: "WHATSAPP" as never })).toMatchObject({ success: false });
   });

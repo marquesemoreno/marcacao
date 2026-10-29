@@ -120,6 +120,7 @@ export function BroadcastManagement() {
   const [channelSetup, setChannelSetup] = useState<ChannelSetup | null>(null);
   const [consentOpen, setConsentOpen] = useState(false);
   const [channelFormKey, setChannelFormKey] = useState(0);
+  const [selectionList, setSelectionList] = useState<ParsedBroadcastRecipient[]>([]);
 
   const [name, setName] = useState("");
   const [template, setTemplate] = useState("");
@@ -177,6 +178,7 @@ export function BroadcastManagement() {
         if (parsed.length > 0) {
           setAudienceSource("selecao");
           setRecipients(parsed);
+          setSelectionList(parsed);
           setFormOpen(true);
         }
       } catch {
@@ -561,6 +563,7 @@ export function BroadcastManagement() {
               <ChannelCampaignFields
                 key={`${formChannel}-${channelFormKey}`}
                 channel={formChannel}
+                audiences={{ hasBridge, marcadores: marcadoresAudience, selecao: selectionList }}
                 onCreated={() => {
                   setChannelFormKey((k) => k + 1);
                   setFormOpen(false);

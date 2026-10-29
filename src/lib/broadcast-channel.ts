@@ -106,7 +106,15 @@ export function prepareChannelRecipients(
     channel === "EMAIL"
       ? parseEmailCsv(csv).map((r) => ({ raw: r.email, variables: r.variables }))
       : parseBroadcastCsv(csv).map((r) => ({ raw: r.phone, variables: r.variables }));
+  return prepareChannelRows(channel, rows);
+}
 
+/** Mesma limpeza (endereço válido, sem repetidos) para públicos que já vêm prontos — sistema
+ * da clínica, marcadores, seleção da lista de pacientes (só telefone, então só SMS). */
+export function prepareChannelRows(
+  channel: "SMS" | "EMAIL",
+  rows: { raw: string; variables: Record<string, string> }[]
+): { recipients: { address: string; variables: Record<string, string> }[]; invalid: number; duplicates: number } {
   const seen = new Set<string>();
   const recipients: { address: string; variables: Record<string, string> }[] = [];
   let invalid = 0;

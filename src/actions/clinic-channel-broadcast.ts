@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { isClinicManager, requireClinicManager, requireClinicSession } from "@/lib/session";
 import { normalizeBroadcastVariants } from "@/lib/broadcast-variants";
-import { prepareChannelRecipients } from "@/lib/broadcast-channel";
+import { prepareChannelRecipients, prepareChannelRows } from "@/lib/broadcast-channel";
 import { missingChannelConfig } from "@/lib/channel-config";
 import { channelSendDecision, parseConsentList, planConsentChanges } from "@/lib/channel-consent";
 
@@ -24,6 +24,8 @@ export async function createClinicChannelCampaign(input: {
   messageTemplate: string;
   extraVariants: string[];
   csv: string;
+  /** Público pronto (sistema da clínica, marcadores, seleção de pacientes) no lugar do CSV — só SMS. */
+  recipients?: { phone: string; variables: Record<string, string> }[];
 }) {
   const { clinicId, userId } = await requireClinicSession();
 
@@ -41,7 +43,11 @@ export async function createClinicChannelCampaign(input: {
 
   let prepared: ReturnType<typeof prepareChannelRecipients>;
   try {
-    prepared = prepareChannelRecipients(input.channel, input.csv);
+    if (input.recipients) {
+      if (input.channel !== "SMS") return fail("Para e-mail, use uma lista com a coluna email.");
+      if (input.recipients.length > MAX_CONSENTS_PER_CALL) return fail(`No máximo ${MAX_CONSENTS_PER_CALL} destinatários por campanha.`);
+      prepared = prepareChannelRows("SMS", input.recipients.map((r) => ({ raw: String(r.phone ?? ""), variables: r.variables ?? {} })));
+    } else prepared = prepareChannelRecipients(input.channel, input.csv);
   } catch (error) {
     return fail(error instanceof Error ? error.message : "Não foi possível ler o CSV.");
   }

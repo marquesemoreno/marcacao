@@ -9,6 +9,8 @@ import { applyBroadcastVariables } from "@/lib/broadcast-csv";
 import { parseConsentList } from "@/lib/channel-consent";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { BroadcastPreview } from "@/components/clinic/broadcast-preview";
+import { BridgeAudiencePicker } from "@/components/clinic/bridge-audience-picker";
+import type { ParsedBroadcastRecipient } from "@/lib/broadcast-csv";
 
 const inputClass =
   "w-full mt-1 h-9 px-3 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500";
@@ -32,7 +34,32 @@ const FOOTER_SAMPLE = `\nRT: Dr. Nome Sobrenome — CRM-BA 12345\nSair: https://
 /** Campos de "Nova campanha" quando o canal é SMS ou e-mail (o WhatsApp fica em
  * broadcast-management.tsx). Público por lista com telefone/e-mail; só recebe quem tem aceite
  * daquele canal (LGPD). Cria rascunho — o início passa pela confirmação da lista. */
-export function ChannelCampaignFields({ channel, onCreated }: { channel: Channel; onCreated: () => void }) {
+type SmsSource = "csv" | "bridge" | "marcadores" | "selecao";
+
+export function ChannelCampaignFields({
+  channel,
+  onCreated,
+  audiences,
+}: {
+  channel: Channel;
+  onCreated: () => void;
+  /** Públicos prontos da tela de Disparos (só telefone, então só para SMS). */
+  audiences: { hasBridge: boolean; marcadores: ParsedBroadcastRecipient[]; selecao: ParsedBroadcastRecipient[] };
+}) {
+  const sources: [SmsSource, string][] =
+    channel === "SMS"
+      ? [
+          ...(audiences.selecao.length ? ([["selecao", `Seleção da lista de pacientes (${audiences.selecao.length})`]] as [SmsSource, string][]) : []),
+          ...(audiences.hasBridge ? ([["bridge", "Pacientes do sistema da clínica"]] as [SmsSource, string][]) : []),
+          ...(audiences.marcadores.length ? ([["marcadores", `Marcadores (${audiences.marcadores.length})`]] as [SmsSource, string][]) : []),
+          ["csv", "Colar lista / arquivo"],
+        ]
+      : [["csv", "Colar lista / arquivo"]];
+  const [source, setSource] = useState<SmsSource>(sources[0][0]);
+  const [bridgeRecipients, setBridgeRecipients] = useState<ParsedBroadcastRecipient[]>([]);
+  const ready: ParsedBroadcastRecipient[] | null =
+    source === "selecao" ? audiences.selecao : source === "marcadores" ? audiences.marcadores : source === "bridge" ? bridgeRecipients : null;
+  const columns = ready?.[0] ? Object.keys(ready[0].variables) : [];
   const [name, setName] = useState("");
   const [subject, setSubject] = useState("");
   const [template, setTemplate] = useState("");
@@ -40,15 +67,15 @@ export function ChannelCampaignFields({ channel, onCreated }: { channel: Channel
   const [csv, setCsv] = useState("");
   const [busy, setBusy] = useState(false);
 
-  const sampleVars = { nome: "Maria", procedimento: "consulta", data: "10/11" };
+  const sampleVars = ready?.[0]?.variables ?? { nome: "Maria", procedimento: "consulta", data: "10/11" };
   const sample = template.trim() ? applyBroadcastVariables(template, sampleVars) : "";
   const credits = smsCredits(`${sample}${FOOTER_SAMPLE}`);
-  const missing = !name.trim() ? "Falta dar um nome à campanha." : !template.trim() ? "Falta escrever a mensagem." : channel === "EMAIL" && !subject.trim() ? "Falta o assunto do e-mail." : !csv.trim() ? "Falta a lista de destinatários." : null;
+  const missing = !name.trim() ? "Falta dar um nome à campanha." : !template.trim() ? "Falta escrever a mensagem." : channel === "EMAIL" && !subject.trim() ? "Falta o assunto do e-mail." : ready ? (ready.length === 0 ? (source === "bridge" ? "Clique em “Ver prévia do público”." : "O público está vazio.") : null) : !csv.trim() ? "Falta a lista de destinatários." : null;
 
   async function submit() {
     setBusy(true);
     try {
-      const result = await createClinicChannelCampaign({ channel, name, subject, messageTemplate: template, extraVariants: variants, csv });
+      const result = await createClinicChannelCampaign({ channel, name, subject, messageTemplate: template, extraVariants: variants, csv: ready ? "" : csv, recipients: ready ?? undefined });
       if (!result.success) {
         toast.error(result.error);
         return;
@@ -82,6 +109,32 @@ export function ChannelCampaignFields({ channel, onCreated }: { channel: Channel
 
       <fieldset className="space-y-2">
         <legend className="text-sm font-semibold text-slate-800 dark:text-slate-100">1. Para quem</legend>
+        {sources.length > 1 && (
+          <div role="radiogroup" aria-label="Público" className="inline-flex flex-wrap rounded-lg border border-slate-200 dark:border-slate-700 p-0.5 text-sm">
+            {sources.map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                role="radio"
+                aria-checked={source === value}
+                onClick={() => setSource(value)}
+                className={`px-3 h-8 rounded-md font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50 ${
+                  source === value ? "bg-emerald-600 text-white" : "text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
+        {source === "bridge" ? (
+          <BridgeAudiencePicker onRecipients={setBridgeRecipients} />
+        ) : ready ? (
+          <p className="rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 p-3 text-sm text-emerald-900 dark:text-emerald-200">
+            <strong>{ready.length}</strong> {ready.length === 1 ? "contato" : "contatos"} {source === "marcadores" ? "dos Marcadores" : "selecionados na lista de pacientes"}.
+          </p>
+        ) : (
+        <>
         <div className="flex items-center justify-between gap-2">
           <label htmlFor="channel-csv" className={labelClass}>
             Lista com a coluna {channel === "EMAIL" ? "email" : "telefone"} — as outras colunas viram variáveis (pode colar de uma planilha)
@@ -103,6 +156,11 @@ export function ChannelCampaignFields({ channel, onCreated }: { channel: Channel
           </label>
         </div>
         <textarea id="channel-csv" className={`${textareaClass} font-mono`} rows={5} value={csv} onChange={(e) => setCsv(e.target.value)} placeholder={CSV_HINT[channel]} />
+        </>
+        )}
+        {source === "bridge" && bridgeRecipients.length > 0 && (
+          <p className="text-sm font-medium text-emerald-700 dark:text-emerald-400">{bridgeRecipients.length} contatos no público.</p>
+        )}
         <p className="text-xs text-slate-500 dark:text-slate-400">
           Só recebe quem tem aceite de {channel === "EMAIL" ? "e-mail" : "SMS"} registrado pela gestão — o aceite do WhatsApp não vale aqui. Os demais ficam como “Sem
           consentimento”.
@@ -131,7 +189,9 @@ export function ChannelCampaignFields({ channel, onCreated }: { channel: Channel
             placeholder="Ex.: Olá {{nome}}, temos horários para {{procedimento}} esta semana."
           />
         </label>
-        <p className="text-xs text-slate-500 dark:text-slate-400">Use {"{{nome}}"}, {"{{procedimento}}"} ou qualquer coluna da lista entre chaves.</p>
+        <p className="text-xs text-slate-500 dark:text-slate-400">
+          {columns.length ? `Variáveis deste público: ${columns.map((c) => `{{${c}}}`).join(", ")}` : <>Use {"{{nome}}"}, {"{{procedimento}}"} ou qualquer coluna da lista entre chaves.</>}
+        </p>
         {channel === "SMS" && template.trim() && (
           <p className={`text-xs ${credits > 1 ? "text-amber-700 dark:text-amber-400" : "text-slate-600 dark:text-slate-400"}`}>
             Com o responsável técnico e o link para sair, cada SMS deve consumir cerca de {credits} {credits === 1 ? "crédito" : "créditos"} (160 caracteres no primeiro, 153
@@ -150,7 +210,7 @@ export function ChannelCampaignFields({ channel, onCreated }: { channel: Channel
           </button>
         )}
         {sample && (
-          <BroadcastPreview label="Prévia (com dados de exemplo e o rodapé obrigatório)">
+          <BroadcastPreview label={`Prévia (${ready?.[0] ? "1º destinatário" : "dados de exemplo"}, com o rodapé obrigatório)`}>
             {channel === "EMAIL" && subject.trim() && <p className="mb-2 font-semibold">{applyBroadcastVariables(subject, sampleVars)}</p>}
             {sample}
             {FOOTER_SAMPLE.replace(/x{42}/, "…")}
