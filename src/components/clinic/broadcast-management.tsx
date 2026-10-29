@@ -1,6 +1,7 @@
 "use client";
 
 import { normalizeBroadcastVariants, previewBroadcastVariants } from "@/lib/broadcast-variants";
+import { buildTemplateParams, checkTemplateParamSources, renderTemplatePreview } from "@/lib/broadcast-cloud-template";
 import { PageHeader } from "@/components/clinic/page-header";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { CalendarClock, Copy, Image as ImageIcon, Loader2, MoreHorizontal, Pause, Phone, Play, Plus, Trash2, Upload, X } from "lucide-react";
@@ -18,6 +19,8 @@ import {
   getClinicCampaignStartPreview,
   deleteClinicDraftCampaign,
   getClinicCampaignForDuplicate,
+  getClinicCloudBroadcastSetup,
+  type ClinicCloudTemplate,
   retryClinicCampaignFailures,
   getClinicNextAutomatedSend,
   setRecipientCalled,
@@ -100,6 +103,10 @@ export function BroadcastManagement() {
   const [template, setTemplate] = useState("");
   // Variações 2 e 3 (opcionais): cada paciente recebe um dos textos, contra bloqueio.
   const [extraVariants, setExtraVariants] = useState<string[]>(["", ""]);
+  // API oficial: só modelo aprovado pela Meta; cada {{n}} recebe variável e/ou texto fixo.
+  const [cloud, setCloud] = useState<{ active: boolean; templates: ClinicCloudTemplate[]; error?: string } | null>(null);
+  const [cloudTemplateName, setCloudTemplateName] = useState("");
+  const [cloudParams, setCloudParams] = useState<string[]>([]);
   const [csvText, setCsvText] = useState("");
   const [recipients, setRecipients] = useState<ParsedBroadcastRecipient[]>([]);
   const [csvError, setCsvError] = useState<string | null>(null);
@@ -139,6 +146,7 @@ export function BroadcastManagement() {
     loadCampaigns();
     clinicHasBridgeAudience().then(setHasBridge).catch(() => {});
     listMarcadoresAudience().then(setMarcadoresAudience).catch(() => {});
+    getClinicCloudBroadcastSetup().then(setCloud).catch(() => {});
     // "Enviar disparo" da lista de pacientes chega com ?selecao=1 e a seleção no
     // sessionStorage — vira o público desta campanha (lido uma vez e apagado).
     if (new URLSearchParams(window.location.search).get("selecao") === "1") {
@@ -209,6 +217,8 @@ export function BroadcastManagement() {
     setName("");
     setTemplate("");
     setExtraVariants(["", ""]);
+    setCloudTemplateName("");
+    setCloudParams([]);
     setCsvText("");
     setCsvError(null);
     setRecipients([]);
@@ -249,7 +259,14 @@ export function BroadcastManagement() {
         imageFormData = new FormData();
         imageFormData.set("image", image);
       }
-      await createClinicBroadcastCampaign(name, template, recipients, imageFormData, extraVariants);
+      await createClinicBroadcastCampaign(
+        name,
+        cloudMode ? selectedTemplate?.bodyText ?? "" : template,
+        recipients,
+        cloudMode ? undefined : imageFormData,
+        cloudMode ? [] : extraVariants,
+        cloudMode ? { name: cloudTemplateName, params: cloudParams } : undefined
+      );
       toast.success("Campanha criada como rascunho. Confira e clique em Iniciar quando estiver pronto.");
       resetForm();
       setFormOpen(false);
@@ -327,6 +344,8 @@ export function BroadcastManagement() {
       setName(copy.name);
       setTemplate(copy.template);
       setExtraVariants([copy.variants[0] ?? "", copy.variants[1] ?? ""]);
+      setCloudTemplateName(copy.cloudTemplateName ?? "");
+      setCloudParams(copy.cloudTemplateParams ?? []);
       setAudienceSource("csv");
       setRecipients(copy.recipients);
       setCsvText("");
@@ -378,9 +397,21 @@ export function BroadcastManagement() {
   const variantCheck = template.trim() ? normalizeBroadcastVariants(template, extraVariants) : null;
   const allTexts = variantCheck?.ok ? variantCheck.variants : template.trim() ? [template] : [];
   const variantPreviews = previewBroadcastVariants(allTexts, sampleVars);
-  const unknownVars = recipients.length ? [...new Set(variantPreviews.flatMap((p) => p.unknownVariables))] : [];
-  const unfilled = [...new Set(variantPreviews.flatMap((p) => p.unfilled))];
-  const variantError = variantCheck && !variantCheck.ok ? variantCheck.error : null;
+  const cloudMode = Boolean(cloud?.active);
+  const selectedTemplate = cloud?.templates.find((t) => t.name === cloudTemplateName) ?? null;
+  const templateProblem = cloudMode
+    ? !selectedTemplate
+      ? "Escolha o modelo aprovado."
+      : recipients.length
+        ? checkTemplateParamSources(selectedTemplate.variableCount, cloudParams, columns)
+        : null
+    : null;
+  const builtCloud = selectedTemplate ? buildTemplateParams(cloudParams.slice(0, selectedTemplate.variableCount), sampleVars) : null;
+  const cloudPreview = selectedTemplate && builtCloud?.ok ? renderTemplatePreview(selectedTemplate.bodyText, builtCloud.params) : selectedTemplate?.bodyText ?? "";
+  const unknownVars = !cloudMode && recipients.length ? [...new Set(variantPreviews.flatMap((p) => p.unknownVariables))] : [];
+  const unfilled = cloudMode ? [] : [...new Set(variantPreviews.flatMap((p) => p.unfilled))];
+  const variantError = cloudMode ? templateProblem : variantCheck && !variantCheck.ok ? variantCheck.error : null;
+  const hasMessage = cloudMode ? Boolean(selectedTemplate) : Boolean(template.trim());
   const livePreview = variantPreviews[0]?.text ?? "";
   const formEstimate = recipients.length ? estimateCampaignFinish({ pending: recipients.length, sentToday: 0, now: new Date() }) : null;
   const sourceOptions: [Source, string][] = [
@@ -548,6 +579,71 @@ export function BroadcastManagement() {
           {/* 2. Mensagem */}
           <fieldset className="space-y-2">
             <legend className="text-sm font-semibold text-slate-800 dark:text-slate-100">2. Mensagem</legend>
+            {cloudMode ? (
+              <div className="space-y-3">
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Esta clínica usa a API oficial do WhatsApp: campanhas só podem usar um modelo aprovado pela Meta. O texto é o do modelo; você escolhe o que entra
+                  em cada campo {"{{1}}"}, {"{{2}}"}… Para um texto novo, crie o modelo em WhatsApp → Modelos e espere a aprovação.
+                </p>
+                {cloud?.error && <p className="text-sm text-red-600 dark:text-red-400">Não foi possível carregar os modelos: {cloud.error}</p>}
+                <label htmlFor="broadcast-cloud-template" className={labelClass}>
+                  Modelo aprovado
+                </label>
+                <select
+                  id="broadcast-cloud-template"
+                  value={cloudTemplateName}
+                  onChange={(e) => {
+                    setCloudTemplateName(e.target.value);
+                    const t = cloud?.templates.find((x) => x.name === e.target.value);
+                    setCloudParams(Array.from({ length: t?.variableCount ?? 0 }, (_, i) => (i === 0 && columns.includes("nome") ? "{{nome}}" : "")));
+                  }}
+                  className={inputClass}
+                >
+                  <option value="">{cloud?.templates.length ? "Escolha…" : "Nenhum modelo aprovado ainda"}</option>
+                  {cloud?.templates.map((t) => (
+                    <option key={`${t.name}-${t.language}`} value={t.name}>
+                      {t.name} ({t.category === "MARKETING" ? "marketing" : t.category === "UTILITY" ? "utilidade" : t.category.toLowerCase()}, {t.language})
+                    </option>
+                  ))}
+                </select>
+                {selectedTemplate && (
+                  <>
+                    <div className="whitespace-pre-wrap rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 p-3 text-sm text-slate-700 dark:text-slate-200">
+                      {selectedTemplate.bodyText}
+                    </div>
+                    {Array.from({ length: selectedTemplate.variableCount }, (_, i) => (
+                      <label key={i} className="block text-xs font-medium text-slate-600 dark:text-slate-400">
+                        {`O que vai em {{${i + 1}}}`}
+                        <input
+                          type="text"
+                          value={cloudParams[i] ?? ""}
+                          onChange={(e) => setCloudParams((prev) => Array.from({ length: selectedTemplate.variableCount }, (_, j) => (j === i ? e.target.value : prev[j] ?? "")))}
+                          placeholder={columns.length ? `Ex.: {{${columns[0]}}} ou um texto fixo` : "Texto fixo ou {{variável}}"}
+                          className={`mt-1 ${inputClass}`}
+                        />
+                      </label>
+                    ))}
+                    {columns.length > 0 && (
+                      <p className="text-xs text-slate-500 dark:text-slate-400">Variáveis deste público: {columns.map((c) => `{{${c}}}`).join(", ")}</p>
+                    )}
+                  </>
+                )}
+                {recipients.length > 0 && templateProblem && (
+                  <p aria-live="polite" className="text-sm text-red-600 dark:text-red-400">
+                    {templateProblem}
+                  </p>
+                )}
+                {selectedTemplate && (
+                  <div>
+                    <p className={labelClass}>Prévia{recipients[0] ? " (1º destinatário)" : ""}</p>
+                    <div className="mt-1 max-h-60 overflow-y-auto whitespace-pre-wrap rounded-lg border border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/40 p-3 text-sm text-slate-900 dark:text-slate-100">
+                      {builtCloud && !builtCloud.ok ? builtCloud.error : cloudPreview}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+            <>
             <label htmlFor="broadcast-template" className="sr-only">
               Texto da mensagem
             </label>
@@ -626,9 +722,12 @@ export function BroadcastManagement() {
                   </div>
                 </div>
               ))}
+            </>
+            )}
           </fieldset>
 
-          {/* 3. Imagem */}
+          {/* 3. Imagem (texto livre; o modelo da API oficial não leva imagem) */}
+          {!cloudMode && (
           <fieldset className="space-y-2">
             <legend className="text-sm font-semibold text-slate-800 dark:text-slate-100">3. Imagem (opcional)</legend>
             {imagePreviewUrl ? (
@@ -651,21 +750,22 @@ export function BroadcastManagement() {
               </label>
             )}
           </fieldset>
+          )}
 
           <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 dark:border-slate-800 pt-4">
             <p className="text-sm text-slate-600 dark:text-slate-300">
               {!name.trim()
                 ? "Falta dar um nome à campanha."
-                : !template.trim()
-                  ? "Falta escrever a mensagem."
+                : !hasMessage
+                  ? cloudMode ? "Falta escolher o modelo." : "Falta escrever a mensagem."
                   : formEstimate
                 ? `${plural(recipients.length, "destinatário", "destinatários")} · envio seguro: 1 a cada 4–6 min, seg–sex 9h–17h, até 100/dia — ${estimateText(formEstimate.businessDays, formEstimate.finishIso)} se começar agora.`
                 : "Escolha o público para ver a previsão de envio."}
             </p>
             <button
               type="button"
-              disabled={creating || unknownVars.length > 0 || unfilled.length > 0 || Boolean(variantError) || !name.trim() || !template.trim()}
-              title={!name.trim() ? "Dê um nome à campanha" : !template.trim() ? "Escreva a mensagem" : undefined}
+              disabled={creating || unknownVars.length > 0 || unfilled.length > 0 || Boolean(variantError) || !name.trim() || !hasMessage}
+              title={!name.trim() ? "Dê um nome à campanha" : !hasMessage ? (cloudMode ? "Escolha o modelo" : "Escreva a mensagem") : undefined}
               onClick={handleCreate}
               className="inline-flex h-9 items-center gap-1.5 px-4 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 rounded-lg"
             >

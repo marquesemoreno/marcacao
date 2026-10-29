@@ -3,6 +3,9 @@
 import { normalizeBroadcastVariants, previewBroadcastVariants, countSentByVariant } from "@/lib/broadcast-variants";
 
 import { NO_CONSENT_MESSAGE } from "@/lib/marketing-consent";
+import { buildTemplateParams, checkTemplateParamSources, renderTemplatePreview } from "@/lib/broadcast-cloud-template";
+import { listCloudTemplates } from "@/lib/whatsapp-cloud";
+import { decryptToken } from "@/lib/token-crypto";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireClinicManager, requireClinicSession } from "@/lib/session";
@@ -146,7 +149,7 @@ export async function getClinicCampaignStartPreview(campaignId: string) {
   await assertClinicOwnsCampaign(campaignId, clinicId);
   const campaign = await prisma.broadcastCampaign.findUnique({
     where: { id: campaignId },
-    select: { messageTemplate: true, messageVariants: true, imagePath: true, lowPriority: true, tagOnSend: true, channel: true, subject: true, clinic: { select: { technicalDirectorName: true, technicalDirectorCrm: true } } },
+    select: { messageTemplate: true, messageVariants: true, imagePath: true, lowPriority: true, tagOnSend: true, channel: true, subject: true, cloudTemplateName: true, cloudTemplateBody: true, cloudTemplateParams: true, clinic: { select: { technicalDirectorName: true, technicalDirectorCrm: true } } },
   });
   const isReschedule = campaign?.tagOnSend === RESCHEDULE_PENDING_TAG;
   const rt = isReschedule ? null : technicalDirectorLine(campaign?.clinic.technicalDirectorName, campaign?.clinic.technicalDirectorCrm);
@@ -195,6 +198,12 @@ export async function getClinicCampaignStartPreview(campaignId: string) {
     });
     withConsent = consents.filter((c) => channelSendDecision({ consentAt: c.consentAt, revokedAt: c.revokedAt }) === "ENVIAR").length;
   }
+  // API oficial: sai o texto do modelo aprovado, com os campos {{n}} preenchidos.
+  const usesTemplate = Boolean(campaign?.cloudTemplateName);
+  if (campaign?.cloudTemplateName) {
+    const built = buildTemplateParams(campaign.cloudTemplateParams, vars);
+    variantMessages = [built.ok ? renderTemplatePreview(campaign.cloudTemplateBody ?? "", built.params) : `⚠ ${built.error}`];
+  }
   return {
     pending,
     channel,
@@ -205,9 +214,10 @@ export async function getClinicCampaignStartPreview(campaignId: string) {
     /** Todas as variações montadas (a 1ª é a principal). */
     variantMessages,
     missingTechnicalDirector: !isReschedule && !rt,
-    unknownVariables: [...new Set(previews.flatMap((p) => p.unknownVariables))],
-    unfilled: [...new Set(previews.flatMap((p) => p.unfilled))],
-    hasImage: Boolean(campaign?.imagePath),
+    unknownVariables: usesTemplate ? [] : [...new Set(previews.flatMap((p) => p.unknownVariables))],
+    unfilled: usesTemplate ? [] : [...new Set(previews.flatMap((p) => p.unfilled))],
+    templateName: campaign?.cloudTemplateName ?? null,
+    hasImage: !usesTemplate && Boolean(campaign?.imagePath),
     lowPriority: Boolean(campaign?.lowPriority),
     ...estimateCampaignFinish({ pending, sentToday, now: new Date(), sharing: campaign?.lowPriority ? 1 : 1 + otherActive }),
     remindersOn: await clinicRemindersActive(clinicId, new Date()),
@@ -261,13 +271,15 @@ export async function getClinicCampaignForDuplicate(campaignId: string) {
   await assertClinicOwnsCampaign(campaignId, clinicId);
   const c = await prisma.broadcastCampaign.findUnique({
     where: { id: campaignId },
-    select: { name: true, messageTemplate: true, messageVariants: true, recipients: { select: { phone: true, variables: true } } },
+    select: { name: true, messageTemplate: true, messageVariants: true, cloudTemplateName: true, cloudTemplateParams: true, recipients: { select: { phone: true, variables: true } } },
   });
   if (!c) throw new Error("Campanha não encontrada");
   return {
     name: `${c.name} (cópia)`,
     template: c.messageTemplate,
     variants: c.messageVariants,
+    cloudTemplateName: c.cloudTemplateName,
+    cloudTemplateParams: c.cloudTemplateParams,
     recipients: c.recipients.map((r) => ({ phone: r.phone, variables: (r.variables ?? {}) as Record<string, string> })),
   };
 }
@@ -290,9 +302,26 @@ export async function createClinicBroadcastCampaign(
   recipients: ParsedBroadcastRecipient[],
   imageFormData?: FormData,
   /** Até 2 variações além da mensagem principal (sorteadas por destinatário). */
-  extraVariants: string[] = []
+  extraVariants: string[] = [],
+  /** API oficial: modelo aprovado + o que vai em cada {{n}}. */
+  cloudTemplate?: { name: string; params: string[] }
 ) {
   const { clinicId, userId } = await requireClinicSession();
+  const cloud = await getClinicCloudBroadcastSetup();
+  let templateData: { cloudTemplateName: string; cloudTemplateLanguage: string; cloudTemplateBody: string; cloudTemplateParams: string[] } | null = null;
+  if (cloud.active) {
+    // Fora da janela de 24 h a Meta só aceita modelo aprovado.
+    const tpl = cloud.templates.find((t) => t.name === cloudTemplate?.name);
+    if (!tpl) throw new Error("Escolha um modelo aprovado pela Meta — na API oficial não dá para disparar texto livre.");
+    const params = (cloudTemplate?.params ?? []).slice(0, tpl.variableCount).map((p) => p.trim());
+    const problem = checkTemplateParamSources(tpl.variableCount, params, Object.keys(recipients[0]?.variables ?? {}));
+    if (problem) throw new Error(problem);
+    templateData = { cloudTemplateName: tpl.name, cloudTemplateLanguage: tpl.language, cloudTemplateBody: tpl.bodyText, cloudTemplateParams: params };
+    // O texto da campanha vira o do modelo (lista, relatório e duplicar mostram isso).
+    messageTemplate = tpl.bodyText;
+    extraVariants = [];
+    imageFormData = undefined;
+  }
 
   const trimmedName = name.trim();
   const trimmedTemplate = messageTemplate.trim();
@@ -341,6 +370,7 @@ export async function createClinicBroadcastCampaign(
       name: trimmedName,
       messageTemplate: trimmedTemplate,
       messageVariants: checked.variants.slice(1),
+      ...(templateData ?? {}),
       createdByUserId: userId,
       recipients: {
         create: normalized.map((r) => ({
@@ -382,8 +412,11 @@ export async function startClinicBroadcastCampaign(campaignId: string) {
   // CFM: campanha de marketing sem responsável técnico (nome + CRM) não inicia.
   const c = await prisma.broadcastCampaign.findUnique({
     where: { id: campaignId },
-    select: { tagOnSend: true, channel: true, clinic: { select: { technicalDirectorName: true, technicalDirectorCrm: true } } },
+    select: { tagOnSend: true, channel: true, cloudTemplateName: true, clinic: { select: { technicalDirectorName: true, technicalDirectorCrm: true } } },
   });
+  if (c && c.channel === "WHATSAPP" && !c.cloudTemplateName && (await getClinicCloudBroadcastSetup()).active) {
+    return { success: false as const, error: "A clínica usa a API oficial: duplique a campanha e escolha um modelo aprovado pela Meta." };
+  }
   if (c && c.tagOnSend !== RESCHEDULE_PENDING_TAG && !technicalDirectorLine(c.clinic.technicalDirectorName, c.clinic.technicalDirectorCrm)) {
     return { success: false as const, error: "Cadastre o responsável técnico (nome e CRM) em Configurações antes de iniciar a campanha." };
   }
@@ -566,4 +599,30 @@ export async function setCampaignExclusions(raw: string) {
   if (ids.length > 5000) throw new Error("Lista grande demais.");
   await prisma.clinic.update({ where: { id: clinicId }, data: { campaignExcludedPatientIds: ids.sort((a, b) => a - b) } });
   return ids.length;
+}
+
+export type ClinicCloudTemplate = { name: string; language: string; category: string; bodyText: string; variableCount: number };
+
+/** API oficial ativa? Se sim, os modelos APROVADOS da clínica (só eles podem ser disparados). */
+export async function getClinicCloudBroadcastSetup(): Promise<{ active: boolean; templates: ClinicCloudTemplate[]; error?: string }> {
+  const { clinicId } = await requireClinicSession();
+  const account = await prisma.whatsappCloudAccount.findUnique({ where: { clinicId }, select: { active: true, wabaId: true, accessToken: true } });
+  if (!account?.active) return { active: false, templates: [] };
+  let token: string;
+  try {
+    token = decryptToken(account.accessToken);
+  } catch {
+    return { active: true, templates: [], error: "Não foi possível ler o acesso da API oficial. Reconecte o WhatsApp." };
+  }
+  const r = await listCloudTemplates(account.wabaId, token);
+  if (!r.success) return { active: true, templates: [], error: r.error };
+  return {
+    active: true,
+    templates: r.data.data
+      .filter((t) => t.status === "APPROVED")
+      .map((t) => {
+        const body = (t as typeof t & { components?: { type: string; text?: string }[] }).components?.find((c) => c.type === "BODY")?.text ?? "";
+        return { name: t.name, language: t.language, category: t.category, bodyText: body, variableCount: new Set(body.match(/\{\{\d+\}\}/g) ?? []).size };
+      }),
+  };
 }

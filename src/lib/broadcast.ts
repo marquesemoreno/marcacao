@@ -5,6 +5,8 @@ import { sendWhatsAppMessage, sendWhatsAppMedia, toggleNinthDigit } from "@/lib/
 import { getSignedMediaUrl } from "@/lib/whatsapp-media";
 import { technicalDirectorLine, buildBroadcastMessage } from "@/lib/broadcast-csv";
 import { pickBroadcastVariant } from "@/lib/broadcast-variants";
+import { buildTemplateParams, cloudBroadcastMode } from "@/lib/broadcast-cloud-template";
+import { activeCloudAccount, cloudSendTemplate } from "@/lib/whatsapp-cloud-send";
 import { RESCHEDULE_PENDING_TAG } from "@/lib/conversation-tags";
 import { lastAutomatedSend } from "@/lib/automated-pacing-server";
 import { isWithinReminderWindow, lowPriorityMustYield } from "@/lib/automated-pacing";
@@ -66,6 +68,11 @@ export async function dispatchNextBatch(): Promise<{ processed: number }> {
       const last = await lastAutomatedSend(campaign.clinicId);
       if (!isMarketingGapElapsed(last.at, now, Math.random())) continue;
     }
+    // API oficial: sem modelo aprovado a campanha fica parada (não queima a fila com falhas).
+    const cloudAccount = await activeCloudAccount(campaign.clinicId);
+    const mode = cloudBroadcastMode({ cloudActive: Boolean(cloudAccount), templateName: campaign.cloudTemplateName });
+    if (mode === "MISSING_TEMPLATE") continue;
+
     const recipients = await prisma.broadcastRecipient.findMany({
       where: { campaignId: campaign.id, status: "PENDING" },
       take,
@@ -122,7 +129,22 @@ export async function dispatchNextBatch(): Promise<{ processed: number }> {
       let result: { success: boolean; skipped: boolean };
       let failureReason = "Falha ao enviar via WhatsApp";
 
-      if (campaign.imagePath) {
+      if (mode === "TEMPLATE" && cloudAccount) {
+        // Modelo aprovado: texto fixo da Meta, sem variações nem imagem; só os {{n}} variam.
+        const built = buildTemplateParams(campaign.cloudTemplateParams, variables);
+        if (!built.ok) {
+          result = { success: false, skipped: false };
+          failureReason = built.error;
+        } else {
+          result = await cloudSendTemplate(
+            cloudAccount,
+            recipient.phone,
+            { name: campaign.cloudTemplateName!, language: campaign.cloudTemplateLanguage || "pt_BR", bodyParams: built.params },
+            "broadcast.sent"
+          );
+          if (!result.success) failureReason = "Falha ao enviar o modelo pela API oficial";
+        }
+      } else if (campaign.imagePath) {
         const mediaUrl = await getSignedMediaUrl(campaign.imagePath);
         if (!mediaUrl) {
           result = { success: false, skipped: false };
@@ -146,7 +168,7 @@ export async function dispatchNextBatch(): Promise<{ processed: number }> {
         where: { id: recipient.id },
         data:
           result.success || result.skipped
-            ? { status: "SENT", sentAt: new Date(), variantIndex: variant.index }
+            ? { status: "SENT", sentAt: new Date(), variantIndex: mode === "TEMPLATE" ? 0 : variant.index }
             : { status: "FAILED", errorMessage: failureReason },
       });
 

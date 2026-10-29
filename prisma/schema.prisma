@@ -932,6 +932,13 @@ model BroadcastCampaign {
   /// Até 2 variações além de messageTemplate; cada destinatário recebe uma, sorteada
   /// (pickBroadcastVariant em src/lib/broadcast-variants.ts) — contra bloqueio de número.
   messageVariants String[]                @default([]) @map("message_variants")
+  /// API oficial: modelo aprovado pela Meta usado no lugar do texto livre (null = Evolution).
+  cloudTemplateName     String?  @map("cloud_template_name")
+  cloudTemplateLanguage String?  @map("cloud_template_language")
+  /// Corpo do modelo com {{1}}, {{2}}… — só para prévia e relatório.
+  cloudTemplateBody     String?  @map("cloud_template_body")
+  /// O que vai em cada {{n}}: variável da planilha ({{nome}}) e/ou texto fixo.
+  cloudTemplateParams   String[] @default([]) @map("cloud_template_params")
   /// Canal de envio. WHATSAPP é o fluxo original (src/lib/broadcast.ts); SMS e EMAIL são
   /// despachados por src/lib/channel-broadcast.ts e, nesses dois, BroadcastRecipient.phone
   /// guarda o ENDEREÇO do destinatário (número com DDI 55 no SMS, e-mail no EMAIL).
