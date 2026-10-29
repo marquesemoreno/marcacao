@@ -37,7 +37,7 @@ export async function listClinicBroadcastCampaigns() {
     include: {
       _count: { select: { recipients: true } },
       recipients: {
-        select: { id: true, status: true, sentAt: true, errorMessage: true, phone: true, variables: true, calledAt: true, variantIndex: true },
+        select: { id: true, status: true, sentAt: true, errorMessage: true, phone: true, variables: true, calledAt: true, variantIndex: true, deliveryStatus: true },
         orderBy: { createdAt: "asc" },
       },
     },
@@ -86,6 +86,15 @@ export async function listClinicBroadcastCampaigns() {
       failures: failedList.slice(0, 30).map((r) => ({ phone: r.phone, reason: r.errorMessage })),
       skipped,
       noConsent,
+      /** E-mail: retorno do Resend (webhook). null = canal sem relatório de entrega. */
+      delivery:
+        c.channel === "EMAIL"
+          ? {
+              delivered: c.recipients.filter((r) => r.deliveryStatus === "DELIVERED").length,
+              bounced: c.recipients.filter((r) => r.deliveryStatus === "BOUNCED").length,
+              complained: c.recipients.filter((r) => r.deliveryStatus === "COMPLAINED").length,
+            }
+          : null,
       // Quantos receberam cada texto — só faz sentido com variações.
       sentByVariant: c.messageVariants.length ? countSentByVariant(c.recipients, 1 + c.messageVariants.length) : null,
       pending,

@@ -1293,6 +1293,13 @@ function CampaignCard({
           {c.pending > 0 && c.status !== "DRAFT" && ` · ${c.pending} na fila`}
           {c.skipped > 0 && ` · ${c.skipped} ${c.skipped === 1 ? "pediu" : "pediram"} para não receber`}
           {c.noConsent > 0 && ` · ${c.noConsent} sem consentimento para campanhas`}
+          {c.delivery && c.sent > 0 && (
+            <>
+              {` · ${c.delivery.delivered} entregue${c.delivery.delivered === 1 ? "" : "s"}`}
+              {c.delivery.bounced > 0 && <span className="text-amber-700 dark:text-amber-400">{` · ${c.delivery.bounced} voltaram (e-mail inexistente ou cheio)`}</span>}
+              {c.delivery.complained > 0 && <span className="text-red-700 dark:text-red-400">{` · ${c.delivery.complained} marcaram como spam (saíram da lista)`}</span>}
+            </>
+          )}
           {c.failed > 0 && <span className="text-red-700 dark:text-red-400"> · {plural(c.failed, "falha", "falhas")}</span>}
         </p>
         {c.sentByVariant && (

@@ -987,11 +987,17 @@ model BroadcastRecipient {
   calledAt     DateTime?                @map("called_at")
   /// Variação enviada (0 = messageTemplate, 1–2 = messageVariants); null = não enviado.
   variantIndex Int?                     @map("variant_index")
+  /// Id da mensagem no provedor (e-mail: id do Resend) — casa o webhook de entrega.
+  providerMessageId String?             @map("provider_message_id")
+  /// DELIVERED | DELAYED | BOUNCED | COMPLAINED (webhook do Resend); null = sem retorno.
+  deliveryStatus String?                @map("delivery_status")
+  deliveryAt   DateTime?                @map("delivery_at")
   createdAt    DateTime                 @default(now()) @map("created_at")
 
   campaign BroadcastCampaign @relation(fields: [campaignId], references: [id])
 
   @@index([campaignId, status])
+  @@index([providerMessageId])
   @@map("broadcast_recipients")
 }
 

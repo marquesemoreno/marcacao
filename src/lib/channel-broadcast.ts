@@ -71,7 +71,7 @@ export async function dispatchNextChannelBatch(options: { now?: Date; env?: Env 
       const variant = pickBroadcastVariant([campaign.messageTemplate, ...campaign.messageVariants], recipient.id);
       const unsubscribeUrl = `${getBaseUrl()}/api/u/${signUnsubscribeToken(consent.id, env.UNSUBSCRIBE_SECRET ?? "")}`;
 
-      let result: { success: boolean; error?: string };
+      let result: { success: boolean; error?: string; id?: string };
       if (campaign.channel === "EMAIL") {
         const content = buildEmailContent({
           subject: campaign.subject ?? "",
@@ -104,7 +104,7 @@ export async function dispatchNextChannelBatch(options: { now?: Date; env?: Env 
       await prisma.broadcastRecipient.update({
         where: { id: recipient.id },
         data: result.success
-          ? { status: "SENT", sentAt: new Date(), variantIndex: variant.index }
+          ? { status: "SENT", sentAt: new Date(), variantIndex: variant.index, providerMessageId: result.id ?? null }
           : { status: "FAILED", errorMessage: result.error ?? "Falha ao enviar" },
       });
     }
