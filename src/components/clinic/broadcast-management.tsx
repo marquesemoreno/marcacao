@@ -4,7 +4,8 @@ import { normalizeBroadcastVariants, previewBroadcastVariants } from "@/lib/broa
 import { buildTemplateParams, checkTemplateParamSources, renderTemplatePreview } from "@/lib/broadcast-cloud-template";
 import { PageHeader } from "@/components/clinic/page-header";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { CalendarClock, Copy, Image as ImageIcon, Loader2, MoreHorizontal, Pause, Phone, Play, Plus, Trash2, Upload, X } from "lucide-react";
+import { CalendarClock, Copy, FileText, Image as ImageIcon, Loader2, MoreHorizontal, Paperclip, Pause, Phone, Play, Plus, Trash2, Upload, X } from "lucide-react";
+import { BROADCAST_ATTACHMENT_ACCEPT, checkBroadcastAttachment } from "@/lib/broadcast-attachment";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -201,10 +202,16 @@ export function BroadcastManagement() {
     reader.readAsText(file, "utf-8");
   }
 
+  /** Anexo da campanha: imagem (com prévia) ou documento — PDF, Word, Excel (só o nome). */
   function handleImageSelect(file: File) {
+    const checked = checkBroadcastAttachment({ name: file.name, type: file.type, size: file.size });
+    if (!checked.ok) {
+      toast.error(checked.error);
+      return;
+    }
     if (imagePreviewUrl) URL.revokeObjectURL(imagePreviewUrl);
     setImage(file);
-    setImagePreviewUrl(URL.createObjectURL(file));
+    setImagePreviewUrl(checked.kind === "image" ? URL.createObjectURL(file) : null);
   }
 
   function handleRemoveImage() {
@@ -257,7 +264,7 @@ export function BroadcastManagement() {
       let imageFormData: FormData | undefined;
       if (image) {
         imageFormData = new FormData();
-        imageFormData.set("image", image);
+        imageFormData.set("attachment", image);
       }
       await createClinicBroadcastCampaign(
         name,
@@ -351,7 +358,7 @@ export function BroadcastManagement() {
       setCsvText("");
       setFormOpen(true);
       toast.success(
-        `Cópia aberta em “Nova campanha” com ${copy.recipients.length} destinatário(s).${campaign.hasImage ? " Anexe a imagem de novo." : ""}`
+        `Cópia aberta em “Nova campanha” com ${copy.recipients.length} destinatário(s).${campaign.hasImage ? ` Anexe ${campaign.attachmentKind === "document" ? "o documento" : "a imagem"} de novo.` : ""}`
       );
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch {
@@ -726,28 +733,48 @@ export function BroadcastManagement() {
             )}
           </fieldset>
 
-          {/* 3. Imagem (texto livre; o modelo da API oficial não leva imagem) */}
+          {/* 3. Anexo: imagem ou documento (texto livre; o modelo da API oficial não leva anexo) */}
           {!cloudMode && (
           <fieldset className="space-y-2">
-            <legend className="text-sm font-semibold text-slate-800 dark:text-slate-100">3. Imagem (opcional)</legend>
-            {imagePreviewUrl ? (
+            <legend className="text-sm font-semibold text-slate-800 dark:text-slate-100">3. Anexo (opcional)</legend>
+            {image ? (
               <div className="flex items-center gap-3">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={imagePreviewUrl} alt="Prévia da imagem da campanha" className="w-16 h-16 rounded-lg object-cover border border-slate-200 dark:border-slate-800" />
+                {imagePreviewUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={imagePreviewUrl} alt="Prévia da imagem da campanha" className="w-16 h-16 rounded-lg object-cover border border-slate-200 dark:border-slate-800" />
+                ) : (
+                  <div className="flex items-center gap-2 rounded-lg border border-slate-200 dark:border-slate-800 px-3 py-2 min-w-0">
+                    <FileText className="w-6 h-6 shrink-0 text-slate-500 dark:text-slate-400" aria-hidden />
+                    <div className="min-w-0 text-sm">
+                      <p className="truncate font-medium text-slate-900 dark:text-slate-100">
+                        {(() => {
+                          const checked = checkBroadcastAttachment({ name: image.name, type: image.type, size: image.size });
+                          return checked.ok ? checked.fileName : image.name;
+                        })()}
+                      </p>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">{(image.size / 1024 / 1024).toFixed(1)} MB · o paciente recebe com este nome</p>
+                    </div>
+                  </div>
+                )}
                 <button type="button" onClick={handleRemoveImage} className="inline-flex items-center gap-1.5 text-sm font-medium text-red-600 dark:text-red-400">
                   <X className="w-4 h-4" aria-hidden /> Remover
                 </button>
               </div>
             ) : (
-              <label className="inline-flex items-center gap-1.5 text-sm font-medium text-emerald-700 dark:text-emerald-300 cursor-pointer focus-within:ring-2 focus-within:ring-emerald-500/50 rounded-md px-1">
-                <ImageIcon className="w-4 h-4" aria-hidden /> Anexar imagem
-                <input
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp,image/gif"
-                  className="sr-only"
-                  onChange={(e) => e.target.files?.[0] && handleImageSelect(e.target.files[0])}
-                />
-              </label>
+              <div className="space-y-1">
+                <label className="inline-flex items-center gap-1.5 text-sm font-medium text-emerald-700 dark:text-emerald-300 cursor-pointer focus-within:ring-2 focus-within:ring-emerald-500/50 rounded-md px-1">
+                  <Paperclip className="w-4 h-4" aria-hidden /> Anexar imagem ou documento
+                  <input
+                    type="file"
+                    accept={BROADCAST_ATTACHMENT_ACCEPT}
+                    className="sr-only"
+                    onChange={(e) => e.target.files?.[0] && handleImageSelect(e.target.files[0])}
+                  />
+                </label>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Imagem, PDF, Word ou Excel (por exemplo, uma tabela de valores), até 15 MB. A mensagem acima vai junto, como legenda.
+                </p>
+              </div>
             )}
           </fieldset>
           )}
@@ -920,7 +947,11 @@ export function BroadcastManagement() {
                   Como chega para o 1º destinatário{confirming.preview.samplePhone ? ` (${confirming.preview.samplePhone})` : ""}:
                 </p>
                 <div className="mt-1 max-h-64 overflow-y-auto whitespace-pre-wrap rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900 p-3 text-sm text-slate-900 dark:text-slate-100">
-                  {confirming.preview.hasImage && <p className="mb-2 text-xs text-slate-500 dark:text-slate-400">[imagem anexada]</p>}
+                  {confirming.preview.hasImage && (
+                    <p className="mb-2 text-xs text-slate-500 dark:text-slate-400">
+                      [{confirming.preview.attachmentKind === "document" ? `documento anexado: ${confirming.preview.attachmentName ?? "arquivo"}` : "imagem anexada"}]
+                    </p>
+                  )}
                   {confirming.preview.sampleMessage}
                 </div>
               </div>
@@ -1074,7 +1105,12 @@ function CampaignCard({
                 {c.channel === "SMS" ? "SMS" : "E-mail"}
               </span>
             )}
-            {c.hasImage && <ImageIcon className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 shrink-0" aria-label="Com imagem" />}
+            {c.hasImage &&
+              (c.attachmentKind === "document" ? (
+                <FileText className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 shrink-0" aria-label={`Com documento${c.attachmentName ? `: ${c.attachmentName}` : ""}`} />
+              ) : (
+                <ImageIcon className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 shrink-0" aria-label="Com imagem" />
+              ))}
           </div>
           {c.status === "RUNNING" && (
           <p className={`mt-1 text-sm font-medium ${SITUATION_CLASS[c.situation.tone]}`}>

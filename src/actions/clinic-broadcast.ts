@@ -22,8 +22,7 @@ import { missingChannelConfig } from "@/lib/channel-config";
 import { channelSendDecision } from "@/lib/channel-consent";
 import { buildEmailContent, buildSmsContent } from "@/lib/channel-content";
 
-const ALLOWED_IMAGE_MIME_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
-const MAX_IMAGE_SIZE_BYTES = 15 * 1024 * 1024; // mesmo limite já usado pra mídia do inbox
+import { attachmentKindOf, checkBroadcastAttachment } from "@/lib/broadcast-attachment";
 
 /** Mirror de listBroadcastCampaigns (admin-broadcast.ts) — clinicId vem da sessão,
  * não é parâmetro (a clínica só pode ver as próprias campanhas). */
@@ -76,6 +75,9 @@ export async function listClinicBroadcastCampaigns() {
       name: c.name,
       status: c.status,
       hasImage: Boolean(c.imagePath),
+      /** "image" | "document" | null (sem anexo) e o nome do arquivo que o paciente vê. */
+      attachmentKind: c.imagePath ? attachmentKindOf(c.imageMimeType) : null,
+      attachmentName: c.attachmentName,
       lowPriority: c.lowPriority,
       total: c._count.recipients,
       sent,
@@ -149,7 +151,7 @@ export async function getClinicCampaignStartPreview(campaignId: string) {
   await assertClinicOwnsCampaign(campaignId, clinicId);
   const campaign = await prisma.broadcastCampaign.findUnique({
     where: { id: campaignId },
-    select: { messageTemplate: true, messageVariants: true, imagePath: true, lowPriority: true, tagOnSend: true, channel: true, subject: true, cloudTemplateName: true, cloudTemplateBody: true, cloudTemplateParams: true, clinic: { select: { technicalDirectorName: true, technicalDirectorCrm: true } } },
+    select: { messageTemplate: true, messageVariants: true, imagePath: true, imageMimeType: true, attachmentName: true, lowPriority: true, tagOnSend: true, channel: true, subject: true, cloudTemplateName: true, cloudTemplateBody: true, cloudTemplateParams: true, clinic: { select: { technicalDirectorName: true, technicalDirectorCrm: true } } },
   });
   const isReschedule = campaign?.tagOnSend === RESCHEDULE_PENDING_TAG;
   const rt = isReschedule ? null : technicalDirectorLine(campaign?.clinic.technicalDirectorName, campaign?.clinic.technicalDirectorCrm);
@@ -218,6 +220,8 @@ export async function getClinicCampaignStartPreview(campaignId: string) {
     unfilled: usesTemplate ? [] : [...new Set(previews.flatMap((p) => p.unfilled))],
     templateName: campaign?.cloudTemplateName ?? null,
     hasImage: !usesTemplate && Boolean(campaign?.imagePath),
+    attachmentKind: !usesTemplate && campaign?.imagePath ? attachmentKindOf(campaign.imageMimeType) : null,
+    attachmentName: !usesTemplate ? campaign?.attachmentName ?? null : null,
     lowPriority: Boolean(campaign?.lowPriority),
     ...estimateCampaignFinish({ pending, sentToday, now: new Date(), sharing: campaign?.lowPriority ? 1 : 1 + otherActive }),
     remindersOn: await clinicRemindersActive(clinicId, new Date()),
@@ -334,18 +338,16 @@ export async function createClinicBroadcastCampaign(
     throw new Error("A lista de destinatários está vazia — confira o CSV.");
   }
 
-  const imageFile = imageFormData?.get("image");
-  let imageBuffer: Buffer | null = null;
-  let imageMimeType: string | null = null;
-  if (imageFile instanceof File && imageFile.size > 0) {
-    if (!ALLOWED_IMAGE_MIME_TYPES.includes(imageFile.type)) {
-      throw new Error("Tipo de imagem não suportado. Envie JPEG, PNG, WEBP ou GIF.");
-    }
-    if (imageFile.size > MAX_IMAGE_SIZE_BYTES) {
-      throw new Error("Imagem muito grande. O limite é 15 MB.");
-    }
-    imageBuffer = Buffer.from(await imageFile.arrayBuffer());
-    imageMimeType = imageFile.type;
+  // Anexo opcional: imagem ou documento (PDF, Word, Excel). A chave "image" é a antiga e
+  // continua valendo.
+  const attachmentFile = imageFormData?.get("attachment") ?? imageFormData?.get("image");
+  let attachmentBuffer: Buffer | null = null;
+  let attachment: { mimeType: string; fileName: string } | null = null;
+  if (attachmentFile instanceof File && attachmentFile.size > 0) {
+    const checked = checkBroadcastAttachment({ name: attachmentFile.name, type: attachmentFile.type, size: attachmentFile.size });
+    if (!checked.ok) throw new Error(checked.error);
+    attachmentBuffer = Buffer.from(await attachmentFile.arrayBuffer());
+    attachment = { mimeType: checked.mimeType, fileName: checked.fileName };
   }
 
   const seenPhones = new Set<string>();
@@ -382,14 +384,14 @@ export async function createClinicBroadcastCampaign(
     },
   });
 
-  if (imageBuffer && imageMimeType) {
-    const uploaded = await uploadWhatsAppMedia(campaign.id, imageBuffer, imageMimeType);
+  if (attachmentBuffer && attachment) {
+    const uploaded = await uploadWhatsAppMedia(campaign.id, attachmentBuffer, attachment.mimeType);
     if (!uploaded) {
-      throw new Error("Campanha criada, mas não foi possível subir a imagem. Duplique a campanha, anexe a imagem de novo e exclua o rascunho antigo.");
+      throw new Error("Campanha criada, mas não foi possível subir o anexo. Duplique a campanha, anexe o arquivo de novo e exclua o rascunho antigo.");
     }
     await prisma.broadcastCampaign.update({
       where: { id: campaign.id },
-      data: { imagePath: uploaded.path, imageMimeType },
+      data: { imagePath: uploaded.path, imageMimeType: attachment.mimeType, attachmentName: attachment.fileName },
     });
   }
 

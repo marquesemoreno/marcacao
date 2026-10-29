@@ -949,6 +949,10 @@ model BroadcastCampaign {
   /// src/lib/whatsapp-media.ts) — null quando a campanha é só texto.
   imagePath       String?                 @map("image_path")
   imageMimeType   String?                 @map("image_mime_type")
+  /// Anexo da campanha = imagem OU documento (PDF, Word, Excel): imagePath/imageMimeType guardam o
+  /// arquivo (nomes antigos). Aqui o nome que o paciente vê no WhatsApp (ex.: "Tabela de valores.pdf");
+  /// null em campanha antiga só com imagem (ver broadcastMediaFile em src/lib/broadcast-attachment.ts).
+  attachmentName  String?                 @map("attachment_name")
   status          BroadcastCampaignStatus @default(DRAFT)
   /// Quando setada, o dispatcher (src/lib/broadcast.ts) aplica essa tag na Conversation
   /// do destinatário logo após o envio bem-sucedido, e reabre a conversa (status OPEN)

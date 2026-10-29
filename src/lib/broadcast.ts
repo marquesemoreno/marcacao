@@ -5,6 +5,7 @@ import { sendWhatsAppMessage, sendWhatsAppMedia, toggleNinthDigit } from "@/lib/
 import { getSignedMediaUrl } from "@/lib/whatsapp-media";
 import { technicalDirectorLine, buildBroadcastMessage } from "@/lib/broadcast-csv";
 import { pickBroadcastVariant } from "@/lib/broadcast-variants";
+import { broadcastMediaFile } from "@/lib/broadcast-attachment";
 import { buildTemplateParams, cloudBroadcastMode } from "@/lib/broadcast-cloud-template";
 import { activeCloudAccount, cloudSendTemplate } from "@/lib/whatsapp-cloud-send";
 import { RESCHEDULE_PENDING_TAG } from "@/lib/conversation-tags";
@@ -148,13 +149,15 @@ export async function dispatchNextBatch(): Promise<{ processed: number }> {
         const mediaUrl = await getSignedMediaUrl(campaign.imagePath);
         if (!mediaUrl) {
           result = { success: false, skipped: false };
-          failureReason = "Falha ao gerar URL da imagem da campanha";
+          failureReason = "Falha ao gerar URL do anexo da campanha";
         } else {
+          // Imagem ou documento (PDF, Word, Excel): o tipo e o nome vêm do que foi anexado.
+          const media = broadcastMediaFile(campaign);
           result = await sendWhatsAppMedia(
             recipient.phone,
             mediaUrl,
-            campaign.imageMimeType ?? "image/jpeg",
-            "campanha.jpg",
+            media.mimeType,
+            media.fileName,
             text,
             "broadcast.sent",
             campaign.clinicId
