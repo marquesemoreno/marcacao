@@ -4,7 +4,7 @@ import { normalizeBroadcastVariants, previewBroadcastVariants } from "@/lib/broa
 import { buildTemplateParams, checkTemplateParamSources, renderTemplatePreview } from "@/lib/broadcast-cloud-template";
 import { PageHeader } from "@/components/clinic/page-header";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { CalendarClock, Copy, FileText, Image as ImageIcon, Loader2, MoreHorizontal, Paperclip, Pause, Phone, Play, Plus, Trash2, Upload, X } from "lucide-react";
+import { CalendarClock, Copy, FileText, Mail, MessageCircle, MessageSquareText, ShieldCheck, Image as ImageIcon, Loader2, MoreHorizontal, Paperclip, Pause, Phone, Play, Plus, Trash2, Upload, X } from "lucide-react";
 import { BROADCAST_ATTACHMENT_ACCEPT, checkBroadcastAttachment } from "@/lib/broadcast-attachment";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "sonner";
@@ -32,10 +32,19 @@ import { SELECTION_BROADCAST_KEY } from "@/components/clinic/patient-list-table"
 import { buildBroadcastMessage, parseBroadcastCsv, BROADCAST_OPT_OUT_FOOTER, type ParsedBroadcastRecipient } from "@/lib/broadcast-csv";
 import { estimateCampaignFinish, unfilledPlaceholders, unknownTemplateVariables } from "@/lib/broadcast-schedule";
 import { RescheduleBroadcastModal } from "@/components/clinic/reschedule-broadcast-modal";
+import { BroadcastPreview } from "@/components/clinic/broadcast-preview";
+import { ChannelCampaignFields, ChannelConsentDialog, type ChannelSetup } from "@/components/clinic/channel-broadcast-panel";
+import { getChannelSetup } from "@/actions/clinic-channel-broadcast";
 
 type Campaign = Awaited<ReturnType<typeof listClinicBroadcastCampaigns>>[number];
 type StartPreview = Awaited<ReturnType<typeof getClinicCampaignStartPreview>>;
 type Source = "csv" | "bridge" | "selecao" | "marcadores";
+type FormChannel = "WHATSAPP" | "SMS" | "EMAIL";
+const CHANNEL_OPTIONS: { value: FormChannel; label: string; Icon: typeof Mail }[] = [
+  { value: "WHATSAPP", label: "WhatsApp", Icon: MessageCircle },
+  { value: "SMS", label: "SMS", Icon: MessageSquareText },
+  { value: "EMAIL", label: "E-mail", Icon: Mail },
+];
 
 const STATUS_LABEL: Record<Campaign["status"], string> = {
   DRAFT: "Rascunho",
@@ -99,6 +108,11 @@ export function BroadcastManagement() {
   const [creating, setCreating] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
+  // Canal é o passo 0 de "Nova campanha" (crítica 29/10): SMS/e-mail aparecem desativados até o suporte ligar.
+  const [formChannel, setFormChannel] = useState<FormChannel>("WHATSAPP");
+  const [channelSetup, setChannelSetup] = useState<ChannelSetup | null>(null);
+  const [consentOpen, setConsentOpen] = useState(false);
+  const [channelFormKey, setChannelFormKey] = useState(0);
 
   const [name, setName] = useState("");
   const [template, setTemplate] = useState("");
@@ -136,18 +150,16 @@ export function BroadcastManagement() {
     }
   }, []);
 
-  // O painel de SMS/e-mail (channel-broadcast-panel.tsx) avisa quando cria uma campanha.
-  useEffect(() => {
-    const onChanged = () => loadCampaigns(true);
-    window.addEventListener("broadcast:changed", onChanged);
-    return () => window.removeEventListener("broadcast:changed", onChanged);
-  }, [loadCampaigns]);
+  const loadChannelSetup = useCallback(() => {
+    getChannelSetup().then(setChannelSetup).catch(() => {});
+  }, []);
 
   useEffect(() => {
     loadCampaigns();
     clinicHasBridgeAudience().then(setHasBridge).catch(() => {});
     listMarcadoresAudience().then(setMarcadoresAudience).catch(() => {});
     getClinicCloudBroadcastSetup().then(setCloud).catch(() => {});
+    loadChannelSetup();
     // "Enviar disparo" da lista de pacientes chega com ?selecao=1 e a seleção no
     // sessionStorage — vira o público desta campanha (lido uma vez e apagado).
     if (new URLSearchParams(window.location.search).get("selecao") === "1") {
@@ -164,7 +176,7 @@ export function BroadcastManagement() {
         // seleção inválida: segue com o formulário normal
       }
     }
-  }, [loadCampaigns]);
+  }, [loadCampaigns, loadChannelSetup]);
 
   // Enquanto houver campanha enviando, atualiza a lista sozinha (progresso e situação).
   const anyRunning = campaigns.some((c) => c.status === "RUNNING");
@@ -348,6 +360,7 @@ export function BroadcastManagement() {
     try {
       const copy = await getClinicCampaignForDuplicate(campaign.id);
       resetForm();
+      setFormChannel("WHATSAPP");
       setName(copy.name);
       setTemplate(copy.template);
       setExtraVariants([copy.variants[0] ?? "", copy.variants[1] ?? ""]);
@@ -443,6 +456,16 @@ export function BroadcastManagement() {
         }
         actions={
           <div className="flex flex-wrap-reverse justify-end gap-2">
+            {channelSetup?.isManager && (
+              <button
+                type="button"
+                onClick={() => setConsentOpen(true)}
+                className="inline-flex h-9 items-center gap-1.5 px-3 text-sm font-medium text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg"
+              >
+                <ShieldCheck className="w-4 h-4" aria-hidden />
+                Aceites SMS/e-mail
+              </button>
+            )}
             <button
               type="button"
               onClick={() => setRescheduleModalOpen(true)}
@@ -471,12 +494,80 @@ export function BroadcastManagement() {
         }}
       />
 
+      <ChannelConsentDialog open={consentOpen} onOpenChange={setConsentOpen} setup={channelSetup} onDone={loadChannelSetup} />
+
       <Sheet open={formOpen} onOpenChange={setFormOpen}>
         <SheetContent side="right" className="w-full sm:max-w-2xl overflow-y-auto">
           <SheetHeader>
             <SheetTitle>Nova campanha</SheetTitle>
             <SheetDescription>Cria um rascunho — nada é enviado até você clicar em Iniciar e confirmar.</SheetDescription>
           </SheetHeader>
+        <div className="px-4 pb-2 space-y-2">
+          <div
+            role="radiogroup"
+            aria-label="Canal"
+            className="grid grid-cols-3 gap-2"
+            onKeyDown={(e) => {
+              const delta = e.key === "ArrowRight" || e.key === "ArrowDown" ? 1 : e.key === "ArrowLeft" || e.key === "ArrowUp" ? -1 : 0;
+              if (!delta) return;
+              e.preventDefault();
+              const idx = CHANNEL_OPTIONS.findIndex((o) => o.value === formChannel);
+              const next = CHANNEL_OPTIONS[(idx + delta + CHANNEL_OPTIONS.length) % CHANNEL_OPTIONS.length].value;
+              setFormChannel(next);
+              (e.currentTarget.querySelector(`[data-channel="${next}"]`) as HTMLElement | null)?.focus();
+            }}
+          >
+            {CHANNEL_OPTIONS.map(({ value, label, Icon }) => {
+              const info = value === "SMS" ? channelSetup?.sms : value === "EMAIL" ? channelSetup?.email : null;
+              const off = value !== "WHATSAPP" && !info?.ready;
+              const selected = formChannel === value;
+              return (
+                <button
+                  key={value}
+                  type="button"
+                  role="radio"
+                  data-channel={value}
+                  aria-checked={selected}
+                  tabIndex={selected ? 0 : -1}
+                  onClick={() => setFormChannel(value)}
+                  className={`flex flex-col items-start gap-0.5 rounded-lg border px-3 py-2 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50 ${
+                    selected
+                      ? "border-emerald-600 bg-emerald-50 dark:bg-emerald-950/40"
+                      : "border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"
+                  }`}
+                >
+                  <span className={`flex items-center gap-1.5 text-sm font-semibold ${off ? "text-slate-500 dark:text-slate-400" : "text-slate-900 dark:text-slate-100"}`}>
+                    <Icon className="w-4 h-4" aria-hidden /> {label}
+                  </span>
+                  <span className="text-xs text-slate-600 dark:text-slate-400">
+                    {value === "WHATSAPP" ? (cloudMode ? "modelo aprovado" : "texto livre") : off ? "não ativado" : plural(info?.consents ?? 0, "aceite", "aceites")}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {formChannel !== "WHATSAPP" ? (
+          <section className="px-4 pb-6" aria-label={`Nova campanha por ${formChannel === "SMS" ? "SMS" : "e-mail"}`}>
+            {(formChannel === "SMS" ? channelSetup?.sms : channelSetup?.email)?.ready ? (
+              <ChannelCampaignFields
+                key={`${formChannel}-${channelFormKey}`}
+                channel={formChannel}
+                onCreated={() => {
+                  setChannelFormKey((k) => k + 1);
+                  setFormOpen(false);
+                  loadCampaigns(true);
+                }}
+              />
+            ) : (
+              <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 p-4 text-sm text-slate-700 dark:text-slate-200 space-y-1">
+                <p className="font-semibold">{formChannel === "SMS" ? "SMS" : "E-mail"} ainda não foi ativado para a clínica.</p>
+                <p>Fale com o suporte da Conecta Saúde para ativar. Enquanto isso, as campanhas seguem pelo WhatsApp.</p>
+              </div>
+            )}
+          </section>
+        ) : (
         <section className="px-4 pb-6 space-y-5" aria-label="Nova campanha">
 
           <div>
@@ -641,12 +732,9 @@ export function BroadcastManagement() {
                   </p>
                 )}
                 {selectedTemplate && (
-                  <div>
-                    <p className={labelClass}>Prévia{recipients[0] ? " (1º destinatário)" : ""}</p>
-                    <div className="mt-1 max-h-60 overflow-y-auto whitespace-pre-wrap rounded-lg border border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/40 p-3 text-sm text-slate-900 dark:text-slate-100">
-                      {builtCloud && !builtCloud.ok ? builtCloud.error : cloudPreview}
-                    </div>
-                  </div>
+                  <BroadcastPreview label={`Prévia${recipients[0] ? " (1º destinatário)" : ""}`}>
+                    {builtCloud && !builtCloud.ok ? builtCloud.error : cloudPreview}
+                  </BroadcastPreview>
                 )}
               </div>
             ) : (
@@ -719,15 +807,12 @@ export function BroadcastManagement() {
             </p>
             {livePreview &&
               variantPreviews.map((p, i) => (
-                <div key={i}>
-                  <p className={labelClass}>
-                    Prévia{variantPreviews.length > 1 ? ` — ${i === 0 ? "mensagem principal" : `variação ${i + 1}`}` : ""}
-                    {recipients[0] ? " (1º destinatário)" : ""}
-                  </p>
-                  <div className="mt-1 max-h-60 overflow-y-auto whitespace-pre-wrap rounded-lg border border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/40 p-3 text-sm text-slate-900 dark:text-slate-100">
-                    {p.text}
-                  </div>
-                </div>
+                <BroadcastPreview
+                  key={i}
+                  label={`Prévia${variantPreviews.length > 1 ? ` — ${i === 0 ? "mensagem principal" : `variação ${i + 1}`}` : ""}${recipients[0] ? " (1º destinatário)" : ""}`}
+                >
+                  {p.text}
+                </BroadcastPreview>
               ))}
             </>
             )}
@@ -801,6 +886,7 @@ export function BroadcastManagement() {
             </button>
           </div>
         </section>
+        )}
         </SheetContent>
       </Sheet>
 
@@ -916,7 +1002,9 @@ export function BroadcastManagement() {
                   <p>
                     Vai para <strong>{plural(confirming.preview.pending, "endereço", "endereços")}</strong> por{" "}
                     {confirming.preview.channel === "SMS" ? "SMS" : "e-mail"}, em lotes, de segunda a sexta das 9h às 17h.
-                    {confirming.preview.smsCredits ? ` Cada SMS consome ${confirming.preview.smsCredits} ${confirming.preview.smsCredits === 1 ? "crédito" : "créditos"}.` : ""}
+                    {confirming.preview.smsCredits
+                      ? ` Cada SMS consome ${plural(confirming.preview.smsCredits, "crédito", "créditos")} — até ${plural(confirming.preview.smsCredits * (confirming.preview.withConsent ?? 0), "crédito", "créditos")} no total (só quem tem aceite recebe).`
+                      : ""}
                   </p>
                   <p
                     className={
@@ -925,9 +1013,9 @@ export function BroadcastManagement() {
                         : ""
                     }
                   >
-                    <strong>{plural(confirming.preview.withConsent ?? 0, "tem", "têm")}</strong> consentimento para este canal.
+                    <strong>{plural(confirming.preview.withConsent ?? 0, "tem", "têm")}</strong> aceite deste canal.
                     {(confirming.preview.withConsent ?? 0) < confirming.preview.pending
-                      ? " Os demais serão pulados e aparecem como “Sem consentimento”. A gestão registra os aceites em “Disparos por SMS e e-mail”."
+                      ? " Os demais serão pulados e aparecem como “Sem consentimento”. A gestão registra os aceites no botão “Aceites SMS/e-mail”, no topo da página."
                       : ""}
                   </p>
                 </div>
@@ -942,19 +1030,14 @@ export function BroadcastManagement() {
                     : ""}
               </p>
               )}
-              <div>
-                <p className={labelClass}>
-                  Como chega para o 1º destinatário{confirming.preview.samplePhone ? ` (${confirming.preview.samplePhone})` : ""}:
-                </p>
-                <div className="mt-1 max-h-64 overflow-y-auto whitespace-pre-wrap rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900 p-3 text-sm text-slate-900 dark:text-slate-100">
+              <BroadcastPreview tall label={`Como chega para o 1º destinatário${confirming.preview.samplePhone ? ` (${confirming.preview.samplePhone})` : ""}:`}>
                   {confirming.preview.hasImage && (
                     <p className="mb-2 text-xs text-slate-500 dark:text-slate-400">
                       [{confirming.preview.attachmentKind === "document" ? `documento anexado: ${confirming.preview.attachmentName ?? "arquivo"}` : "imagem anexada"}]
                     </p>
                   )}
                   {confirming.preview.sampleMessage}
-                </div>
-              </div>
+              </BroadcastPreview>
               {confirming.preview.variantMessages.length > 1 && (
                 <details className="text-sm">
                   <summary className="cursor-pointer font-medium text-slate-700 dark:text-slate-200">

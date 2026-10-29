@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { requireClinicManager, requireClinicSession } from "@/lib/session";
+import { isClinicManager, requireClinicManager, requireClinicSession } from "@/lib/session";
 import { normalizeBroadcastVariants } from "@/lib/broadcast-variants";
 import { prepareChannelRecipients } from "@/lib/broadcast-channel";
 import { missingChannelConfig } from "@/lib/channel-config";
@@ -28,6 +28,9 @@ export async function createClinicChannelCampaign(input: {
   const { clinicId, userId } = await requireClinicSession();
 
   if (input.channel !== "SMS" && input.channel !== "EMAIL") return fail("Canal inválido.");
+  if (missingChannelConfig(input.channel).length > 0) {
+    return fail(`${input.channel === "SMS" ? "SMS" : "E-mail"} ainda não foi ativado para a clínica — fale com o suporte.`);
+  }
   const name = input.name.trim();
   const template = input.messageTemplate.trim();
   if (!name || !template) return fail("Preencha o nome da campanha e o texto da mensagem.");
@@ -120,16 +123,19 @@ export async function registerChannelConsents(channel: "SMS" | "EMAIL", raw: str
   };
 }
 
-/** O que a tela precisa para SMS/e-mail: o que falta configurar no servidor (nomes das
- * variáveis, nunca valores) e quantos aceites ativos a clínica tem. */
+/** O que a tela precisa para SMS/e-mail: se o canal está ativo (os nomes das variáveis que
+ * faltam ficam no servidor — a clínica não age sobre eles), quantos aceites ativos a clínica
+ * tem e se quem está logado é da gestão (só a gestão registra aceites). */
 export async function getChannelSetup() {
-  const { clinicId } = await requireClinicSession();
-  const [smsConsents, emailConsents] = await Promise.all([
+  const { clinicId, userId } = await requireClinicSession();
+  const [smsConsents, emailConsents, isManager] = await Promise.all([
     prisma.channelConsent.count({ where: { clinicId, channel: "SMS", revokedAt: null } }),
     prisma.channelConsent.count({ where: { clinicId, channel: "EMAIL", revokedAt: null } }),
+    isClinicManager(userId),
   ]);
   return {
-    sms: { missing: missingChannelConfig("SMS"), consents: smsConsents },
-    email: { missing: missingChannelConfig("EMAIL"), consents: emailConsents },
+    isManager,
+    sms: { ready: missingChannelConfig("SMS").length === 0, consents: smsConsents },
+    email: { ready: missingChannelConfig("EMAIL").length === 0, consents: emailConsents },
   };
 }

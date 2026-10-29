@@ -1,14 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { prismaMock, session } = vi.hoisted(() => ({
+const { prismaMock, session, channelConfig } = vi.hoisted(() => ({
+  channelConfig: { missingChannelConfig: vi.fn() },
   prismaMock: {
     broadcastCampaign: { create: vi.fn() },
     channelConsent: { findMany: vi.fn(), createMany: vi.fn(), updateMany: vi.fn(), count: vi.fn() },
   },
-  session: { requireClinicSession: vi.fn(), requireClinicManager: vi.fn() },
+  session: { requireClinicSession: vi.fn(), requireClinicManager: vi.fn(), isClinicManager: vi.fn() },
 }));
 vi.mock("@/lib/prisma", () => ({ prisma: prismaMock }));
 vi.mock("@/lib/session", () => session);
+vi.mock("@/lib/channel-config", () => channelConfig);
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 
 import { createClinicChannelCampaign, registerChannelConsents } from "./clinic-channel-broadcast";
@@ -19,6 +21,7 @@ beforeEach(() => {
   session.requireClinicManager.mockResolvedValue({ clinicId: "clinic1", userId: "user1" });
   prismaMock.channelConsent.findMany.mockResolvedValue([]);
   prismaMock.broadcastCampaign.create.mockResolvedValue({ id: "camp1" });
+  channelConfig.missingChannelConfig.mockReturnValue([]);
 });
 
 const base = { channel: "EMAIL" as const, name: "Retorno", subject: "Olá {{nome}}", messageTemplate: "Oi {{nome}}", extraVariants: [] as string[], csv: "email,nome\na@x.com,Ana\nb@x.com,Bia\nruim,Cris" };
@@ -33,6 +36,15 @@ describe("createClinicChannelCampaign", () => {
   it("nome ou texto em branco são recusados", async () => {
     expect(await createClinicChannelCampaign({ ...base, name: " " })).toMatchObject({ success: false });
     expect(await createClinicChannelCampaign({ ...base, messageTemplate: "" })).toMatchObject({ success: false });
+  });
+
+  it("canal sem chaves no servidor não cria rascunho e não expõe nomes de variáveis", async () => {
+    channelConfig.missingChannelConfig.mockReturnValue(["RESEND_API_KEY"]);
+    const out = await createClinicChannelCampaign(base);
+    expect(out).toMatchObject({ success: false });
+    expect((out as { error: string }).error).toMatch(/suporte/);
+    expect((out as { error: string }).error).not.toMatch(/RESEND/);
+    expect(prismaMock.broadcastCampaign.create).not.toHaveBeenCalled();
   });
 
   it("canal WhatsApp não passa por aqui", async () => {
