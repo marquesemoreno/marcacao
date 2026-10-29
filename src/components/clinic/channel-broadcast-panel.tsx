@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Loader2, Upload } from "lucide-react";
 import { toast } from "sonner";
-import { createClinicChannelCampaign, getChannelSetup, registerChannelConsents } from "@/actions/clinic-channel-broadcast";
+import { createClinicChannelCampaign, getChannelSetup, registerChannelConsents, sendClinicChannelTest } from "@/actions/clinic-channel-broadcast";
 import { smsCredits } from "@/lib/broadcast-channel";
 import { applyBroadcastVariables } from "@/lib/broadcast-csv";
 import { parseConsentList } from "@/lib/channel-consent";
@@ -40,9 +40,12 @@ export function ChannelCampaignFields({
   channel,
   onCreated,
   audiences,
+  myEmail,
 }: {
   channel: Channel;
   onCreated: () => void;
+  /** E-mail de login de quem está montando a campanha — destino padrão do teste. */
+  myEmail: string;
   /** Públicos prontos da tela de Disparos (só telefone, então só para SMS). */
   audiences: { hasBridge: boolean; marcadores: ParsedBroadcastRecipient[]; selecao: ParsedBroadcastRecipient[] };
 }) {
@@ -66,6 +69,21 @@ export function ChannelCampaignFields({
   const [variants, setVariants] = useState<string[]>([]);
   const [csv, setCsv] = useState("");
   const [busy, setBusy] = useState(false);
+  const [testTo, setTestTo] = useState(channel === "EMAIL" ? myEmail : "");
+  const [testing, setTesting] = useState(false);
+
+  async function sendTest() {
+    setTesting(true);
+    try {
+      const result = await sendClinicChannelTest({ channel, to: testTo, subject, messageTemplate: template, variables: ready?.[0]?.variables });
+      if (!result.success) toast.error(result.error);
+      else toast.success(`Teste enviado para ${result.to}. ${channel === "EMAIL" ? "Confira a caixa de entrada (e o spam)." : "Deve chegar em instantes."}`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível enviar o teste.");
+    } finally {
+      setTesting(false);
+    }
+  }
 
   const sampleVars = ready?.[0]?.variables ?? { nome: "Maria", procedimento: "consulta", data: "10/11" };
   const sample = template.trim() ? applyBroadcastVariables(template, sampleVars) : "";
@@ -216,6 +234,33 @@ export function ChannelCampaignFields({
             {FOOTER_SAMPLE.replace(/x{42}/, "…")}
           </BroadcastPreview>
         )}
+      </fieldset>
+
+      <fieldset className="space-y-2 rounded-lg border border-slate-200 dark:border-slate-700 p-3">
+        <legend className="px-1 text-sm font-semibold text-slate-800 dark:text-slate-100">Enviar teste para mim</legend>
+        <p className="text-xs text-slate-500 dark:text-slate-400">
+          Manda 1 {channel === "EMAIL" ? "e-mail" : "SMS"} agora, a qualquer horário, para conferir como chega. Não cria a campanha nem conta como envio.
+        </p>
+        <div className="flex flex-wrap items-end gap-2">
+          <label className="block flex-1 min-w-48">
+            <span className={labelClass}>{channel === "EMAIL" ? "Seu e-mail" : "Seu celular (com DDD)"}</span>
+            <input
+              className={inputClass}
+              type={channel === "EMAIL" ? "email" : "tel"}
+              value={testTo}
+              onChange={(e) => setTestTo(e.target.value)}
+              placeholder={channel === "EMAIL" ? "voce@clinica.com.br" : "(77) 99999-1234"}
+            />
+          </label>
+          <button
+            type="button"
+            onClick={sendTest}
+            disabled={testing || !testTo.trim() || !template.trim() || (channel === "EMAIL" && !subject.trim())}
+            className="inline-flex h-9 items-center gap-1.5 px-3 text-sm font-medium rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-50"
+          >
+            {testing && <Loader2 className="w-4 h-4 animate-spin" aria-hidden />} Enviar teste
+          </button>
+        </div>
       </fieldset>
 
       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 dark:border-slate-800 pt-4">

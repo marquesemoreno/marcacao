@@ -26,6 +26,47 @@ function batchSize(env: Env): number {
   return Number.isInteger(n) && n >= 1 ? n : DEFAULT_BATCH_SIZE;
 }
 
+/** "Enviar teste para mim": 1 mensagem, na hora, para quem está montando a campanha. Não
+ * passa pela janela de marketing nem pelo aceite (é a própria equipe), mas leva o mesmo
+ * rodapé (RT + link de sair, aqui um link de exemplo) para conferir como o paciente recebe. */
+export async function sendChannelTest(input: {
+  channel: "SMS" | "EMAIL";
+  to: string;
+  subject: string;
+  template: string;
+  variables: Record<string, string>;
+  technicalDirector: string | null;
+  env?: Env;
+}): Promise<{ success: boolean; error?: string }> {
+  const env = input.env ?? process.env;
+  const unsubscribeUrl = `${getBaseUrl()}/api/u/teste`;
+  if (input.channel === "EMAIL") {
+    const content = buildEmailContent({
+      subject: `[TESTE] ${input.subject}`,
+      template: input.template,
+      variables: input.variables,
+      technicalDirector: input.technicalDirector,
+      unsubscribeUrl,
+    });
+    return sendEmailViaResend({
+      apiKey: env.RESEND_API_KEY ?? "",
+      from: env.BROADCAST_EMAIL_FROM ?? "",
+      to: input.to,
+      subject: content.subject,
+      html: content.html,
+      text: content.text,
+    });
+  }
+  const content = buildSmsContent({ template: input.template, variables: input.variables, technicalDirector: input.technicalDirector, unsubscribeUrl });
+  return sendSmsViaComtele({
+    apiKey: env.COMTELE_API_KEY ?? "",
+    route: Number(env.COMTELE_ROUTE),
+    number: input.to,
+    message: content.text,
+    tag: "teste",
+  });
+}
+
 export async function dispatchNextChannelBatch(options: { now?: Date; env?: Env } = {}): Promise<{ processed: number }> {
   const now = options.now ?? new Date();
   const env = options.env ?? process.env;

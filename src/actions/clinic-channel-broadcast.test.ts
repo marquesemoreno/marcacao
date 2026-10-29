@@ -1,10 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { prismaMock, session, channelConfig } = vi.hoisted(() => ({
+const { prismaMock, session, channelConfig, sendTestMock } = vi.hoisted(() => ({
+  sendTestMock: vi.fn(),
   channelConfig: { missingChannelConfig: vi.fn() },
   prismaMock: {
     broadcastCampaign: { create: vi.fn() },
     channelConsent: { findMany: vi.fn(), createMany: vi.fn(), updateMany: vi.fn(), count: vi.fn() },
+    clinic: { findUnique: vi.fn() },
   },
   session: { requireClinicSession: vi.fn(), requireClinicManager: vi.fn(), isClinicManager: vi.fn() },
 }));
@@ -13,7 +15,9 @@ vi.mock("@/lib/session", () => session);
 vi.mock("@/lib/channel-config", () => channelConfig);
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 
-import { createClinicChannelCampaign, registerChannelConsents } from "./clinic-channel-broadcast";
+vi.mock("@/lib/channel-broadcast", () => ({ sendChannelTest: sendTestMock }));
+
+import { createClinicChannelCampaign, registerChannelConsents, sendClinicChannelTest } from "./clinic-channel-broadcast";
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -25,6 +29,31 @@ beforeEach(() => {
 });
 
 const base = { channel: "EMAIL" as const, name: "Retorno", subject: "Olá {{nome}}", messageTemplate: "Oi {{nome}}", extraVariants: [] as string[], csv: "email,nome\na@x.com,Ana\nb@x.com,Bia\nruim,Cris" };
+
+describe("sendClinicChannelTest", () => {
+  const t = { channel: "EMAIL" as const, to: "Eu@Clinica.com", subject: "Oi", messageTemplate: "Olá {{nome}}" };
+  it("manda 1 teste na hora, com o endereço normalizado, sem criar campanha", async () => {
+    prismaMock.clinic.findUnique.mockResolvedValue({ technicalDirectorName: "Dr. X", technicalDirectorCrm: "CRM-BA 1" });
+    sendTestMock.mockResolvedValue({ success: true });
+    session.requireClinicSession.mockResolvedValue({ clinicId: "clinic1", userId: "user-a" });
+    expect(await sendClinicChannelTest(t)).toEqual({ success: true, to: "eu@clinica.com" });
+    expect(sendTestMock.mock.calls[0][0]).toMatchObject({ channel: "EMAIL", to: "eu@clinica.com", template: "Olá {{nome}}" });
+    expect(prismaMock.broadcastCampaign.create).not.toHaveBeenCalled();
+  });
+  it("recusa endereço inválido e canal sem chaves", async () => {
+    expect(await sendClinicChannelTest({ ...t, to: "nada" })).toMatchObject({ success: false });
+    channelConfig.missingChannelConfig.mockReturnValue(["RESEND_API_KEY"]);
+    expect(await sendClinicChannelTest(t)).toMatchObject({ success: false });
+    expect(sendTestMock).not.toHaveBeenCalled();
+  });
+  it("limita a 5 testes seguidos por usuário", async () => {
+    prismaMock.clinic.findUnique.mockResolvedValue(null);
+    sendTestMock.mockResolvedValue({ success: true });
+    session.requireClinicSession.mockResolvedValue({ clinicId: "clinic1", userId: "user-b" });
+    for (let i = 0; i < 5; i++) expect(await sendClinicChannelTest(t)).toMatchObject({ success: true });
+    expect(await sendClinicChannelTest(t)).toMatchObject({ success: false });
+  });
+});
 
 describe("createClinicChannelCampaign", () => {
   it("e-mail sem assunto é recusado", async () => {

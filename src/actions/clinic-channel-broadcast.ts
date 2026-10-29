@@ -4,7 +4,8 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { isClinicManager, requireClinicManager, requireClinicSession } from "@/lib/session";
 import { normalizeBroadcastVariants } from "@/lib/broadcast-variants";
-import { prepareChannelRecipients, prepareChannelRows } from "@/lib/broadcast-channel";
+import { isValidEmail, normalizeEmail, prepareChannelRecipients, prepareChannelRows, toSmsNumber } from "@/lib/broadcast-channel";
+import { technicalDirectorLine } from "@/lib/broadcast-csv";
 import { missingChannelConfig } from "@/lib/channel-config";
 import { channelSendDecision, parseConsentList, planConsentChanges } from "@/lib/channel-consent";
 
@@ -88,6 +89,52 @@ export async function createClinicChannelCampaign(input: {
   };
 }
 
+// Limite simples por usuário (por instância do servidor) para o botão de teste não virar
+// disparo: 5 testes a cada 10 minutos.
+const testLog = new Map<string, number[]>();
+const TEST_LIMIT = 5;
+const TEST_WINDOW_MS = 10 * 60_000;
+
+/** "Enviar teste para mim" de Nova campanha (SMS/e-mail): manda 1 mensagem na hora, a qualquer
+ * horário, com dados de exemplo, para o endereço de quem está montando a campanha. */
+export async function sendClinicChannelTest(input: {
+  channel: "SMS" | "EMAIL";
+  to: string;
+  subject: string;
+  messageTemplate: string;
+  variables?: Record<string, string>;
+}) {
+  const { clinicId, userId } = await requireClinicSession();
+  if (input.channel !== "SMS" && input.channel !== "EMAIL") return fail("Canal inválido.");
+  if (missingChannelConfig(input.channel).length > 0) {
+    return fail(`${input.channel === "SMS" ? "SMS" : "E-mail"} ainda não foi ativado para a clínica — fale com o suporte.`);
+  }
+  const template = input.messageTemplate.trim();
+  if (!template) return fail("Escreva a mensagem antes de testar.");
+  if (input.channel === "EMAIL" && !input.subject.trim()) return fail("Escreva o assunto antes de testar.");
+  const to = input.channel === "EMAIL" ? (isValidEmail(input.to) ? normalizeEmail(input.to) : null) : toSmsNumber(input.to);
+  if (!to) return fail(input.channel === "EMAIL" ? "E-mail inválido." : "Celular inválido — use DDD + número.");
+
+  const now = Date.now();
+  const recent = (testLog.get(userId) ?? []).filter((t) => now - t < TEST_WINDOW_MS);
+  if (recent.length >= TEST_LIMIT) return fail("Muitos testes seguidos — espere alguns minutos.");
+  testLog.set(userId, [...recent, now]);
+
+  const clinic = await prisma.clinic.findUnique({ where: { id: clinicId }, select: { technicalDirectorName: true, technicalDirectorCrm: true } });
+  // Import tardio: channel-broadcast é server-only e quebraria os testes desta action.
+  const { sendChannelTest } = await import("@/lib/channel-broadcast");
+  const result = await sendChannelTest({
+    channel: input.channel,
+    to,
+    subject: input.subject.trim(),
+    template,
+    variables: input.variables ?? { nome: "Maria", procedimento: "consulta", data: "10/11" },
+    technicalDirector: technicalDirectorLine(clinic?.technicalDirectorName ?? null, clinic?.technicalDirectorCrm ?? null),
+  });
+  if (!result.success) return fail(result.error ?? "O provedor recusou o envio.");
+  return { success: true as const, to };
+}
+
 /** Registra aceites de marketing por SMS/e-mail (só gestão). `source` é obrigatório: é de onde
  * veio o consentimento (ficha, formulário…), a prova em caso de questionamento (LGPD). */
 export async function registerChannelConsents(channel: "SMS" | "EMAIL", raw: string, source: string) {
@@ -134,13 +181,15 @@ export async function registerChannelConsents(channel: "SMS" | "EMAIL", raw: str
  * tem e se quem está logado é da gestão (só a gestão registra aceites). */
 export async function getChannelSetup() {
   const { clinicId, userId } = await requireClinicSession();
-  const [smsConsents, emailConsents, isManager] = await Promise.all([
+  const [smsConsents, emailConsents, isManager, user] = await Promise.all([
     prisma.channelConsent.count({ where: { clinicId, channel: "SMS", revokedAt: null } }),
     prisma.channelConsent.count({ where: { clinicId, channel: "EMAIL", revokedAt: null } }),
     isClinicManager(userId),
+    prisma.user.findUnique({ where: { id: userId }, select: { email: true } }),
   ]);
   return {
     isManager,
+    myEmail: user?.email ?? "",
     sms: { ready: missingChannelConfig("SMS").length === 0, consents: smsConsents },
     email: { ready: missingChannelConfig("EMAIL").length === 0, consents: emailConsents },
   };

@@ -564,6 +564,7 @@ export function BroadcastManagement() {
                 key={`${formChannel}-${channelFormKey}`}
                 channel={formChannel}
                 audiences={{ hasBridge, marcadores: marcadoresAudience, selecao: selectionList }}
+                myEmail={channelSetup?.myEmail ?? ""}
                 onCreated={() => {
                   setChannelFormKey((k) => k + 1);
                   setFormOpen(false);
