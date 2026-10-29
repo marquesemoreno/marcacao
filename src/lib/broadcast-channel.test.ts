@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { isValidEmail, normalizeEmail, parseEmailCsv, smsCredits, toSmsNumber } from "./broadcast-channel";
+import { isValidEmail, normalizeEmail, parseEmailCsv, smsCostRange, smsCredits, toSmsNumber } from "./broadcast-channel";
 
 describe("normalizeEmail / isValidEmail", () => {
   it("tira espaços e deixa minúsculo", () => {
@@ -103,5 +103,13 @@ describe("prepareChannelRecipients", () => {
 
   it("CSV vazio: nada a enviar", () => {
     expect(prepareChannelRecipients("EMAIL", " ").recipients).toEqual([]);
+  });
+});
+
+describe("smsCostRange", () => {
+  it("usa o pacote de 10 mil (R$ 0,09) e o de 500 (R$ 0,12)", () => {
+    const r = smsCostRange(200);
+    expect(r.min).toBeCloseTo(18);
+    expect(r.max).toBeCloseTo(24);
   });
 });

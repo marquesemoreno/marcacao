@@ -18,6 +18,21 @@ export function isValidEmail(value: string): boolean {
 
 /** Créditos de SMS consumidos: até 160 caracteres = 1; acima disso a Comtele cobra 1 a
  * cada 153 (SMS concatenado). */
+/** Preço do crédito de SMS na Comtele por pacote comprado (cotação 29/10/2026). O custo de
+ * uma campanha depende do pacote da clínica, por isso a tela mostra a faixa. */
+export const SMS_PRICE_TIERS: { credits: number; price: number }[] = [
+  { credits: 500, price: 0.12 },
+  { credits: 1000, price: 0.11 },
+  { credits: 2500, price: 0.1 },
+  { credits: 5000, price: 0.095 },
+  { credits: 10000, price: 0.09 },
+];
+
+/** Custo de N créditos no pacote mais caro e no mais barato. */
+export function smsCostRange(credits: number): { max: number; min: number } {
+  return { max: credits * SMS_PRICE_TIERS[0].price, min: credits * SMS_PRICE_TIERS[SMS_PRICE_TIERS.length - 1].price };
+}
+
 export function smsCredits(text: string): number {
   if (text.length === 0) return 0;
   return text.length <= 160 ? 1 : Math.ceil(text.length / 153);

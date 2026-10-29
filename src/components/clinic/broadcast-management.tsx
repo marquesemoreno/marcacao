@@ -31,6 +31,7 @@ import { listMarcadoresAudience } from "@/actions/marcadores";
 import { SELECTION_BROADCAST_KEY } from "@/components/clinic/patient-list-table";
 import { buildBroadcastMessage, parseBroadcastCsv, BROADCAST_OPT_OUT_FOOTER, type ParsedBroadcastRecipient } from "@/lib/broadcast-csv";
 import { estimateCampaignFinish, unfilledPlaceholders, unknownTemplateVariables } from "@/lib/broadcast-schedule";
+import { smsCostRange } from "@/lib/broadcast-channel";
 import { RescheduleBroadcastModal } from "@/components/clinic/reschedule-broadcast-modal";
 import { BroadcastPreview } from "@/components/clinic/broadcast-preview";
 import { ChannelCampaignFields, ChannelConsentDialog, type ChannelSetup } from "@/components/clinic/channel-broadcast-panel";
@@ -97,6 +98,12 @@ function estimateText(businessDays: number, finishIso: string | null, lateIso?: 
 }
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+const brl = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+/** Faixa de custo na Comtele: R$ 0,12 (pacote de 500) a R$ 0,09 (pacote de 10 mil) por crédito. */
+function smsCostText(credits: number): string {
+  const { max, min } = smsCostRange(credits);
+  return `cerca de ${brl(min)} a ${brl(max)}, conforme o pacote de créditos`;
+}
 
 /** Tela de Disparos (crítica 15/10/2026): campanhas no topo com a situação de cada uma
  * (enviando / fora do horário / cedendo a vez / limite do dia) e previsão de término;
@@ -1003,7 +1010,7 @@ export function BroadcastManagement() {
                     Vai para <strong>{plural(confirming.preview.pending, "endereço", "endereços")}</strong> por{" "}
                     {confirming.preview.channel === "SMS" ? "SMS" : "e-mail"}, em lotes, de segunda a sexta das 9h às 17h.
                     {confirming.preview.smsCredits
-                      ? ` Cada SMS consome ${plural(confirming.preview.smsCredits, "crédito", "créditos")} — até ${plural(confirming.preview.smsCredits * (confirming.preview.withConsent ?? 0), "crédito", "créditos")} no total (só quem tem aceite recebe).`
+                      ? ` Cada SMS consome ${plural(confirming.preview.smsCredits, "crédito", "créditos")} — até ${plural(confirming.preview.smsCredits * (confirming.preview.withConsent ?? 0), "crédito", "créditos")} no total (só quem tem aceite recebe), ${smsCostText(confirming.preview.smsCredits * (confirming.preview.withConsent ?? 0))}.`
                       : ""}
                   </p>
                   <p
