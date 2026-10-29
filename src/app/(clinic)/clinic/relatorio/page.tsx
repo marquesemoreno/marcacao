@@ -30,6 +30,10 @@ import {
   getClinicCampaignBreakdown,
 } from "@/actions/clinic";
 import { CampaignBreakdownTable } from "@/components/clinic/campaign-breakdown-table";
+import { getClinicReportInsights } from "@/actions/clinic-insights";
+import { ReportAiSummary } from "@/components/clinic/report-ai-summary";
+import { AgendaRiskBlock, FunnelCard, PatientsCard, WeeklyTrendCard } from "@/components/clinic/report-insights-blocks";
+import { buildInsightFacts, computeFunnel } from "@/lib/report-insights";
 import Link from "next/link";
 import { isProcedureAgenda } from "@/lib/doctor-names";
 import { formatDurationHuman, SLA_CRITICAL_MINUTES, SLA_WARNING_MINUTES } from "@/lib/sla-calculator";
@@ -132,6 +136,7 @@ export default async function ClinicReportPage({
     prevChat,
     prevManagement,
     campaignBreakdown,
+    insights,
   ] = await Promise.all([
     getClinicChatReport(period, tags, params.channel),
     isExclusive
@@ -147,6 +152,7 @@ export default async function ClinicReportPage({
     getClinicChatReport(period, tags, params.channel, true),
     getClinicManagementReport(period, params.channel, true),
     getClinicCampaignBreakdown(period),
+    getClinicReportInsights(period),
   ]);
   const rs = chatReport.responseStats;
   const prevRs = prevChat.responseStats;
@@ -163,6 +169,31 @@ export default async function ClinicReportPage({
           ? "text-amber-700 dark:text-amber-400"
           : "text-rose-700 dark:text-rose-400";
   const topAttendantId = topConverter(management.attendants);
+
+  // Funil: conversas → respondidas pela equipe → com desfecho → agendaram.
+  const funnel = computeFunnel({
+    total: chatReport.totalConversations,
+    answered: rs.answered,
+    withOutcome: outcomes.withOutcome,
+    scheduled: chatReport.totalAgendados,
+    lost: outcomes.lostTotal,
+    noOutcome: outcomes.noOutcome,
+    ticket: management.ticket,
+  });
+  // Dia com mais risco: só conta dia com volume (≥ 10 lembrados) pra não alarmar por 1 caso.
+  const riskiestWeekday =
+    insights.agenda?.byWeekday.filter((w) => w.reminded >= 10).sort((a, b) => b.riskPct - a.riskPct)[0] ?? null;
+  const insightFacts = buildInsightFacts({
+    conversionRate: { current: chatReport.conversionRate, previous: prevChat.conversionRate },
+    medianFirstReplyMin: { current: rs.medianFirstResponseMin, previous: prevRs.medianFirstResponseMin },
+    conversations: { current: chatReport.totalConversations, previous: prevChat.totalConversations },
+    topLostReason: outcomes.topLossReason
+      ? { label: outcomes.topLossReason.label.replace("Perdido — ", ""), count: outcomes.topLossReason.count }
+      : null,
+    biggestDrop: funnel.biggestDrop,
+    riskiestWeekday,
+    opportunity: funnel.opportunity,
+  });
   const kindTotal =
     management.kindDistribution.CONSULTA +
     management.kindDistribution.RETORNO +
@@ -357,6 +388,32 @@ export default async function ClinicReportPage({
           </div>
         </dl>
       </section>
+
+      <ReportAiSummary clinicName={clinic.tradeName} periodLabel={labels.title} facts={insightFacts} />
+
+      {/* =========================================================================
+          FUNIL, TENDÊNCIA E PACIENTES
+         ========================================================================= */}
+      <section aria-labelledby="bloco-funil" className="space-y-6">
+        <BlockHeading id="bloco-funil" title="Funil e evolução" hint="Onde os pacientes se perdem, como as semanas evoluem e quantos são novos." />
+        <NotFiltered show={conversationFiltered} />
+        <FunnelCard funnel={funnel} />
+        <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
+          <WeeklyTrendCard weeks={insights.trend} />
+          <PatientsCard patients={insights.patients} />
+        </div>
+      </section>
+
+      {insights.agenda && (
+        <section aria-labelledby="bloco-agenda" className="space-y-6">
+          <BlockHeading
+            id="bloco-agenda"
+            title="Agenda e confirmações"
+            hint="Agenda do sistema da clínica cruzada com as respostas ao lembrete de confirmação."
+          />
+          <AgendaRiskBlock agenda={insights.agenda} />
+        </section>
+      )}
 
       {/* =========================================================================
           BLOCO 1 — RESULTADO
