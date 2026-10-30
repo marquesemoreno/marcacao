@@ -54,7 +54,14 @@ export async function saveInstagramAccount(clinicId: string, input: { accessToke
 
   await prisma.instagramAccount.upsert({
     where: { clinicId },
-    update: { accessToken, igUserId, username: me.username ?? null, active: true },
+    update: {
+      accessToken,
+      igUserId,
+      username: me.username ?? null,
+      active: true,
+      // Token novo colado: validade desconhecida até o cron de renovação rodar.
+      ...(accessToken !== existing?.accessToken ? { tokenExpiresAt: null } : {}),
+    },
     create: { clinicId, accessToken, igUserId, username: me.username ?? null },
   });
   revalidatePath("/admin/clinicas");

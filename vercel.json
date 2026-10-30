@@ -26,6 +26,10 @@
     {
       "path": "/api/cron/msp-lead-outreach",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/instagram-token-refresh",
+      "schedule": "0 7 * * *"
     }
   ]
 }
