@@ -91,7 +91,6 @@ export async function createClinicChannelCampaign(input: {
 
 // Limite simples por usuário (por instância do servidor) para o botão de teste não virar
 // disparo: 5 testes a cada 10 minutos.
-const testLog = new Map<string, number[]>();
 const TEST_LIMIT = 5;
 const TEST_WINDOW_MS = 10 * 60_000;
 
@@ -115,10 +114,15 @@ export async function sendClinicChannelTest(input: {
   const to = input.channel === "EMAIL" ? (isValidEmail(input.to) ? normalizeEmail(input.to) : null) : toSmsNumber(input.to);
   if (!to) return fail(input.channel === "EMAIL" ? "E-mail inválido." : "Celular inválido — use DDD + número.");
 
-  const now = Date.now();
-  const recent = (testLog.get(userId) ?? []).filter((t) => now - t < TEST_WINDOW_MS);
-  if (recent.length >= TEST_LIMIT) return fail("Muitos testes seguidos — espere alguns minutos.");
-  testLog.set(userId, [...recent, now]);
+  // Limite contado no banco (webhook_logs): em memória zerava a cada instância nova da Vercel.
+  // Cada SMS gasta crédito — conta a tentativa, não só o sucesso. Sem o destinatário (LGPD).
+  const recent = await prisma.webhookLog.count({
+    where: { event: "channel.test_send", payload: { path: ["userId"], equals: userId }, createdAt: { gte: new Date(Date.now() - TEST_WINDOW_MS) } },
+  });
+  if (recent >= TEST_LIMIT) return fail("Muitos testes seguidos — espere alguns minutos.");
+  await prisma.webhookLog.create({
+    data: { event: "channel.test_send", payload: { userId, clinicId, channel: input.channel }, status: "sent" },
+  });
 
   const clinic = await prisma.clinic.findUnique({ where: { id: clinicId }, select: { technicalDirectorName: true, technicalDirectorCrm: true } });
   // Import tardio: channel-broadcast é server-only e quebraria os testes desta action.

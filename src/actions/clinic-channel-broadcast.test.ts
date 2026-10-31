@@ -7,6 +7,7 @@ const { prismaMock, session, channelConfig, sendTestMock } = vi.hoisted(() => ({
     broadcastCampaign: { create: vi.fn() },
     channelConsent: { findMany: vi.fn(), createMany: vi.fn(), updateMany: vi.fn(), count: vi.fn() },
     clinic: { findUnique: vi.fn() },
+    webhookLog: { count: vi.fn(), create: vi.fn() },
   },
   session: { requireClinicSession: vi.fn(), requireClinicManager: vi.fn(), isClinicManager: vi.fn() },
 }));
@@ -26,6 +27,8 @@ beforeEach(() => {
   prismaMock.channelConsent.findMany.mockResolvedValue([]);
   prismaMock.broadcastCampaign.create.mockResolvedValue({ id: "camp1" });
   channelConfig.missingChannelConfig.mockReturnValue([]);
+  prismaMock.webhookLog.count.mockResolvedValue(0);
+  prismaMock.webhookLog.create.mockResolvedValue({});
 });
 
 const base = { channel: "EMAIL" as const, name: "Retorno", subject: "Olá {{nome}}", messageTemplate: "Oi {{nome}}", extraVariants: [] as string[], csv: "email,nome\na@x.com,Ana\nb@x.com,Bia\nruim,Cris" };
@@ -46,12 +49,22 @@ describe("sendClinicChannelTest", () => {
     expect(await sendClinicChannelTest(t)).toMatchObject({ success: false });
     expect(sendTestMock).not.toHaveBeenCalled();
   });
-  it("limita a 5 testes seguidos por usuário", async () => {
+  it("limita a 5 testes em 10 min por usuário, contando no banco (vale entre instâncias)", async () => {
     prismaMock.clinic.findUnique.mockResolvedValue(null);
     sendTestMock.mockResolvedValue({ success: true });
     session.requireClinicSession.mockResolvedValue({ clinicId: "clinic1", userId: "user-b" });
-    for (let i = 0; i < 5; i++) expect(await sendClinicChannelTest(t)).toMatchObject({ success: true });
+    prismaMock.webhookLog.count.mockResolvedValue(5);
     expect(await sendClinicChannelTest(t)).toMatchObject({ success: false });
+    expect(sendTestMock).not.toHaveBeenCalled();
+    expect(prismaMock.webhookLog.count.mock.calls[0][0].where).toMatchObject({ event: "channel.test_send", payload: { path: ["userId"], equals: "user-b" } });
+  });
+  it("registra cada teste enviado para o limite", async () => {
+    prismaMock.clinic.findUnique.mockResolvedValue(null);
+    sendTestMock.mockResolvedValue({ success: true });
+    session.requireClinicSession.mockResolvedValue({ clinicId: "clinic1", userId: "user-c" });
+    prismaMock.webhookLog.count.mockResolvedValue(4);
+    expect(await sendClinicChannelTest(t)).toMatchObject({ success: true });
+    expect(prismaMock.webhookLog.create.mock.calls[0][0].data).toMatchObject({ event: "channel.test_send", payload: { userId: "user-c", clinicId: "clinic1", channel: "EMAIL" } });
   });
 });
 
