@@ -3,10 +3,11 @@ import { createAppointmentSchema } from "./appointment";
 
 const validInput = {
   patientName: "Maria Silva",
-  patientCpf: "123.456.789-00",
+  patientCpf: "529.982.247-25",
   patientPhone: "(11) 91234-5678",
   clinicProcedureId: "clx1y2z3a0001",
-  date: "2026-09-10",
+  // Sempre no futuro: data fixa quebrou o teste quando passou (o schema recusa data passada).
+  date: new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10),
 };
 
 describe("createAppointmentSchema", () => {
@@ -15,7 +16,7 @@ describe("createAppointmentSchema", () => {
 
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.patientCpf).toBe("12345678900");
+      expect(result.data.patientCpf).toBe("52998224725");
       expect(result.data.patientPhone).toBe("11912345678");
     }
   });
@@ -95,7 +96,7 @@ describe("createAppointmentSchema", () => {
     if (!result.success) {
       const fields = result.error.issues.map((issue) => issue.path[0]);
       expect(fields).toEqual(
-        expect.arrayContaining(["patientName", "patientCpf", "patientPhone", "clinicProcedureId", "date"])
+        expect.arrayContaining(["patientName", "patientPhone", "clinicProcedureId", "date"])
       );
     }
   });

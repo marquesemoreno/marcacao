@@ -7,5 +7,7 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["src/**/*.test.ts"],
+    // appointments.test.ts é integração contra o Supabase real (sem banco no CI).
+    exclude: ["**/node_modules/**", ...(process.env.CI ? ["src/actions/appointments.test.ts"] : [])],
   },
 });
