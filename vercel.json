@@ -30,6 +30,10 @@
     {
       "path": "/api/cron/instagram-token-refresh",
       "schedule": "0 7 * * *"
+    },
+    {
+      "path": "/api/cron/health-check",
+      "schedule": "*/15 * * * *"
     }
   ]
 }
