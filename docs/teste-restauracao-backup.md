@@ -40,6 +40,10 @@ restaurado e o registro mais novo. Esperado:
 - contagens iguais ou um pouco menores (o que entrou depois da hora do backup);
 - "última mensagem no backup" perto do horário do backup escolhido.
 
+> Atenção: o backup do banco **não inclui os arquivos do Storage** (fotos, áudios, PDFs do
+> WhatsApp e anexos de campanha). Num incidente, as mensagens voltam, mas esses arquivos
+> dependem do Storage continuar de pé.
+
 ### 3. Conferência manual rápida (5 min)
 No SQL Editor do projeto restaurado, conferir 2–3 coisas reais que você conhece:
 uma conversa recente da Urolaser, uma campanha de Disparos, um paciente da agenda.
@@ -53,4 +57,4 @@ uma conversa recente da Urolaser, uma campanha de Disparos, um paciente da agend
 
 | Data | Backup usado | Tempo p/ restaurar | Resultado | Observações |
 |------|--------------|--------------------|-----------|-------------|
-|      |              |                    |           |             |
+| 31/10/2026 | diário de 31/10 ~00:40 UTC | (anotar) | ✅ 48 tabelas, nenhuma faltando/vazia | Diferenças só do que entrou depois (41 mensagens, 3 conversas). Arquivos do Storage (mídias) NÃO estão no backup do banco. |
