@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { fetchBridgeCampaignPatients } from "@/lib/hospital-bridge";
 import { buildCampaignAudience } from "@/lib/campaign-audience";
 import { technicalDirectorLine } from "@/lib/broadcast-csv";
-import { ruleCampaignName, ruleTargetDate } from "@/lib/automation-rules";
+import { BIRTHDAY_ACTIVE_DAYS, birthdayKeysFor, ruleCampaignName, ruleTargetDate } from "@/lib/automation-rules";
 
 /** Quem já recebeu este mesmo passo nesse período não recebe de novo. */
 const REPEAT_GUARD_DAYS = 30;
@@ -52,7 +52,8 @@ async function runOne(
   const integration = await prisma.hospitalIntegration.findUnique({ where: { clinicId: rule.clinicId }, select: { active: true } });
   if (!integration?.active) return { ...base, status: "sem sistema da clínica" };
 
-  const target = ruleTargetDate(now, rule.daysAfter);
+  const isBirthday = rule.kind === "ANIVERSARIO";
+  const target = ruleTargetDate(now, isBirthday ? BIRTHDAY_ACTIVE_DAYS : rule.daysAfter);
   const { patients, futurePhones } = await fetchBridgeCampaignPatients(rule.clinicId, { desde: target });
   const optedOutPhones = new Set(
     (await prisma.contact.findMany({ where: { optedOutOfBroadcastsAt: { not: null }, phone: { not: null } }, select: { phone: true } }))
@@ -64,7 +65,9 @@ async function runOne(
     optedOutPhones,
     excludedPatientIds: new Set(rule.clinic.campaignExcludedPatientIds),
     today: now,
-    lastVisitOn: { date: target, futurePhones: rule.requireNoFuture ? new Set(futurePhones) : undefined },
+    ...(isBirthday
+      ? { birthdayOn: birthdayKeysFor(now) }
+      : { lastVisitOn: { date: target, futurePhones: rule.requireNoFuture ? new Set(futurePhones) : undefined } }),
   });
 
   const since = new Date(now.getTime() - REPEAT_GUARD_DAYS * 86400000);

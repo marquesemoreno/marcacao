@@ -12,6 +12,7 @@ const STEP_HELP: Record<AutomationRuleView["kind"], string> = {
   POS_CONSULTA: "Para quem consultou — pergunta como está e abre espaço para dúvidas.",
   RETORNO: "Para quem não voltou e não tem consulta marcada.",
   REATIVACAO: "Para quem sumiu há muito tempo e não tem consulta marcada.",
+  ANIVERSARIO: "No dia do aniversário, para quem passou na clínica nos últimos 2 anos.",
 };
 
 const field = "h-9 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2 text-sm";
@@ -53,11 +54,13 @@ function RuleCard({ rule, cloud, onSaved }: { rule: AutomationRuleView; cloud: {
         </span>
       </div>
 
+      {rule.kind !== "ANIVERSARIO" && (
       <label className="flex flex-wrap items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
         Enviar
         <input type="number" min={1} max={1095} value={daysAfter} onChange={(e) => setDaysAfter(Number(e.target.value))} className={`${field} w-20`} />
         dias depois da última consulta
       </label>
+      )}
 
       <label className="block text-sm text-slate-700 dark:text-slate-300">
         Modelo aprovado pela Meta
@@ -148,7 +151,7 @@ export function AutomationRulesSheet({
         <SheetHeader>
           <SheetTitle>Régua automática</SheetTitle>
           <SheetDescription>
-            Todo dia às 8h, quem teve a última consulta no dia certo entra numa campanha automática. O envio segue o ritmo dos Disparos e só vai
+            Todo dia às 8h, quem teve a última consulta no dia certo (ou faz aniversário) entra numa campanha automática. O envio segue o ritmo dos Disparos e só vai
             para maiores de 18 anos com consentimento de marketing, sem repetir o mesmo passo em 30 dias.
           </SheetDescription>
         </SheetHeader>

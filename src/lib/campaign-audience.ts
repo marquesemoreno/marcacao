@@ -38,6 +38,8 @@ export type AudienceOptions = {
   /** Régua automática: só quem teve a última consulta exatamente em `date` (AAAA-MM-DD).
    * Com futurePhones, quem já tem consulta futura fica de fora (retorno/reativação). */
   lastVisitOn?: { date: string; futurePhones?: Set<string> };
+  /** Aniversário: só quem nasceu num destes dias ("MM-DD"). */
+  birthdayOn?: string | string[];
 };
 
 export type AudienceRecipient = { phone: string; variables: { nome: string; saudacao: string } };
@@ -76,7 +78,9 @@ export function buildCampaignAudience(patients: BridgeCampaignPatient[], options
     excludedRetornoRange: 0,
     excludedHasFuture: 0,
     excludedDoctor: 0,
+    excludedNotBirthday: 0,
   };
+  const birthdayKeys = options.birthdayOn ? new Set([options.birthdayOn].flat()) : null;
   // Código do médico vem como número (Santa Clara: 4) ou texto com zero ("04") conforme a tabela.
   const doctorKey = (d: string | number | null | undefined) => String(d ?? "").trim().replace(/^0+(?=\d)/, "");
   const doctorIds = options.doctorIds?.size ? new Set([...options.doctorIds].map(doctorKey)) : null;
@@ -111,6 +115,10 @@ export function buildCampaignAudience(patients: BridgeCampaignPatient[], options
         stats.excludedRetornoRange++;
         continue;
       }
+    }
+    if (birthdayKeys && !(patient.nascimento && birthdayKeys.has(patient.nascimento.slice(5, 10)))) {
+      stats.excludedNotBirthday++;
+      continue;
     }
     if (options.lastVisitOn) {
       if (options.lastVisitOn.futurePhones && (patient.proximaMarcacao || futurePhones.has(formatToWhatsAppNumber(patient.telefone)))) {

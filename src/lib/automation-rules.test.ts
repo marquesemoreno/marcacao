@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { ruleTargetDate, ruleCampaignName, DEFAULT_RULE_STEPS, validateRuleInput } from "./automation-rules";
+import { ruleTargetDate, ruleCampaignName, DEFAULT_RULE_STEPS, validateRuleInput, birthdayKeysFor } from "./automation-rules";
 
 describe("ruleTargetDate", () => {
   it("conta os dias no horário de Brasília", () => {
@@ -31,5 +31,20 @@ describe("validateRuleInput", () => {
     expect(validateRuleInput({ daysAfter: 0 })).toMatch(/dias/);
     expect(validateRuleInput({ daysAfter: 2000 })).toMatch(/dias/);
     expect(validateRuleInput({ daysAfter: 7 })).toBeNull();
+  });
+});
+
+describe("birthdayKeysFor", () => {
+  it("dia comum: só o próprio dia (Brasília)", () => {
+    expect(birthdayKeysFor(new Date("2026-11-02T12:00:00Z"))).toEqual(["11-02"]);
+    expect(birthdayKeysFor(new Date("2026-11-02T02:00:00Z"))).toEqual(["11-01"]);
+  });
+  it("28/02 em ano não bissexto também pega quem nasceu em 29/02", () => {
+    expect(birthdayKeysFor(new Date("2027-02-28T12:00:00Z"))).toEqual(["02-28", "02-29"]);
+    expect(birthdayKeysFor(new Date("2028-02-28T12:00:00Z"))).toEqual(["02-28"]);
+  });
+  it("passo de aniversário existe e não depende de consulta futura", () => {
+    const s = DEFAULT_RULE_STEPS.find((x) => x.kind === "ANIVERSARIO");
+    expect(s?.requireNoFuture).toBe(false);
   });
 });

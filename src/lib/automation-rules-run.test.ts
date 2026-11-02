@@ -92,3 +92,21 @@ describe("runAutomationRules", () => {
     expect(prismaMock.automationRule.update).toHaveBeenCalled();
   });
 });
+
+describe("runAutomationRules — aniversário", () => {
+  it("pega pacientes ativos dos últimos 2 anos e manda para quem faz aniversário hoje", async () => {
+    prismaMock.automationRule.findMany.mockResolvedValue([{ ...rule, id: "r2", kind: "ANIVERSARIO", name: "Aniversário", daysAfter: 0 }]);
+    bridge.fetchBridgeCampaignPatients.mockResolvedValue({
+      patients: [
+        { ...patient(1, "77991111111", "2026-01-10"), nascimento: "1975-11-02" },
+        { ...patient(2, "77992222222", "2026-01-10"), nascimento: "1975-11-03" },
+      ],
+      futurePhones: [],
+    });
+    const [r] = await runAutomationRules(now);
+    expect(r.status).toBe("criada");
+    expect(bridge.fetchBridgeCampaignPatients).toHaveBeenCalledWith("c1", { desde: "2024-11-02" });
+    const data = prismaMock.broadcastCampaign.create.mock.calls[0][0].data;
+    expect(data.recipients.create.map((x: { phone: string }) => x.phone)).toEqual(["5577991111111"]);
+  });
+});

@@ -178,3 +178,19 @@ describe("buildCampaignAudience — régua (última consulta exatamente num dia)
     expect(recipients).toHaveLength(1);
   });
 });
+
+describe("buildCampaignAudience — aniversário", () => {
+  const base = { optedOutPhones: new Set<string>(), today };
+  it("só entra quem faz aniversário no dia (MM-DD)", () => {
+    const { recipients, stats } = buildCampaignAudience(
+      [p({ id: 1, telefone: "77991111111", nascimento: "1980-10-01" }), p({ id: 2, telefone: "77992222222", nascimento: "1980-10-02" })],
+      { ...base, birthdayOn: "10-01" },
+    );
+    expect(recipients.map((r) => r.phone)).toEqual(["5577991111111"]);
+    expect(stats.excludedNotBirthday).toBe(1);
+  });
+  it("sem data de nascimento fica de fora", () => {
+    const { stats } = buildCampaignAudience([p({ nascimento: null })], { ...base, birthdayOn: "10-01" });
+    expect(stats.excludedNotBirthday).toBe(1);
+  });
+});

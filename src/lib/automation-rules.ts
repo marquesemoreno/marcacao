@@ -2,7 +2,7 @@
  * fica em src/lib/automation-rules-run.ts e cria uma campanha de Disparos por passo/dia,
  * então ritmo, consentimento, opt-out e modelo da API oficial são os mesmos das campanhas. */
 
-export type AutomationRuleKind = "POS_CONSULTA" | "RETORNO" | "REATIVACAO";
+export type AutomationRuleKind = "POS_CONSULTA" | "RETORNO" | "REATIVACAO" | "ANIVERSARIO";
 
 export const DEFAULT_RULE_STEPS: {
   kind: AutomationRuleKind;
@@ -32,7 +32,28 @@ export const DEFAULT_RULE_STEPS: {
     requireNoFuture: true,
     messageTemplate: "{{saudacao}}! Sentimos sua falta por aqui — já faz 1 ano da sua última consulta. Quer agendar um horário? É só responder.",
   },
+  {
+    // daysAfter não vale aqui: o dia é o do aniversário (ver birthdayKeysFor).
+    kind: "ANIVERSARIO",
+    name: "Aniversário",
+    daysAfter: 0,
+    requireNoFuture: false,
+    messageTemplate: "{{saudacao}}! Hoje é seu dia e toda a equipe da clínica deseja um feliz aniversário, com muita saúde! 🎉",
+  },
 ];
+
+/** Quantos anos para trás conta como paciente da clínica pro aniversário. */
+export const BIRTHDAY_ACTIVE_DAYS = 730;
+
+/** Dias de nascimento ("MM-DD") que fazem aniversário hoje em Brasília — em ano não
+ * bissexto, quem nasceu em 29/02 comemora em 28/02. */
+export function birthdayKeysFor(now: Date): string[] {
+  const today = ruleTargetDate(now, 0);
+  const key = today.slice(5);
+  const year = Number(today.slice(0, 4));
+  const leap = (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
+  return key === "02-28" && !leap ? ["02-28", "02-29"] : [key];
+}
 
 const BRT_OFFSET_MS = 3 * 60 * 60 * 1000;
 

@@ -56,7 +56,7 @@ export async function saveAutomationRule(input: {
   const { clinicId } = await requireClinicManager();
   const step = DEFAULT_RULE_STEPS.find((s) => s.kind === input.kind);
   if (!step) return { success: false as const, error: "Passo desconhecido." };
-  const invalid = validateRuleInput({ daysAfter: input.daysAfter });
+  const invalid = input.kind === "ANIVERSARIO" ? null : validateRuleInput({ daysAfter: input.daysAfter });
   if (invalid) return { success: false as const, error: invalid };
 
   const cloud = await getClinicCloudBroadcastSetup();
@@ -80,7 +80,7 @@ export async function saveAutomationRule(input: {
 
   const data = {
     name: step.name,
-    daysAfter: input.daysAfter,
+    daysAfter: input.kind === "ANIVERSARIO" ? 0 : input.daysAfter,
     requireNoFuture: step.requireNoFuture,
     messageTemplate: step.messageTemplate,
     active: input.active,
