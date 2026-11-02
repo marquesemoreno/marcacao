@@ -177,6 +177,17 @@ describe("buildCampaignAudience — régua (última consulta exatamente num dia)
     });
     expect(recipients).toHaveLength(1);
   });
+  it("data por paciente (intervalo de retorno por médico)", () => {
+    const { recipients } = buildCampaignAudience(
+      [
+        p({ id: 1, telefone: "77991111111", ultimaPassada: "2026-07-01", medicoUltima: "12" }),
+        p({ id: 2, telefone: "77992222222", ultimaPassada: "2026-07-01", medicoUltima: "7" }),
+        p({ id: 3, telefone: "77993333333", ultimaPassada: "2026-04-01", medicoUltima: "7" }),
+      ],
+      { ...base, lastVisitOn: { date: (pt) => (pt.medicoUltima === "12" ? "2026-07-01" : "2026-04-01") } },
+    );
+    expect(recipients.map((r) => r.phone)).toEqual(["5577991111111", "5577993333333"]);
+  });
 });
 
 describe("buildCampaignAudience — aniversário", () => {

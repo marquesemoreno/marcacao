@@ -11,6 +11,7 @@ const { prismaMock, bridge } = vi.hoisted(() => ({
     broadcastCampaign: { create: vi.fn() },
     user: { findFirst: vi.fn() },
     webhookLog: { create: vi.fn() },
+    returnInterval: { findMany: vi.fn() },
   },
 }));
 vi.mock("@/lib/prisma", () => ({ prisma: prismaMock }));
@@ -54,6 +55,7 @@ beforeEach(() => {
   prismaMock.broadcastRecipient.findMany.mockResolvedValue([]);
   prismaMock.user.findFirst.mockResolvedValue({ id: "u1" });
   prismaMock.webhookLog.create.mockResolvedValue({});
+  prismaMock.returnInterval.findMany.mockResolvedValue([]);
   bridge.fetchBridgeCampaignPatients.mockResolvedValue({
     patients: [patient(1, "77991111111", "2026-11-01"), patient(2, "77992222222", "2026-10-30")],
     futurePhones: [],
@@ -69,6 +71,23 @@ describe("runAutomationRules", () => {
     expect(data).toMatchObject({ status: "RUNNING", lowPriority: true, automationRuleId: "r1", cloudTemplateName: "pos_consulta", name: "Régua · Pós-consulta · 02/11" });
     expect(data.recipients.create.map((x: { phone: string }) => x.phone)).toEqual(["5577991111111"]);
     expect(prismaMock.automationRule.update).toHaveBeenCalledWith({ where: { id: "r1" }, data: { lastRunDate: "2026-11-02" } });
+  });
+
+  it("Retorno usa o intervalo do médico da última consulta (padrão = daysAfter)", async () => {
+    prismaMock.automationRule.findMany.mockResolvedValue([{ ...rule, kind: "RETORNO", name: "Retorno", daysAfter: 180, requireNoFuture: true }]);
+    prismaMock.returnInterval.findMany.mockResolvedValue([{ kind: "DOCTOR", key: "12", label: "Dr. A", days: 90 }]);
+    bridge.fetchBridgeCampaignPatients.mockResolvedValue({
+      patients: [
+        { ...patient(1, "77991111111", "2026-08-04"), medicoUltima: "12" }, // 90 dias, médico 12
+        { ...patient(2, "77992222222", "2026-08-04"), medicoUltima: "7" }, // 90 dias, mas médico 7 usa 180
+        { ...patient(3, "77993333333", "2026-05-06"), medicoUltima: "7" }, // 180 dias
+      ],
+      futurePhones: [],
+    });
+    await runAutomationRules(now);
+    expect(bridge.fetchBridgeCampaignPatients).toHaveBeenCalledWith("c1", { desde: "2026-05-06" });
+    const data = prismaMock.broadcastCampaign.create.mock.calls[0][0].data;
+    expect(data.recipients.create.map((x: { phone: string }) => x.phone)).toEqual(["5577991111111", "5577993333333"]);
   });
 
   it("sem API oficial ativa não cria nada", async () => {

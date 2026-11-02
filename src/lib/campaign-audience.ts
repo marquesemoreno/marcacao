@@ -36,8 +36,9 @@ export type AudienceOptions = {
   /** Só pacientes cuja última consulta foi com um destes médicos (código do sistema). */
   doctorIds?: Set<string>;
   /** Régua automática: só quem teve a última consulta exatamente em `date` (AAAA-MM-DD).
-   * Com futurePhones, quem já tem consulta futura fica de fora (retorno/reativação). */
-  lastVisitOn?: { date: string; futurePhones?: Set<string> };
+   * Com futurePhones, quem já tem consulta futura fica de fora (retorno/reativação).
+   * `date` como função = data por paciente (intervalo de retorno por médico). */
+  lastVisitOn?: { date: string | ((patient: BridgeCampaignPatient) => string); futurePhones?: Set<string> };
   /** Aniversário: só quem nasceu num destes dias ("MM-DD"). */
   birthdayOn?: string | string[];
 };
@@ -125,7 +126,8 @@ export function buildCampaignAudience(patients: BridgeCampaignPatient[], options
         stats.excludedHasFuture++;
         continue;
       }
-      if ((patient.ultimaAtendida ?? patient.ultimaPassada ?? null) !== options.lastVisitOn.date) {
+      const want = typeof options.lastVisitOn.date === "function" ? options.lastVisitOn.date(patient) : options.lastVisitOn.date;
+      if ((patient.ultimaAtendida ?? patient.ultimaPassada ?? null) !== want) {
         stats.excludedRetornoRange++;
         continue;
       }

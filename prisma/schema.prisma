@@ -1405,6 +1405,21 @@ model NpsResponse {
   @@map("nps_responses")
 }
 
+/// Intervalo de retorno (src/lib/return-interval.ts). kind DOCTOR: key = código do médico
+/// no sistema da clínica, label = nome; kind PROCEDURE: key = ClinicProcedure.id.
+model ReturnInterval {
+  id        String   @id @default(cuid())
+  clinicId  String   @map("clinic_id")
+  kind      String
+  key       String
+  label     String
+  days      Int
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([clinicId, kind, key])
+  @@map("return_intervals")
+}
+
 /// Termo de consentimento versionado. clinicId null = termo padrão do Conecta.
 model ConsentTerm {
   id          String              @id @default(cuid())

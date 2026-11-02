@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { fetchBridgeCampaignPatients } from "@/lib/hospital-bridge";
-import { buildCampaignAudience } from "@/lib/campaign-audience";
+import { buildCampaignAudience, type BridgeCampaignPatient } from "@/lib/campaign-audience";
+import { resolveReturnDays, type ReturnInterval } from "@/lib/return-interval";
 import { technicalDirectorLine } from "@/lib/broadcast-csv";
 import { BIRTHDAY_ACTIVE_DAYS, birthdayKeysFor, ruleCampaignName, ruleTargetDate } from "@/lib/automation-rules";
 
@@ -42,7 +43,15 @@ export async function ruleAudience(
   now: Date,
 ) {
   const isBirthday = r.kind === "ANIVERSARIO";
-  const target = ruleTargetDate(now, isBirthday ? BIRTHDAY_ACTIVE_DAYS : r.daysAfter);
+  // Retorno: cada médico pode ter seu intervalo (ReturnInterval); daysAfter é o padrão.
+  const doctorDays =
+    r.kind === "RETORNO"
+      ? ((await Promise.resolve()
+          .then(() => prisma.returnInterval.findMany({ where: { clinicId: r.clinicId, kind: "DOCTOR" } }))
+          .catch(() => [])) as ReturnInterval[])
+      : [];
+  const oldest = Math.max(r.daysAfter, ...doctorDays.map((d) => d.days));
+  const target = ruleTargetDate(now, isBirthday ? BIRTHDAY_ACTIVE_DAYS : oldest);
   const { patients, futurePhones } = await fetchBridgeCampaignPatients(r.clinicId, { desde: target });
   const optedOutPhones = new Set(
     (await prisma.contact.findMany({ where: { optedOutOfBroadcastsAt: { not: null }, phone: { not: null } }, select: { phone: true } }))
@@ -56,7 +65,12 @@ export async function ruleAudience(
     today: now,
     ...(isBirthday
       ? { birthdayOn: birthdayKeysFor(now) }
-      : { lastVisitOn: { date: target, futurePhones: r.requireNoFuture ? new Set(futurePhones) : undefined } }),
+      : {
+          lastVisitOn: {
+            date: doctorDays.length
+              ? (p: BridgeCampaignPatient) => ruleTargetDate(now, resolveReturnDays({ doctorCode: p.medicoUltima }, doctorDays, r.daysAfter))
+              : ruleTargetDate(now, r.daysAfter),
+            futurePhones: r.requireNoFuture ? new Set(futurePhones) : undefined } }),
   });
   if (!r.ruleId) return audience;
   const since = new Date(now.getTime() - REPEAT_GUARD_DAYS * 86400000);

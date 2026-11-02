@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  Repeat,
   MessageCircle,
   KanbanSquare,
   Users,
@@ -50,6 +51,7 @@ const NAV_GROUPS: NavGroup[] = [
       { href: "/clinic/relatorio", label: "Relatórios", icon: BarChart3, onlyManager: true },
       { href: "/clinic/ia", label: "Ações da IA", icon: Sparkles },
       { href: "/clinic/ficha", label: "Ficha prévia", icon: ClipboardList, onlyManager: true },
+      { href: "/clinic/retorno", label: "Retorno", icon: Repeat, onlyManager: true },
       { href: "/clinic/acessos", label: "Acessos", icon: ShieldCheck, onlyManager: true },
       { href: "/clinic/whatsapp", label: "WhatsApp", icon: Smartphone, onlyManager: true },
       // Visível também pras clínicas só-WhatsApp (horários e ticket médio valem pra elas).

@@ -8,6 +8,7 @@ import { getAgendaPatient, type AgendaPatient } from "@/actions/agenda";
 import type { AgendaItem, AgendaStatusChoice } from "@/lib/agenda";
 import { StatusIcon } from "./status-icon";
 import { StatusMenu } from "./status-menu";
+import { ReturnHintRow } from "./return-hint-row";
 import { FormResponseSection } from "./form-response-section";
 import { AGENDA_STATUS_META, formatLongDate, toTitleCase } from "@/lib/agenda-ui";
 import { appointmentStatusLabels } from "@/lib/format";
@@ -92,6 +93,7 @@ export function PatientSheet({
                 <Row label="Médico" value={item.doctor ? toTitleCase(item.doctor) : "—"} />
                 <Row label="Telefone" value={item.phone ?? "Sem telefone"} />
                 <Row label="Origem" value={item.source === "BRIDGE" ? "Sistema da clínica" : "Conecta Saúde"} />
+                <ReturnHintRow item={item} />
               </section>
               <FormResponseSection item={item} />
 
