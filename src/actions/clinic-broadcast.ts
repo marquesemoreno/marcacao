@@ -85,7 +85,11 @@ export async function listClinicBroadcastCampaigns() {
       sent,
       failed: failedList.length,
       failureReasons: [...new Set(failedList.map((r) => r.errorMessage).filter((m): m is string => !!m))].slice(0, 3),
-      failures: failedList.slice(0, 30).map((r) => ({ phone: r.phone, reason: r.errorMessage })),
+      failures: failedList.slice(0, 30).map((r) => ({
+        phone: r.phone,
+        name: ((r.variables ?? {}) as Record<string, string>).nome || null,
+        reason: r.errorMessage,
+      })),
       skipped,
       noConsent,
       /** E-mail: retorno do Resend (webhook). null = canal sem relatório de entrega. */
@@ -457,9 +461,23 @@ export async function pauseClinicBroadcastCampaign(campaignId: string) {
 /** "Pausar todos os envios" — botão de pânico quando o número cai ou recebe alerta. */
 export async function pauseAllClinicBroadcastCampaigns() {
   const { clinicId } = await requireClinicSession();
-  const { count } = await prisma.broadcastCampaign.updateMany({ where: { clinicId, status: "RUNNING" }, data: { status: "PAUSED" } });
+  // Avisos urgentes de remarcação continuam: pausar por pânico não deve deixar paciente sem aviso.
+  const running = await prisma.broadcastCampaign.findMany({
+    where: { clinicId, status: "RUNNING", OR: [{ tagOnSend: null }, { tagOnSend: { not: RESCHEDULE_PENDING_TAG } }] },
+    select: { id: true },
+  });
+  const ids = running.map((c) => c.id);
+  if (ids.length) await prisma.broadcastCampaign.updateMany({ where: { id: { in: ids } }, data: { status: "PAUSED" } });
   revalidatePath("/clinic/disparos");
-  return { paused: count };
+  return { paused: ids.length, ids };
+}
+
+/** Desfazer do "Pausar todos": volta a enviar só as que estavam enviando há pouco. */
+export async function resumeClinicBroadcastCampaigns(ids: string[]) {
+  const { clinicId } = await requireClinicSession();
+  const { count } = await prisma.broadcastCampaign.updateMany({ where: { clinicId, id: { in: ids }, status: "PAUSED" }, data: { status: "RUNNING" } });
+  revalidatePath("/clinic/disparos");
+  return { resumed: count };
 }
 
 /** Saúde do número pro diálogo de início e o cabeçalho de Disparos (ver number-health.ts). */

@@ -39,6 +39,15 @@ function RuleCard({ rule, cloud, onSaved }: { rule: AutomationRuleView; cloud: {
     templateName !== (rule.cloudTemplateName ?? "") ||
     JSON.stringify(params.slice(0, tpl?.variableCount ?? 0)) !== JSON.stringify(rule.cloudTemplateParams.slice(0, tpl?.variableCount ?? 0));
   const canTurnOn = cloud.active && !!tpl && !daysError && !paramsError;
+  const blockedReason = rule.active || canTurnOn
+    ? null
+    : !cloud.active
+      ? "Precisa da API oficial ativa."
+      : !tpl
+        ? "Escolha um modelo aprovado para ligar."
+        : daysError
+          ? "Corrija os dias para ligar."
+          : "Preencha os campos do modelo para ligar.";
 
   // Prévia "Amanhã às 8h: ~N" — recalcula quando os dias mudam (o sistema da clínica responde em ~1s).
   useEffect(() => {
@@ -98,7 +107,7 @@ function RuleCard({ rule, cloud, onSaved }: { rule: AutomationRuleView; cloud: {
             aria-checked={rule.active}
             aria-labelledby={`${switchId}-title`}
             disabled={saving || (!rule.active && !canTurnOn)}
-            title={!rule.active && !canTurnOn ? "Escolha um modelo aprovado e preencha os campos para ligar." : undefined}
+            aria-describedby={blockedReason ? `${switchId}-why` : undefined}
             onClick={() => save(!rule.active)}
             className={`relative h-6 w-11 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 disabled:opacity-50 ${rule.active ? "bg-emerald-600" : "bg-slate-300 dark:bg-slate-600"}`}
           >
@@ -106,6 +115,11 @@ function RuleCard({ rule, cloud, onSaved }: { rule: AutomationRuleView; cloud: {
           </button>
         </label>
       </div>
+      {blockedReason && (
+        <p id={`${switchId}-why`} className="-mt-2 text-right text-xs text-slate-600 dark:text-slate-400">
+          {blockedReason}
+        </p>
+      )}
 
       {!isBirthday && (
         <div>

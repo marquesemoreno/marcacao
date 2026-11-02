@@ -27,6 +27,7 @@ import {
   setRecipientCalled,
   getClinicNumberHealth,
   pauseAllClinicBroadcastCampaigns,
+  resumeClinicBroadcastCampaigns,
 } from "@/actions/clinic-broadcast";
 import { BridgeAudiencePicker } from "@/components/clinic/bridge-audience-picker";
 import { listMarcadoresAudience } from "@/actions/marcadores";
@@ -509,8 +510,19 @@ export function BroadcastManagement() {
   async function pauseAll() {
     setPausingAll(true);
     try {
-      const { paused } = await pauseAllClinicBroadcastCampaigns();
-      toast.success(paused ? `${plural(paused, "campanha pausada", "campanhas pausadas")}. Para retomar, use Retomar em cada uma.` : "Nenhuma campanha estava enviando.");
+      const { paused, ids } = await pauseAllClinicBroadcastCampaigns();
+      if (paused) {
+        toast.success(`${plural(paused, "campanha pausada", "campanhas pausadas")}. Avisos de remarcação continuam.`, {
+          duration: 10000,
+          action: {
+            label: "Desfazer",
+            onClick: async () => {
+              await resumeClinicBroadcastCampaigns(ids).catch(() => toast.error("Não foi possível desfazer."));
+              await loadCampaigns(true);
+            },
+          },
+        });
+      } else toast.info("Nenhuma campanha estava enviando (avisos de remarcação não são pausados aqui).");
       await loadCampaigns(true);
     } catch {
       toast.error("Não foi possível pausar. Tente de novo.");
@@ -599,14 +611,22 @@ export function BroadcastManagement() {
       {(health || running.length > 0) && (
         <div className="flex flex-wrap items-center justify-between gap-2 -mt-2">
           {health ? (
-            <p
-              role="status"
-              className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium ${HEALTH_TONE[health.tone]}`}
-            >
-              <span aria-hidden className={`h-2 w-2 shrink-0 rounded-full ${health.tone === "ok" ? "bg-emerald-500" : health.tone === "warn" ? "bg-amber-500" : "bg-red-500"}`} />
-              {healthLabel(health)}
-              {health.tone === "warn" && <span className="font-normal">· {health.reasons.join(" ")}</span>}
-            </p>
+            <details className={`group rounded-md border px-2.5 py-1 text-xs ${HEALTH_TONE[health.tone]}`}>
+              <summary className={`flex items-center gap-1.5 font-medium list-none ${health.reasons.length ? "cursor-pointer" : "pointer-events-none"}`}>
+                <span aria-hidden className={`h-2 w-2 shrink-0 rounded-full ${health.tone === "ok" ? "bg-emerald-500" : health.tone === "warn" ? "bg-amber-500" : "bg-red-500"}`} />
+                {healthLabel(health)}
+                {health.reasons.length > 0 && health.tone !== "danger" && (
+                  <span className="font-semibold underline underline-offset-2">· {plural(health.reasons.length, "motivo de atenção", "motivos de atenção")}</span>
+                )}
+              </summary>
+              {health.reasons.length > 0 && (
+                <ul className="mt-1.5 mb-0.5 list-disc pl-5 space-y-0.5 max-w-prose">
+                  {health.reasons.map((r) => (
+                    <li key={r}>{r}</li>
+                  ))}
+                </ul>
+              )}
+            </details>
           ) : (
             <span />
           )}
@@ -1054,8 +1074,14 @@ export function BroadcastManagement() {
           </div>
 
           <div className="sticky bottom-0 -mx-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-950/95 backdrop-blur px-4 py-3">
-            <p className="text-sm text-slate-600 dark:text-slate-300 min-w-0 flex-1">
-              {formStep === 1
+            <p id="broadcast-footer-status" className="text-sm text-slate-600 dark:text-slate-300 min-w-0 flex-1">
+              {formStep === 2 && unknownVars.length > 0
+                ? <span className="text-red-700 dark:text-red-400">Corrija as variáveis que não existem: {unknownVars.map((v) => `{{${v}}}`).join(", ")}.</span>
+                : formStep === 2 && unfilled.length > 0
+                ? <span className="text-red-700 dark:text-red-400">Preencha: {unfilled.join(", ")}.</span>
+                : formStep === 2 && variantError
+                ? <span className="text-red-700 dark:text-red-400">{variantError}</span>
+                : formStep === 1
                 ? !name.trim()
                   ? "Falta dar um nome à campanha."
                   : recipients.length
@@ -1073,6 +1099,7 @@ export function BroadcastManagement() {
               <button
                 type="button"
                 disabled={!name.trim() || recipients.length === 0}
+                aria-describedby="broadcast-footer-status"
                 onClick={() => setFormStep(2)}
                 className="inline-flex h-9 items-center gap-1.5 px-4 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 rounded-lg"
               >
@@ -1090,7 +1117,7 @@ export function BroadcastManagement() {
             <button
               type="button"
               disabled={creating || unknownVars.length > 0 || unfilled.length > 0 || Boolean(variantError) || !name.trim() || !hasMessage}
-              title={!name.trim() ? "Dê um nome à campanha" : !hasMessage ? (cloudMode ? "Escolha o modelo" : "Escreva a mensagem") : undefined}
+              aria-describedby="broadcast-footer-status"
               onClick={handleCreate}
               className="inline-flex h-9 items-center gap-1.5 px-4 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 rounded-lg"
             >
@@ -1598,7 +1625,14 @@ function CampaignCard({
             <ul className="mt-1 space-y-0.5 text-slate-600 dark:text-slate-300">
               {c.failures.map((f, i) => (
                 <li key={i} className="tabular-nums">
-                  {f.phone} — {f.reason ?? "motivo não informado"}
+                  {f.name ? (
+                    <>
+                      <span className="font-medium text-slate-800 dark:text-slate-100">{f.name}</span> · {f.phone}
+                    </>
+                  ) : (
+                    f.phone
+                  )}{" "}
+                  — {f.reason ?? "motivo não informado"}
                 </li>
               ))}
               {c.failed > c.failures.length && <li>…e mais {c.failed - c.failures.length}</li>}
