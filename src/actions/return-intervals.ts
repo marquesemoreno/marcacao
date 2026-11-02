@@ -3,8 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireClinicManager, requireClinicSession } from "@/lib/session";
-import { fetchBridgeDoctors } from "@/lib/hospital-bridge";
-import { resolveReturnDays, returnDueDate, validateReturnDays, type ReturnInterval } from "@/lib/return-interval";
+import { fetchBridgeCampaignPatients, fetchBridgeDoctors } from "@/lib/hospital-bridge";
+import { rankDoctors, resolveReturnDays, returnDueDate, validateReturnDays, type ReturnInterval } from "@/lib/return-interval";
 
 const DEFAULT_DAYS = 180;
 
@@ -20,18 +20,24 @@ async function intervalsOf(clinicId: string): Promise<ReturnInterval[]> {
 /** Tela de configuração (gestão): médicos do sistema da clínica + procedimentos do Conecta. */
 export async function getReturnIntervalSettings() {
   const { clinicId } = await requireClinicManager();
-  const [saved, doctors, procedures, fallback] = await Promise.all([
+  const yearAgo = new Date(Date.now() - 365 * 86_400_000).toISOString().slice(0, 10);
+  const [saved, doctors, procedures, fallback, lastDoctorCodes] = await Promise.all([
     intervalsOf(clinicId),
     fetchBridgeDoctors(clinicId).catch(() => []),
     prisma.clinicProcedure.findMany({ where: { clinicId }, select: { id: true, procedure: { select: { name: true } } } }),
     defaultDays(clinicId),
+    // Médico da última consulta de cada paciente do último ano (bridge antigo sem o campo = null).
+    fetchBridgeCampaignPatients(clinicId, { desde: yearAgo })
+      .then(({ patients }) => (patients.some((p) => "medicoUltima" in p) ? patients.map((p) => p.medicoUltima ?? "") : null))
+      .catch(() => null),
   ]);
   const daysOf = (kind: ReturnInterval["kind"], key: string) => saved.find((s) => s.kind === kind && s.key === key)?.days ?? null;
   return {
     fallback,
-    doctors: doctors
-      .map((d) => ({ key: String(d.id).trim(), label: d.nome, days: daysOf("DOCTOR", String(d.id).trim()) }))
-      .sort((a, b) => a.label.localeCompare(b.label, "pt-BR")),
+    doctors: rankDoctors(
+      doctors.map((d) => ({ key: String(d.id).trim(), label: d.nome, days: daysOf("DOCTOR", String(d.id).trim()) })),
+      lastDoctorCodes,
+    ),
     procedures: procedures
       .map((p) => ({ key: p.id, label: p.procedure.name, days: daysOf("PROCEDURE", p.id) }))
       .sort((a, b) => a.label.localeCompare(b.label, "pt-BR")),

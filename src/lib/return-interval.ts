@@ -44,3 +44,23 @@ export function returnDueDate(visitDate: string, days: number): string {
   d.setUTCDate(d.getUTCDate() + days);
   return d.toISOString().slice(0, 10);
 }
+
+/** Tela Retorno: o sistema da clínica lista "médicos" que não atendem (faturamento,
+ * convênios). Ativo = é o médico da última consulta de algum paciente (ou já tem intervalo).
+ * Sem dados de pacientes (ponte fora), nada é escondido. */
+export function rankDoctors<T extends { key: string; label: string; days: number | null }>(
+  doctors: T[],
+  lastDoctorCodes: string[] | null,
+): (T & { active: boolean; patients: number })[] {
+  const count = new Map<string, number>();
+  for (const c of lastDoctorCodes ?? []) {
+    const k = c.trim();
+    if (k) count.set(k, (count.get(k) ?? 0) + 1);
+  }
+  return doctors
+    .map((d) => {
+      const patients = count.get(d.key.trim()) ?? 0;
+      return { ...d, patients, active: lastDoctorCodes === null || patients > 0 || d.days !== null };
+    })
+    .sort((a, b) => Number(b.active) - Number(a.active) || b.patients - a.patients || a.label.localeCompare(b.label, "pt-BR"));
+}

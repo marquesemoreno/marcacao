@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { resolveReturnDays, validateReturnDays, returnDueDate, type ReturnInterval } from "./return-interval";
+import { resolveReturnDays, validateReturnDays, returnDueDate, rankDoctors, type ReturnInterval } from "./return-interval";
 
 const intervals: ReturnInterval[] = [
   { kind: "DOCTOR", key: "12", label: "Dr. João Silva", days: 90 },
@@ -38,5 +38,26 @@ describe("validateReturnDays", () => {
 describe("returnDueDate", () => {
   it("soma os dias à data da consulta", () => {
     expect(returnDueDate("2026-11-02", 90)).toBe("2027-01-31");
+  });
+});
+
+describe("rankDoctors", () => {
+  const doctors = [
+    { key: "1", label: "Ana", days: null },
+    { key: "2", label: "Faturamento", days: null },
+    { key: "3", label: "Bruno", days: null },
+    { key: "4", label: "Carla", days: 90 },
+  ];
+  it("ativos (com pacientes) primeiro, do mais movimentado; configurados sempre ativos", () => {
+    const r = rankDoctors(doctors, ["3", " 1", "3", "3", "1", "1", "1"]);
+    expect(r.map((d) => [d.key, d.active, d.patients])).toEqual([
+      ["1", true, 4],
+      ["3", true, 3],
+      ["4", true, 0],
+      ["2", false, 0],
+    ]);
+  });
+  it("sem dados de pacientes, todos ficam ativos (não esconde nada)", () => {
+    expect(rankDoctors(doctors, null).every((d) => d.active)).toBe(true);
   });
 });
