@@ -1324,3 +1324,116 @@ model DataDeletionRecord {
 
   @@map("data_deletion_records")
 }
+
+/// Fase 1 da jornada do paciente (02/11/2026). Tabelas novas, sem FK pra tabelas
+/// existentes (mesmo estilo de PatientAccessLog) — nada muda nas consultas atuais.
+
+/// Link de uso do paciente (ficha prévia, check-in, NPS). Só o SHA-256 do token fica aqui;
+/// o token cru vai só na mensagem. Ver src/lib/patient-token.ts.
+model PatientToken {
+  id                    String    @id @default(cuid())
+  clinicId              String    @map("clinic_id")
+  kind                  String
+  tokenHash             String    @unique @map("token_hash")
+  phone                 String?
+  contactId             String?   @map("contact_id")
+  /// "BRIDGE" (NUMERO no sistema da clínica) ou "LOCAL" (Appointment.id), como AgendaMark.
+  appointmentSource     String?   @map("appointment_source")
+  appointmentExternalId String?   @map("appointment_external_id")
+  appointmentDate       DateTime? @map("appointment_date") @db.Date
+  expiresAt             DateTime  @map("expires_at")
+  usedAt                DateTime? @map("used_at")
+  revokedAt             DateTime? @map("revoked_at")
+  createdAt             DateTime  @default(now()) @map("created_at")
+
+  @@index([clinicId, kind, appointmentDate])
+  @@index([expiresAt])
+  @@map("patient_tokens")
+}
+
+/// Modelo da ficha prévia por clínica. Cada edição = nova versão (respostas antigas
+/// continuam ligadas à versão que o paciente viu). body = { questions: FormQuestion[] }.
+model FormTemplate {
+  id        String                @id @default(cuid())
+  clinicId  String                @map("clinic_id")
+  kind      String                @default("ANAMNESE")
+  name      String
+  version   Int
+  body      Json
+  active    Boolean               @default(true)
+  createdAt DateTime              @default(now()) @map("created_at")
+  responses PatientFormResponse[]
+
+  @@unique([clinicId, kind, version])
+  @@map("form_templates")
+}
+
+/// Resposta da ficha prévia. answers é JSON criptografado (AES-256-GCM, token-crypto) —
+/// dado de saúde (LGPD art. 11). Leitura registrada em PatientAccessLog.
+model PatientFormResponse {
+  id                    String       @id @default(cuid())
+  clinicId              String       @map("clinic_id")
+  templateId            String       @map("template_id")
+  template              FormTemplate @relation(fields: [templateId], references: [id])
+  tokenId               String?      @unique @map("token_id")
+  phone                 String?
+  contactId             String?      @map("contact_id")
+  appointmentSource     String?      @map("appointment_source")
+  appointmentExternalId String?      @map("appointment_external_id")
+  appointmentDate       DateTime?    @map("appointment_date") @db.Date
+  answersEncrypted      String       @map("answers_encrypted")
+  consentAcceptanceId   String?      @map("consent_acceptance_id")
+  submittedAt           DateTime     @default(now()) @map("submitted_at")
+
+  @@index([clinicId, appointmentDate])
+  @@index([clinicId, phone])
+  @@map("patient_form_responses")
+}
+
+/// Termo de consentimento versionado. clinicId null = termo padrão do Conecta.
+model ConsentTerm {
+  id          String              @id @default(cuid())
+  clinicId    String?             @map("clinic_id")
+  kind        String
+  version     Int
+  title       String
+  body        String
+  publishedAt DateTime            @default(now()) @map("published_at")
+  acceptances ConsentAcceptance[]
+
+  @@index([clinicId, kind, version])
+  @@map("consent_terms")
+}
+
+/// Aceite de um termo (qual versão, quando). IP só como hash.
+model ConsentAcceptance {
+  id         String      @id @default(cuid())
+  termId     String      @map("term_id")
+  term       ConsentTerm @relation(fields: [termId], references: [id])
+  clinicId   String      @map("clinic_id")
+  phone      String?
+  contactId  String?     @map("contact_id")
+  ipHash     String?     @map("ip_hash")
+  userAgent  String?     @map("user_agent")
+  acceptedAt DateTime    @default(now()) @map("accepted_at")
+
+  @@index([clinicId, phone])
+  @@map("consent_acceptances")
+}
+
+/// Auditoria de alterações (quem mudou o quê). changes = auditDiff() — campos sensíveis
+/// mascarados. Leituras ficam em PatientAccessLog.
+model AuditLog {
+  id        String   @id @default(cuid())
+  clinicId  String?  @map("clinic_id")
+  userId    String?  @map("user_id")
+  action    String
+  entity    String
+  entityId  String   @map("entity_id")
+  changes   Json
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([clinicId, createdAt])
+  @@index([entity, entityId])
+  @@map("audit_logs")
+}

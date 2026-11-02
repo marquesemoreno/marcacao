@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireClinicSession } from "@/lib/session";
+import { recordAudit } from "@/lib/audit-server";
 import { extractBridgeNumeroFromNotes, fetchBridgeDailyAgendaOrNull } from "@/lib/hospital-bridge";
 import { toggleNinthDigit } from "@/lib/whatsapp";
 import {
@@ -163,8 +164,21 @@ export async function setAgendaStatus(input: {
     if (!appt) throw new Error("Agendamento não encontrado.");
   }
   const date = new Date(`${input.date}T00:00:00Z`);
+  const markKey = { clinicId_source_externalId: { clinicId, source: input.source, externalId: input.externalId } };
+  const before = await prisma.agendaMark.findUnique({ where: markKey, select: { status: true } });
+  const audit = (to: string | null) =>
+    recordAudit({
+      clinicId,
+      userId,
+      action: "agenda.status",
+      entity: `agenda:${input.source}`,
+      entityId: input.externalId,
+      before: before ? { status: before.status } : null,
+      after: to ? { status: to } : null,
+    });
   if (input.status === "AUTO") {
     await prisma.agendaMark.deleteMany({ where: { clinicId, source: input.source, externalId: input.externalId } });
+    await audit(null);
     revalidatePath("/clinic/agenda");
     return { success: true };
   }
@@ -177,6 +191,7 @@ export async function setAgendaStatus(input: {
     update: { status: input.status, updatedByUserId: userId, date, phone: input.phone ?? undefined, ...(updatedAt ? { updatedAt } : {}) },
     create: { clinicId, source: input.source, externalId: input.externalId, date, status: input.status, updatedByUserId: userId, phone: input.phone ?? null, ...(updatedAt ? { updatedAt } : {}) },
   });
+  await audit(input.status);
   revalidatePath("/clinic/agenda");
   return { success: true };
 }
