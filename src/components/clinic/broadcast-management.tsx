@@ -175,6 +175,7 @@ export function BroadcastManagement() {
   const [health, setHealth] = useState<NumberHealthView | null>(null);
   const [riskAck, setRiskAck] = useState(false);
   const [configOpen, setConfigOpen] = useState(false);
+  const [switchingPriority, setSwitchingPriority] = useState(false);
   const [startHealth, setStartHealth] = useState<NumberHealthView | null>(null);
   const [pausingAll, setPausingAll] = useState(false);
   const loadHealth = useCallback(() => {
@@ -466,7 +467,7 @@ export function BroadcastManagement() {
     }
   }
 
-  async function toggleLowPriority(c: Campaign) {
+  async function toggleLowPriority(c: Campaign): Promise<boolean> {
     try {
       await setClinicCampaignLowPriority(c.id, !c.lowPriority);
       toast.success(!c.lowPriority ? `“${c.name}” agora espera os lembretes e outras campanhas.` : `“${c.name}” volta à prioridade normal.`, {
@@ -479,8 +480,10 @@ export function BroadcastManagement() {
         },
       });
       await loadCampaigns(true);
+      return true;
     } catch {
       toast.error("Não foi possível salvar.");
+      return false;
     }
   }
 
@@ -618,6 +621,13 @@ export function BroadcastManagement() {
           ? "Mensagens automáticas de pós-consulta, retorno e aniversário ficam em Configurar › Régua automática."
           : "Mensagens automáticas de pós-consulta e aniversário são ligadas pela gestão."}
       </p>
+
+      {health?.tone === "danger" && (
+        <div role="alert" className="rounded-lg border border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-950/40 p-3 text-sm text-red-800 dark:text-red-300">
+          <p className="font-semibold">O número de WhatsApp está desconectado — nenhuma campanha, lembrete ou mensagem do Chat sai agora.</p>
+          <p className="mt-0.5">Reconecte o celular da clínica no WhatsApp ou fale com o suporte da Conecta Saúde. Os envios voltam sozinhos quando ele reconectar.</p>
+        </div>
+      )}
 
       {(health || running.length > 0) && (
         <div className="flex flex-wrap items-center justify-between gap-2 -mt-2">
@@ -1112,7 +1122,7 @@ export function BroadcastManagement() {
                 disabled={!name.trim() || recipients.length === 0}
                 aria-describedby="broadcast-footer-status"
                 onClick={() => setFormStep(2)}
-                className="inline-flex h-9 items-center gap-1.5 px-4 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 rounded-lg"
+                className={`inline-flex h-9 items-center gap-1.5 px-4 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 rounded-lg ${FOCUS_RING}`}
               >
                 Continuar
               </button>
@@ -1121,7 +1131,7 @@ export function BroadcastManagement() {
             <button
               type="button"
               onClick={() => setFormStep(1)}
-              className="h-9 px-3 text-sm font-medium rounded-lg text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
+              className={`h-9 px-3 text-sm font-medium rounded-lg text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 ${FOCUS_RING}`}
             >
               Voltar
             </button>
@@ -1130,7 +1140,7 @@ export function BroadcastManagement() {
               disabled={creating || unknownVars.length > 0 || unfilled.length > 0 || Boolean(variantError) || !name.trim() || !hasMessage}
               aria-describedby="broadcast-footer-status"
               onClick={handleCreate}
-              className="inline-flex h-9 items-center gap-1.5 px-4 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 rounded-lg"
+              className={`inline-flex h-9 items-center gap-1.5 px-4 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 rounded-lg ${FOCUS_RING}`}
             >
               {creating && <Loader2 className="w-4 h-4 animate-spin" aria-hidden />}
               Criar rascunho
@@ -1264,13 +1274,19 @@ export function BroadcastManagement() {
                         {!confirming.preview.lowPriority && (
                           <button
                             type="button"
+                            disabled={switchingPriority}
                             onClick={async () => {
                               const c = confirming.campaign;
-                              await toggleLowPriority(c);
-                              setConfirming({ campaign: c, preview: { ...confirming.preview!, lowPriority: true } });
+                              const preview = confirming.preview!;
+                              setSwitchingPriority(true);
+                              const ok = await toggleLowPriority(c);
+                              setSwitchingPriority(false);
+                              // Só marca na prévia se o servidor confirmou (crítica 02/11, 6ª).
+                              if (ok) setConfirming({ campaign: { ...c, lowPriority: true }, preview: { ...preview, lowPriority: true } });
                             }}
-                            className="font-semibold underline underline-offset-2"
+                            className={`inline-flex items-center gap-1.5 font-semibold underline underline-offset-2 disabled:opacity-60 ${FOCUS_RING}`}
                           >
+                            {switchingPriority && <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden />}
                             Mais seguro: mudar para baixa prioridade (cede a vez aos lembretes)
                           </button>
                         )}
@@ -1391,7 +1407,7 @@ export function BroadcastManagement() {
                 <button
                   type="button"
                   onClick={() => setConfirming(null)}
-                  className="h-9 px-4 text-sm font-medium rounded-lg text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
+                  className={`h-9 px-4 text-sm font-medium rounded-lg text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 ${FOCUS_RING}`}
                 >
                   Cancelar
                 </button>
@@ -1432,14 +1448,14 @@ export function BroadcastManagement() {
             <button
               type="button"
               onClick={() => setDeleting(null)}
-              className="h-9 px-4 text-sm font-medium rounded-lg text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
+              className={`h-9 px-4 text-sm font-medium rounded-lg text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 ${FOCUS_RING}`}
             >
               Voltar
             </button>
             <button
               type="button"
               onClick={() => deleting && removeDraft(deleting)}
-              className="inline-flex h-9 items-center gap-1.5 px-4 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 rounded-lg"
+              className={`inline-flex h-9 items-center gap-1.5 px-4 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 rounded-lg ${FOCUS_RING}`}
             >
               <Trash2 className="w-4 h-4" aria-hidden /> Excluir rascunho
             </button>
@@ -1535,7 +1551,7 @@ function CampaignCard({
               type="button"
               disabled={busy}
               onClick={onStart}
-              className="inline-flex h-8 items-center gap-1.5 px-3 text-xs font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50"
+              className={`inline-flex h-8 items-center gap-1.5 px-3 text-xs font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50 ${FOCUS_RING}`}
               aria-label={`${c.status === "PAUSED" ? "Retomar" : "Iniciar"} ${c.name}`}
             >
               {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden /> : <Play className="w-3.5 h-3.5" aria-hidden />}
@@ -1603,15 +1619,16 @@ function CampaignCard({
                 label: "Saíram da lista",
                 value: String(c.skipped),
                 tone: "",
+                hint: c.skipped > 0 ? "pediram para não receber" : undefined,
               },
-              ...(c.noConsent > 0 ? [{ label: "Sem aceite", value: String(c.noConsent), tone: "" }] : []),
+              ...(c.noConsent > 0 ? [{ label: "Sem aceite", value: String(c.noConsent), tone: "", hint: "não autorizaram campanhas" }] : []),
               { label: "Falhas", value: String(c.failed), tone: c.failed > 0 ? "text-red-700 dark:text-red-400" : "" },
             ] as { label: string; value: string; tone: string; hint?: string }[]
           ).map((s) => (
             <div key={s.label} className="rounded-md bg-slate-50 dark:bg-slate-800/60 px-2.5 py-1.5">
               <dt className="text-slate-500 dark:text-slate-400">{s.label}</dt>
               <dd className={`text-sm font-semibold tabular-nums text-slate-900 dark:text-slate-100 ${s.tone}`}>{s.value}</dd>
-              {s.hint && <dd className="text-[11px] leading-tight text-slate-500 dark:text-slate-400">{s.hint}</dd>}
+              {s.hint && <dd className="text-xs leading-tight text-slate-600 dark:text-slate-300">{s.hint}</dd>}
             </div>
           ))}
         </dl>

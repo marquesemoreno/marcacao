@@ -46,6 +46,12 @@ describe("numberHealth", () => {
     expect(h.reasons.join(" ")).toContain("pelo menos 6 dias úteis");
   });
 
+  it("padrão do bloqueio da Santa Clara (~115 em 4 dias) já pede confirmação antes de chegar lá", () => {
+    // 115 em 4 dias ≈ 29/dia; com 5 dias nesse ritmo já são ~145–150.
+    expect(numberHealth({ ...base, automatedToday: 29, automated7d: 150 }).needsAck).toBe(true);
+    expect(numberHealth({ ...base, automatedToday: 29, automated7d: 115 }).needsAck).toBe(false);
+  });
+
   it("dia calmo mas semana pesada alerta", () => {
     const h = numberHealth({ ...base, automatedToday: 5, automated7d: 300 });
     expect(h.needsAck).toBe(true);

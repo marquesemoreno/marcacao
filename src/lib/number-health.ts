@@ -32,8 +32,9 @@ export type NumberHealth = {
 export const RECENT_DOWN_DAYS = 30;
 /** Automáticas no dia a partir das quais alertamos (o teto de campanha é MARKETING_DAILY_CAP). */
 export const HIGH_VOLUME = 80;
-/** Santa Clara bloqueou com ~115 automáticas em 4 dias (out/2026). */
-export const HIGH_VOLUME_7D = 250;
+/** Santa Clara bloqueou com ~115 automáticas em 4 dias (out/2026) ≈ 200 em 7 dias — o alerta
+ * precisa disparar ANTES desse ponto. */
+export const HIGH_VOLUME_7D = 150;
 /** Campanha que, sozinha, passa de 2 dias cheios de envio. */
 export const LARGE_CAMPAIGN = MARKETING_DAILY_CAP * 2;
 export const FAILURES_ALERT = 2;
