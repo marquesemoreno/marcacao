@@ -40,6 +40,9 @@ import { SystemPendings } from "./system-pendings";
 import { BookingRequests } from "./booking-requests";
 import { PatientSheet } from "./patient-sheet";
 import { WaitlistDialog } from "./waitlist-dialog";
+import { isNationalHolidayYMD } from "@/lib/holidays";
+
+const isHoliday = (iso: string) => isNationalHolidayYMD(+iso.slice(0, 4), +iso.slice(5, 7), +iso.slice(8, 10));
 
 function rangeFor(view: AgendaView, date: string): { from: string; to: string; days: string[] } {
   if (view === "semana") {
@@ -396,6 +399,8 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
         doctor: selectedDoctors.length === 1 && selectedDoctors[0] !== NO_DOCTOR ? selectedDoctors[0] : null,
         items: visibleItems.filter((i) => i.date === d),
         highlight: d === today,
+        // "0 pacientes" verde num feriado parecia dia livre pra marcar.
+        ...(isHoliday(d) ? { sublabel: `Feriado · ${visibleItems.filter((i) => i.date === d).length} pac.` } : {}),
       }));
     }
     if (view === "medico") {
@@ -568,7 +573,7 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
             </p>
           ) : (
             <p
-              className="text-xs text-slate-500 dark:text-slate-400 tabular-nums"
+              className={`text-xs text-slate-500 dark:text-slate-400 tabular-nums ${live ? "hidden md:block" : ""}`}
               aria-live="off"
               title={current.hasBridge ? "Marcações sem telefone no sistema da clínica não aparecem aqui." : undefined}
             >
@@ -659,7 +664,7 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
               <div className={`${panel} flex items-center gap-3 px-4 py-3`}>
                 <CalendarX2 className="w-5 h-5 shrink-0 text-slate-400" aria-hidden />
                 <p className="text-sm text-slate-600 dark:text-slate-300">
-                  Nenhum paciente {view === "semana" ? "nesta semana" : `em ${brDate(date)}`}. Escolha um horário na grade ou use “Novo agendamento” para marcar.
+                  {view !== "semana" && isHoliday(date) ? "Feriado nacional. " : ""}Nenhum paciente {view === "semana" ? "nesta semana" : `em ${brDate(date)}`}. Escolha um horário na grade ou use “Novo agendamento” para marcar.
                 </p>
               </div>
             )}

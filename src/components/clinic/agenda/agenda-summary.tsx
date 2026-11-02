@@ -24,7 +24,7 @@ export function AgendaSummary({
   onToggleLate?: () => void;
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Resumo e filtro por status">
+    <div className="flex items-center gap-1.5 overflow-x-auto md:flex-wrap md:overflow-visible [&>*]:shrink-0" role="group" aria-label="Resumo e filtro por status">
       <span className="mr-1 text-sm font-semibold text-slate-800 dark:text-slate-100 tabular-nums">
         {summary.total} {summary.total === 1 ? "paciente" : "pacientes"}
       </span>
