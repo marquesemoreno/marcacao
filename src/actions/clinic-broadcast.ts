@@ -23,6 +23,8 @@ import { channelSendDecision } from "@/lib/channel-consent";
 import { buildEmailContent, buildSmsContent } from "@/lib/channel-content";
 
 import { attachmentKindOf, checkBroadcastAttachment } from "@/lib/broadcast-attachment";
+import { numberHealth } from "@/lib/number-health";
+import { getWhatsappChannelStatus } from "@/actions/inbox";
 
 /** Mirror de listBroadcastCampaigns (admin-broadcast.ts) — clinicId vem da sessão,
  * não é parâmetro (a clínica só pode ver as próprias campanhas). */
@@ -450,6 +452,47 @@ export async function pauseClinicBroadcastCampaign(campaignId: string) {
   await prisma.broadcastCampaign.update({ where: { id: campaignId }, data: { status: "PAUSED" } });
   revalidatePath("/clinic/disparos");
   return { success: true as const };
+}
+
+/** "Pausar todos os envios" — botão de pânico quando o número cai ou recebe alerta. */
+export async function pauseAllClinicBroadcastCampaigns() {
+  const { clinicId } = await requireClinicSession();
+  const { count } = await prisma.broadcastCampaign.updateMany({ where: { clinicId, status: "RUNNING" }, data: { status: "PAUSED" } });
+  revalidatePath("/clinic/disparos");
+  return { paused: count };
+}
+
+/** Saúde do número pro diálogo de início e o cabeçalho de Disparos (ver number-health.ts). */
+export async function getClinicNumberHealth() {
+  const { clinicId } = await requireClinicSession();
+  const now = new Date();
+  const dayStart = startOfBrazilDay(now);
+  const [connection, cloud, downLogs, campaignToday, remindersToday, failedToday] = await Promise.all([
+    getWhatsappChannelStatus(),
+    prisma.whatsappCloudAccount.findFirst({ where: { clinicId, active: true }, select: { id: true } }),
+    // Estado gravado pelo cron health-check só quando muda (event "health.state").
+    prisma.webhookLog.findMany({
+      where: { event: "health.state", status: "down", createdAt: { gte: new Date(now.getTime() - 60 * 86_400_000) } },
+      orderBy: { createdAt: "desc" },
+      take: 50,
+      select: { payload: true, createdAt: true },
+    }),
+    prisma.broadcastRecipient.count({ where: { status: "SENT", sentAt: { gte: dayStart }, campaign: { clinicId, channel: "WHATSAPP" } } }),
+    prisma.bridgeReminderLog.count({ where: { clinicId, sentAt: { gte: dayStart } } }),
+    prisma.message.count({
+      where: { status: "FAILED", direction: "OUTBOUND", senderUserId: null, sentFromDevice: false, createdAt: { gte: dayStart }, conversation: { clinicId } },
+    }),
+  ]);
+  const lastDown = downLogs.find((l) => (l.payload as { key?: string } | null)?.key === `whatsapp:${clinicId}`);
+  const input = {
+    connection,
+    onCloud: Boolean(cloud),
+    lastDownAt: lastDown?.createdAt ?? null,
+    automatedToday: campaignToday + remindersToday,
+    failedToday,
+    now,
+  };
+  return { ...numberHealth(input), connection, onCloud: input.onCloud, automatedToday: input.automatedToday };
 }
 
 /** Aviso de remarcação em massa — médico desmarcou a agenda de um dia, avisa todos os

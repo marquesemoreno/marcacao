@@ -93,6 +93,21 @@ describe("runAutomationRules", () => {
   });
 });
 
+describe("ruleAudience (prévia da régua)", () => {
+  it("conta quem receberia amanhã com os dias escolhidos, mesmo sem regra salva", async () => {
+    const { ruleAudience } = await import("./automation-rules-run");
+    const tomorrow = new Date("2026-11-03T11:00:00Z");
+    bridge.fetchBridgeCampaignPatients.mockResolvedValue({
+      patients: [patient(1, "77991111111", "2026-11-02"), patient(2, "77992222222", "2026-11-01")],
+      futurePhones: [],
+    });
+    const r = await ruleAudience({ clinicId: "c1", ruleId: null, kind: "POS_CONSULTA", daysAfter: 1, requireNoFuture: false, excludedPatientIds: [] }, tomorrow);
+    expect(bridge.fetchBridgeCampaignPatients).toHaveBeenCalledWith("c1", { desde: "2026-11-02" });
+    expect(r.map((x) => x.phone)).toEqual(["5577991111111"]);
+    expect(prismaMock.broadcastRecipient.findMany).not.toHaveBeenCalled();
+  });
+});
+
 describe("runAutomationRules — aniversário", () => {
   it("pega pacientes ativos dos últimos 2 anos e manda para quem faz aniversário hoje", async () => {
     prismaMock.automationRule.findMany.mockResolvedValue([{ ...rule, id: "r2", kind: "ANIVERSARIO", name: "Aniversário", daysAfter: 0 }]);

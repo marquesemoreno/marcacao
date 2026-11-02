@@ -6,6 +6,7 @@ import { DEFAULT_RULE_STEPS, validateRuleInput, type AutomationRuleKind } from "
 import { checkTemplateParamSources } from "@/lib/broadcast-cloud-template";
 import { getClinicCloudBroadcastSetup } from "@/actions/clinic-broadcast";
 import { revalidatePath } from "next/cache";
+import { ruleAudience } from "@/lib/automation-rules-run";
 
 export type AutomationRuleView = {
   kind: AutomationRuleKind;
@@ -44,6 +45,31 @@ export async function listAutomationRules(): Promise<AutomationRuleView[]> {
       };
     }),
   );
+}
+
+/** "Amanhã às 8h: ~N pacientes" — quantos entrariam no passo com os dias escolhidos.
+ * Conta antes do consentimento de marketing (o envio ainda pula quem não aceitou). */
+export async function previewAutomationRule(input: { kind: AutomationRuleKind; daysAfter: number }) {
+  const { clinicId } = await requireClinicManager();
+  const step = DEFAULT_RULE_STEPS.find((s) => s.kind === input.kind);
+  if (!step) return { ok: false as const, error: "Passo desconhecido." };
+  if (input.kind !== "ANIVERSARIO" && validateRuleInput({ daysAfter: input.daysAfter })) return { ok: false as const, error: "Dias inválidos." };
+  const integration = await prisma.hospitalIntegration.findUnique({ where: { clinicId }, select: { active: true } });
+  if (!integration?.active) return { ok: false as const, error: "Sem sistema da clínica conectado." };
+  const [rule, clinic] = await Promise.all([
+    prisma.automationRule.findUnique({ where: { clinicId_kind: { clinicId, kind: input.kind } }, select: { id: true } }),
+    prisma.clinic.findUniqueOrThrow({ where: { id: clinicId }, select: { campaignExcludedPatientIds: true } }),
+  ]);
+  try {
+    const tomorrow = new Date(Date.now() + 86_400_000);
+    const audience = await ruleAudience(
+      { clinicId, ruleId: rule?.id ?? null, kind: input.kind, daysAfter: input.daysAfter, requireNoFuture: step.requireNoFuture, excludedPatientIds: clinic.campaignExcludedPatientIds },
+      tomorrow,
+    );
+    return { ok: true as const, count: audience.length };
+  } catch {
+    return { ok: false as const, error: "O sistema da clínica não respondeu." };
+  }
 }
 
 export async function saveAutomationRule(input: {

@@ -35,6 +35,40 @@ export async function runAutomationRules(now = new Date()): Promise<RunResult[]>
   return results;
 }
 
+/** Quem receberia o passo no dia `now` — usado pelo cron e pela prévia "Amanhã às 8h: ~N"
+ * no Sheet da régua (crítica 02/11: ligar sem saber o impacto). */
+export async function ruleAudience(
+  r: { clinicId: string; ruleId: string | null; kind: string; daysAfter: number; requireNoFuture: boolean; excludedPatientIds: number[] },
+  now: Date,
+) {
+  const isBirthday = r.kind === "ANIVERSARIO";
+  const target = ruleTargetDate(now, isBirthday ? BIRTHDAY_ACTIVE_DAYS : r.daysAfter);
+  const { patients, futurePhones } = await fetchBridgeCampaignPatients(r.clinicId, { desde: target });
+  const optedOutPhones = new Set(
+    (await prisma.contact.findMany({ where: { optedOutOfBroadcastsAt: { not: null }, phone: { not: null } }, select: { phone: true } }))
+      .map((c) => c.phone)
+      .filter((p): p is string => !!p),
+  );
+  const { recipients: audience } = buildCampaignAudience(patients, {
+    minAge: 18,
+    optedOutPhones,
+    excludedPatientIds: new Set(r.excludedPatientIds),
+    today: now,
+    ...(isBirthday
+      ? { birthdayOn: birthdayKeysFor(now) }
+      : { lastVisitOn: { date: target, futurePhones: r.requireNoFuture ? new Set(futurePhones) : undefined } }),
+  });
+  if (!r.ruleId) return audience;
+  const since = new Date(now.getTime() - REPEAT_GUARD_DAYS * 86400000);
+  const recent = new Set(
+    (await prisma.broadcastRecipient.findMany({
+      where: { phone: { in: audience.map((x) => x.phone) }, campaign: { automationRuleId: r.ruleId, createdAt: { gte: since } } },
+      select: { phone: true },
+    })).map((x) => x.phone),
+  );
+  return audience.filter((x) => !recent.has(x.phone));
+}
+
 async function runOne(
   rule: Awaited<ReturnType<typeof prisma.automationRule.findMany>>[number] & {
     clinic: { technicalDirectorName: string | null; technicalDirectorCrm: string | null; campaignExcludedPatientIds: number[] };
@@ -52,32 +86,10 @@ async function runOne(
   const integration = await prisma.hospitalIntegration.findUnique({ where: { clinicId: rule.clinicId }, select: { active: true } });
   if (!integration?.active) return { ...base, status: "sem sistema da clínica" };
 
-  const isBirthday = rule.kind === "ANIVERSARIO";
-  const target = ruleTargetDate(now, isBirthday ? BIRTHDAY_ACTIVE_DAYS : rule.daysAfter);
-  const { patients, futurePhones } = await fetchBridgeCampaignPatients(rule.clinicId, { desde: target });
-  const optedOutPhones = new Set(
-    (await prisma.contact.findMany({ where: { optedOutOfBroadcastsAt: { not: null }, phone: { not: null } }, select: { phone: true } }))
-      .map((c) => c.phone)
-      .filter((p): p is string => !!p),
+  const recipients = await ruleAudience(
+    { clinicId: rule.clinicId, ruleId: rule.id, kind: rule.kind, daysAfter: rule.daysAfter, requireNoFuture: rule.requireNoFuture, excludedPatientIds: rule.clinic.campaignExcludedPatientIds },
+    now,
   );
-  const { recipients: audience } = buildCampaignAudience(patients, {
-    minAge: 18,
-    optedOutPhones,
-    excludedPatientIds: new Set(rule.clinic.campaignExcludedPatientIds),
-    today: now,
-    ...(isBirthday
-      ? { birthdayOn: birthdayKeysFor(now) }
-      : { lastVisitOn: { date: target, futurePhones: rule.requireNoFuture ? new Set(futurePhones) : undefined } }),
-  });
-
-  const since = new Date(now.getTime() - REPEAT_GUARD_DAYS * 86400000);
-  const recent = new Set(
-    (await prisma.broadcastRecipient.findMany({
-      where: { phone: { in: audience.map((r) => r.phone) }, campaign: { automationRuleId: rule.id, createdAt: { gte: since } } },
-      select: { phone: true },
-    })).map((r) => r.phone),
-  );
-  const recipients = audience.filter((r) => !recent.has(r.phone));
   if (recipients.length === 0) return { ...base, status: "ninguém hoje", recipients: 0 };
 
   const owner = await prisma.user.findFirst({

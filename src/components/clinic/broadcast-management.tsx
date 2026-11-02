@@ -25,6 +25,8 @@ import {
   retryClinicCampaignFailures,
   getClinicNextAutomatedSend,
   setRecipientCalled,
+  getClinicNumberHealth,
+  pauseAllClinicBroadcastCampaigns,
 } from "@/actions/clinic-broadcast";
 import { BridgeAudiencePicker } from "@/components/clinic/bridge-audience-picker";
 import { listMarcadoresAudience } from "@/actions/marcadores";
@@ -40,6 +42,20 @@ import { AutomationRulesSheet } from "@/components/clinic/automation-rules-sheet
 
 type Campaign = Awaited<ReturnType<typeof listClinicBroadcastCampaigns>>[number];
 type StartPreview = Awaited<ReturnType<typeof getClinicCampaignStartPreview>>;
+type NumberHealthView = Awaited<ReturnType<typeof getClinicNumberHealth>>;
+
+const HEALTH_TONE = {
+  ok: "border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-200",
+  warn: "border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200",
+  danger: "border-red-300 bg-red-50 text-red-800 dark:border-red-800 dark:bg-red-950/40 dark:text-red-300",
+} as const;
+
+function healthLabel(h: NumberHealthView): string {
+  if (h.connection === "down") return "Número desconectado";
+  if (h.onCloud) return "API oficial ativa";
+  const conn = h.connection === "open" ? "Número conectado" : "Conexão não verificada";
+  return `${conn} · ${h.automatedToday} automáticas hoje`;
+}
 type Source = "csv" | "bridge" | "selecao" | "marcadores";
 type FormChannel = "WHATSAPP" | "SMS" | "EMAIL";
 const CHANNEL_OPTIONS: { value: FormChannel; label: string; Icon: typeof Mail }[] = [
@@ -147,6 +163,13 @@ export function BroadcastManagement() {
   const [confirming, setConfirming] = useState<{ campaign: Campaign; preview: StartPreview | null } | null>(null);
   const [deleting, setDeleting] = useState<Campaign | null>(null);
   const [nextSend, setNextSend] = useState<{ lastAt: string | null; nextAt: string | null } | null>(null);
+  // Saúde do número (crítica 02/11): conexão, volume automático de hoje, queda recente.
+  const [health, setHealth] = useState<NumberHealthView | null>(null);
+  const [riskAck, setRiskAck] = useState(false);
+  const [pausingAll, setPausingAll] = useState(false);
+  const loadHealth = useCallback(() => {
+    getClinicNumberHealth().then(setHealth).catch(() => {});
+  }, []);
 
   const loadCampaigns = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
@@ -170,6 +193,7 @@ export function BroadcastManagement() {
     listMarcadoresAudience().then(setMarcadoresAudience).catch(() => {});
     getClinicCloudBroadcastSetup().then(setCloud).catch(() => {});
     loadChannelSetup();
+    loadHealth();
     // "Enviar disparo" da lista de pacientes chega com ?selecao=1 e a seleção no
     // sessionStorage — vira o público desta campanha (lido uma vez e apagado).
     if (new URLSearchParams(window.location.search).get("selecao") === "1") {
@@ -187,7 +211,7 @@ export function BroadcastManagement() {
         // seleção inválida: segue com o formulário normal
       }
     }
-  }, [loadCampaigns, loadChannelSetup]);
+  }, [loadCampaigns, loadChannelSetup, loadHealth]);
 
   // Enquanto houver campanha enviando, atualiza a lista sozinha (progresso e situação).
   const anyRunning = campaigns.some((c) => c.status === "RUNNING");
@@ -310,6 +334,8 @@ export function BroadcastManagement() {
 
   async function askStart(campaign: Campaign) {
     setConfirming({ campaign, preview: null });
+    setRiskAck(false);
+    loadHealth();
     try {
       const preview = await getClinicCampaignStartPreview(campaign.id);
       setConfirming({ campaign, preview });
@@ -456,6 +482,19 @@ export function BroadcastManagement() {
   const active = campaigns.filter((c) => c.status === "DRAFT" || c.status === "PAUSED");
   const done = campaigns.filter((c) => c.status === "COMPLETED");
 
+  async function pauseAll() {
+    setPausingAll(true);
+    try {
+      const { paused } = await pauseAllClinicBroadcastCampaigns();
+      toast.success(paused ? `${plural(paused, "campanha pausada", "campanhas pausadas")}. Para retomar, use Retomar em cada uma.` : "Nenhuma campanha estava enviando.");
+      await loadCampaigns(true);
+    } catch {
+      toast.error("Não foi possível pausar. Tente de novo.");
+    } finally {
+      setPausingAll(false);
+    }
+  }
+
   return (
     <div className="p-4 sm:p-6 space-y-6 max-w-4xl mx-auto">
       <PageHeader
@@ -506,6 +545,35 @@ export function BroadcastManagement() {
           </div>
         }
       />
+
+      {(health || running.length > 0) && (
+        <div className="flex flex-wrap items-center justify-between gap-2 -mt-2">
+          {health ? (
+            <p
+              role="status"
+              className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium ${HEALTH_TONE[health.tone]}`}
+              title={health.reasons.join(" ") || undefined}
+            >
+              <span aria-hidden className={`h-2 w-2 rounded-full ${health.tone === "ok" ? "bg-emerald-500" : health.tone === "warn" ? "bg-amber-500" : "bg-red-500"}`} />
+              {healthLabel(health)}
+              {health.tone === "warn" && <span className="font-normal">· {health.reasons[0]}</span>}
+            </p>
+          ) : (
+            <span />
+          )}
+          {running.length > 0 && (
+            <button
+              type="button"
+              onClick={pauseAll}
+              disabled={pausingAll}
+              className="inline-flex h-9 items-center gap-1.5 px-3 text-sm font-semibold rounded-lg border border-red-300 dark:border-red-800 text-red-700 dark:text-red-300 bg-white dark:bg-slate-900 hover:bg-red-50 dark:hover:bg-red-950/40 disabled:opacity-60"
+            >
+              {pausingAll ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden /> : <Pause className="w-4 h-4" aria-hidden />}
+              Pausar todos os envios
+            </button>
+          )}
+        </div>
+      )}
 
       <RescheduleBroadcastModal
         open={rescheduleModalOpen}
@@ -1098,7 +1166,25 @@ export function BroadcastManagement() {
               {confirming.preview.missingTechnicalDirector && (
                 <div role="alert" className="rounded-lg border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 p-3 text-sm text-amber-900 dark:text-amber-200">
                   Falta o responsável técnico (nome e CRM), exigido pelo CFM em campanhas. A gestão cadastra em{" "}
-                  <a href="/clinic/precos" className="font-semibold underline underline-offset-2">Configurações</a>.
+                  <a href="/clinic/precos" className="font-semibold underline underline-offset-2">Configurações › Preços e parâmetros</a>.
+                </div>
+              )}
+              {health && confirming.preview.channel === "WHATSAPP" && (
+                <div role={health.tone === "ok" ? "status" : "alert"} className={`rounded-lg border p-3 text-sm space-y-2 ${HEALTH_TONE[health.tone]}`}>
+                  <p className="font-semibold">{healthLabel(health)}</p>
+                  {health.reasons.length > 0 && (
+                    <ul className="list-disc pl-5 space-y-0.5">
+                      {health.reasons.map((r) => (
+                        <li key={r}>{r}</li>
+                      ))}
+                    </ul>
+                  )}
+                  {health.needsAck && (
+                    <label className="flex items-start gap-2 font-medium">
+                      <input type="checkbox" checked={riskAck} onChange={(e) => setRiskAck(e.target.checked)} className="mt-0.5 h-4 w-4 accent-amber-600" />
+                      Entendo o risco e quero iniciar mesmo assim
+                    </label>
+                  )}
                 </div>
               )}
               <div className="flex justify-end gap-2">
@@ -1117,7 +1203,8 @@ export function BroadcastManagement() {
                     (confirming.preview.channel !== "WHATSAPP" && (confirming.preview.withConsent ?? 0) === 0) ||
                     confirming.preview.unknownVariables.length > 0 ||
                     confirming.preview.unfilled.length > 0 ||
-                    confirming.preview.missingTechnicalDirector
+                    confirming.preview.missingTechnicalDirector ||
+                    (confirming.preview.channel === "WHATSAPP" && !!health && (health.blocksStart || (health.needsAck && !riskAck)))
                   }
                   onClick={confirmStart}
                   className="inline-flex h-9 items-center gap-1.5 px-4 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 rounded-lg"
