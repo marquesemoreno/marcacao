@@ -2,7 +2,14 @@
  * o texto fixo do modelo e só os campos {{1}}, {{2}}… variando. Cada campo da campanha
  * guarda o que vai nele — variável da planilha ({{nome}}) e/ou texto fixo. */
 
-export type CloudBroadcastMode = "TEXT" | "TEMPLATE" | "MISSING_TEMPLATE";
+/** Nome do modelo da Meta legível: "aviso_novos_medicos" → "Aviso novos medicos (marketing)". */
+export function templateLabel(t: { name: string; category: string; language: string }): string {
+  const name = t.name.replace(/_/g, " ");
+  const cat = t.category === "MARKETING" ? "marketing" : t.category === "UTILITY" ? "utilidade" : t.category.toLowerCase();
+  return `${name.charAt(0).toUpperCase()}${name.slice(1)} (${cat}${t.language.startsWith("pt") ? "" : `, ${t.language}`})`;
+}
+
+export type CloudBroadcastMode ="TEXT" | "TEMPLATE" | "MISSING_TEMPLATE";
 
 export function cloudBroadcastMode(input: { cloudActive: boolean; templateName: string | null }): CloudBroadcastMode {
   if (!input.cloudActive) return "TEXT";

@@ -1,7 +1,7 @@
 "use client";
 
 import { normalizeBroadcastVariants, previewBroadcastVariants } from "@/lib/broadcast-variants";
-import { buildTemplateParams, checkTemplateParamSources, renderTemplatePreview } from "@/lib/broadcast-cloud-template";
+import { buildTemplateParams, checkTemplateParamSources, renderTemplatePreview, templateLabel } from "@/lib/broadcast-cloud-template";
 import { PageHeader } from "@/components/clinic/page-header";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { CalendarClock, Copy, FileText, Mail, MessageCircle, MessageSquareText, ShieldCheck, Image as ImageIcon, Loader2, MoreHorizontal, Paperclip, Pause, Phone, Play, Plus, Repeat, Trash2, Upload, X } from "lucide-react";
@@ -715,7 +715,7 @@ export function BroadcastManagement() {
             <div
               role="radiogroup"
               aria-label="Público"
-              className="inline-flex flex-wrap rounded-lg border border-slate-200 dark:border-slate-700 p-0.5 text-sm"
+              className="flex flex-wrap gap-2 text-sm"
               onKeyDown={(e) => {
                 const delta = e.key === "ArrowRight" || e.key === "ArrowDown" ? 1 : e.key === "ArrowLeft" || e.key === "ArrowUp" ? -1 : 0;
                 if (!delta) return;
@@ -735,8 +735,10 @@ export function BroadcastManagement() {
                   aria-checked={audienceSource === value}
                   tabIndex={audienceSource === value ? 0 : -1}
                   onClick={() => switchSource(value)}
-                  className={`px-3 h-8 rounded-md font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50 ${
-                    audienceSource === value ? "bg-emerald-600 text-white" : "text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+                  className={`px-3 h-9 rounded-lg border font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50 ${
+                    audienceSource === value
+                      ? "border-emerald-600 bg-emerald-50 text-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-100"
+                      : "border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
                   }`}
                 >
                   {label}
@@ -829,7 +831,7 @@ export function BroadcastManagement() {
                   <option value="">{cloud?.templates.length ? "Escolha…" : "Nenhum modelo aprovado ainda"}</option>
                   {cloud?.templates.map((t) => (
                     <option key={`${t.name}-${t.language}`} value={t.name}>
-                      {t.name} ({t.category === "MARKETING" ? "marketing" : t.category === "UTILITY" ? "utilidade" : t.category.toLowerCase()}, {t.language})
+                      {templateLabel(t)}
                     </option>
                   ))}
                 </select>

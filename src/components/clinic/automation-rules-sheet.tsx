@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { listAutomationRules, previewAutomationRule, saveAutomationRule, type AutomationRuleView } from "@/actions/automation-rules";
 import type { ClinicCloudTemplate } from "@/actions/clinic-broadcast";
-import { renderTemplatePreview } from "@/lib/broadcast-cloud-template";
+import { renderTemplatePreview, templateLabel } from "@/lib/broadcast-cloud-template";
 
 const STEP_HELP: Record<AutomationRuleView["kind"], string> = {
   POS_CONSULTA: "Para quem consultou — pergunta como está e abre espaço para dúvidas.",
@@ -149,7 +149,7 @@ function RuleCard({ rule, cloud, onSaved }: { rule: AutomationRuleView; cloud: {
           <option value="">{cloud.active ? "Escolha um modelo…" : "Disponível com a API oficial ativa"}</option>
           {cloud.templates.map((t) => (
             <option key={t.name} value={t.name}>
-              {t.name.replace(/_/g, " ")}
+              {templateLabel(t)}
             </option>
           ))}
         </select>
