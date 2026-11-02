@@ -23,14 +23,16 @@ Destinatários vêm de CSV (coluna `telefone` ou `email`). Consentimento **por c
    toda leitura de campanhas quebra (o Prisma seleciona as colunas novas). Só `migrate deploy`;
    nunca `--shadow-database-url` contra produção.
 2. Criar as variáveis no Vercel: `UNSUBSCRIBE_SECRET`, `RESEND_API_KEY`, `BROADCAST_EMAIL_FROM`,
-   `COMTELE_API_KEY`, `COMTELE_ROUTE` (e opcional `CHANNEL_BATCH_SIZE`).
+   `COMTELE_API_KEY`, `COMTELE_ROUTE` (**16** — rota de marketing, confirmada pela Comtele em
+   29/10/2026) (e opcional `CHANNEL_BATCH_SIZE`).
 3. Resend: verificar o domínio de envio (SPF/DKIM) antes de usar um remetente do domínio.
 4. Deploy do código.
 
 ## Ainda não validado (precisa de chave real)
 - **Comtele:** a documentação pública é contraditória (tipo de `receivers`, significado de
   `route`, corpo de erro) e a resposta não traz id da mensagem. O adaptador segue o exemplo da
-  documentação, mas **nunca foi chamado de verdade**. Testar com 1 número antes de qualquer campanha.
+  documentação, mas **nunca foi chamado de verdade** (a rota de marketing é a 16, segundo a
+  Comtele; falta só confirmar que o campo `route` da API aceita esse valor). Testar com 1 número antes de qualquer campanha.
 - **Resend:** idem, não chamado de verdade (formato conferido na documentação).
 - A tela não foi aberta no navegador (precisa de login e banco).
 - Despachante e ações testados com banco simulado, não com banco real.

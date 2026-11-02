@@ -75,12 +75,12 @@ export function AgendaGrid({
   }, [colsKey]);
 
   // Crítica 9ª: o calc fixo passava da tela (811×631) ou deixava a página rolar junto (1440).
-  // No desktop a caixa vai do topo dela até o fim da janela.
+  // Do tablet pra cima a caixa vai do topo dela até o fim da janela.
   useEffect(() => {
     const box = scrollRef.current;
     if (!box) return;
     const fit = () => {
-      if (window.innerWidth < 1024) return void (box.style.height = "");
+      if (window.innerWidth < 768) return void (box.style.height = "");
       const top = box.getBoundingClientRect().top + window.scrollY;
       box.style.height = `${Math.max(224, window.innerHeight - top - 16)}px`;
     };
