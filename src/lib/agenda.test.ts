@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   arrivalQueue,
+  matchesPatientQuery,
+  systemPendings,
   agendaDoctors,
   daySummary,
   visibleRowRange,
@@ -155,5 +157,31 @@ describe("arrivalQueue", () => {
       now
     );
     expect(q.map((x) => x.position)).toEqual([1, 1]);
+  });
+});
+
+describe("systemPendings", () => {
+  it("lista só marcações do sistema canceladas à mão, de hoje em diante", () => {
+    const list = systemPendings(
+      [
+        item({ key: "a", source: "BRIDGE", status: "CANCELLED", isManual: true, date: "2026-11-02" }),
+        item({ key: "b", source: "BRIDGE", status: "CANCELLED", isManual: true, date: "2026-11-01" }),
+        item({ key: "c", source: "LOCAL", status: "CANCELLED", isManual: true, date: "2026-11-03" }),
+        item({ key: "d", source: "BRIDGE", status: "NO_SHOW", isManual: true, date: "2026-11-03" }),
+        item({ key: "e", source: "BRIDGE", status: "CONFIRMED", isManual: true, date: "2026-11-03" }),
+      ],
+      "2026-11-02"
+    );
+    expect(list.map((i) => i.key)).toEqual(["a"]);
+  });
+});
+
+describe("matchesPatientQuery", () => {
+  it("acha por nome sem acento e por pedaço do telefone", () => {
+    const p = item({ patientName: "MARIA JOSÉ", phone: "5577999701234" });
+    expect(matchesPatientQuery(p, "jose")).toBe(true);
+    expect(matchesPatientQuery(p, "9970-1234")).toBe(true);
+    expect(matchesPatientQuery(p, "joao")).toBe(false);
+    expect(matchesPatientQuery(p, "  ")).toBe(true);
   });
 });

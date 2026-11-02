@@ -175,3 +175,23 @@ export function arrivalQueue(items: AgendaItem[], date: string, now: Date = new 
     return { item, position, waitingMin: Math.max(0, Math.round((now.getTime() - new Date(item.arrivedAt!).getTime()) / 60_000)) };
   });
 }
+
+/** Cancelamentos feitos só no Conecta que ainda precisam ser feitos no sistema da clínica.
+ * A marcação continua vindo pela ponte enquanto não for cancelada lá — quando a recepção
+ * cancela no sistema, ela some da ponte e sai desta lista sozinha. */
+export function systemPendings(items: AgendaItem[], today: string): AgendaItem[] {
+  return items
+    .filter((i) => i.source === "BRIDGE" && i.isManual && i.status === "CANCELLED" && i.date >= today)
+    .sort((a, b) => (a.date + (a.time ?? "")).localeCompare(b.date + (b.time ?? "")));
+}
+
+const fold = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+
+/** Busca de paciente na Agenda: nome sem acento ou pedaço do telefone (só dígitos, ≥3). */
+export function matchesPatientQuery(item: AgendaItem, query: string): boolean {
+  const q = query.trim();
+  if (!q) return true;
+  if (fold(item.patientName).includes(fold(q))) return true;
+  const digits = q.replace(/\D/g, "");
+  return digits.length >= 3 && !!item.phone && item.phone.replace(/\D/g, "").includes(digits);
+}

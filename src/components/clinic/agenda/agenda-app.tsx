@@ -1,9 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { AlertTriangle, CalendarX2, RefreshCw } from "lucide-react";
+import { AlertTriangle, CalendarX2, Keyboard, RefreshCw, Search, X } from "lucide-react";
 import { getAgenda, setAgendaStatus, type AgendaResult } from "@/actions/agenda";
 import { getSlotCandidates, listWaitlist } from "@/actions/waitlist";
 import { openSlotFromStatus, type OpenSlot } from "@/lib/waitlist";
@@ -19,6 +19,8 @@ import {
   addDays,
   agendaDoctors,
   daySummary,
+  matchesPatientQuery,
+  systemPendings,
   monthGridDays,
   weekDays,
   type AgendaItem,
@@ -32,6 +34,7 @@ import { AgendaGrid, type AgendaColumn } from "./agenda-grid";
 import { AgendaMonth } from "./agenda-month";
 import { AgendaSummary } from "./agenda-summary";
 import { ArrivalQueue } from "./arrival-queue";
+import { SystemPendings } from "./system-pendings";
 import { PatientSheet } from "./patient-sheet";
 import { WaitlistDialog } from "./waitlist-dialog";
 
@@ -59,6 +62,15 @@ function nowInBahia(): string {
   return new Date(Date.now() - 3 * 3600_000).toISOString().slice(11, 16);
 }
 
+const SHORTCUTS: [string, string][] = [
+  ["← →", "Período anterior / próximo"],
+  ["H", "Hoje"],
+  ["D S M P", "Dia, Semana, Mês, Por médico"],
+  ["/", "Buscar paciente"],
+  ["Esc", "Limpar a busca / fechar"],
+  ["?", "Mostrar estes atalhos"],
+];
+
 const panel = "rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900";
 
 /** Agenda da recepção (/clinic/agenda). Data e visão ficam no endereço (F5 e link
@@ -74,6 +86,9 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
   const [reloadKey, setReloadKey] = useState(0);
   const [selectedDoctors, setSelectedDoctors] = useState<string[]>([]);
   const [selectedGroups, setSelectedGroups] = useState<string[]>([]);
+  const [query, setQuery] = useState("");
+  const [helpOpen, setHelpOpen] = useState(false);
+  const searchRef = useRef<HTMLInputElement>(null);
   const [openItem, setOpenItem] = useState<AgendaItem | null>(null);
   const [schedule, setSchedule] = useState<{
     date: string;
@@ -135,10 +150,11 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
     [allItems, selectedDoctors]
   );
   const visibleItems = useMemo(() => {
-    if (!selectedGroups.length) return doctorItems;
+    const byQuery = doctorItems.filter((i) => matchesPatientQuery(i, query));
+    if (!selectedGroups.length) return byQuery;
     const statuses = AGENDA_STATUS_GROUPS.filter((g) => selectedGroups.includes(g.id)).flatMap((g) => g.statuses);
-    return doctorItems.filter((i) => statuses.includes(i.status));
-  }, [doctorItems, selectedGroups]);
+    return byQuery.filter((i) => statuses.includes(i.status));
+  }, [doctorItems, selectedGroups, query]);
   const summary = useMemo(() => daySummary(doctorItems), [doctorItems]);
 
   const reload = useCallback(() => setReloadKey((k) => k + 1), []);
@@ -251,10 +267,13 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
   // modal/painel aberto.
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape" && helpOpen) return setHelpOpen(false);
       if (e.ctrlKey || e.metaKey || e.altKey || schedule || openItem) return;
       const el = e.target as HTMLElement | null;
       if (el && (el.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName))) return;
-      if (e.key === "ArrowLeft") move(-1);
+      if (e.key === "/") searchRef.current?.focus();
+      else if (e.key === "?") setHelpOpen((o) => !o);
+      else if (e.key === "ArrowLeft") move(-1);
       else if (e.key === "ArrowRight") move(1);
       else if (e.key.toLowerCase() === "h") setDate(today);
       else {
@@ -266,7 +285,7 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [move, today, schedule, openItem]);
+  }, [move, today, schedule, openItem, helpOpen]);
 
   const label =
     view === "semana"
@@ -359,6 +378,44 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
           </p>
         )}
 
+        <div className="flex flex-wrap items-center gap-2">
+          <label className="relative min-w-[12rem] max-w-sm flex-1">
+            <span className="sr-only">Buscar paciente na agenda</span>
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden />
+            <input
+              ref={searchRef}
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") {
+                  setQuery("");
+                  e.currentTarget.blur();
+                }
+              }}
+              placeholder="Buscar paciente (nome ou telefone)"
+              className="h-9 w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 pl-8 pr-3 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
+            />
+          </label>
+          {query && current && (
+            <span className="inline-flex items-center gap-1 text-xs tabular-nums text-slate-500 dark:text-slate-400" aria-live="polite">
+              {visibleItems.length} {visibleItems.length === 1 ? "encontrado" : "encontrados"} neste período
+              <button type="button" onClick={() => setQuery("")} aria-label="Limpar busca" className="rounded p-1 hover:text-slate-800 dark:hover:text-slate-100">
+                <X className="h-3.5 w-3.5" aria-hidden />
+              </button>
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={() => setHelpOpen(true)}
+            className="ml-auto inline-flex h-9 items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
+          >
+            <Keyboard className="h-4 w-4" aria-hidden /> Atalhos <kbd className="rounded border border-slate-300 dark:border-slate-600 px-1 font-mono text-[11px]">?</kbd>
+          </button>
+        </div>
+
+        {current && <SystemPendings items={systemPendings(allItems, today)} onOpen={setOpenItem} />}
+
         {view === "mes" && selectedGroups.length > 0 && (
           <p className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
             Contando só: {AGENDA_STATUS_GROUPS.filter((g) => selectedGroups.includes(g.id)).map((g) => g.label.toLowerCase()).join(", ")}.
@@ -448,6 +505,37 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
         exceptPhone={waitlistSlot?.exceptPhone ?? null}
         onChanged={setWaitlistCount}
       />
+      {helpOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4" onClick={() => setHelpOpen(false)}>
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="atalhos-agenda"
+            className="w-full max-w-sm rounded-xl bg-white dark:bg-slate-900 p-5 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 id="atalhos-agenda" className="text-base font-semibold">Atalhos da Agenda</h2>
+            <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
+              {SHORTCUTS.map(([k, v]) => (
+                <div key={k} className="contents">
+                  <dt>
+                    <kbd className="rounded border border-slate-300 dark:border-slate-600 px-1.5 py-0.5 font-mono text-xs">{k}</kbd>
+                  </dt>
+                  <dd className="text-slate-600 dark:text-slate-300">{v}</dd>
+                </div>
+              ))}
+            </dl>
+            <button
+              type="button"
+              autoFocus
+              onClick={() => setHelpOpen(false)}
+              className="mt-4 inline-flex h-9 w-full items-center justify-center rounded-lg border border-slate-200 dark:border-slate-700 text-sm font-medium hover:bg-slate-50 dark:hover:bg-slate-800"
+            >
+              Fechar
+            </button>
+          </div>
+        </div>
+      )}
       <PatientSheet item={openItem} onClose={() => setOpenItem(null)} onSetStatus={handleSetStatus} onReschedule={handleReschedule} />
 
       {schedule && (
