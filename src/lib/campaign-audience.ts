@@ -35,6 +35,9 @@ export type AudienceOptions = {
   retorno?: { minMonths: number; maxMonths: number; futurePhones: Set<string> };
   /** Só pacientes cuja última consulta foi com um destes médicos (código do sistema). */
   doctorIds?: Set<string>;
+  /** Régua automática: só quem teve a última consulta exatamente em `date` (AAAA-MM-DD).
+   * Com futurePhones, quem já tem consulta futura fica de fora (retorno/reativação). */
+  lastVisitOn?: { date: string; futurePhones?: Set<string> };
 };
 
 export type AudienceRecipient = { phone: string; variables: { nome: string; saudacao: string } };
@@ -78,7 +81,7 @@ export function buildCampaignAudience(patients: BridgeCampaignPatient[], options
   const doctorKey = (d: string | number | null | undefined) => String(d ?? "").trim().replace(/^0+(?=\d)/, "");
   const doctorIds = options.doctorIds?.size ? new Set([...options.doctorIds].map(doctorKey)) : null;
   const futurePhones = new Set<string>();
-  for (const raw of options.retorno?.futurePhones ?? []) {
+  for (const raw of [...(options.retorno?.futurePhones ?? []), ...(options.lastVisitOn?.futurePhones ?? [])]) {
     const f = formatToWhatsAppNumber(raw);
     futurePhones.add(f);
     const alt = toggleNinthDigit(f);
@@ -105,6 +108,16 @@ export function buildCampaignAudience(patients: BridgeCampaignPatient[], options
       const last = patient.ultimaAtendida ?? patient.ultimaPassada ?? null;
       const months = last ? monthsBetween(last, today) : null;
       if (months === null || months < options.retorno.minMonths || months >= options.retorno.maxMonths) {
+        stats.excludedRetornoRange++;
+        continue;
+      }
+    }
+    if (options.lastVisitOn) {
+      if (options.lastVisitOn.futurePhones && (patient.proximaMarcacao || futurePhones.has(formatToWhatsAppNumber(patient.telefone)))) {
+        stats.excludedHasFuture++;
+        continue;
+      }
+      if ((patient.ultimaAtendida ?? patient.ultimaPassada ?? null) !== options.lastVisitOn.date) {
         stats.excludedRetornoRange++;
         continue;
       }

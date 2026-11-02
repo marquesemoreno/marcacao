@@ -228,6 +228,7 @@ model Clinic {
   hospitalIntegration  HospitalIntegration?
   aiAttendantConfig    AiAttendantConfig?
   broadcastCampaigns   BroadcastCampaign[]
+  automationRules      AutomationRule[]
   channelConsents      ChannelConsent[]
   bridgeReminderLogs   BridgeReminderLog[]
   knowledgeEntries     ClinicKnowledgeEntry[]
@@ -962,6 +963,8 @@ model BroadcastCampaign {
   /// Baixa prioridade (campanha longa, ex.: Outubro Rosa): pausa sozinha enquanto houver
   /// lembrete de confirmação ou outra campanha da clínica na fila (lowPriorityMustYield).
   lowPriority     Boolean                 @default(false) @map("low_priority")
+  /// Campanha criada pela régua automática (AutomationRule.id); null = campanha manual.
+  automationRuleId String?                @map("automation_rule_id")
   createdByUserId String                  @map("created_by_user_id")
   createdAt       DateTime                @default(now()) @map("created_at")
   updatedAt       DateTime                @updatedAt @map("updated_at")
@@ -969,7 +972,38 @@ model BroadcastCampaign {
   clinic     Clinic               @relation(fields: [clinicId], references: [id])
   recipients BroadcastRecipient[]
 
+  @@index([automationRuleId])
+
   @@map("broadcast_campaigns")
+}
+
+/// Passo da régua automática (src/lib/automation-rules.ts): todo dia, quem teve a última
+/// consulta há `daysAfter` dias vira uma campanha de Disparos (RUNNING, baixa prioridade).
+/// Só roda com a API oficial ativa e modelo aprovado (cloudTemplateName).
+model AutomationRule {
+  id                    String   @id @default(cuid())
+  clinicId              String   @map("clinic_id")
+  /// POS_CONSULTA | RETORNO | REATIVACAO
+  kind                  String
+  name                  String
+  daysAfter             Int      @map("days_after")
+  /// Tira quem já tem consulta futura marcada (retorno/reativação).
+  requireNoFuture       Boolean  @default(true) @map("require_no_future")
+  messageTemplate       String   @map("message_template") @db.Text
+  cloudTemplateName     String?  @map("cloud_template_name")
+  cloudTemplateLanguage String?  @map("cloud_template_language")
+  cloudTemplateBody     String?  @map("cloud_template_body")
+  cloudTemplateParams   String[] @default([]) @map("cloud_template_params")
+  active                Boolean  @default(false)
+  /// Último dia (AAAA-MM-DD, Brasília) em que rodou — evita rodar 2× no mesmo dia.
+  lastRunDate           String?  @map("last_run_date")
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  clinic Clinic @relation(fields: [clinicId], references: [id])
+
+  @@unique([clinicId, kind])
+  @@map("automation_rules")
 }
 
 model BroadcastRecipient {

@@ -1,0 +1,94 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const { prismaMock, bridge } = vi.hoisted(() => ({
+  bridge: { fetchBridgeCampaignPatients: vi.fn() },
+  prismaMock: {
+    automationRule: { findMany: vi.fn(), update: vi.fn() },
+    whatsappCloudAccount: { findUnique: vi.fn() },
+    hospitalIntegration: { findUnique: vi.fn() },
+    contact: { findMany: vi.fn() },
+    broadcastRecipient: { findMany: vi.fn() },
+    broadcastCampaign: { create: vi.fn() },
+    user: { findFirst: vi.fn() },
+    webhookLog: { create: vi.fn() },
+  },
+}));
+vi.mock("@/lib/prisma", () => ({ prisma: prismaMock }));
+vi.mock("@/lib/hospital-bridge", () => bridge);
+
+import { runAutomationRules } from "./automation-rules-run";
+
+const now = new Date("2026-11-02T11:00:00Z"); // 08h de 02/11 em Brasília
+const rule = {
+  id: "r1",
+  clinicId: "c1",
+  kind: "POS_CONSULTA",
+  name: "Pós-consulta",
+  daysAfter: 1,
+  requireNoFuture: false,
+  messageTemplate: "Oi {{nome}}",
+  cloudTemplateName: "pos_consulta",
+  cloudTemplateLanguage: "pt_BR",
+  cloudTemplateBody: "Oi {{1}}",
+  cloudTemplateParams: ["{{nome}}"],
+  active: true,
+  lastRunDate: null,
+  clinic: { technicalDirectorName: "Dr. X", technicalDirectorCrm: "CRM-BA 1", campaignExcludedPatientIds: [] },
+};
+const patient = (id: number, telefone: string, ultimaPassada: string) => ({
+  id,
+  nome: "MARIA SILVA",
+  telefone,
+  nascimento: "1980-01-01",
+  ultimaMarcacao: ultimaPassada,
+  ultimaPassada,
+  proximaMarcacao: null,
+});
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  prismaMock.automationRule.findMany.mockResolvedValue([rule]);
+  prismaMock.whatsappCloudAccount.findUnique.mockResolvedValue({ active: true });
+  prismaMock.hospitalIntegration.findUnique.mockResolvedValue({ active: true });
+  prismaMock.contact.findMany.mockResolvedValue([]);
+  prismaMock.broadcastRecipient.findMany.mockResolvedValue([]);
+  prismaMock.user.findFirst.mockResolvedValue({ id: "u1" });
+  prismaMock.webhookLog.create.mockResolvedValue({});
+  bridge.fetchBridgeCampaignPatients.mockResolvedValue({
+    patients: [patient(1, "77991111111", "2026-11-01"), patient(2, "77992222222", "2026-10-30")],
+    futurePhones: [],
+  });
+});
+
+describe("runAutomationRules", () => {
+  it("cria campanha RUNNING de baixa prioridade só com quem consultou ontem", async () => {
+    const [r] = await runAutomationRules(now);
+    expect(r.status).toBe("criada");
+    expect(bridge.fetchBridgeCampaignPatients).toHaveBeenCalledWith("c1", { desde: "2026-11-01" });
+    const data = prismaMock.broadcastCampaign.create.mock.calls[0][0].data;
+    expect(data).toMatchObject({ status: "RUNNING", lowPriority: true, automationRuleId: "r1", cloudTemplateName: "pos_consulta", name: "Régua · Pós-consulta · 02/11" });
+    expect(data.recipients.create.map((x: { phone: string }) => x.phone)).toEqual(["5577991111111"]);
+    expect(prismaMock.automationRule.update).toHaveBeenCalledWith({ where: { id: "r1" }, data: { lastRunDate: "2026-11-02" } });
+  });
+
+  it("sem API oficial ativa não cria nada", async () => {
+    prismaMock.whatsappCloudAccount.findUnique.mockResolvedValue({ active: false });
+    const [r] = await runAutomationRules(now);
+    expect(r.status).toBe("sem API oficial ativa");
+    expect(prismaMock.broadcastCampaign.create).not.toHaveBeenCalled();
+  });
+
+  it("não repete quem já recebeu este passo nos últimos 30 dias", async () => {
+    prismaMock.broadcastRecipient.findMany.mockResolvedValue([{ phone: "5577991111111" }]);
+    const [r] = await runAutomationRules(now);
+    expect(r.status).toBe("ninguém hoje");
+    expect(prismaMock.broadcastCampaign.create).not.toHaveBeenCalled();
+  });
+
+  it("erro do bridge vira status e não derruba os outros passos", async () => {
+    bridge.fetchBridgeCampaignPatients.mockRejectedValue(new Error("bridge fora do ar"));
+    const [r] = await runAutomationRules(now);
+    expect(r.status).toBe("erro: bridge fora do ar");
+    expect(prismaMock.automationRule.update).toHaveBeenCalled();
+  });
+});

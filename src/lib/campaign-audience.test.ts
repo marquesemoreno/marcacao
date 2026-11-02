@@ -144,3 +144,37 @@ describe("buildCampaignAudience — filtro por médico da última consulta", () 
     expect(stats.excludedDoctor).toBe(0);
   });
 });
+
+describe("buildCampaignAudience — régua (última consulta exatamente num dia)", () => {
+  const base = { optedOutPhones: new Set<string>(), today };
+  it("só entra quem teve a última consulta no dia pedido", () => {
+    const { recipients, stats } = buildCampaignAudience(
+      [p({ id: 1, telefone: "77991111111", ultimaPassada: "2026-09-30" }), p({ id: 2, telefone: "77992222222", ultimaPassada: "2026-09-29" })],
+      { ...base, lastVisitOn: { date: "2026-09-30" } },
+    );
+    expect(recipients.map((r) => r.phone)).toEqual(["5577991111111"]);
+    expect(stats.excludedRetornoRange).toBe(1);
+  });
+  it("prefere a última ATENDIDA quando existe", () => {
+    const { recipients } = buildCampaignAudience([p({ ultimaPassada: "2026-09-30", ultimaAtendida: "2026-04-01" })], {
+      ...base,
+      lastVisitOn: { date: "2026-04-01" },
+    });
+    expect(recipients).toHaveLength(1);
+  });
+  it("com futurePhones, quem já tem consulta marcada fica de fora", () => {
+    const { recipients, stats } = buildCampaignAudience([p({ ultimaPassada: "2026-04-01", proximaMarcacao: "2026-10-10" })], {
+      ...base,
+      lastVisitOn: { date: "2026-04-01", futurePhones: new Set() },
+    });
+    expect(recipients).toHaveLength(0);
+    expect(stats.excludedHasFuture).toBe(1);
+  });
+  it("sem futurePhones (pós-consulta), consulta futura não tira ninguém", () => {
+    const { recipients } = buildCampaignAudience([p({ ultimaPassada: "2026-09-30", proximaMarcacao: "2026-10-10" })], {
+      ...base,
+      lastVisitOn: { date: "2026-09-30" },
+    });
+    expect(recipients).toHaveLength(1);
+  });
+});

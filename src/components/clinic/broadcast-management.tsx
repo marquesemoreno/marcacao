@@ -4,7 +4,7 @@ import { normalizeBroadcastVariants, previewBroadcastVariants } from "@/lib/broa
 import { buildTemplateParams, checkTemplateParamSources, renderTemplatePreview } from "@/lib/broadcast-cloud-template";
 import { PageHeader } from "@/components/clinic/page-header";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { CalendarClock, Copy, FileText, Mail, MessageCircle, MessageSquareText, ShieldCheck, Image as ImageIcon, Loader2, MoreHorizontal, Paperclip, Pause, Phone, Play, Plus, Trash2, Upload, X } from "lucide-react";
+import { CalendarClock, Copy, FileText, Mail, MessageCircle, MessageSquareText, ShieldCheck, Image as ImageIcon, Loader2, MoreHorizontal, Paperclip, Pause, Phone, Play, Plus, Repeat, Trash2, Upload, X } from "lucide-react";
 import { BROADCAST_ATTACHMENT_ACCEPT, checkBroadcastAttachment } from "@/lib/broadcast-attachment";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "sonner";
@@ -36,6 +36,7 @@ import { RescheduleBroadcastModal } from "@/components/clinic/reschedule-broadca
 import { BroadcastPreview } from "@/components/clinic/broadcast-preview";
 import { ChannelCampaignFields, ChannelConsentDialog, type ChannelSetup } from "@/components/clinic/channel-broadcast-panel";
 import { getChannelSetup } from "@/actions/clinic-channel-broadcast";
+import { AutomationRulesSheet } from "@/components/clinic/automation-rules-sheet";
 
 type Campaign = Awaited<ReturnType<typeof listClinicBroadcastCampaigns>>[number];
 type StartPreview = Awaited<ReturnType<typeof getClinicCampaignStartPreview>>;
@@ -119,6 +120,7 @@ export function BroadcastManagement() {
   const [formChannel, setFormChannel] = useState<FormChannel>("WHATSAPP");
   const [channelSetup, setChannelSetup] = useState<ChannelSetup | null>(null);
   const [consentOpen, setConsentOpen] = useState(false);
+  const [rulesOpen, setRulesOpen] = useState(false);
   const [channelFormKey, setChannelFormKey] = useState(0);
   const [selectionList, setSelectionList] = useState<ParsedBroadcastRecipient[]>([]);
 
@@ -468,6 +470,16 @@ export function BroadcastManagement() {
             {channelSetup?.isManager && (
               <button
                 type="button"
+                onClick={() => setRulesOpen(true)}
+                className="inline-flex h-9 items-center gap-1.5 px-3 text-sm font-medium text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg"
+              >
+                <Repeat className="w-4 h-4" aria-hidden />
+                Régua automática
+              </button>
+            )}
+            {channelSetup?.isManager && (
+              <button
+                type="button"
                 onClick={() => setConsentOpen(true)}
                 className="inline-flex h-9 items-center gap-1.5 px-3 text-sm font-medium text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg"
               >
@@ -503,6 +515,7 @@ export function BroadcastManagement() {
         }}
       />
 
+      <AutomationRulesSheet open={rulesOpen} onOpenChange={setRulesOpen} cloud={cloud} />
       <ChannelConsentDialog open={consentOpen} onOpenChange={setConsentOpen} setup={channelSetup} onDone={loadChannelSetup} />
 
       <Sheet open={formOpen} onOpenChange={setFormOpen}>
