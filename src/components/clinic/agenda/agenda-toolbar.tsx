@@ -17,6 +17,7 @@ const focusRing = "focus:outline-none focus-visible:ring-2 focus-visible:ring-em
  * AgendaApp): ← → muda o período, H volta pra hoje, D/S/M/P troca a visão. */
 export function AgendaToolbar({
   label,
+  shortLabel,
   view,
   loading,
   onPrev,
@@ -29,6 +30,8 @@ export function AgendaToolbar({
   live = false,
 }: {
   label: string;
+  /** Versão curta da data pro celular ("Ter, 03/11"). */
+  shortLabel?: string;
   view: AgendaView;
   loading: boolean;
   onPrev: () => void;
@@ -56,7 +59,14 @@ export function AgendaToolbar({
           <ChevronRight className="w-4 h-4" />
         </button>
         <h1 className="ml-1 truncate text-lg md:text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100 first-letter:uppercase" aria-live="polite">
-          {label}
+          {shortLabel ? (
+            <>
+              <span className="sm:hidden">{shortLabel}</span>
+              <span className="hidden sm:inline">{label}</span>
+            </>
+          ) : (
+            label
+          )}
         </h1>
         <button
           type="button"
@@ -76,13 +86,14 @@ export function AgendaToolbar({
       <button
         type="button"
         onClick={onWaitlist}
-        className={`${navBtn} gap-1.5 px-3 text-sm font-medium`}
-        title="Pacientes esperando uma vaga abrir"
+        className={`${navBtn} gap-1.5 px-2.5 text-sm font-medium xl:px-3`}
+        title="Lista de espera — pacientes esperando uma vaga abrir"
+        aria-label={`Lista de espera${waitlistCount ? `, ${waitlistCount}` : ""}`}
       >
         <ListChecks className="w-4 h-4" aria-hidden />
-        Lista de espera{waitlistCount ? <span className="tabular-nums rounded-md bg-emerald-100 dark:bg-emerald-950/60 px-1.5 text-xs font-semibold text-emerald-800 dark:text-emerald-300">{waitlistCount}</span> : null}
+        <span className="hidden xl:inline">Lista de espera</span>{waitlistCount ? <span className="tabular-nums rounded-md bg-emerald-100 dark:bg-emerald-950/60 px-1.5 text-xs font-semibold text-emerald-800 dark:text-emerald-300">{waitlistCount}</span> : null}
       </button>
-      <div role="group" aria-label="Visão da agenda" className="inline-flex rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 p-0.5">
+      <div role="group" aria-label="Visão da agenda" className="inline-flex max-w-full overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 p-0.5">
         {AGENDA_VIEWS.map((v) => (
           <button
             key={v.id}
@@ -90,7 +101,7 @@ export function AgendaToolbar({
             aria-pressed={view === v.id}
             onClick={() => onView(v.id)}
             title={`${v.label} (${v.key})`}
-            className={`px-3 h-8 text-sm font-medium rounded-md ${focusRing} ${
+            className={`shrink-0 px-2.5 sm:px-3 h-8 text-sm font-medium rounded-md ${focusRing} ${
               view === v.id
                 ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-xs"
                 : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"

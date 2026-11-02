@@ -129,9 +129,14 @@ export function PatientSheet({
 
               <section className="space-y-2">
                 {loading ? (
-                  <p className="flex items-center gap-2 text-xs text-slate-500">
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden /> Buscando conversa e histórico…
-                  </p>
+                  <div className="space-y-2" aria-busy="true" aria-label="Buscando conversa e histórico">
+                    <div className="flex gap-2">
+                      <div className="h-8 w-28 animate-pulse rounded-md bg-slate-200 dark:bg-slate-800" />
+                      <div className="h-8 w-24 animate-pulse rounded-md bg-slate-200 dark:bg-slate-800" />
+                    </div>
+                    <div className="h-3 w-3/4 animate-pulse rounded bg-slate-200 dark:bg-slate-800" />
+                    <div className="h-3 w-1/2 animate-pulse rounded bg-slate-200 dark:bg-slate-800" />
+                  </div>
                 ) : patient?.conversationId ? (
                   <div className="flex flex-wrap gap-2">
                     <Link

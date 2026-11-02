@@ -4,7 +4,7 @@ import { useState } from "react";
 import { CalendarClock, ChevronDown, ClipboardCheck, MessageCircle, UserCheck, UserX } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { overdueMinutes, shortProcedure, type AgendaItem, type AgendaStatusChoice } from "@/lib/agenda";
-import { AGENDA_STATUS_META, initialsOf, toTitleCase, todayInBahia } from "@/lib/agenda-ui";
+import { AGENDA_STATUS_META, toTitleCase, todayInBahia } from "@/lib/agenda-ui";
 import { StatusIcon } from "./status-icon";
 import { StatusMenu } from "./status-menu";
 
@@ -92,15 +92,10 @@ export function AppointmentCard({
         <button
           type="button"
           onClick={() => onOpen(item)}
-          className="min-w-0 flex-1 text-left px-2 pt-1.5 pb-1 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
+          className="min-w-0 flex-1 text-left px-2 pt-1 pb-0.5 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
           aria-label={`${item.time ?? "Sem horário"}, ${name}, ${meta.label}${lateMin !== null ? `, atrasado ${lateMin} minutos` : ""}${item.formDone ? ", ficha prévia enviada" : ""}. Abrir ficha`}
         >
           <div className="flex items-center gap-2 min-w-0">
-            {!compact && (
-              <span className="size-7 shrink-0 rounded-full bg-white/80 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-[11px] font-semibold text-slate-600 dark:text-slate-300 flex items-center justify-center">
-                {initialsOf(name)}
-              </span>
-            )}
             <div className="min-w-0 flex-1">
               <p className="flex items-center gap-1.5 text-sm font-semibold text-slate-900 dark:text-slate-100 min-w-0">
                 <span className="tabular-nums text-xs font-medium text-slate-600 dark:text-slate-400 shrink-0">{item.time ?? "—"}</span>
@@ -118,14 +113,13 @@ export function AppointmentCard({
               {lateMin !== null && (
                 <p className="text-xs font-semibold text-amber-800 dark:text-amber-300 tabular-nums">Atrasado {lateMin} min — ainda não chegou</p>
               )}
-              {!compact && subtitle && <p className="truncate text-xs text-slate-600 dark:text-slate-400" title={item.procedure ?? undefined}>{subtitle}</p>}
             </div>
           </div>
         </button>
       </div>
 
       {(!compact || canArrive || wantsReschedule) && (
-        <div className="flex flex-wrap items-center gap-1 px-2 pb-1.5">
+        <div className="flex flex-wrap items-center gap-1 px-2 pb-1">
           {!compact && (
             <Popover open={open} onOpenChange={setOpen}>
               <PopoverTrigger className={`${quickBtn} border ${meta.badge}`} aria-label={`Status: ${meta.label}. Alterar`}>
@@ -146,6 +140,12 @@ export function AppointmentCard({
             >
               <UserCheck className="w-3 h-3" aria-hidden /> Chegou
             </button>
+          )}
+          {/* Crítica 8ª: procedimento·médico na linha do status — cartão de ~85 px caiu pra ~56. */}
+          {!compact && subtitle && (
+            <span className="min-w-0 flex-1 truncate text-xs text-slate-600 dark:text-slate-400" title={item.procedure ?? undefined}>
+              {subtitle}
+            </span>
           )}
           {lateMin !== null && (
             <button

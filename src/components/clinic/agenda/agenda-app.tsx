@@ -365,6 +365,11 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
       : view === "mes"
         ? new Date(`${date}T12:00:00Z`).toLocaleDateString("pt-BR", { month: "long", year: "numeric", timeZone: "UTC" })
         : formatLongDate(date);
+  // Celular: "Terça-feira, 3 de nov…" truncava; forma curta "Ter, 03/11" (crítica 8ª).
+  const shortLabel =
+    view === "dia" || view === "medico"
+      ? new Date(`${date}T12:00:00Z`).toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit", month: "2-digit", timeZone: "UTC" }).replace(".", "").replace(/^./, (c) => c.toUpperCase())
+      : undefined;
 
   const columns: AgendaColumn[] = useMemo(() => {
     if (view === "semana") {
@@ -406,7 +411,7 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
   const emptyPeriod = !!current && allItems.length === 0 && failed.length === 0;
 
   return (
-    <div className="flex flex-col lg:flex-row gap-4 lg:gap-6">
+    <div className="flex flex-col lg:flex-row gap-4 lg:gap-6 px-4 lg:px-0">
       <AgendaSidebar
         date={date}
         onDateChange={setDate}
@@ -420,6 +425,7 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
       <div className="flex-1 min-w-0 space-y-3 pb-20 md:pb-0">
         <AgendaToolbar
           label={label}
+          shortLabel={shortLabel}
           view={view}
           loading={loading}
           onPrev={() => move(-1)}
@@ -469,7 +475,7 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
                   e.currentTarget.blur();
                 }
               }}
-              placeholder="Buscar paciente (nome ou telefone)"
+              placeholder="Buscar paciente"
               className="h-9 w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 pl-8 pr-3 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
             />
           </label>
@@ -658,7 +664,7 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
           <aside
             id="fila-recepcao"
             aria-label="Fila e pendências"
-            className={`space-y-3 xl:sticky xl:top-3 xl:shrink-0 ${pendings.length > 0 || includesToday || bookingCount > 0 ? "xl:w-80" : "hidden"}`}
+            className={`space-y-3 xl:sticky xl:top-3 xl:shrink-0 ${view === "semana" ? "xl:hidden" : ""} ${pendings.length > 0 || includesToday || bookingCount > 0 ? "xl:w-80" : "hidden"}`}
           >
             {includesToday && (
               <ArrivalQueue items={doctorItems} date={today} onSetStatus={handleSetStatus} onOpen={setOpenItem} />

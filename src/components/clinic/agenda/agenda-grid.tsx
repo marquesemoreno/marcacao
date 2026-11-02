@@ -80,7 +80,7 @@ export function AgendaGrid({
   const segments = collapseEmptyRows(rows, occupied, nowRow != null ? new Set([nowRow]) : new Set(), openedGaps);
 
   return (
-    <div ref={scrollRef} className="relative h-[calc(100dvh-13rem)] min-h-[20rem] overflow-auto rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+    <div ref={scrollRef} className="relative h-[calc(100dvh-12rem)] min-h-[14rem] overflow-auto rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
       <div className="grid min-w-fit" style={template}>
         {/* Cabeçalho */}
         <div className="sticky top-0 left-0 z-30 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800" />
@@ -183,11 +183,13 @@ export function AgendaGrid({
                 const col = columns[i];
                 const items = c.cells.get(row) ?? [];
                 const cellKey = `${col.id}|${row}`;
-                const showAll = expanded.has(cellKey);
+                // Crítica 8ª: o "+6 às 07:00" escondia justo o pico. Perto de agora (±1 h) mostra todos.
+                const nearNow = nowRow != null && Math.abs(row - nowRow) <= 4;
+                const showAll = nearNow || expanded.has(cellKey);
                 const shown = showAll ? items : items.slice(0, CELL_LIMIT);
                 const hidden = items.length - shown.length;
                 return (
-                  <div key={col.id} className={`group/cell relative border-t border-l ${line} min-h-8 p-0.5 space-y-0.5`}>
+                  <div key={col.id} className={`group/cell relative border-t border-l ${line} min-h-8 [@media(hover:none)]:min-h-9 p-0.5 space-y-0.5`}>
                     {shown.map((item) => (
                       <AppointmentCard key={item.key} item={item} compact={compact} nowTime={nowTime} onOpen={onOpen} onSetStatus={onSetStatus} onReschedule={onReschedule} />
                     ))}
@@ -220,7 +222,7 @@ export function AgendaGrid({
                         type="button"
                         tabIndex={-1}
                         onClick={() => onSlotClick(col, time)}
-                        className="absolute right-1 top-1 z-10 hidden group-hover/cell:inline-flex [@media(hover:none)]:inline-flex size-6 [@media(hover:none)]:size-9 items-center justify-center rounded-md bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-emerald-700 dark:text-emerald-400 shadow-xs"
+                        className="absolute right-1 top-1 z-10 hidden group-hover/cell:inline-flex [@media(hover:none)]:!hidden size-6 items-center justify-center rounded-md bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-emerald-700 dark:text-emerald-400 shadow-xs"
                         aria-label={`Encaixar paciente às ${time}`}
                         title={`Encaixar às ${time}`}
                       >
