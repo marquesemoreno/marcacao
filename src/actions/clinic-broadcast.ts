@@ -257,14 +257,15 @@ export async function getClinicCampaignStartPreview(campaignId: string) {
 
 /** Devolve as falhas pra fila e deixa a campanha pausada — a recepção confere e clica
  * em Retomar (passa pela confirmação de novo). */
-export async function retryClinicCampaignFailures(campaignId: string) {
+export async function retryClinicCampaignFailures(campaignId: string, resume = false) {
   const { clinicId } = await requireClinicSession();
   await assertClinicOwnsCampaign(campaignId, clinicId);
   const { count } = await prisma.broadcastRecipient.updateMany({
     where: { campaignId, status: "FAILED" },
     data: { status: "PENDING", errorMessage: null },
   });
-  if (count > 0) await prisma.broadcastCampaign.update({ where: { id: campaignId }, data: { status: "PAUSED" } });
+  // "Devolver e retomar" (crítica 02/11): a campanha já passou pela confirmação de início.
+  if (count > 0) await prisma.broadcastCampaign.update({ where: { id: campaignId }, data: { status: resume ? "RUNNING" : "PAUSED" } });
   revalidatePath("/clinic/disparos");
   return { requeued: count };
 }

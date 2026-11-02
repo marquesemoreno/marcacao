@@ -45,6 +45,8 @@ type Campaign = Awaited<ReturnType<typeof listClinicBroadcastCampaigns>>[number]
 type StartPreview = Awaited<ReturnType<typeof getClinicCampaignStartPreview>>;
 type NumberHealthView = Awaited<ReturnType<typeof getClinicNumberHealth>>;
 
+const FOCUS_RING = "focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60 focus-visible:ring-offset-1 dark:focus-visible:ring-offset-slate-950";
+
 const HEALTH_TONE = {
   ok: "border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-200",
   warn: "border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200",
@@ -446,8 +448,16 @@ export function BroadcastManagement() {
   async function retryFailures(c: Campaign) {
     setBusyId(c.id);
     try {
-      const r = await retryClinicCampaignFailures(c.id);
-      toast.success(`${r.requeued} falha(s) de volta à fila. A campanha ficou pausada — clique em Retomar para enviar.`);
+      const r = await retryClinicCampaignFailures(c.id, true);
+      toast.success(`${plural(r.requeued, "falha voltou", "falhas voltaram")} para a fila e a campanha segue enviando no ritmo seguro.`, {
+        action: {
+          label: "Pausar",
+          onClick: async () => {
+            await pauseClinicBroadcastCampaign(c.id).catch(() => toast.error("Não foi possível pausar."));
+            await loadCampaigns(true);
+          },
+        },
+      });
       await loadCampaigns(true);
     } catch {
       toast.error("Não foi possível devolver as falhas à fila.");
@@ -544,7 +554,7 @@ export function BroadcastManagement() {
           <div className="flex flex-wrap-reverse justify-end gap-2">
             {channelSetup?.isManager && (
               <Popover open={configOpen} onOpenChange={setConfigOpen}>
-                <PopoverTrigger className="inline-flex h-9 items-center gap-1.5 px-3 text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg">
+                <PopoverTrigger className={`inline-flex h-9 items-center gap-1.5 px-3 text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg ${FOCUS_RING}`}>
                   <Settings2 className="w-4 h-4" aria-hidden />
                   Configurar
                 </PopoverTrigger>
@@ -584,7 +594,7 @@ export function BroadcastManagement() {
               type="button"
               onClick={() => setRescheduleModalOpen(true)}
               aria-describedby="disparos-remarcacao-hint"
-              className="inline-flex h-9 items-center gap-1.5 px-3 text-sm font-medium text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg"
+              className={`inline-flex h-9 items-center gap-1.5 px-3 text-sm font-medium text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg ${FOCUS_RING}`}
             >
               <CalendarClock className="w-4 h-4" aria-hidden />
               Médico desmarcou
@@ -592,7 +602,7 @@ export function BroadcastManagement() {
             <button
               type="button"
               onClick={() => setFormOpen(true)}
-              className="inline-flex h-9 items-center gap-1.5 px-3 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg"
+              className={`inline-flex h-9 items-center gap-1.5 px-3 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg ${FOCUS_RING}`}
             >
               <Plus className="w-4 h-4" aria-hidden />
               Nova campanha
@@ -601,7 +611,8 @@ export function BroadcastManagement() {
         }
       />
 
-      <p id="disparos-remarcacao-hint" className="-mt-4 text-xs text-slate-500 dark:text-slate-400">
+      {/* Dica para quem está começando; some depois que a clínica já tem algumas campanhas. */}
+      <p id="disparos-remarcacao-hint" className={campaigns.length >= 3 ? "sr-only" : "-mt-4 text-xs text-slate-500 dark:text-slate-400"}>
         <strong className="font-medium text-slate-600 dark:text-slate-300">Médico desmarcou</strong> avisa de uma vez os pacientes agendados com ele no dia.{" "}
         {channelSetup?.isManager
           ? "Mensagens automáticas de pós-consulta, retorno e aniversário ficam em Configurar › Régua automática."
@@ -635,7 +646,7 @@ export function BroadcastManagement() {
               type="button"
               onClick={pauseAll}
               disabled={pausingAll}
-              className="inline-flex h-9 items-center gap-1.5 px-3 text-sm font-semibold rounded-lg border border-red-300 dark:border-red-800 text-red-700 dark:text-red-300 bg-white dark:bg-slate-900 hover:bg-red-50 dark:hover:bg-red-950/40 disabled:opacity-60"
+              className={`inline-flex h-9 items-center gap-1.5 px-3 text-sm font-semibold rounded-lg border border-red-300 dark:border-red-800 text-red-700 dark:text-red-300 bg-white dark:bg-slate-900 hover:bg-red-50 dark:hover:bg-red-950/40 disabled:opacity-60 ${FOCUS_RING}`}
             >
               {pausingAll ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden /> : <Pause className="w-4 h-4" aria-hidden />}
               Pausar todos os envios
@@ -1583,17 +1594,17 @@ function CampaignCard({
           <div className="h-full bg-emerald-500" style={{ width: `${progress}%` }} />
         </div>
         {/* Crítica 02/11: a linha "a · b · c…" de até 8 itens virou células com rótulo. */}
-        <dl className="mt-2 grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+        <dl className={`mt-2 grid grid-cols-2 gap-2 text-xs ${c.noConsent > 0 ? "sm:grid-cols-5" : "sm:grid-cols-4"}`}>
           {(
             [
               { label: "Enviadas", value: `${c.sent} de ${c.total}`, tone: "" },
               { label: "Na fila", value: c.status === "DRAFT" ? "—" : String(c.pending), tone: "" },
               {
-                label: "Puladas",
-                value: String(c.skipped + c.noConsent),
+                label: "Saíram da lista",
+                value: String(c.skipped),
                 tone: "",
-                hint: [c.skipped && `${c.skipped} saíram da lista`, c.noConsent && `${c.noConsent} sem aceite`].filter(Boolean).join(" · "),
               },
+              ...(c.noConsent > 0 ? [{ label: "Sem aceite", value: String(c.noConsent), tone: "" }] : []),
               { label: "Falhas", value: String(c.failed), tone: c.failed > 0 ? "text-red-700 dark:text-red-400" : "" },
             ] as { label: string; value: string; tone: string; hint?: string }[]
           ).map((s) => (
@@ -1643,7 +1654,7 @@ function CampaignCard({
               onClick={onRetry}
               className="mt-2 inline-flex h-8 items-center gap-1.5 px-3 text-xs font-medium rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-50"
             >
-              Tentar de novo as falhas
+              Devolver falhas à fila e retomar
             </button>
           </details>
         )}

@@ -18,11 +18,16 @@ describe("numberHealth", () => {
     expect(h.blocksStart).toBe(true);
   });
 
-  it("queda nos últimos 30 dias pede confirmação extra", () => {
+  it("queda nos últimos 30 dias sozinha só avisa (sem confirmação)", () => {
     const h = numberHealth({ ...base, lastDownAt: new Date("2026-10-20T12:00:00Z") });
     expect(h.tone).toBe("warn");
-    expect(h.needsAck).toBe(true);
+    expect(h.needsAck).toBe(false);
     expect(h.reasons.join(" ")).toContain("20/10");
+  });
+
+  it("queda recente + campanha longa juntas pedem confirmação", () => {
+    const h = numberHealth({ ...base, automatedToday: 0, lastDownAt: new Date("2026-10-20T12:00:00Z"), campaignPending: 60 + 200 });
+    expect(h.needsAck).toBe(true);
   });
 
   it("queda há mais de 30 dias não alerta", () => {

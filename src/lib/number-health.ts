@@ -45,19 +45,25 @@ export function numberHealth(i: NumberHealthInput): NumberHealth {
     return { tone: "danger", reasons: ["O número está desconectado — nada sai até reconectar."], needsAck: false, blocksStart: true };
   }
   if (i.onCloud) return { tone: "ok", reasons: [], needsAck: false, blocksStart: false };
-  const reasons: string[] = [];
+  // Crítica 02/11 (5ª): pedir "Entendo o risco" por qualquer motivo virava clique automático.
+  // Motivos "fortes" (volume, falhas) pedem confirmação sozinhos; os de contexto (queda recente,
+  // campanha longa) só avisam — a não ser que apareçam juntos com outro.
+  const strong: string[] = [];
+  const soft: string[] = [];
   if (i.lastDownAt && i.now.getTime() - i.lastDownAt.getTime() <= RECENT_DOWN_DAYS * 86_400_000) {
-    reasons.push(`O número caiu em ${ddmm(i.lastDownAt)} — números que voltaram há pouco são mais vigiados pelo WhatsApp.`);
+    soft.push(`O número caiu em ${ddmm(i.lastDownAt)} — números que voltaram há pouco são mais vigiados pelo WhatsApp.`);
   }
-  if (i.failedToday >= FAILURES_ALERT) reasons.push(`${i.failedToday} envios automáticos falharam hoje.`);
+  if (i.failedToday >= FAILURES_ALERT) strong.push(`${i.failedToday} envios automáticos falharam hoje.`);
   const pending = i.campaignPending ?? 0;
   const projected = i.automatedToday + Math.min(pending, MARKETING_DAILY_CAP);
-  if (i.automatedToday >= HIGH_VOLUME) reasons.push(`${i.automatedToday} mensagens automáticas já saíram hoje.`);
-  else if (projected >= HIGH_VOLUME) reasons.push(`Com esta campanha, até ${projected} mensagens automáticas hoje — perto do limite seguro.`);
-  if ((i.automated7d ?? 0) >= HIGH_VOLUME_7D) reasons.push(`${i.automated7d} mensagens automáticas nos últimos 7 dias — volume parecido com o dos bloqueios de outubro.`);
+  if (i.automatedToday >= HIGH_VOLUME) strong.push(`${i.automatedToday} mensagens automáticas já saíram hoje.`);
+  else if (projected >= HIGH_VOLUME) strong.push(`Com esta campanha, até ${projected} mensagens automáticas hoje — perto do limite seguro.`);
+  if ((i.automated7d ?? 0) >= HIGH_VOLUME_7D) strong.push(`${i.automated7d} mensagens automáticas nos últimos 7 dias — volume parecido com o dos bloqueios de outubro.`);
   if (pending >= LARGE_CAMPAIGN) {
     const days = Math.ceil(pending / MARKETING_DAILY_CAP);
-    reasons.push(`Esta campanha manda ${pending} mensagens ao longo de pelo menos ${days} dias úteis seguidos.`);
+    soft.push(`Esta campanha manda ${pending} mensagens ao longo de pelo menos ${days} dias úteis seguidos.`);
   }
-  return { tone: reasons.length ? "warn" : "ok", reasons, needsAck: reasons.length > 0, blocksStart: false };
+  const reasons = [...strong, ...soft];
+  const needsAck = strong.length > 0 || soft.length >= 2;
+  return { tone: reasons.length ? "warn" : "ok", reasons, needsAck, blocksStart: false };
 }
