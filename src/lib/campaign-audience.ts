@@ -16,6 +16,8 @@ export type BridgeCampaignPatient = {
   ultimaPassada?: string | null;
   proximaMarcacao?: string | null;
   ultimaAtendida?: string | null;
+  /** Código (MEDICOS.A_MEDICOS) do médico da última marcação passada. */
+  medicoUltima?: string | null;
 };
 
 export type AudienceOptions = {
@@ -31,6 +33,8 @@ export type AudienceOptions = {
    * consulta futura. futurePhones = telefones das marcações futuras (muitas entram sem
    * código de paciente, então o código sozinho não basta). */
   retorno?: { minMonths: number; maxMonths: number; futurePhones: Set<string> };
+  /** Só pacientes cuja última consulta foi com um destes médicos (código do sistema). */
+  doctorIds?: Set<string>;
 };
 
 export type AudienceRecipient = { phone: string; variables: { nome: string; saudacao: string } };
@@ -68,7 +72,11 @@ export function buildCampaignAudience(patients: BridgeCampaignPatient[], options
     sharedPhones: 0,
     excludedRetornoRange: 0,
     excludedHasFuture: 0,
+    excludedDoctor: 0,
   };
+  // Código do médico vem como número (Santa Clara: 4) ou texto com zero ("04") conforme a tabela.
+  const doctorKey = (d: string | number | null | undefined) => String(d ?? "").trim().replace(/^0+(?=\d)/, "");
+  const doctorIds = options.doctorIds?.size ? new Set([...options.doctorIds].map(doctorKey)) : null;
   const futurePhones = new Set<string>();
   for (const raw of options.retorno?.futurePhones ?? []) {
     const f = formatToWhatsAppNumber(raw);
@@ -83,6 +91,10 @@ export function buildCampaignAudience(patients: BridgeCampaignPatient[], options
   for (const patient of patients) {
     if (options.excludedPatientIds?.has(Number(patient.id))) {
       stats.excludedManual++;
+      continue;
+    }
+    if (doctorIds && !doctorIds.has(doctorKey(patient.medicoUltima))) {
+      stats.excludedDoctor++;
       continue;
     }
     if (options.retorno) {

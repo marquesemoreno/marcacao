@@ -124,3 +124,23 @@ describe("buildCampaignAudience — retorno (sem vir há X–Y meses)", () => {
     expect(stats.excludedRetornoRange).toBe(1);
   });
 });
+
+describe("buildCampaignAudience — filtro por médico da última consulta", () => {
+  const base = { optedOutPhones: new Set<string>(), today };
+  it("só entra quem teve a última consulta com o médico escolhido (código sem espaços)", () => {
+    const { recipients, stats } = buildCampaignAudience(
+      [p({ id: 1, telefone: "77991111111", medicoUltima: "01 " }), p({ id: 2, telefone: "77992222222", medicoUltima: "02" }), p({ id: 3, telefone: "77993333333", medicoUltima: null })],
+      { ...base, doctorIds: new Set(["01"]) },
+    );
+    expect(recipients.map((r) => r.phone)).toEqual(["5577991111111"]);
+    expect(stats.excludedDoctor).toBe(2);
+  });
+  it("casa código com e sem zero à esquerda (\"04\" = 4)", () => {
+    const { recipients } = buildCampaignAudience([p({ medicoUltima: "04" })], { ...base, doctorIds: new Set(["4"]) });
+    expect(recipients).toHaveLength(1);
+  });
+  it("sem filtro de médico ninguém sai por isso", () => {
+    const { stats } = buildCampaignAudience([p({ medicoUltima: "02" })], base);
+    expect(stats.excludedDoctor).toBe(0);
+  });
+});

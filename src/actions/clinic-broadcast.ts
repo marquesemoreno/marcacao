@@ -15,7 +15,7 @@ import { technicalDirectorLine, buildBroadcastMessage, type ParsedBroadcastRecip
 import { campaignSituation, estimateCampaignFinish, patientsNeedingCall, startOfBrazilDay, unfilledPlaceholders, unknownTemplateVariables, urgentSendTimes } from "@/lib/broadcast-schedule";
 import { RESCHEDULE_PENDING_TAG } from "@/lib/conversation-tags";
 import { formatDate, getBaseUrl } from "@/lib/format";
-import { fetchBridgeCampaignPatients } from "@/lib/hospital-bridge";
+import { fetchBridgeCampaignPatients, fetchBridgeDoctors } from "@/lib/hospital-bridge";
 import { lastAutomatedSend } from "@/lib/automated-pacing-server";
 import { buildCampaignAudience } from "@/lib/campaign-audience";
 import { missingChannelConfig } from "@/lib/channel-config";
@@ -551,6 +551,8 @@ export type BridgeAudienceFilters = {
   maxAge?: number;
   /** Público "Retorno": quem não vem há entre minMonths e maxMonths meses, sem consulta futura. */
   retorno?: { minMonths: number; maxMonths: number };
+  /** Código do médico (MEDICOS.A_MEDICOS) da última consulta do paciente. */
+  doctorId?: string;
 };
 
 /** Prévia do público tirado direto do sistema da clínica (Firebird via bridge) — sem CSV.
@@ -574,6 +576,9 @@ export async function previewBridgeAudience(filters: BridgeAudienceFilters) {
     sexo: filters.sexo,
     desde: since.toISOString().slice(0, 10),
   });
+  if (filters.doctorId && patients.length > 0 && !patients.some((p) => "medicoUltima" in p)) {
+    throw new Error("O sistema desta clínica está com o bridge antigo — atualize o index.js e reinicie o pm2 para filtrar por médico.");
+  }
   if (retorno && patients.length > 0 && !patients.some((p) => "ultimaPassada" in p)) {
     throw new Error("O sistema desta clínica está com o bridge antigo — atualize o index.js e reinicie o pm2 para usar o público Retorno.");
   }
@@ -589,6 +594,7 @@ export async function previewBridgeAudience(filters: BridgeAudienceFilters) {
     optedOutPhones,
     excludedPatientIds: new Set(clinic.campaignExcludedPatientIds),
     retorno: retorno ? { ...retorno, futurePhones: new Set(futurePhones) } : undefined,
+    doctorIds: filters.doctorId ? new Set([filters.doctorId]) : undefined,
   });
 
   return {
@@ -600,6 +606,13 @@ export async function previewBridgeAudience(filters: BridgeAudienceFilters) {
       phone: `${r.phone.slice(0, 4)} ••••• ${r.phone.slice(-4)}`,
     })),
   };
+}
+
+/** Médicos do sistema da clínica, pro filtro "última consulta com" do público. */
+export async function listBridgeAudienceDoctors() {
+  const { clinicId } = await requireClinicSession();
+  const doctors = await fetchBridgeDoctors(clinicId);
+  return doctors.map((d) => ({ id: String(d.id).trim(), nome: d.nome }));
 }
 
 /** Clínica tem integração com o sistema hospitalar ativa? (mostra a opção na tela) */

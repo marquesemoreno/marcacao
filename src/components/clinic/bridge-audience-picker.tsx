@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Database, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { previewBridgeAudience, type BridgeAudienceFilters } from "@/actions/clinic-broadcast";
+import { listBridgeAudienceDoctors, previewBridgeAudience, type BridgeAudienceFilters } from "@/actions/clinic-broadcast";
 import type { ParsedBroadcastRecipient } from "@/lib/broadcast-csv";
 
 type Preview = Awaited<ReturnType<typeof previewBridgeAudience>>;
@@ -17,6 +17,11 @@ export function BridgeAudiencePicker({ onRecipients }: { onRecipients: (r: Parse
   const [kind, setKind] = useState<"recentes" | "retorno">("recentes");
   const [range, setRange] = useState("6-12");
   const [sexo, setSexo] = useState<"" | "F" | "M">("");
+  const [doctorId, setDoctorId] = useState("");
+  const [doctors, setDoctors] = useState<{ id: string; nome: string }[]>([]);
+  useEffect(() => {
+    listBridgeAudienceDoctors().then(setDoctors).catch(() => setDoctors([]));
+  }, []);
   const [months, setMonths] = useState(12);
   const [minAge, setMinAge] = useState("18");
   const [maxAge, setMaxAge] = useState("");
@@ -33,6 +38,7 @@ export function BridgeAudiencePicker({ onRecipients }: { onRecipients: (r: Parse
       const filters: BridgeAudienceFilters = {
         sexo: sexo || undefined,
         months,
+        doctorId: doctorId || undefined,
         retorno: kind === "retorno" ? { minMonths: Number(range.split("-")[0]), maxMonths: Number(range.split("-")[1]) } : undefined,
         minAge: minAge ? Number(minAge) : undefined,
         maxAge: maxAge ? Number(maxAge) : undefined,
@@ -102,6 +108,17 @@ export function BridgeAudiencePicker({ onRecipients }: { onRecipients: (r: Parse
             </select>
           </label>
         )}
+        {doctors.length > 0 && (
+          <label className="text-xs font-medium text-slate-600 dark:text-slate-400">
+            Última consulta com
+            <select value={doctorId} onChange={(e) => { setDoctorId(e.target.value); invalidate(); }} className={selectClass}>
+              <option value="">Qualquer médico</option>
+              {doctors.map((d) => (
+                <option key={d.id} value={d.id}>{d.nome}</option>
+              ))}
+            </select>
+          </label>
+        )}
         <label className="text-xs font-medium text-slate-600 dark:text-slate-400">
           Idade mínima
           <input type="number" min={0} max={120} value={minAge} onChange={(e) => { setMinAge(e.target.value); invalidate(); }} className={selectClass} />
@@ -138,6 +155,7 @@ export function BridgeAudiencePicker({ onRecipients }: { onRecipients: (r: Parse
             <li>Telefone inválido: <strong>{s.invalidPhone}</strong></li>
             <li>Pediram para não receber mais: <strong>{s.optedOut}</strong></li>
             <li>Número compartilhado (vai sem nome): <strong>{s.sharedPhones}</strong></li>
+            {doctorId && <li>Última consulta com outro médico: <strong>{s.excludedDoctor}</strong></li>}
             {kind === "retorno" && (
               <>
                 <li>Já têm consulta marcada: <strong>{s.excludedHasFuture}</strong></li>
