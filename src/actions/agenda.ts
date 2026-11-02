@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireClinicSession } from "@/lib/session";
+import { agendaTopicFor, notifyAgenda } from "@/lib/realtime-server";
 import { recordAudit } from "@/lib/audit-server";
 import { extractBridgeNumeroFromNotes, fetchBridgeDailyAgendaOrNull } from "@/lib/hospital-bridge";
 import { toggleNinthDigit } from "@/lib/whatsapp";
@@ -189,6 +190,7 @@ export async function setAgendaStatus(input: {
   if (input.status === "AUTO") {
     await prisma.agendaMark.deleteMany({ where: { clinicId, source: input.source, externalId: input.externalId } });
     await audit(null);
+    await notifyAgenda(clinicId);
     revalidatePath("/clinic/agenda");
     return { success: true };
   }
@@ -202,8 +204,15 @@ export async function setAgendaStatus(input: {
     create: { clinicId, source: input.source, externalId: input.externalId, date, status: input.status, updatedByUserId: userId, phone: input.phone ?? null, ...(updatedAt ? { updatedAt } : {}) },
   });
   await audit(input.status);
+  await notifyAgenda(clinicId);
   revalidatePath("/clinic/agenda");
   return { success: true };
+}
+
+/** Tópico do aviso "a Agenda mudou" desta clínica (Realtime). */
+export async function getAgendaRealtimeTopic(): Promise<string | null> {
+  const { clinicId } = await requireClinicSession();
+  return agendaTopicFor(clinicId);
 }
 
 /** Painel lateral do paciente na Agenda: conversa no Chat (pra abrir a ficha e o

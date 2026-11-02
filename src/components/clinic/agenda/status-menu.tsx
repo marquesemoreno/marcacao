@@ -6,10 +6,10 @@ import type { AgendaItem, AgendaStatusChoice, ManualAgendaStatus } from "@/lib/a
 import { AGENDA_STATUS_META, todayInBahia } from "@/lib/agenda-ui";
 import { StatusIcon } from "./status-icon";
 
-const POSITIVE: ManualAgendaStatus[] = ["CONFIRMED", "IN_SERVICE", "COMPLETED"];
+const POSITIVE: ManualAgendaStatus[] = ["CONFIRMED", "IN_SERVICE", "IN_ROOM", "COMPLETED"];
 const NEGATIVE: ManualAgendaStatus[] = ["NO_SHOW", "CANCELLED"];
 /** Só fazem sentido no dia (ou depois): ninguém chega, é atendido ou falta amanhã. */
-const SAME_DAY_ONLY: ManualAgendaStatus[] = ["IN_SERVICE", "COMPLETED", "NO_SHOW"];
+const SAME_DAY_ONLY: ManualAgendaStatus[] = ["IN_SERVICE", "IN_ROOM", "COMPLETED", "NO_SHOW"];
 
 const itemClass =
   "w-full flex items-center justify-between gap-2 rounded-md px-2 h-8 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50 disabled:opacity-40 disabled:hover:bg-transparent";

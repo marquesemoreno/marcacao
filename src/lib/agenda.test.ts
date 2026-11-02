@@ -113,7 +113,7 @@ describe("daySummary", () => {
       item({ status: "NO_SHOW" }),
       item({ status: "CANCELLED" }),
     ]);
-    expect(s).toEqual({ total: 7, confirmado: 1, aguardando: 2, remarcar: 1, presente: 1, atendido: 0, falta: 2 });
+    expect(s).toEqual({ total: 7, confirmado: 1, aguardando: 2, remarcar: 1, presente: 1, atendimento: 0, atendido: 0, falta: 2 });
   });
 });
 
@@ -240,5 +240,18 @@ describe("overdueMinutes", () => {
     expect(overdueMinutes(item({ ...base, date: "2026-11-01" }), "2026-11-02", "08:40")).toBeNull();
     expect(overdueMinutes(item({ ...base, status: "IN_SERVICE" }), "2026-11-02", "08:40")).toBeNull();
     expect(overdueMinutes(item({ ...base, time: null }), "2026-11-02", "08:40")).toBeNull();
+  });
+});
+
+describe("IN_ROOM (em atendimento)", () => {
+  it("é status manual e conta no resumo como em atendimento", () => {
+    expect(resolveAgendaStatus({ manual: "IN_ROOM", reminderResponse: "CONFIRMED" })).toBe("IN_ROOM");
+    const s = daySummary([item({ status: "IN_ROOM" }), item({ status: "IN_SERVICE" })]);
+    expect(s.atendimento).toBe(1);
+    expect(s.presente).toBe(1);
+  });
+  it("sai da fila de chegada (fila = só quem aguarda)", () => {
+    const q = arrivalQueue([item({ key: "x", date: "2026-10-21", status: "IN_ROOM", arrivedAt: "2026-10-21T12:00:00Z" })], "2026-10-21");
+    expect(q).toEqual([]);
   });
 });

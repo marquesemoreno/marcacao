@@ -26,6 +26,7 @@ export function AgendaToolbar({
   onRefresh,
   onWaitlist,
   waitlistCount,
+  live = false,
 }: {
   label: string;
   view: AgendaView;
@@ -38,6 +39,8 @@ export function AgendaToolbar({
   onWaitlist: () => void;
   /** Pacientes aguardando vaga; null enquanto não carregou. */
   waitlistCount: number | null;
+  /** Recebendo avisos em tempo real (Realtime conectado). */
+  live?: boolean;
 }) {
   const navBtn = `inline-flex items-center justify-center h-9 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 ${focusRing}`;
   return (
@@ -64,6 +67,11 @@ export function AgendaToolbar({
         >
           {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
         </button>
+        {live && (
+          <span className="hidden sm:inline-flex items-center gap-1.5 text-xs font-medium text-emerald-700 dark:text-emerald-400" title="Mudanças de outras telas e o “Cheguei” do paciente aparecem na hora">
+            <span className="size-2 rounded-full bg-emerald-500" aria-hidden /> Ao vivo
+          </span>
+        )}
       </div>
       <button
         type="button"

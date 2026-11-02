@@ -7,13 +7,14 @@ export type AgendaStatus =
   | "SENT" // lembrete enviado, aguardando resposta
   | "CONFIRMED"
   | "RESCHEDULE" // paciente pediu outra data
-  | "IN_SERVICE" // presente / em atendimento (marcado pela recepção)
+  | "IN_SERVICE" // chegou, aguardando na recepção
+  | "IN_ROOM" // chamado — em atendimento com o médico
   | "COMPLETED"
   | "CANCELLED"
   | "NO_SHOW";
 
 /** Status que a recepção pode marcar à mão (gravados em AgendaMark). */
-export const MANUAL_AGENDA_STATUSES = ["CONFIRMED", "IN_SERVICE", "COMPLETED", "NO_SHOW", "CANCELLED"] as const;
+export const MANUAL_AGENDA_STATUSES = ["CONFIRMED", "IN_SERVICE", "IN_ROOM", "COMPLETED", "NO_SHOW", "CANCELLED"] as const;
 export type ManualAgendaStatus = (typeof MANUAL_AGENDA_STATUSES)[number];
 
 export type AgendaItem = {
@@ -131,6 +132,7 @@ export type DaySummary = {
   confirmado: number;
   aguardando: number;
   remarcar: number;
+  atendimento: number;
   presente: number;
   atendido: number;
   falta: number;
@@ -139,12 +141,13 @@ export type DaySummary = {
 /** Contagem do dia pra faixa de resumo da Agenda. "Quer remarcar" fica separado de
  * "aguardando" porque é o único status que pede ação da recepção. */
 export function daySummary(items: AgendaItem[]): DaySummary {
-  const s: DaySummary = { total: items.length, confirmado: 0, aguardando: 0, remarcar: 0, presente: 0, atendido: 0, falta: 0 };
+  const s: DaySummary = { total: items.length, confirmado: 0, aguardando: 0, remarcar: 0, presente: 0, atendimento: 0, atendido: 0, falta: 0 };
   for (const i of items) {
     if (i.status === "CONFIRMED") s.confirmado++;
     else if (i.status === "PENDING" || i.status === "SENT") s.aguardando++;
     else if (i.status === "RESCHEDULE") s.remarcar++;
     else if (i.status === "IN_SERVICE") s.presente++;
+    else if (i.status === "IN_ROOM") s.atendimento++;
     else if (i.status === "COMPLETED") s.atendido++;
     else s.falta++;
   }

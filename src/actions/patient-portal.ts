@@ -9,6 +9,7 @@ import { checkinWindow } from "@/lib/patient-journey";
 import { encryptFormAnswers, ensureConsentTerm, getActiveFormTemplate, hashIp } from "@/lib/patient-form-server";
 import { fetchBridgeDailyAgendaOrNull } from "@/lib/hospital-bridge";
 import { greetingFirstName } from "@/lib/format";
+import { notifyAgenda } from "@/lib/realtime-server";
 
 /** Página do paciente /p/[token] (sem login): ficha prévia + "Cheguei". O token É a
  * credencial — tudo aqui parte dele, nunca de ids vindos do navegador. */
@@ -57,7 +58,7 @@ export async function loadPatientPortal(raw: string) {
     form: template && !response ? { questions: template.body.questions } : null,
     formDoneAt: response?.submittedAt.toISOString() ?? null,
     term: { id: term.id, title: term.title, body: term.body.replaceAll("{{clinica}}", clinicName) },
-    checkedIn: mark?.status === "IN_SERVICE" || mark?.status === "COMPLETED",
+    checkedIn: ["IN_SERVICE", "IN_ROOM", "COMPLETED"].includes(mark?.status ?? ""),
     checkin: visit ? checkinWindow(visit.date, visit.time) : ("CLOSED" as const),
   };
 }
@@ -112,6 +113,7 @@ export async function submitPatientForm(
     console.error("[ficha] falha ao gravar", e);
     return { ok: false, error: "Não conseguimos salvar agora. Tente de novo em instantes." };
   }
+  await notifyAgenda(token.clinicId); // selo "ficha enviada" aparece na hora
   return { ok: true };
 }
 
@@ -150,5 +152,6 @@ export async function patientCheckIn(raw: string): Promise<{ ok: true } | { ok: 
     before: before ? { status: before.status } : null,
     after: { status: "IN_SERVICE" },
   });
+  await notifyAgenda(token.clinicId);
   return { ok: true };
 }

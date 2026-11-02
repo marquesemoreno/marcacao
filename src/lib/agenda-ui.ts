@@ -34,6 +34,12 @@ export const AGENDA_STATUS_META: Record<AgendaStatus, { label: string; badge: st
     tint: "bg-sky-50/80 dark:bg-sky-950/30",
     dot: "bg-sky-500",
   },
+  IN_ROOM: {
+    label: "Em atendimento",
+    badge: "bg-indigo-100 text-indigo-800 border-indigo-300 dark:bg-indigo-950/60 dark:text-indigo-300 dark:border-indigo-800",
+    tint: "bg-indigo-50/70 dark:bg-indigo-950/25",
+    dot: "bg-indigo-500",
+  },
   COMPLETED: {
     label: "Atendido",
     badge: "bg-slate-100 text-slate-700 border-slate-300 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700",
@@ -56,11 +62,12 @@ export const AGENDA_STATUS_META: Record<AgendaStatus, { label: string; badge: st
 };
 
 /** Grupos do filtro de status e da faixa de resumo (ids batem com daySummary). */
-export const AGENDA_STATUS_GROUPS: { id: "confirmado" | "aguardando" | "remarcar" | "presente" | "atendido" | "falta"; label: string; statuses: AgendaStatus[]; dot: string }[] = [
+export const AGENDA_STATUS_GROUPS: { id: "confirmado" | "aguardando" | "remarcar" | "presente" | "atendimento" | "atendido" | "falta"; label: string; statuses: AgendaStatus[]; dot: string }[] = [
   { id: "aguardando", label: "Aguardando", statuses: ["PENDING", "SENT"], dot: "bg-amber-400" },
   { id: "remarcar", label: "Quer remarcar", statuses: ["RESCHEDULE"], dot: "bg-violet-500" },
   { id: "confirmado", label: "Confirmado", statuses: ["CONFIRMED"], dot: "bg-emerald-500" },
   { id: "presente", label: "Chegou", statuses: ["IN_SERVICE"], dot: "bg-sky-500" },
+  { id: "atendimento", label: "Em atendimento", statuses: ["IN_ROOM"], dot: "bg-indigo-500" },
   { id: "atendido", label: "Atendido", statuses: ["COMPLETED"], dot: "bg-slate-400" },
   { id: "falta", label: "Faltou / cancelado", statuses: ["CANCELLED", "NO_SHOW"], dot: "bg-gradient-to-r from-rose-500 from-50% to-slate-700 to-50%" },
 ];

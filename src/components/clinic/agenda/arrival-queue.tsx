@@ -1,31 +1,32 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Check, Clock, Loader2, UserRound } from "lucide-react";
+import { Check, ClipboardCheck, Clock, Loader2, Stethoscope, UserRound } from "lucide-react";
 import { arrivalQueue, type AgendaItem } from "@/lib/agenda";
 import { toTitleCase } from "@/lib/agenda-ui";
 
-/** Fila de chegada (Agenda, só no dia de hoje): quem a recepção marcou "Chegou", em ordem
- * de chegada, com o tempo de espera e a posição na fila do médico. "Atendido" tira da fila. */
+/** Torre da recepção (Agenda, dia de hoje): "Aguardando" = quem chegou (pela recepção ou
+ * pelo "Cheguei" do celular), em ordem de chegada por médico; "Chamar" passa pra "Em
+ * atendimento"; "Atendido" encerra. Fase 3 da jornada do paciente (02/11/2026). */
 export function ArrivalQueue({
   items,
   date,
-  onDone,
+  onSetStatus,
   onOpen,
 }: {
   items: AgendaItem[];
   date: string;
-  onDone: (item: AgendaItem) => Promise<unknown>;
+  onSetStatus: (item: AgendaItem, status: "IN_ROOM" | "COMPLETED") => Promise<unknown>;
   onOpen: (item: AgendaItem) => void;
 }) {
   const [now, setNow] = useState(() => new Date());
   // Crítica 02/11: "Atendido" sem estado de envio — toque duplo no balcão disparava duas vezes.
   const [saving, setSaving] = useState<Set<string>>(() => new Set());
-  const done = async (item: AgendaItem) => {
+  const act = async (item: AgendaItem, status: "IN_ROOM" | "COMPLETED") => {
     if (saving.has(item.key)) return;
     setSaving((s) => new Set(s).add(item.key));
     try {
-      await onDone(item);
+      await onSetStatus(item, status);
     } catch {
       // o toast de erro já sai em handleSetStatus
     } finally {
@@ -41,21 +42,28 @@ export function ArrivalQueue({
     return () => clearInterval(t);
   }, []);
   const queue = arrivalQueue(items, date, now);
-  if (queue.length === 0) return null;
+  const inRoom = items.filter((i) => i.date === date && i.status === "IN_ROOM");
+  if (queue.length === 0 && inRoom.length === 0) return null;
   const fmt = new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" });
 
   return (
     <section aria-labelledby="fila-chegada" className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
       <h2 id="fila-chegada" className="flex items-center gap-2 border-b border-slate-100 dark:border-slate-800 px-4 py-2.5 text-sm font-semibold">
         <UserRound className="h-4 w-4 text-sky-600" aria-hidden />
-        Fila de chegada
-        <span className="text-xs font-normal text-slate-500 tabular-nums">{queue.length} {queue.length === 1 ? "chegou e aguarda" : "chegaram e aguardam"}</span>
+        Recepção agora
+        <span className="text-xs font-normal text-slate-500 tabular-nums">
+          {queue.length} aguardando · {inRoom.length} em atendimento
+        </span>
       </h2>
+      {queue.length > 0 && <h3 className="px-4 pt-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Aguardando</h3>}
       <ol className="divide-y divide-slate-100 dark:divide-slate-800">
         {queue.map(({ item, position, waitingMin, lateMin }) => (
           <li key={item.key} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2 text-sm">
             <button type="button" onClick={() => onOpen(item)} className="min-w-0 flex-1 rounded text-left hover:underline underline-offset-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50">
               <span className="font-medium">{toTitleCase(item.patientName || "Paciente")}</span>
+              {item.formDone && (
+                <ClipboardCheck className="ml-1 inline h-3.5 w-3.5 text-emerald-700 dark:text-emerald-400" role="img" aria-label="Ficha prévia enviada" />
+              )}
               <span className="block text-xs text-slate-500 dark:text-slate-400">
                 {item.doctor ? toTitleCase(item.doctor) : "Sem médico"} · {position}º da fila · chegou {fmt.format(new Date(item.arrivedAt!))}
                 {item.time ? ` · marcado ${item.time}` : " · ordem de chegada"}
@@ -80,16 +88,40 @@ export function ArrivalQueue({
             })()}
             <button
               type="button"
-              onClick={() => void done(item)}
+              onClick={() => void act(item, "IN_ROOM")}
               disabled={saving.has(item.key)}
               aria-busy={saving.has(item.key)}
-              className="inline-flex h-9 disabled:opacity-60 items-center gap-1 rounded-md border border-emerald-300 dark:border-emerald-700 px-2.5 text-xs font-semibold text-emerald-800 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/40"
+              className="inline-flex h-9 disabled:opacity-60 items-center gap-1 rounded-md bg-indigo-600 px-2.5 text-xs font-semibold text-white hover:bg-indigo-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
             >
-              {saving.has(item.key) ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> : <Check className="h-3.5 w-3.5" aria-hidden />} Atendido
+              {saving.has(item.key) ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> : <Stethoscope className="h-3.5 w-3.5" aria-hidden />} Chamar
             </button>
           </li>
         ))}
       </ol>
+      {inRoom.length > 0 && (
+        <>
+          <h3 className="border-t border-slate-100 dark:border-slate-800 px-4 pt-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Em atendimento</h3>
+          <ul className="divide-y divide-slate-100 dark:divide-slate-800">
+            {inRoom.map((item) => (
+              <li key={item.key} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2 text-sm">
+                <button type="button" onClick={() => onOpen(item)} className="min-w-0 flex-1 rounded text-left hover:underline underline-offset-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50">
+                  <span className="font-medium">{toTitleCase(item.patientName || "Paciente")}</span>
+                  <span className="block text-xs text-slate-500 dark:text-slate-400">{item.doctor ? toTitleCase(item.doctor) : "Sem médico"}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void act(item, "COMPLETED")}
+                  disabled={saving.has(item.key)}
+                  aria-busy={saving.has(item.key)}
+                  className="inline-flex h-9 disabled:opacity-60 items-center gap-1 rounded-md border border-emerald-300 dark:border-emerald-700 px-2.5 text-xs font-semibold text-emerald-800 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
+                >
+                  {saving.has(item.key) ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> : <Check className="h-3.5 w-3.5" aria-hidden />} Atendido
+                </button>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
     </section>
   );
 }

@@ -1,4 +1,4 @@
-import { CalendarClock, CheckCheck, CircleCheck, CircleDashed, Send, UserCheck, UserX, XCircle, type LucideIcon } from "lucide-react";
+import { CalendarClock, CheckCheck, Stethoscope, CircleCheck, CircleDashed, Send, UserCheck, UserX, XCircle, type LucideIcon } from "lucide-react";
 import type { AgendaStatus } from "@/lib/agenda";
 
 const ICONS: Record<AgendaStatus, LucideIcon> = {
@@ -7,6 +7,7 @@ const ICONS: Record<AgendaStatus, LucideIcon> = {
   SENT: Send,
   RESCHEDULE: CalendarClock,
   IN_SERVICE: UserCheck,
+  IN_ROOM: Stethoscope,
   COMPLETED: CheckCheck,
   CANCELLED: XCircle,
   NO_SHOW: UserX,
@@ -18,6 +19,7 @@ const COLORS: Record<AgendaStatus, string> = {
   SENT: "text-amber-500 dark:text-amber-400",
   RESCHEDULE: "text-violet-600 dark:text-violet-400",
   IN_SERVICE: "text-sky-600 dark:text-sky-400",
+  IN_ROOM: "text-indigo-600 dark:text-indigo-400",
   COMPLETED: "text-slate-500 dark:text-slate-400",
   CANCELLED: "text-slate-400 dark:text-slate-500",
   NO_SHOW: "text-rose-600 dark:text-rose-400",

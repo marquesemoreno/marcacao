@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { useAgendaRealtime } from "@/hooks/use-agenda-realtime";
 import { AlertTriangle, CalendarX2, Keyboard, RefreshCw, Search, X } from "lucide-react";
 import { getAgenda, setAgendaStatus, type AgendaResult } from "@/actions/agenda";
 import { getSlotCandidates, listWaitlist } from "@/actions/waitlist";
@@ -209,6 +210,10 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
   const summary = useMemo(() => daySummary(doctorItems), [doctorItems]);
 
   const reload = useCallback(() => setReloadKey((k) => k + 1), []);
+  // Ao vivo: outra tela ou o "Cheguei" do paciente avisa e recarrega (sem esperar 90 s).
+  const live = useAgendaRealtime(() => {
+    if (!document.querySelector("[data-status-menu]")) reload();
+  });
 
   // Respostas ao lembrete mudam o status ao longo da manhã: recarrega sozinho a cada 90 s
   // (sem esqueleto — mesmo período), só com a aba visível e nada aberto por cima.
@@ -418,6 +423,7 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
           onToday={() => setDate(today)}
           onView={setView}
           onRefresh={reload}
+          live={live}
           onWaitlist={() => {
             setWaitlistSlot(null);
             setWaitlistOpen(true);
@@ -632,7 +638,7 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
           {(pendings.length > 0 || includesToday) && (
             <aside aria-label="Fila e pendências" className="space-y-3 xl:sticky xl:top-3 xl:w-80 xl:shrink-0">
               {includesToday && (
-                <ArrivalQueue items={doctorItems} date={today} onDone={(item) => handleSetStatus(item, "COMPLETED")} onOpen={setOpenItem} />
+                <ArrivalQueue items={doctorItems} date={today} onSetStatus={handleSetStatus} onOpen={setOpenItem} />
               )}
               <SystemPendings items={pendings} onOpen={setOpenItem} />
             </aside>

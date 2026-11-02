@@ -64,7 +64,7 @@ export async function getMarcadoresReport(from: string, to: string): Promise<{ r
           select: { phone: true, sentAt: true },
         }),
         prisma.agendaMark.findMany({
-          where: { clinicId, status: { in: ["IN_SERVICE", "COMPLETED"] }, OR: tails.map((t) => ({ phone: { endsWith: t } })) },
+          where: { clinicId, status: { in: ["IN_SERVICE", "IN_ROOM", "COMPLETED"] }, OR: tails.map((t) => ({ phone: { endsWith: t } })) },
           select: { phone: true, date: true },
         }),
       ])
