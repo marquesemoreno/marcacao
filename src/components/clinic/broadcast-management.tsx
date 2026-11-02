@@ -32,7 +32,7 @@ import { BridgeAudiencePicker } from "@/components/clinic/bridge-audience-picker
 import { listMarcadoresAudience } from "@/actions/marcadores";
 import { SELECTION_BROADCAST_KEY } from "@/components/clinic/patient-list-table";
 import { buildBroadcastMessage, parseBroadcastCsv, BROADCAST_OPT_OUT_FOOTER, type ParsedBroadcastRecipient } from "@/lib/broadcast-csv";
-import { estimateCampaignFinish, unfilledPlaceholders, unknownTemplateVariables } from "@/lib/broadcast-schedule";
+import { estimateCampaignFinish, MARKETING_DAILY_CAP, unfilledPlaceholders, unknownTemplateVariables } from "@/lib/broadcast-schedule";
 import { smsCostRange } from "@/lib/broadcast-channel";
 import { RescheduleBroadcastModal } from "@/components/clinic/reschedule-broadcast-modal";
 import { BroadcastPreview } from "@/components/clinic/broadcast-preview";
@@ -54,7 +54,7 @@ function healthLabel(h: NumberHealthView): string {
   if (h.connection === "down") return "Número desconectado";
   if (h.onCloud) return "API oficial ativa";
   const conn = h.connection === "open" ? "Número conectado" : "Conexão não verificada";
-  return `${conn} · ${h.automatedToday} automáticas hoje`;
+  return `${conn} · ${h.automatedToday} mensagens automáticas hoje, ${h.automated7d} na semana`;
 }
 type Source = "csv" | "bridge" | "selecao" | "marcadores";
 type FormChannel = "WHATSAPP" | "SMS" | "EMAIL";
@@ -360,6 +360,7 @@ export function BroadcastManagement() {
             connection: "unknown",
             onCloud: false,
             automatedToday: 0,
+            automated7d: 0,
           }),
         );
     } catch {
@@ -570,7 +571,7 @@ export function BroadcastManagement() {
             <button
               type="button"
               onClick={() => setRescheduleModalOpen(true)}
-              title="Médico desmarcou um dia: avisa todos os pacientes agendados com ele"
+              aria-describedby="disparos-remarcacao-hint"
               className="inline-flex h-9 items-center gap-1.5 px-3 text-sm font-medium text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg"
             >
               <CalendarClock className="w-4 h-4" aria-hidden />
@@ -587,6 +588,13 @@ export function BroadcastManagement() {
           </div>
         }
       />
+
+      <p id="disparos-remarcacao-hint" className="-mt-4 text-xs text-slate-500 dark:text-slate-400">
+        <strong className="font-medium text-slate-600 dark:text-slate-300">Médico desmarcou</strong> avisa de uma vez os pacientes agendados com ele no dia.{" "}
+        {channelSetup?.isManager
+          ? "Mensagens automáticas de pós-consulta, retorno e aniversário ficam em Configurar › Régua automática."
+          : "Mensagens automáticas de pós-consulta e aniversário são ligadas pela gestão."}
+      </p>
 
       {(health || running.length > 0) && (
         <div className="flex flex-wrap items-center justify-between gap-2 -mt-2">
@@ -1058,7 +1066,7 @@ export function BroadcastManagement() {
                 : !hasMessage
                   ? cloudMode ? "Falta escolher o modelo." : "Falta escrever a mensagem."
                   : formEstimate
-                ? `${plural(recipients.length, "destinatário", "destinatários")} · envio seguro: 1 a cada 4–6 min, seg–sex 9h–17h, até 100/dia — ${estimateText(formEstimate.businessDays, formEstimate.finishIso)} se começar agora.`
+                ? `${plural(recipients.length, "destinatário", "destinatários")} · envio seguro: 1 a cada 4–6 min, seg–sex 9h–17h, até ${MARKETING_DAILY_CAP}/dia — ${estimateText(formEstimate.businessDays, formEstimate.finishIso)} se começar agora.`
                 : "Escolha o público para ver a previsão de envio."}
             </p>
             {formStep === 1 ? (
@@ -1211,10 +1219,28 @@ export function BroadcastManagement() {
                       </ul>
                     )}
                     {startHealth.needsAck && (
-                      <label className="flex items-start gap-2 font-medium">
-                        <input type="checkbox" checked={riskAck} onChange={(e) => setRiskAck(e.target.checked)} className="mt-0.5 h-4 w-4 accent-amber-600" />
-                        Entendo o risco e quero iniciar mesmo assim
-                      </label>
+                      <>
+                        <p>
+                          Se o WhatsApp bloquear o número, <strong>os lembretes de confirmação e o Chat param</strong> até ele voltar — em outubro isso levou dias.
+                        </p>
+                        {!confirming.preview.lowPriority && (
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              const c = confirming.campaign;
+                              await toggleLowPriority(c);
+                              setConfirming({ campaign: c, preview: { ...confirming.preview!, lowPriority: true } });
+                            }}
+                            className="font-semibold underline underline-offset-2"
+                          >
+                            Mais seguro: mudar para baixa prioridade (cede a vez aos lembretes)
+                          </button>
+                        )}
+                        <label className="flex items-start gap-2 font-medium">
+                          <input type="checkbox" checked={riskAck} onChange={(e) => setRiskAck(e.target.checked)} className="mt-0.5 h-4 w-4 accent-amber-600" />
+                          Entendo que o número pode ser bloqueado e quero iniciar mesmo assim
+                        </label>
+                      </>
                     )}
                   </div>
                 ))}
@@ -1222,7 +1248,7 @@ export function BroadcastManagement() {
                 <div className="space-y-2">
                   <p className="text-sm text-slate-700 dark:text-slate-200">
                     Aviso de remarcação para <strong>{plural(confirming.preview.pending, "paciente", "pacientes")}</strong>: 1 a cada 4–6 min, das 8h às 18h,
-                    todo dia (por ser urgente, usa uma janela maior que a das campanhas, 9h–17h em dias úteis)
+                    todo dia (por ser urgente, usa uma janela maior que a das campanhas)
                     {confirming.preview.urgentLastAt
                       ? ` — o último recebe por volta de ${new Date(confirming.preview.urgentLastAt).toLocaleString("pt-BR", { weekday: "short", hour: "2-digit", minute: "2-digit", timeZone: "America/Bahia" })}`
                       : ""}
@@ -1258,15 +1284,23 @@ export function BroadcastManagement() {
                   </p>
                 </div>
               ) : (
-              <p className="text-sm text-slate-700 dark:text-slate-200">
-                Vai para <strong>{plural(confirming.preview.pending, "pessoa", "pessoas")}</strong>, uma a cada 4–6 min, de segunda a sexta das 9h às 17h, até 100 por dia —{" "}
-                {estimateText(confirming.preview.businessDays, confirming.preview.finishIso)}.
-                {confirming.preview.lowPriority
-                  ? " Como é de baixa prioridade, espera os lembretes e outras campanhas e pode demorar mais."
-                  : confirming.preview.remindersOn
-                    ? " Os lembretes de confirmação têm a vez nas manhãs, então pode terminar um pouco depois."
-                    : ""}
-              </p>
+              <div className="text-sm text-slate-700 dark:text-slate-200">
+                <p>
+                  <strong>{plural(confirming.preview.pending, "pessoa", "pessoas")}</strong> · {estimateText(confirming.preview.businessDays, confirming.preview.finishIso)}
+                  {confirming.preview.lowPriority ? " · baixa prioridade" : ""}
+                </p>
+                <details className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                  <summary className="cursor-pointer">Como é o ritmo</summary>
+                  <p className="mt-1">
+                    Uma mensagem a cada 4–6 min, de segunda a sexta das 9h às 17h, até {MARKETING_DAILY_CAP} por dia.
+                    {confirming.preview.lowPriority
+                      ? " Baixa prioridade espera os lembretes e outras campanhas, então pode demorar mais."
+                      : confirming.preview.remindersOn
+                        ? " Os lembretes de confirmação têm a vez nas manhãs, então pode terminar um pouco depois."
+                        : ""}
+                  </p>
+                </details>
+              </div>
               )}
               <BroadcastPreview tall label={`Como chega para o 1º destinatário${confirming.preview.samplePhone ? ` (${confirming.preview.samplePhone})` : ""}:`}>
                   {confirming.preview.hasImage && (

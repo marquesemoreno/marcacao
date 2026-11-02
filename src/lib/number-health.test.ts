@@ -37,7 +37,14 @@ describe("numberHealth", () => {
   it("conta a própria campanha: dia calmo + campanha grande também alerta", () => {
     const h = numberHealth({ ...base, automatedToday: 5, campaignPending: 600 });
     expect(h.needsAck).toBe(true);
-    expect(h.reasons.join(" ")).toContain("~85");
+    expect(h.reasons.join(" ")).toContain("até 105");
+    expect(h.reasons.join(" ")).toContain("pelo menos 6 dias úteis");
+  });
+
+  it("dia calmo mas semana pesada alerta", () => {
+    const h = numberHealth({ ...base, automatedToday: 5, automated7d: 300 });
+    expect(h.needsAck).toBe(true);
+    expect(h.reasons.join(" ")).toContain("7 dias");
   });
 
   it("campanha pequena num dia calmo segue ok", () => {

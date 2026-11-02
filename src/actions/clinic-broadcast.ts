@@ -467,7 +467,8 @@ export async function getClinicNumberHealth(campaignPending?: number) {
   const { clinicId } = await requireClinicSession();
   const now = new Date();
   const dayStart = startOfBrazilDay(now);
-  const [connection, cloud, downLogs, campaignToday, remindersToday, failedToday] = await Promise.all([
+  const weekStart = new Date(now.getTime() - 7 * 86_400_000);
+  const [connection, cloud, downLogs, campaignToday, remindersToday, failedToday, campaign7d, reminders7d] = await Promise.all([
     getWhatsappChannelStatus(),
     prisma.whatsappCloudAccount.findFirst({ where: { clinicId, active: true }, select: { id: true } }),
     // Estado gravado pelo cron health-check só quando muda (event "health.state").
@@ -482,6 +483,8 @@ export async function getClinicNumberHealth(campaignPending?: number) {
     prisma.message.count({
       where: { status: "FAILED", direction: "OUTBOUND", senderUserId: null, sentFromDevice: false, createdAt: { gte: dayStart }, conversation: { clinicId } },
     }),
+    prisma.broadcastRecipient.count({ where: { status: "SENT", sentAt: { gte: weekStart }, campaign: { clinicId, channel: "WHATSAPP" } } }),
+    prisma.bridgeReminderLog.count({ where: { clinicId, sentAt: { gte: weekStart } } }),
   ]);
   const lastDown = downLogs.find((l) => (l.payload as { key?: string } | null)?.key === `whatsapp:${clinicId}`);
   const input = {
@@ -489,11 +492,12 @@ export async function getClinicNumberHealth(campaignPending?: number) {
     onCloud: Boolean(cloud),
     lastDownAt: lastDown?.createdAt ?? null,
     automatedToday: campaignToday + remindersToday,
+    automated7d: campaign7d + reminders7d,
     failedToday,
     campaignPending,
     now,
   };
-  return { ...numberHealth(input), connection, onCloud: input.onCloud, automatedToday: input.automatedToday };
+  return { ...numberHealth(input), connection, onCloud: input.onCloud, automatedToday: input.automatedToday, automated7d: input.automated7d };
 }
 
 /** Aviso de remarcação em massa — médico desmarcou a agenda de um dia, avisa todos os
