@@ -9,7 +9,7 @@ const { prismaMock, session, channelConfig, sendTestMock } = vi.hoisted(() => ({
     clinic: { findUnique: vi.fn() },
     webhookLog: { count: vi.fn(), create: vi.fn() },
   },
-  session: { requireClinicSession: vi.fn(), requireClinicManager: vi.fn(), isClinicManager: vi.fn() },
+  session: { requireClinicSession: vi.fn(), requireClinicManager: vi.fn(), requireClinicPermission: vi.fn(), isClinicManager: vi.fn() },
 }));
 vi.mock("@/lib/prisma", () => ({ prisma: prismaMock }));
 vi.mock("@/lib/session", () => session);
@@ -23,6 +23,7 @@ import { createClinicChannelCampaign, registerChannelConsents, sendClinicChannel
 beforeEach(() => {
   vi.clearAllMocks();
   session.requireClinicSession.mockResolvedValue({ clinicId: "clinic1", userId: "user1" });
+  session.requireClinicPermission.mockImplementation(() => session.requireClinicSession());
   session.requireClinicManager.mockResolvedValue({ clinicId: "clinic1", userId: "user1" });
   prismaMock.channelConsent.findMany.mockResolvedValue([]);
   prismaMock.broadcastCampaign.create.mockResolvedValue({ id: "camp1" });
@@ -159,9 +160,9 @@ describe("registerChannelConsents", () => {
     expect(prismaMock.channelConsent.createMany).not.toHaveBeenCalled();
   });
 
-  it("só gestão registra (usa requireClinicManager)", async () => {
-    session.requireClinicManager.mockRejectedValue(new Error("Acesso restrito à gestão"));
-    await expect(registerChannelConsents("EMAIL", "a@x.com", "ficha")).rejects.toThrow(/gestão/i);
+  it("só quem tem a permissão de disparos registra", async () => {
+    session.requireClinicPermission.mockRejectedValue(new Error("Acesso restrito pela sua função na clínica"));
+    await expect(registerChannelConsents("EMAIL", "a@x.com", "ficha")).rejects.toThrow(/função/i);
     expect(prismaMock.channelConsent.createMany).not.toHaveBeenCalled();
   });
 

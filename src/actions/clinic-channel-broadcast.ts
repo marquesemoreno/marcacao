@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { isClinicManager, requireClinicManager, requireClinicSession } from "@/lib/session";
+import { isClinicManager, requireClinicManager, requireClinicSession, requireClinicPermission } from "@/lib/session";
 import { normalizeBroadcastVariants } from "@/lib/broadcast-variants";
 import { isValidEmail, normalizeEmail, prepareChannelRecipients, prepareChannelRows, toSmsNumber } from "@/lib/broadcast-channel";
 import { technicalDirectorLine } from "@/lib/broadcast-csv";
@@ -28,7 +28,7 @@ export async function createClinicChannelCampaign(input: {
   /** Público pronto (sistema da clínica, marcadores, seleção de pacientes) no lugar do CSV — só SMS. */
   recipients?: { phone: string; variables: Record<string, string> }[];
 }) {
-  const { clinicId, userId } = await requireClinicSession();
+  const { clinicId, userId } = await requireClinicPermission("disparos");
 
   if (input.channel !== "SMS" && input.channel !== "EMAIL") return fail("Canal inválido.");
   if (missingChannelConfig(input.channel).length > 0) {
@@ -103,7 +103,7 @@ export async function sendClinicChannelTest(input: {
   messageTemplate: string;
   variables?: Record<string, string>;
 }) {
-  const { clinicId, userId } = await requireClinicSession();
+  const { clinicId, userId } = await requireClinicPermission("disparos");
   if (input.channel !== "SMS" && input.channel !== "EMAIL") return fail("Canal inválido.");
   if (missingChannelConfig(input.channel).length > 0) {
     return fail(`${input.channel === "SMS" ? "SMS" : "E-mail"} ainda não foi ativado para a clínica — fale com o suporte.`);
@@ -142,7 +142,7 @@ export async function sendClinicChannelTest(input: {
 /** Registra aceites de marketing por SMS/e-mail (só gestão). `source` é obrigatório: é de onde
  * veio o consentimento (ficha, formulário…), a prova em caso de questionamento (LGPD). */
 export async function registerChannelConsents(channel: "SMS" | "EMAIL", raw: string, source: string) {
-  const { clinicId } = await requireClinicManager();
+  const { clinicId } = await requireClinicPermission("disparos");
 
   const trimmedSource = source.trim();
   if (!trimmedSource) return fail("Informe de onde veio o aceite (ex.: ficha de papel 10/2026).");

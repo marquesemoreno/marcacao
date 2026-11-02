@@ -20,8 +20,9 @@ import {
   type LucideIcon, ClipboardList } from "lucide-react";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { getMyUnreadCount } from "@/actions/clinic-shell";
+import { can, type ClinicPermission, type ClinicRole } from "@/lib/clinic-permissions";
 
-type NavItem = { href: string; label: string; icon: LucideIcon; badge?: "unread"; onlyFull?: boolean; onlyManager?: boolean };
+type NavItem = { href: string; label: string; icon: LucideIcon; badge?: "unread"; onlyFull?: boolean; perm?: ClinicPermission };
 type NavGroup = { label: string; items: NavItem[] };
 
 /** N3 — menu agrupado. Itens `onlyFull` não aparecem pra clínicas com WhatsApp exclusivo
@@ -47,15 +48,15 @@ const NAV_GROUPS: NavGroup[] = [
   {
     label: "Administração",
     items: [
-      { href: "/clinic/disparos", label: "Disparos", icon: Megaphone },
-      { href: "/clinic/relatorio", label: "Relatórios", icon: BarChart3, onlyManager: true },
+      { href: "/clinic/disparos", label: "Disparos", icon: Megaphone, perm: "disparos" },
+      { href: "/clinic/relatorio", label: "Relatórios", icon: BarChart3, perm: "relatorios" },
       { href: "/clinic/ia", label: "Ações da IA", icon: Sparkles },
-      { href: "/clinic/ficha", label: "Ficha prévia", icon: ClipboardList, onlyManager: true },
-      { href: "/clinic/retorno", label: "Retorno", icon: Repeat, onlyManager: true },
-      { href: "/clinic/acessos", label: "Acessos", icon: ShieldCheck, onlyManager: true },
-      { href: "/clinic/whatsapp", label: "WhatsApp", icon: Smartphone, onlyManager: true },
+      { href: "/clinic/ficha", label: "Ficha prévia", icon: ClipboardList, perm: "config" },
+      { href: "/clinic/retorno", label: "Retorno", icon: Repeat, perm: "config" },
+      { href: "/clinic/acessos", label: "Acessos", icon: ShieldCheck, perm: "config" },
+      { href: "/clinic/whatsapp", label: "WhatsApp", icon: Smartphone, perm: "config" },
       // Visível também pras clínicas só-WhatsApp (horários e ticket médio valem pra elas).
-      { href: "/clinic/precos", label: "Configurações", icon: Settings, onlyManager: true },
+      { href: "/clinic/precos", label: "Configurações", icon: Settings, perm: "config" },
     ],
   },
 ];
@@ -66,11 +67,11 @@ export function ClinicNav({
   exclusiveWhatsapp = false,
   orientation = "vertical",
   collapsed = false,
-  isManager = true,
+  role = "GESTAO",
 }: {
   exclusiveWhatsapp?: boolean;
   /** Recepção (false) não vê Relatórios nem Configurações — ver requireClinicManager. */
-  isManager?: boolean;
+  role?: ClinicRole;
   orientation?: "vertical" | "horizontal";
   /** Só vale pra orientation="vertical" — ícone sozinho com tooltip (ver ClinicSidebar). */
   collapsed?: boolean;
@@ -90,7 +91,7 @@ export function ClinicNav({
     };
   }, [pathname]);
 
-  const groups = NAV_GROUPS.map((g) => ({ ...g, items: g.items.filter((i) => !(exclusiveWhatsapp && i.onlyFull) && !(i.onlyManager && !isManager)) })).filter(
+  const groups = NAV_GROUPS.map((g) => ({ ...g, items: g.items.filter((i) => !(exclusiveWhatsapp && i.onlyFull) && !(i.perm && !can(role, i.perm))) })).filter(
     (g) => g.items.length > 0
   );
 

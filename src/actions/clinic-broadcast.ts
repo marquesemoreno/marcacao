@@ -8,7 +8,7 @@ import { listCloudTemplates } from "@/lib/whatsapp-cloud";
 import { decryptToken } from "@/lib/token-crypto";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { requireClinicManager, requireClinicSession } from "@/lib/session";
+import { requireClinicManager, requireClinicSession, requireClinicPermission } from "@/lib/session";
 import { formatToWhatsAppNumber } from "@/lib/whatsapp";
 import { uploadWhatsAppMedia } from "@/lib/whatsapp-media";
 import { technicalDirectorLine, buildBroadcastMessage, type ParsedBroadcastRecipient } from "@/lib/broadcast-csv";
@@ -258,7 +258,7 @@ export async function getClinicCampaignStartPreview(campaignId: string) {
 /** Devolve as falhas pra fila e deixa a campanha pausada — a recepção confere e clica
  * em Retomar (passa pela confirmação de novo). */
 export async function retryClinicCampaignFailures(campaignId: string, resume = false) {
-  const { clinicId } = await requireClinicSession();
+  const { clinicId } = await requireClinicPermission("disparos");
   await assertClinicOwnsCampaign(campaignId, clinicId);
   const { count } = await prisma.broadcastRecipient.updateMany({
     where: { campaignId, status: "FAILED" },
@@ -272,7 +272,7 @@ export async function retryClinicCampaignFailures(campaignId: string, resume = f
 
 /** Exclui um rascunho (nunca iniciado). */
 export async function deleteClinicDraftCampaign(campaignId: string) {
-  const { clinicId } = await requireClinicSession();
+  const { clinicId } = await requireClinicPermission("disparos");
   await assertClinicOwnsCampaign(campaignId, clinicId);
   const c = await prisma.broadcastCampaign.findUnique({ where: { id: campaignId }, select: { status: true } });
   if (c?.status !== "DRAFT") throw new Error("Só dá para excluir campanha que ainda não começou.");
@@ -307,7 +307,7 @@ export async function getClinicCampaignForDuplicate(campaignId: string) {
 /** Baixa prioridade: a campanha pausa sozinha enquanto houver lembrete de confirmação
  * ou outra campanha da clínica na fila (ver lowPriorityMustYield). */
 export async function setClinicCampaignLowPriority(campaignId: string, lowPriority: boolean) {
-  const { clinicId } = await requireClinicSession();
+  const { clinicId } = await requireClinicPermission("disparos");
   await assertClinicOwnsCampaign(campaignId, clinicId);
   await prisma.broadcastCampaign.update({ where: { id: campaignId }, data: { lowPriority } });
   revalidatePath("/clinic/disparos");
@@ -326,7 +326,7 @@ export async function createClinicBroadcastCampaign(
   /** API oficial: modelo aprovado + o que vai em cada {{n}}. */
   cloudTemplate?: { name: string; params: string[] }
 ) {
-  const { clinicId, userId } = await requireClinicSession();
+  const { clinicId, userId } = await requireClinicPermission("disparos");
   const cloud = await getClinicCloudBroadcastSetup();
   let templateData: { cloudTemplateName: string; cloudTemplateLanguage: string; cloudTemplateBody: string; cloudTemplateParams: string[] } | null = null;
   if (cloud.active) {
@@ -425,7 +425,7 @@ async function assertClinicOwnsCampaign(campaignId: string, clinicId: string) {
 }
 
 export async function startClinicBroadcastCampaign(campaignId: string) {
-  const { clinicId } = await requireClinicSession();
+  const { clinicId } = await requireClinicPermission("disparos");
   await assertClinicOwnsCampaign(campaignId, clinicId);
   // CFM: campanha de marketing sem responsável técnico (nome + CRM) não inicia.
   const c = await prisma.broadcastCampaign.findUnique({
@@ -475,7 +475,7 @@ export async function pauseAllClinicBroadcastCampaigns() {
 
 /** Desfazer do "Pausar todos": volta a enviar só as que estavam enviando há pouco. */
 export async function resumeClinicBroadcastCampaigns(ids: string[]) {
-  const { clinicId } = await requireClinicSession();
+  const { clinicId } = await requireClinicPermission("disparos");
   const { count } = await prisma.broadcastCampaign.updateMany({ where: { clinicId, id: { in: ids }, status: "PAUSED" }, data: { status: "RUNNING" } });
   revalidatePath("/clinic/disparos");
   return { resumed: count };
@@ -698,7 +698,7 @@ export async function getCampaignExclusions() {
 
 /** Substitui a lista inteira — aceita códigos separados por vírgula, espaço ou linha. */
 export async function setCampaignExclusions(raw: string) {
-  const { clinicId } = await requireClinicManager();
+  const { clinicId } = await requireClinicPermission("disparos");
   const ids = [...new Set(raw.split(/[\s,;]+/).map((t) => t.trim()).filter(Boolean).map(Number))];
   if (ids.some((n) => !Number.isInteger(n) || n <= 0)) throw new Error("Use só os códigos numéricos dos pacientes.");
   if (ids.length > 5000) throw new Error("Lista grande demais.");

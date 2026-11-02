@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { CLINIC_ROLES, type ClinicRole } from "@/lib/clinic-permissions";
 import { prisma } from "@/lib/prisma";
 import { requireAdminSession } from "@/lib/session";
 import { updateClinicSchema, createClinicSchema } from "@/lib/schemas/admin";
@@ -284,8 +285,15 @@ export async function updateUserIsAttendant(userId: string, isAttendant: boolean
 /** Liga/desliga "Gestão" (User.isManager): com gestão, vê Relatórios e Configurações da
  * clínica; sem (recepção), usa chat, agenda, pacientes, CRM e disparos. Vale na hora. */
 export async function updateUserIsManager(userId: string, isManager: boolean) {
+  return updateUserClinicRole(userId, isManager ? "GESTAO" : "RECEPCAO");
+}
+
+/** Função na clínica (Recepção / Marketing / Gestão — src/lib/clinic-permissions.ts).
+ * isManager fica espelhado em GESTAO pra quem ainda lê a coluna antiga. Vale na hora. */
+export async function updateUserClinicRole(userId: string, role: ClinicRole) {
   await requireAdminSession();
-  await prisma.user.update({ where: { id: userId }, data: { isManager } });
+  if (!(CLINIC_ROLES as readonly string[]).includes(role)) throw new Error("Função inválida.");
+  await prisma.user.update({ where: { id: userId }, data: { clinicRole: role, isManager: role === "GESTAO" } });
   revalidatePath("/admin/clinicas");
   return { success: true as const };
 }
@@ -295,7 +303,7 @@ export async function listClinicUsers(clinicId: string) {
   await requireAdminSession();
   return prisma.user.findMany({
     where: { clinicId, role: "CLINIC" },
-    select: { id: true, name: true, email: true, maxConcurrentChats: true, isAttendant: true, isManager: true, createdAt: true },
+    select: { id: true, name: true, email: true, maxConcurrentChats: true, isAttendant: true, isManager: true, clinicRole: true, createdAt: true },
     orderBy: { name: "asc" },
   });
 }

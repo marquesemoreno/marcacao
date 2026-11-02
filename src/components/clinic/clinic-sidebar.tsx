@@ -1,5 +1,7 @@
 "use client";
 
+import type { ClinicRole } from "@/lib/clinic-permissions";
+
 import { useEffect, useState } from "react";
 import { ChevronsLeft, ChevronsRight, Search } from "lucide-react";
 import { openGlobalSearch } from "@/components/clinic/global-search";
@@ -24,12 +26,12 @@ export function ClinicSidebar({
   tradeName,
   userName,
   isExclusive,
-  isManager = true,
+  role = "GESTAO",
 }: {
   tradeName: string;
   userName: string | null | undefined;
   isExclusive: boolean;
-  isManager?: boolean;
+  role?: ClinicRole;
 }) {
   // Recolhida por padrão (libera espaço pra fila/chat) — só fica expandida se o
   // usuário já tiver escolhido isso explicitamente antes (localStorage === "0").
@@ -94,7 +96,7 @@ export function ClinicSidebar({
       </div>
 
       <div className="flex-1 overflow-y-auto overflow-x-hidden mt-1">
-        <ClinicNav exclusiveWhatsapp={isExclusive} collapsed={isCollapsed} isManager={isManager} />
+        <ClinicNav exclusiveWhatsapp={isExclusive} collapsed={isCollapsed} role={role} />
       </div>
 
       <div className="border-t border-slate-800 px-3 py-3 space-y-2">

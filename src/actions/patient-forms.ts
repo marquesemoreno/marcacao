@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { requireClinicManager, requireClinicSession } from "@/lib/session";
+import { requireClinicManager, requireClinicSession, requireClinicPermission } from "@/lib/session";
 import { parseFormTemplate, type FormQuestion } from "@/lib/patient-form";
 import { DEFAULT_ANAMNESE_TEMPLATE } from "@/lib/patient-journey";
 import { decryptFormAnswers, ensureConsentTerm } from "@/lib/patient-form-server";
@@ -58,7 +58,7 @@ export async function saveFormTemplate(input: { questions: FormQuestion[]; activ
 /** Respostas da ficha de uma consulta, já com o texto das perguntas. Abrir conta como
  * acesso a dado de saúde (PatientAccessLog, ou audit_logs quando não há conversa). */
 export async function getAppointmentFormResponse(ref: { source: "BRIDGE" | "LOCAL"; externalId: string }) {
-  const { clinicId, userId } = await requireClinicSession();
+  const { clinicId, userId } = await requireClinicPermission("ficha.ver");
   const r = await prisma.patientFormResponse.findFirst({
     where: { clinicId, appointmentSource: ref.source, appointmentExternalId: ref.externalId },
     orderBy: { submittedAt: "desc" },

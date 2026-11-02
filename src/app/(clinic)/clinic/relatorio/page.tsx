@@ -1,4 +1,4 @@
-import { ManagerOnly, currentUserIsManager } from "@/components/clinic/manager-only";
+import { ManagerOnly, currentUserCan } from "@/components/clinic/manager-only";
 import { PeriodFilter } from "@/components/clinic/period-filter";
 import { PageHeader } from "@/components/clinic/page-header";
 import { ReportSelectFilter } from "@/components/clinic/report-filters";
@@ -119,7 +119,7 @@ export default async function ClinicReportPage({
   searchParams,
 }: RelatorioPageProps) {
   const params = await searchParams;
-  if (!(await currentUserIsManager())) return <ManagerOnly />;
+  if (!(await currentUserCan("relatorios"))) return <ManagerOnly />;
   const period = parsePeriodKey(params.periodo, params.days);
   const labels = periodLabels(period);
   const tags = params.tag ? [params.tag] : undefined;

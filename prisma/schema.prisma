@@ -164,6 +164,8 @@ model User {
   /// Gestão: vê Relatórios e Configurações (preços, horários, ticket, regras, investimento).
   /// Recepção (false) usa chat, agenda, pacientes, CRM e disparos. Ver requireClinicManager.
   isManager          Boolean  @default(false) @map("is_manager")
+  /// RECEPCAO | MARKETING | GESTAO (src/lib/clinic-permissions.ts). isManager = espelho de GESTAO.
+  clinicRole         String   @default("RECEPCAO") @map("clinic_role")
   active             Boolean  @default(true)
   createdAt          DateTime @default(now()) @map("created_at")
   updatedAt          DateTime @updatedAt @map("updated_at")

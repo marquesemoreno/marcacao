@@ -4,7 +4,8 @@ import { useState } from "react";
 import { Users, UserPlus, Loader2, Mail, KeyRound, Save, Pencil } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { listClinicUsers, createTeamMember, updateUserMaxConcurrentChats, updateAttendantName, resetAttendantPassword, updateUserIsAttendant, updateUserIsManager } from "@/actions/admin";
+import { listClinicUsers, createTeamMember, updateUserMaxConcurrentChats, updateAttendantName, resetAttendantPassword, updateUserIsAttendant, updateUserClinicRole } from "@/actions/admin";
+import { CLINIC_ROLES, CLINIC_ROLE_LABEL, parseClinicRole, type ClinicRole } from "@/lib/clinic-permissions";
 
 type Attendant = {
   id: string;
@@ -13,7 +14,14 @@ type Attendant = {
   maxConcurrentChats: number;
   isAttendant: boolean;
   isManager: boolean;
+  clinicRole?: string;
   createdAt: Date | string;
+};
+
+const ROLE_HINT: Record<ClinicRole, string> = {
+  RECEPCAO: "Chat, CRM, Agenda, Pacientes e ficha prévia; sem Disparos nem Relatórios.",
+  MARKETING: "Chat, CRM, Agenda, Disparos e Relatórios; sem ficha prévia nem Configurações.",
+  GESTAO: "acesso a tudo, inclusive Acessos, WhatsApp e Configurações.",
 };
 
 export function ClinicAttendantsModal({ clinicId, clinicName }: { clinicId: string; clinicName: string }) {
@@ -32,17 +40,12 @@ export function ClinicAttendantsModal({ clinicId, clinicName }: { clinicId: stri
   const [resetPasswordValue, setResetPasswordValue] = useState("");
   const [savingAttendantId, setSavingAttendantId] = useState<string | null>(null);
 
-  async function handleToggleManager(attendant: Attendant) {
-    const next = !attendant.isManager;
+  async function handleRoleChange(attendant: Attendant, next: ClinicRole) {
     setSavingAttendantId(attendant.id);
     try {
-      await updateUserIsManager(attendant.id, next);
-      setAttendants((prev) => prev.map((a) => (a.id === attendant.id ? { ...a, isManager: next } : a)));
-      toast.success(
-        next
-          ? `${attendant.name} agora vê Relatórios e Configurações.`
-          : `${attendant.name} agora é recepção: não vê Relatórios nem Configurações.`
-      );
+      await updateUserClinicRole(attendant.id, next);
+      setAttendants((prev) => prev.map((a) => (a.id === attendant.id ? { ...a, clinicRole: next, isManager: next === "GESTAO" } : a)));
+      toast.success(`${attendant.name} agora é ${CLINIC_ROLE_LABEL[next]}: ${ROLE_HINT[next]}`);
     } catch {
       toast.error("Não foi possível salvar.");
     } finally {
@@ -270,16 +273,21 @@ export function ClinicAttendantsModal({ clinicId, clinicName }: { clinicId: stri
                           Atende no chat
                           {!attendant.isAttendant && <span className="text-slate-400 dark:text-slate-500">· só gerência</span>}
                         </label>
-                        <label className="mt-1 ml-3 inline-flex items-center gap-1.5 text-[11px] font-medium text-slate-600 dark:text-slate-300 cursor-pointer" title="Relatórios e Configurações da clínica">
-                          <input
-                            type="checkbox"
-                            checked={attendant.isManager}
+                        <label className="mt-1 ml-3 inline-flex items-center gap-1.5 text-[11px] font-medium text-slate-600 dark:text-slate-300">
+                          Função
+                          <select
+                            value={parseClinicRole(attendant.clinicRole ?? (attendant.isManager ? "GESTAO" : "RECEPCAO"))}
                             disabled={savingAttendantId === attendant.id}
-                            onChange={() => handleToggleManager(attendant)}
-                            className="size-3.5 accent-indigo-600"
-                          />
-                          Gestão
-                          {!attendant.isManager && <span className="text-slate-400 dark:text-slate-500">· recepção</span>}
+                            onChange={(e) => handleRoleChange(attendant, e.target.value as ClinicRole)}
+                            title={ROLE_HINT[parseClinicRole(attendant.clinicRole)]}
+                            className="h-6 rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-1 text-[11px]"
+                          >
+                            {CLINIC_ROLES.map((r) => (
+                              <option key={r} value={r}>
+                                {CLINIC_ROLE_LABEL[r]}
+                              </option>
+                            ))}
+                          </select>
                         </label>
                       </div>
                       {!isEditingNameThis && (

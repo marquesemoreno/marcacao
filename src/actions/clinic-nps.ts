@@ -1,14 +1,14 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
-import { requireClinicManager } from "@/lib/session";
+import { requireClinicPermission } from "@/lib/session";
 import { periodWindow, type PeriodKey } from "@/lib/report-period";
 import { npsBucket, npsSummary } from "@/lib/nps";
 import { decryptFormAnswers } from "@/lib/patient-form-server";
 
 /** Relatório: NPS do período (passo "Satisfação" da régua) + últimos comentários. */
 export async function getClinicNpsReport(period: PeriodKey = "30") {
-  const { clinicId } = await requireClinicManager();
+  const { clinicId } = await requireClinicPermission("relatorios");
   const { since, until } = periodWindow(period, false);
   // Tabela nova (migration 20261102200000): se ainda não aplicada, o relatório segue sem o cartão.
   const rows = await prisma.npsResponse

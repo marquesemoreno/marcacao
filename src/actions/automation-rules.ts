@@ -1,7 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
-import { requireClinicManager } from "@/lib/session";
+import { requireClinicPermission } from "@/lib/session";
 import { DEFAULT_RULE_STEPS, validateRuleInput, type AutomationRuleKind } from "@/lib/automation-rules";
 import { checkTemplateParamSources } from "@/lib/broadcast-cloud-template";
 import { getClinicCloudBroadcastSetup } from "@/actions/clinic-broadcast";
@@ -23,7 +23,7 @@ export type AutomationRuleView = {
 
 /** Os 3 passos da régua da clínica — os que ainda não foram salvos vêm com o padrão. */
 export async function listAutomationRules(): Promise<AutomationRuleView[]> {
-  const { clinicId } = await requireClinicManager();
+  const { clinicId } = await requireClinicPermission("disparos");
   const saved = await prisma.automationRule.findMany({ where: { clinicId } });
   const since = new Date(Date.now() - 30 * 86400000);
   return Promise.all(
@@ -50,7 +50,7 @@ export async function listAutomationRules(): Promise<AutomationRuleView[]> {
 /** "Amanhã às 8h: ~N pacientes" — quantos entrariam no passo com os dias escolhidos.
  * Conta antes do consentimento de marketing (o envio ainda pula quem não aceitou). */
 export async function previewAutomationRule(input: { kind: AutomationRuleKind; daysAfter: number }) {
-  const { clinicId } = await requireClinicManager();
+  const { clinicId } = await requireClinicPermission("disparos");
   const step = DEFAULT_RULE_STEPS.find((s) => s.kind === input.kind);
   if (!step) return { ok: false as const, error: "Passo desconhecido." };
   if (input.kind !== "ANIVERSARIO" && validateRuleInput({ daysAfter: input.daysAfter })) return { ok: false as const, error: "Dias inválidos." };
@@ -79,7 +79,7 @@ export async function saveAutomationRule(input: {
   cloudTemplateName: string | null;
   cloudTemplateParams: string[];
 }) {
-  const { clinicId } = await requireClinicManager();
+  const { clinicId } = await requireClinicPermission("disparos");
   const step = DEFAULT_RULE_STEPS.find((s) => s.kind === input.kind);
   if (!step) return { success: false as const, error: "Passo desconhecido." };
   const invalid = input.kind === "ANIVERSARIO" ? null : validateRuleInput({ daysAfter: input.daysAfter });

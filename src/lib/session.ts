@@ -1,6 +1,7 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { can, parseClinicRole, type ClinicPermission, type ClinicRole } from "@/lib/clinic-permissions";
 
 export async function requireClinicSession() {
   const session = await getServerSession(authOptions);
@@ -29,8 +30,20 @@ export async function requireAdminSession() {
 /** Usuário da clínica com papel de gestão (User.isManager)? Lido do banco a cada chamada —
  * o admin liga/desliga e vale na hora, sem precisar sair e entrar de novo. */
 export async function isClinicManager(userId: string): Promise<boolean> {
-  const user = await prisma.user.findUnique({ where: { id: userId }, select: { isManager: true } });
-  return Boolean(user?.isManager);
+  return (await getClinicRole(userId)) === "GESTAO";
+}
+
+/** Função do usuário (lida do banco a cada chamada — troca vale na hora). */
+export async function getClinicRole(userId: string): Promise<ClinicRole> {
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { clinicRole: true } });
+  return parseClinicRole(user?.clinicRole);
+}
+
+/** Sessão da clínica com a permissão pedida (tabela em clinic-permissions.ts). */
+export async function requireClinicPermission(permission: ClinicPermission) {
+  const session = await requireClinicSession();
+  if (!can(await getClinicRole(session.userId), permission)) throw new Error("Acesso restrito pela sua função na clínica");
+  return session;
 }
 
 /** Como requireClinicSession, mas só para gestão: Relatórios e Configurações (auditoria de

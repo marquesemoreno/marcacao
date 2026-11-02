@@ -3,7 +3,7 @@
 import OpenAI from "openai";
 import { unstable_cache } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { requireClinicManager } from "@/lib/session";
+import { requireClinicPermission } from "@/lib/session";
 import { periodWindow, type PeriodKey } from "@/lib/report-period";
 import { NON_PATIENT_TAG } from "@/lib/conversation-tags";
 import { fetchBridgeDailyAgendaOrNull } from "@/lib/hospital-bridge";
@@ -31,7 +31,7 @@ function isoDay(utcMs: number) {
 
 /** Tendência semanal, pacientes novos x retorno e risco de falta da agenda do sistema da clínica. */
 export async function getClinicReportInsights(period: PeriodKey = "30") {
-  const { clinicId } = await requireClinicManager();
+  const { clinicId } = await requireClinicPermission("relatorios");
   const { since, until } = periodWindow(period, false);
   const end = until ?? new Date();
 
@@ -95,7 +95,7 @@ export async function getClinicReportInsights(period: PeriodKey = "30") {
  * (a IA não vê dado de paciente, só os números). Sem chave ou com erro: devolve null e a
  * tela mostra os fatos em lista. */
 export async function generateReportSummary(input: { clinicName: string; periodLabel: string; facts: string[] }): Promise<{ text: string | null }> {
-  await requireClinicManager();
+  await requireClinicPermission("relatorios");
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey || input.facts.length === 0) return { text: null };
   try {
