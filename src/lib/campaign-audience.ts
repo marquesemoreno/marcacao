@@ -11,6 +11,11 @@ export type BridgeCampaignPatient = {
   /** AAAA-MM-DD ou null quando o cadastro não tem. */
   nascimento: string | null;
   ultimaMarcacao: string | null;
+  /** Bridge novo (01/11/2026): última marcação até hoje, próxima futura e última com STATUS
+   * de atendido (só quando a clínica preenche status). AAAA-MM-DD ou null. */
+  ultimaPassada?: string | null;
+  proximaMarcacao?: string | null;
+  ultimaAtendida?: string | null;
 };
 
 export type AudienceOptions = {
@@ -22,6 +27,10 @@ export type AudienceOptions = {
    * homem cadastrado como sexo feminino no sistema da clínica (Clinic.campaignExcludedPatientIds). */
   excludedPatientIds?: Set<number>;
   today?: Date;
+  /** Público "Retorno": só quem não vem há entre minMonths e maxMonths meses e não tem
+   * consulta futura. futurePhones = telefones das marcações futuras (muitas entram sem
+   * código de paciente, então o código sozinho não basta). */
+  retorno?: { minMonths: number; maxMonths: number; futurePhones: Set<string> };
 };
 
 export type AudienceRecipient = { phone: string; variables: { nome: string; saudacao: string } };
@@ -36,11 +45,37 @@ function ageOn(birth: string, today: Date): number | null {
   return age;
 }
 
+/** Meses completos entre a data (AAAA-MM-DD) e hoje. */
+function monthsBetween(date: string, today: Date): number | null {
+  const d = new Date(`${date}T12:00:00Z`);
+  if (isNaN(d.getTime())) return null;
+  let months = (today.getUTCFullYear() - d.getUTCFullYear()) * 12 + (today.getUTCMonth() - d.getUTCMonth());
+  if (today.getUTCDate() < d.getUTCDate()) months--;
+  return months;
+}
+
 const firstName = (full: string) => toTitleCaseName(full.trim().split(/\s+/)[0] ?? "");
 
 export function buildCampaignAudience(patients: BridgeCampaignPatient[], options: AudienceOptions) {
   const today = options.today ?? new Date();
-  const stats = { total: patients.length, excludedManual: 0, excludedAge: 0, excludedNoBirthDate: 0, invalidPhone: 0, optedOut: 0, sharedPhones: 0 };
+  const stats = {
+    total: patients.length,
+    excludedManual: 0,
+    excludedAge: 0,
+    excludedNoBirthDate: 0,
+    invalidPhone: 0,
+    optedOut: 0,
+    sharedPhones: 0,
+    excludedRetornoRange: 0,
+    excludedHasFuture: 0,
+  };
+  const futurePhones = new Set<string>();
+  for (const raw of options.retorno?.futurePhones ?? []) {
+    const f = formatToWhatsAppNumber(raw);
+    futurePhones.add(f);
+    const alt = toggleNinthDigit(f);
+    if (alt) futurePhones.add(alt);
+  }
 
   // Filtra idade ANTES de agrupar por telefone: a filha menor com o celular da mãe não
   // pode transformar a mensagem da mãe em "sem nome".
@@ -49,6 +84,18 @@ export function buildCampaignAudience(patients: BridgeCampaignPatient[], options
     if (options.excludedPatientIds?.has(Number(patient.id))) {
       stats.excludedManual++;
       continue;
+    }
+    if (options.retorno) {
+      if (patient.proximaMarcacao || futurePhones.has(formatToWhatsAppNumber(patient.telefone))) {
+        stats.excludedHasFuture++;
+        continue;
+      }
+      const last = patient.ultimaAtendida ?? patient.ultimaPassada ?? null;
+      const months = last ? monthsBetween(last, today) : null;
+      if (months === null || months < options.retorno.minMonths || months >= options.retorno.maxMonths) {
+        stats.excludedRetornoRange++;
+        continue;
+      }
     }
     const needsAge = options.minAge != null || options.maxAge != null;
     if (needsAge) {

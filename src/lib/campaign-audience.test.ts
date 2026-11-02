@@ -80,3 +80,47 @@ describe("buildCampaignAudience — lista de exclusão", () => {
     expect(stats.excludedManual).toBe(1);
   });
 });
+
+describe("buildCampaignAudience — retorno (sem vir há X–Y meses)", () => {
+  const base = { optedOutPhones: new Set<string>(), today };
+  const retorno = (extra: Partial<{ minMonths: number; maxMonths: number; futurePhones: Set<string> }> = {}) => ({
+    minMonths: 6,
+    maxMonths: 12,
+    futurePhones: new Set<string>(),
+    ...extra,
+  });
+
+  it("entra quem teve a última marcação passada dentro da faixa", () => {
+    const { recipients } = buildCampaignAudience([p({ ultimaPassada: "2026-01-15" })], { ...base, retorno: retorno() });
+    expect(recipients).toHaveLength(1);
+  });
+  it("fora quem veio há pouco ou há tempo demais", () => {
+    const { recipients, stats } = buildCampaignAudience(
+      [p({ id: 1, telefone: "77991111111", ultimaPassada: "2026-08-20" }), p({ id: 2, telefone: "77992222222", ultimaPassada: "2024-01-10" })],
+      { ...base, retorno: retorno() },
+    );
+    expect(recipients).toHaveLength(0);
+    expect(stats.excludedRetornoRange).toBe(2);
+  });
+  it("fora quem já tem consulta futura (pelo código)", () => {
+    const { recipients, stats } = buildCampaignAudience([p({ ultimaPassada: "2026-01-15", proximaMarcacao: "2026-10-20" })], { ...base, retorno: retorno() });
+    expect(recipients).toHaveLength(0);
+    expect(stats.excludedHasFuture).toBe(1);
+  });
+  it("fora quem já tem consulta futura marcada só pelo telefone (com ou sem 9º dígito)", () => {
+    const { recipients, stats } = buildCampaignAudience([p({ telefone: "77991234567", ultimaPassada: "2026-01-15" })], {
+      ...base,
+      retorno: retorno({ futurePhones: new Set(["7791234567"]) }),
+    });
+    expect(recipients).toHaveLength(0);
+    expect(stats.excludedHasFuture).toBe(1);
+  });
+  it("usa a última consulta ATENDIDA quando o sistema informa (clínica que preenche status)", () => {
+    const { recipients } = buildCampaignAudience([p({ ultimaPassada: "2026-09-01", ultimaAtendida: "2026-02-01" })], { ...base, retorno: retorno() });
+    expect(recipients).toHaveLength(1);
+  });
+  it("sem nenhuma data passada fica de fora", () => {
+    const { stats } = buildCampaignAudience([p({ ultimaPassada: null })], { ...base, retorno: retorno() });
+    expect(stats.excludedRetornoRange).toBe(1);
+  });
+});

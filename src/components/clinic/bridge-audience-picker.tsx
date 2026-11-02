@@ -14,6 +14,8 @@ const selectClass =
 /** Público da campanha direto do sistema da clínica (Firebird via bridge) — alternativa
  * ao CSV. A prévia consulta na hora e entrega os destinatários prontos pro formulário. */
 export function BridgeAudiencePicker({ onRecipients }: { onRecipients: (r: ParsedBroadcastRecipient[]) => void }) {
+  const [kind, setKind] = useState<"recentes" | "retorno">("recentes");
+  const [range, setRange] = useState("6-12");
   const [sexo, setSexo] = useState<"" | "F" | "M">("");
   const [months, setMonths] = useState(12);
   const [minAge, setMinAge] = useState("18");
@@ -31,6 +33,7 @@ export function BridgeAudiencePicker({ onRecipients }: { onRecipients: (r: Parse
       const filters: BridgeAudienceFilters = {
         sexo: sexo || undefined,
         months,
+        retorno: kind === "retorno" ? { minMonths: Number(range.split("-")[0]), maxMonths: Number(range.split("-")[1]) } : undefined,
         minAge: minAge ? Number(minAge) : undefined,
         maxAge: maxAge ? Number(maxAge) : undefined,
       };
@@ -48,6 +51,28 @@ export function BridgeAudiencePicker({ onRecipients }: { onRecipients: (r: Parse
   const s = preview?.stats;
   return (
     <div className="space-y-3">
+      <div role="radiogroup" aria-label="Tipo de público" className="flex flex-wrap gap-1.5">
+        {([
+          ["recentes", "Marcaram recentemente"],
+          ["retorno", "Retorno: não vêm há um tempo"],
+        ] as const).map(([value, label]) => (
+          <button
+            key={value}
+            type="button"
+            role="radio"
+            aria-checked={kind === value}
+            onClick={() => { setKind(value); invalidate(); }}
+            className={`px-3 py-1.5 text-xs font-medium rounded-lg border ${kind === value ? "border-emerald-500 bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300" : "border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-900"}`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      {kind === "retorno" && (
+        <p className="text-xs text-slate-500 dark:text-slate-400">
+          Pacientes cuja última consulta foi na faixa escolhida. Quem já tem consulta marcada fica de fora (pelo cadastro ou pelo telefone).
+        </p>
+      )}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         <label className="text-xs font-medium text-slate-600 dark:text-slate-400">
           Sexo
@@ -57,14 +82,26 @@ export function BridgeAudiencePicker({ onRecipients }: { onRecipients: (r: Parse
             <option value="M">Masculino</option>
           </select>
         </label>
-        <label className="text-xs font-medium text-slate-600 dark:text-slate-400">
-          Última marcação
-          <select value={months} onChange={(e) => { setMonths(Number(e.target.value)); invalidate(); }} className={selectClass}>
-            <option value={6}>Últimos 6 meses</option>
-            <option value={12}>Últimos 12 meses</option>
-            <option value={24}>Últimos 24 meses</option>
-          </select>
-        </label>
+        {kind === "retorno" ? (
+          <label className="text-xs font-medium text-slate-600 dark:text-slate-400">
+            Sem vir há
+            <select value={range} onChange={(e) => { setRange(e.target.value); invalidate(); }} className={selectClass}>
+              <option value="3-6">3 a 6 meses</option>
+              <option value="6-12">6 a 12 meses</option>
+              <option value="12-24">1 a 2 anos</option>
+              <option value="24-36">2 a 3 anos</option>
+            </select>
+          </label>
+        ) : (
+          <label className="text-xs font-medium text-slate-600 dark:text-slate-400">
+            Última marcação
+            <select value={months} onChange={(e) => { setMonths(Number(e.target.value)); invalidate(); }} className={selectClass}>
+              <option value={6}>Últimos 6 meses</option>
+              <option value={12}>Últimos 12 meses</option>
+              <option value={24}>Últimos 24 meses</option>
+            </select>
+          </label>
+        )}
         <label className="text-xs font-medium text-slate-600 dark:text-slate-400">
           Idade mínima
           <input type="number" min={0} max={120} value={minAge} onChange={(e) => { setMinAge(e.target.value); invalidate(); }} className={selectClass} />
@@ -101,6 +138,12 @@ export function BridgeAudiencePicker({ onRecipients }: { onRecipients: (r: Parse
             <li>Telefone inválido: <strong>{s.invalidPhone}</strong></li>
             <li>Pediram para não receber mais: <strong>{s.optedOut}</strong></li>
             <li>Número compartilhado (vai sem nome): <strong>{s.sharedPhones}</strong></li>
+            {kind === "retorno" && (
+              <>
+                <li>Já têm consulta marcada: <strong>{s.excludedHasFuture}</strong></li>
+                <li>Fora da faixa de tempo: <strong>{s.excludedRetornoRange}</strong></li>
+              </>
+            )}
           </ul>
           {preview.sample.length > 0 && (
             <div className="pt-1 border-t border-slate-100 dark:border-slate-800">

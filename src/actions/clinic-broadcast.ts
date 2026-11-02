@@ -549,6 +549,8 @@ export type BridgeAudienceFilters = {
   months: number;
   minAge?: number;
   maxAge?: number;
+  /** Público "Retorno": quem não vem há entre minMonths e maxMonths meses, sem consulta futura. */
+  retorno?: { minMonths: number; maxMonths: number };
 };
 
 /** Prévia do público tirado direto do sistema da clínica (Firebird via bridge) — sem CSV.
@@ -556,14 +558,25 @@ export type BridgeAudienceFilters = {
  * o único lugar que cria campanha (mesma dedup/opt-out/imagem). */
 export async function previewBridgeAudience(filters: BridgeAudienceFilters) {
   const { clinicId } = await requireClinicSession();
-  const months = Math.min(Math.max(Math.round(filters.months) || 12, 1), 60);
+  const retorno = filters.retorno
+    ? {
+        minMonths: Math.min(Math.max(Math.round(filters.retorno.minMonths) || 0, 0), 120),
+        maxMonths: Math.min(Math.max(Math.round(filters.retorno.maxMonths) || 12, 1), 120),
+      }
+    : null;
+  if (retorno && retorno.maxMonths <= retorno.minMonths) throw new Error("A faixa de meses está invertida.");
+  // No retorno o bridge precisa trazer todo mundo com marcação desde o fim da faixa.
+  const months = retorno ? retorno.maxMonths : Math.min(Math.max(Math.round(filters.months) || 12, 1), 60);
   const since = new Date();
   since.setMonth(since.getMonth() - months);
 
-  const patients = await fetchBridgeCampaignPatients(clinicId, {
+  const { patients, futurePhones } = await fetchBridgeCampaignPatients(clinicId, {
     sexo: filters.sexo,
     desde: since.toISOString().slice(0, 10),
   });
+  if (retorno && patients.length > 0 && !patients.some((p) => "ultimaPassada" in p)) {
+    throw new Error("O sistema desta clínica está com o bridge antigo — atualize o index.js e reinicie o pm2 para usar o público Retorno.");
+  }
   const optedOutPhones = new Set(
     (await prisma.contact.findMany({ where: { optedOutOfBroadcastsAt: { not: null }, phone: { not: null } }, select: { phone: true } }))
       .map((c) => c.phone)
@@ -575,6 +588,7 @@ export async function previewBridgeAudience(filters: BridgeAudienceFilters) {
     maxAge: filters.maxAge || undefined,
     optedOutPhones,
     excludedPatientIds: new Set(clinic.campaignExcludedPatientIds),
+    retorno: retorno ? { ...retorno, futurePhones: new Set(futurePhones) } : undefined,
   });
 
   return {

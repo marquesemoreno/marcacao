@@ -530,7 +530,7 @@ export async function createBridgeAppointment(
 export async function fetchBridgeCampaignPatients(
   clinicId: string,
   filters: { sexo?: "F" | "M"; desde: string }
-): Promise<BridgeCampaignPatient[]> {
+): Promise<{ patients: BridgeCampaignPatient[]; futurePhones: string[] }> {
   const config = await getBridgeConfig(clinicId);
   if (!config) throw new Error("Esta clínica não tem integração com o sistema hospitalar ativa.");
   const url = new URL(`${config.apiUrl}/api/pacientes-campanha`);
@@ -546,9 +546,12 @@ export async function fetchBridgeCampaignPatients(
   if (response.status === 404) {
     throw new Error("O bridge desta clínica ainda está na versão antiga — atualize o index.js e reinicie o pm2.");
   }
-  const data = (await response.json().catch(() => null)) as { pacientes?: BridgeCampaignPatient[]; error?: string; detalhe?: string } | null;
+  const data = (await response.json().catch(() => null)) as
+    | { pacientes?: BridgeCampaignPatient[]; telefonesComMarcacaoFutura?: string[]; error?: string; detalhe?: string }
+    | null;
   if (!response.ok || !Array.isArray(data?.pacientes)) {
     throw new Error(`Erro do sistema da clínica: ${data?.detalhe ?? data?.error ?? `HTTP ${response.status}`}`);
   }
-  return data.pacientes;
+  // telefonesComMarcacaoFutura só existe no bridge de 01/11/2026 em diante.
+  return { patients: data.pacientes, futurePhones: data.telefonesComMarcacaoFutura ?? [] };
 }
