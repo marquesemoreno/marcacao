@@ -137,6 +137,10 @@ export function BroadcastManagement() {
   const [channelSetup, setChannelSetup] = useState<ChannelSetup | null>(null);
   const [consentOpen, setConsentOpen] = useState(false);
   const [rulesOpen, setRulesOpen] = useState(false);
+  // "Nova campanha" em 2 etapas (crítica 02/11): 1 = nome + público, 2 = mensagem + anexo.
+  // A revisão final é o diálogo de Iniciar. As etapas só escondem (hidden), não desmontam —
+  // o seletor do sistema da clínica guarda estado interno.
+  const [formStep, setFormStep] = useState<1 | 2>(1);
   const [channelFormKey, setChannelFormKey] = useState(0);
   const [selectionList, setSelectionList] = useState<ParsedBroadcastRecipient[]>([]);
 
@@ -279,6 +283,7 @@ export function BroadcastManagement() {
     setAudienceSource("csv");
     setPickerKey((k) => k + 1);
     handleRemoveImage();
+    setFormStep(1);
   }
 
   function insertVariable(key: string) {
@@ -660,8 +665,34 @@ export function BroadcastManagement() {
             )}
           </section>
         ) : (
-        <section className="px-4 pb-6 space-y-5" aria-label="Nova campanha">
+        <section className="px-4 space-y-5" aria-label="Nova campanha">
+          <ol className="flex items-center gap-2 text-xs font-medium" aria-label="Etapas">
+            {(["Público", "Mensagem"] as const).map((label, i) => {
+              const n = (i + 1) as 1 | 2;
+              const current = formStep === n;
+              return (
+                <li key={label} className="flex items-center gap-2">
+                  {i > 0 && <span aria-hidden className="h-px w-6 bg-slate-300 dark:bg-slate-600" />}
+                  <button
+                    type="button"
+                    aria-current={current ? "step" : undefined}
+                    onClick={() => setFormStep(n)}
+                    className={`inline-flex items-center gap-1.5 rounded-md px-2 py-1 ${current ? "text-emerald-700 dark:text-emerald-300" : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"}`}
+                  >
+                    <span
+                      aria-hidden
+                      className={`grid h-5 w-5 place-items-center rounded-full text-[11px] ${current ? "bg-emerald-600 text-white" : "border border-slate-300 dark:border-slate-600"}`}
+                    >
+                      {n}
+                    </span>
+                    {label}
+                  </button>
+                </li>
+              );
+            })}
+          </ol>
 
+          <div hidden={formStep !== 1} className="space-y-5">
           <div>
             <label htmlFor="broadcast-name" className={labelClass}>
               Nome da campanha (só a equipe vê) <span className="text-red-600" aria-hidden>*</span>
@@ -680,7 +711,7 @@ export function BroadcastManagement() {
 
           {/* 1. Público */}
           <fieldset className="space-y-2">
-            <legend className="text-sm font-semibold text-slate-800 dark:text-slate-100">1. Para quem</legend>
+            <legend className="text-sm font-semibold text-slate-800 dark:text-slate-100">Para quem</legend>
             <div
               role="radiogroup"
               aria-label="Público"
@@ -758,17 +789,23 @@ export function BroadcastManagement() {
                 <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                   Sem cabeçalho, a ordem é telefone, nome, procedimento, data. Com cabeçalho, cada coluna vira uma variável da mensagem.
                 </p>
-                {csvError && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{csvError}</p>}
+                {csvError && (
+                  <p role="alert" className="mt-1 text-sm text-red-600 dark:text-red-400">
+                    {csvError}
+                  </p>
+                )}
                 {recipients.length > 0 && (
                   <p className="mt-1 text-sm font-medium text-emerald-700 dark:text-emerald-400">{plural(recipients.length, "contato", "contatos")} na lista.</p>
                 )}
               </div>
             )}
           </fieldset>
+          </div>
 
+          <div hidden={formStep !== 2} className="space-y-5">
           {/* 2. Mensagem */}
           <fieldset className="space-y-2">
-            <legend className="text-sm font-semibold text-slate-800 dark:text-slate-100">2. Mensagem</legend>
+            <legend className="text-sm font-semibold text-slate-800 dark:text-slate-100">Mensagem</legend>
             {cloudMode ? (
               <div className="space-y-3">
                 <p className="text-xs text-slate-500 dark:text-slate-400">
@@ -798,12 +835,22 @@ export function BroadcastManagement() {
                 </select>
                 {selectedTemplate && (
                   <>
-                    <div className="whitespace-pre-wrap rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 p-3 text-sm text-slate-700 dark:text-slate-200">
-                      {selectedTemplate.bodyText}
+                    <div className="grid gap-3 md:grid-cols-2">
+                    <div className="whitespace-pre-wrap rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 p-3 text-sm text-slate-700 dark:text-slate-200 md:sticky md:top-0 md:self-start">
+                      {selectedTemplate.bodyText.split(/(\{\{\d+\}\})/).map((part, k) =>
+                        /^\{\{\d+\}\}$/.test(part) ? (
+                          <mark key={k} className="rounded bg-emerald-100 px-0.5 font-semibold text-emerald-900 dark:bg-emerald-900/50 dark:text-emerald-100">
+                            {`Campo ${part.replace(/\D/g, "")}`}
+                          </mark>
+                        ) : (
+                          part
+                        ),
+                      )}
                     </div>
+                    <div className="space-y-2">
                     {Array.from({ length: selectedTemplate.variableCount }, (_, i) => (
                       <label key={i} className="block text-xs font-medium text-slate-600 dark:text-slate-400">
-                        {`O que vai em {{${i + 1}}}`}
+                        {`O que vai no Campo ${i + 1}`}
                         <input
                           type="text"
                           value={cloudParams[i] ?? ""}
@@ -816,6 +863,8 @@ export function BroadcastManagement() {
                     {columns.length > 0 && (
                       <p className="text-xs text-slate-500 dark:text-slate-400">Variáveis deste público: {columns.map((c) => `{{${c}}}`).join(", ")}</p>
                     )}
+                    </div>
+                    </div>
                   </>
                 )}
                 {recipients.length > 0 && templateProblem && (
@@ -913,7 +962,7 @@ export function BroadcastManagement() {
           {/* 3. Anexo: imagem ou documento (texto livre; o modelo da API oficial não leva anexo) */}
           {!cloudMode && (
           <fieldset className="space-y-2">
-            <legend className="text-sm font-semibold text-slate-800 dark:text-slate-100">3. Anexo (opcional)</legend>
+            <legend className="text-sm font-semibold text-slate-800 dark:text-slate-100">Anexo (opcional)</legend>
             {image ? (
               <div className="flex items-center gap-3">
                 {imagePreviewUrl ? (
@@ -955,10 +1004,17 @@ export function BroadcastManagement() {
             )}
           </fieldset>
           )}
+          </div>
 
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 dark:border-slate-800 pt-4">
-            <p className="text-sm text-slate-600 dark:text-slate-300">
-              {!name.trim()
+          <div className="sticky bottom-0 -mx-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-950/95 backdrop-blur px-4 py-3">
+            <p className="text-sm text-slate-600 dark:text-slate-300 min-w-0 flex-1" aria-live="polite">
+              {formStep === 1
+                ? !name.trim()
+                  ? "Falta dar um nome à campanha."
+                  : recipients.length
+                    ? `${plural(recipients.length, "destinatário", "destinatários")}${formEstimate ? ` · ${estimateText(formEstimate.businessDays, formEstimate.finishIso)} se começar agora` : ""}.`
+                    : "Escolha o público."
+                : !name.trim()
                 ? "Falta dar um nome à campanha."
                 : !hasMessage
                   ? cloudMode ? "Falta escolher o modelo." : "Falta escrever a mensagem."
@@ -966,6 +1022,24 @@ export function BroadcastManagement() {
                 ? `${plural(recipients.length, "destinatário", "destinatários")} · envio seguro: 1 a cada 4–6 min, seg–sex 9h–17h, até 100/dia — ${estimateText(formEstimate.businessDays, formEstimate.finishIso)} se começar agora.`
                 : "Escolha o público para ver a previsão de envio."}
             </p>
+            {formStep === 1 ? (
+              <button
+                type="button"
+                disabled={!name.trim() || recipients.length === 0}
+                onClick={() => setFormStep(2)}
+                className="inline-flex h-9 items-center gap-1.5 px-4 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 rounded-lg"
+              >
+                Continuar
+              </button>
+            ) : (
+            <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setFormStep(1)}
+              className="h-9 px-3 text-sm font-medium rounded-lg text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
+            >
+              Voltar
+            </button>
             <button
               type="button"
               disabled={creating || unknownVars.length > 0 || unfilled.length > 0 || Boolean(variantError) || !name.trim() || !hasMessage}
@@ -976,6 +1050,8 @@ export function BroadcastManagement() {
               {creating && <Loader2 className="w-4 h-4 animate-spin" aria-hidden />}
               Criar rascunho
             </button>
+            </div>
+            )}
           </div>
         </section>
         )}
@@ -1301,9 +1377,9 @@ function CampaignCard({
             )}
             {c.hasImage &&
               (c.attachmentKind === "document" ? (
-                <FileText className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 shrink-0" aria-label={`Com documento${c.attachmentName ? `: ${c.attachmentName}` : ""}`} />
+                <FileText role="img" className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 shrink-0" aria-label={`Com documento${c.attachmentName ? `: ${c.attachmentName}` : ""}`} />
               ) : (
-                <ImageIcon className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 shrink-0" aria-label="Com imagem" />
+                <ImageIcon role="img" className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 shrink-0" aria-label="Com imagem" />
               ))}
           </div>
           {c.status === "RUNNING" && (
@@ -1389,20 +1465,40 @@ function CampaignCard({
         <div className="h-1.5 w-full rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden" role="progressbar" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100} aria-label={`Progresso do envio de ${c.name}`}>
           <div className="h-full bg-emerald-500" style={{ width: `${progress}%` }} />
         </div>
-        <p className="mt-1 text-xs text-slate-600 dark:text-slate-400 tabular-nums">
-          {c.sent} de {c.total} enviadas
-          {c.pending > 0 && c.status !== "DRAFT" && ` · ${c.pending} na fila`}
-          {c.skipped > 0 && ` · ${c.skipped} ${c.skipped === 1 ? "pediu" : "pediram"} para não receber`}
-          {c.noConsent > 0 && ` · ${c.noConsent} sem consentimento para campanhas`}
-          {c.delivery && c.sent > 0 && (
-            <>
-              {` · ${c.delivery.delivered} entregue${c.delivery.delivered === 1 ? "" : "s"}`}
-              {c.delivery.bounced > 0 && <span className="text-amber-700 dark:text-amber-400">{` · ${c.delivery.bounced} voltaram (e-mail inexistente ou cheio)`}</span>}
-              {c.delivery.complained > 0 && <span className="text-red-700 dark:text-red-400">{` · ${c.delivery.complained} marcaram como spam (saíram da lista)`}</span>}
-            </>
-          )}
-          {c.failed > 0 && <span className="text-red-700 dark:text-red-400"> · {plural(c.failed, "falha", "falhas")}</span>}
-        </p>
+        {/* Crítica 02/11: a linha "a · b · c…" de até 8 itens virou células com rótulo. */}
+        <dl className="mt-2 grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+          {(
+            [
+              { label: "Enviadas", value: `${c.sent} de ${c.total}`, tone: "" },
+              { label: "Na fila", value: c.status === "DRAFT" ? "—" : String(c.pending), tone: "" },
+              {
+                label: "Puladas",
+                value: String(c.skipped + c.noConsent),
+                tone: "",
+                hint: [c.skipped && `${c.skipped} pediram para não receber`, c.noConsent && `${c.noConsent} sem consentimento para campanhas`].filter(Boolean).join(" · "),
+              },
+              { label: "Falhas", value: String(c.failed), tone: c.failed > 0 ? "text-red-700 dark:text-red-400" : "" },
+            ] as { label: string; value: string; tone: string; hint?: string }[]
+          ).map((s) => (
+            <div key={s.label} className="rounded-md bg-slate-50 dark:bg-slate-800/60 px-2.5 py-1.5" title={s.hint || undefined}>
+              <dt className="text-slate-500 dark:text-slate-400">{s.label}</dt>
+              <dd className={`text-sm font-semibold tabular-nums text-slate-900 dark:text-slate-100 ${s.tone}`}>{s.value}</dd>
+              {s.hint && <dd className="sr-only">{s.hint}</dd>}
+            </div>
+          ))}
+        </dl>
+        {c.delivery && c.sent > 0 && (
+          <p className="mt-1 text-xs text-slate-600 dark:text-slate-400 tabular-nums">
+            E-mail: {c.delivery.delivered} entregue{c.delivery.delivered === 1 ? "" : "s"}
+            {c.delivery.bounced > 0 && <span className="text-amber-700 dark:text-amber-400">{` · ${c.delivery.bounced} voltaram (e-mail inexistente ou cheio)`}</span>}
+            {c.delivery.complained > 0 && <span className="text-red-700 dark:text-red-400">{` · ${c.delivery.complained} marcaram como spam (saíram da lista)`}</span>}
+          </p>
+        )}
+        {c.skipped + c.noConsent > 0 && (
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+            Puladas: {[c.skipped && `${c.skipped} ${c.skipped === 1 ? "pediu" : "pediram"} para não receber`, c.noConsent && `${c.noConsent} sem consentimento`].filter(Boolean).join(" · ")}.
+          </p>
+        )}
         {c.sentByVariant && (
           <p className="mt-0.5 text-xs text-slate-600 dark:text-slate-400 tabular-nums">
             Por texto: {c.sentByVariant.map((n, i) => `${i === 0 ? "principal" : `variação ${i + 1}`} ${n}`).join(" · ")}
