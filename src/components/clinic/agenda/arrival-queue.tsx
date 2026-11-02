@@ -52,7 +52,7 @@ export function ArrivalQueue({
         <span className="text-xs font-normal text-slate-500 tabular-nums">{queue.length} {queue.length === 1 ? "chegou e aguarda" : "chegaram e aguardam"}</span>
       </h2>
       <ol className="divide-y divide-slate-100 dark:divide-slate-800">
-        {queue.map(({ item, position, waitingMin }) => (
+        {queue.map(({ item, position, waitingMin, lateMin }) => (
           <li key={item.key} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2 text-sm">
             <button type="button" onClick={() => onOpen(item)} className="min-w-0 flex-1 text-left hover:underline underline-offset-2">
               <span className="font-medium">{toTitleCase(item.patientName || "Paciente")}</span>
@@ -61,17 +61,23 @@ export function ArrivalQueue({
                 {item.time ? ` · marcado ${item.time}` : " · ordem de chegada"}
               </span>
             </button>
-            <span
-              className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-semibold tabular-nums ${
-                waitingMin > 60
+            {/* Atraso conta do horário marcado; quem chegou adiantado só "espera". Sem horário
+                (ordem de chegada), a espera longa é o que alerta. */}
+            {(() => {
+              const late = lateMin ?? (waitingMin > 30 ? waitingMin - 30 : 0);
+              const tone =
+                late > 30
                   ? "bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300"
-                  : waitingMin > 30
+                  : late > 15
                     ? "bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300"
-                    : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300"
-              }`}
-            >
-              <Clock className="h-3 w-3" aria-hidden /> esperando {waitingMin} min{waitingMin > 60 ? " · atrasado" : ""}
-            </span>
+                    : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300";
+              return (
+                <span className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-semibold tabular-nums ${tone}`}>
+                  <Clock className="h-3 w-3" aria-hidden /> esperando {waitingMin} min
+                  {lateMin !== null && lateMin > 15 ? ` · ${lateMin} min após o horário` : ""}
+                </span>
+              );
+            })()}
             <button
               type="button"
               onClick={() => void done(item)}

@@ -87,7 +87,16 @@ export function WaitlistDialog({
     setForm((f) => ({ ...f, patientName: "", phone: "", notes: "" }));
   }
 
-  const offered = (c: SlotCandidate) => run(() => setWaitlistEntryStatus(c.id, "OFFERED"));
+  // Crítica 02/11: abrir o WhatsApp não garante que a mensagem saiu — marca e oferece desfazer.
+  const offered = (c: SlotCandidate) =>
+    run(async () => {
+      const rows = await setWaitlistEntryStatus(c.id, "OFFERED");
+      toast.info(`${c.patientName}: marcado como oferecido`, {
+        description: "Se não chegou a enviar a mensagem, desfaça.",
+        action: { label: "Desfazer", onClick: () => void run(() => setWaitlistEntryStatus(c.id, "WAITING")) },
+      });
+      return rows;
+    });
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

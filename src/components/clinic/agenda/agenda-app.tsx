@@ -169,14 +169,14 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
   }, [reload, schedule, openItem]);
 
   const applyStatus = useCallback(
-    async (item: AgendaItem, status: AgendaStatusChoice) => {
-      await setAgendaStatus({ source: item.source, externalId: item.externalId, date: item.date, phone: item.phone, status });
+    async (item: AgendaItem, status: AgendaStatusChoice, keepArrivedAt?: string) => {
+      await setAgendaStatus({ source: item.source, externalId: item.externalId, date: item.date, phone: item.phone, status, arrivedAt: keepArrivedAt });
       if (status === "AUTO") {
         reload(); // o automático depende do lembrete — recalcula no servidor
         setOpenItem(null);
         return;
       }
-      const arrivedAt = status === "IN_SERVICE" ? new Date().toISOString() : undefined;
+      const arrivedAt = status === "IN_SERVICE" ? keepArrivedAt ?? new Date().toISOString() : undefined;
       setData((d) => (d ? { ...d, items: d.items.map((i) => (i.key === item.key ? { ...i, status, isManual: true, arrivedAt } : i)) } : d));
       setOpenItem((o) => (o && o.key === item.key ? { ...o, status, isManual: true } : o));
     },
@@ -224,9 +224,13 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
         action: {
           label: "Desfazer",
           onClick: () => {
-            applyStatus({ ...item, status: status === "AUTO" ? item.status : status, isManual: status !== "AUTO" }, previous).catch(() =>
-              toast.error("Não foi possível desfazer.")
-            );
+            const undo = () =>
+              applyStatus(
+                { ...item, status: status === "AUTO" ? item.status : status, isManual: status !== "AUTO" },
+                previous,
+                previous === "IN_SERVICE" ? item.arrivedAt : undefined
+              ).catch(() => toast.error("Não foi possível desfazer.", { action: { label: "Tentar de novo", onClick: () => void undo() } }));
+            void undo();
           },
         },
       });
@@ -552,12 +556,21 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
           fetchAgenda={getClinicDoctorAgenda}
           fetchPatients={listClinicPatientsForAppointment}
           onConfirmSchedule={() => {
-            if (schedule.patient) {
-              toast.success("Remarcado.", {
-                description: "Desmarque o horário antigo no sistema da clínica e marque-o como Cancelado aqui.",
-                duration: 9000,
-              });
-            } else toast.success("Agendamento criado.");
+            const from = schedule.patient?.from;
+            if (from) {
+              // Crítica 02/11: o horário antigo ficava "Quer remarcar" e o lembrete era um toast.
+              // Agora vira Cancelado aqui; se veio do sistema da clínica, entra nas pendências.
+              applyStatus(from, "CANCELLED")
+                .then(() =>
+                  toast.success("Remarcado — horário antigo marcado como Cancelado.", {
+                    description: from.source === "BRIDGE" ? "Cancele também no sistema da clínica (fica na lista de pendências até lá)." : undefined,
+                  })
+                )
+                .catch(() => toast.warning("Remarcado, mas não consegui cancelar o horário antigo — marque-o como Cancelado."))
+                .finally(reload);
+              return;
+            }
+            toast.success("Agendamento criado.");
             reload();
           }}
         />

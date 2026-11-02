@@ -56,15 +56,23 @@ export function AgendaGrid({
   const hasUnscheduled = byCell.some((c) => c.unscheduled.length > 0);
 
   // Abre já na hora atual (o pico da recepção é "quem chega agora").
+  // Crítica 02/11: scrollIntoView rolava a página inteira a cada 15 min. Agora rola só a
+  // caixa da grade, e só quando o conjunto de colunas muda (abrir/trocar período).
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const colsKey = columns.map((c) => c.id).join("|");
   useEffect(() => {
-    nowRef.current?.scrollIntoView({ block: "center" });
-  }, [nowRow, columns.length]);
+    const box = scrollRef.current;
+    const now = nowRef.current;
+    if (!box || !now) return;
+    box.scrollTop = Math.max(0, now.offsetTop - box.clientHeight / 2);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [colsKey]);
 
   const rows: number[] = [];
   for (let r = firstRow; r <= lastRow; r++) rows.push(r);
 
   return (
-    <div className="max-h-[calc(100vh-15rem)] overflow-auto rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+    <div ref={scrollRef} className="relative max-h-[calc(100vh-12rem)] min-h-[20rem] overflow-auto rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
       <div className="grid min-w-fit" style={template}>
         {/* Cabeçalho */}
         <div className="sticky top-0 left-0 z-30 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800" />
@@ -95,7 +103,7 @@ export function AgendaGrid({
 
         {hasUnscheduled && (
           <>
-            <div className="sticky left-0 z-10 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 pr-2 py-2 text-[11px] leading-tight text-slate-500 dark:text-slate-400 text-right">
+            <div className="sticky left-0 z-10 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 pr-2 py-2 text-xs leading-tight text-slate-500 dark:text-slate-400 text-right">
               Sem horário
             </div>
             {byCell.map((c, i) => (
@@ -121,14 +129,14 @@ export function AgendaGrid({
             <div key={row} className="contents">
               <div
                 ref={isNow ? nowRef : undefined}
-                className={`sticky left-0 z-10 bg-white dark:bg-slate-900 border-t ${line} pr-2 text-right text-[11px] tabular-nums ${
-                  isNow ? "font-semibold text-emerald-700 dark:text-emerald-400" : "text-slate-400 dark:text-slate-500"
+                className={`sticky left-0 z-10 bg-white dark:bg-slate-900 border-t ${line} pr-2 text-right text-xs tabular-nums ${
+                  isNow ? "font-semibold text-emerald-700 dark:text-emerald-400" : "text-slate-500 dark:text-slate-400"
                 }`}
               >
                 {isNow ? (
                   <>
                     {time}
-                    <span className="block text-[10px]">agora</span>
+                    <span className="block text-[11px]">agora</span>
                   </>
                 ) : isHour ? (
                   time

@@ -148,6 +148,8 @@ export async function setAgendaStatus(input: {
   phone?: string | null;
   /** "AUTO" apaga a marcação manual — volta a valer o status automático (lembrete). */
   status: ManualAgendaStatus | "AUTO";
+  /** Desfazer "Atendido": volta pra fila com a hora de chegada original (não "agora"). */
+  arrivedAt?: string | null;
 }): Promise<{ success: true }> {
   const { clinicId, userId } = await requireClinicSession();
   if (input.status !== "AUTO" && !(MANUAL_AGENDA_STATUSES as readonly string[]).includes(input.status)) {
@@ -166,10 +168,14 @@ export async function setAgendaStatus(input: {
     revalidatePath("/clinic/agenda");
     return { success: true };
   }
+  // A fila de chegada ordena por updatedAt; ao desfazer, reaproveita a chegada original
+  // (só se for de até 24 h atrás — nunca no futuro).
+  const kept = input.status === "IN_SERVICE" && input.arrivedAt ? new Date(input.arrivedAt) : null;
+  const updatedAt = kept && !isNaN(kept.getTime()) && kept.getTime() <= Date.now() && Date.now() - kept.getTime() < 86_400_000 ? kept : undefined;
   await prisma.agendaMark.upsert({
     where: { clinicId_source_externalId: { clinicId, source: input.source, externalId: input.externalId } },
-    update: { status: input.status, updatedByUserId: userId, date, phone: input.phone ?? undefined },
-    create: { clinicId, source: input.source, externalId: input.externalId, date, status: input.status, updatedByUserId: userId, phone: input.phone ?? null },
+    update: { status: input.status, updatedByUserId: userId, date, phone: input.phone ?? undefined, ...(updatedAt ? { updatedAt } : {}) },
+    create: { clinicId, source: input.source, externalId: input.externalId, date, status: input.status, updatedByUserId: userId, phone: input.phone ?? null, ...(updatedAt ? { updatedAt } : {}) },
   });
   revalidatePath("/clinic/agenda");
   return { success: true };

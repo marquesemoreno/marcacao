@@ -150,6 +150,25 @@ describe("arrivalQueue", () => {
       ["b", 2, 20],
     ]);
   });
+  it("atraso conta do horário marcado, não da chegada", () => {
+    const early = { ...qi("a", "IN_SERVICE", "2026-10-21T11:30:00Z"), time: "10:30" }; // chegou 08:30, marcado 10:30
+    const late = { ...qi("b", "IN_SERVICE", "2026-10-21T12:00:00Z"), time: "09:20" }; // marcado 09:20, agora 10:00
+    const walkIn = { ...qi("c", "IN_SERVICE", "2026-10-21T12:00:00Z"), time: null };
+    const q = arrivalQueue([early, late, walkIn], "2026-10-21", now);
+    expect(q.map((x) => [x.item.key, x.waitingMin, x.lateMin])).toEqual([
+      ["a", 90, 0],
+      ["b", 60, 40],
+      ["c", 60, null],
+    ]);
+  });
+  it("médico com espaço sobrando conta na mesma fila", () => {
+    const q = arrivalQueue(
+      [qi("a", "IN_SERVICE", "2026-10-21T12:15:00Z", "Dr. A"), qi("b", "IN_SERVICE", "2026-10-21T12:20:00Z", "Dr. A ")],
+      "2026-10-21",
+      now
+    );
+    expect(q.map((x) => x.position)).toEqual([1, 2]);
+  });
   it("posição conta por médico", () => {
     const q = arrivalQueue(
       [qi("a", "IN_SERVICE", "2026-10-21T12:15:00Z", "Dr. A"), qi("b", "IN_SERVICE", "2026-10-21T12:20:00Z", "Dr. B")],

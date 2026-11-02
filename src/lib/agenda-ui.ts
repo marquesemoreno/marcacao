@@ -11,13 +11,13 @@ export const AGENDA_STATUS_META: Record<AgendaStatus, { label: string; badge: st
     dot: "bg-emerald-500",
   },
   PENDING: {
-    label: "Sem lembrete",
+    label: "Sem confirmação · sem lembrete",
     badge: "bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800",
     tint: "bg-white dark:bg-slate-900",
     dot: "bg-amber-400",
   },
   SENT: {
-    label: "Lembrete enviado",
+    label: "Sem confirmação · lembrete enviado",
     badge: "bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800",
     tint: "bg-white dark:bg-slate-900",
     dot: "bg-amber-400",
@@ -62,7 +62,7 @@ export const AGENDA_STATUS_GROUPS: { id: "confirmado" | "aguardando" | "remarcar
   { id: "confirmado", label: "Confirmado", statuses: ["CONFIRMED"], dot: "bg-emerald-500" },
   { id: "presente", label: "Chegou", statuses: ["IN_SERVICE"], dot: "bg-sky-500" },
   { id: "atendido", label: "Atendido", statuses: ["COMPLETED"], dot: "bg-slate-400" },
-  { id: "falta", label: "Faltou / cancelado", statuses: ["CANCELLED", "NO_SHOW"], dot: "bg-rose-500" },
+  { id: "falta", label: "Faltou / cancelado", statuses: ["CANCELLED", "NO_SHOW"], dot: "bg-gradient-to-r from-rose-500 from-50% to-slate-700 to-50%" },
 ];
 
 export function initialsOf(name: string): string {

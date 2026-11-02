@@ -105,7 +105,7 @@ export function AgendaSidebar({
         </section>
 
         <p className="px-1 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
-          Atalhos: ← → muda o período · H hoje · D S M P troca a visão.
+          Atalhos: ← → período · H hoje · / buscar · ? todos os atalhos.
         </p>
       </div>
     </aside>

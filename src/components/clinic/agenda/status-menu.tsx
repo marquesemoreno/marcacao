@@ -1,6 +1,7 @@
 "use client";
 
-import { Check, RotateCcw } from "lucide-react";
+import { useState } from "react";
+import { AlertTriangle, Check, RotateCcw } from "lucide-react";
 import type { AgendaItem, AgendaStatusChoice, ManualAgendaStatus } from "@/lib/agenda";
 import { AGENDA_STATUS_META, todayInBahia } from "@/lib/agenda-ui";
 import { StatusIcon } from "./status-icon";
@@ -27,6 +28,9 @@ export function StatusMenu({
   onPick: (status: AgendaStatusChoice) => void;
 }) {
   const future = item.date > todayInBahia();
+  // Crítica 02/11: Faltou/Cancelado num toque, logo abaixo de Atendido. Na marcação do sistema
+  // da clínica isso gera trabalho lá também — pede um segundo toque.
+  const [confirming, setConfirming] = useState<ManualAgendaStatus | null>(null);
   const option = (s: ManualAgendaStatus) => {
     const blocked = future && SAME_DAY_ONLY.includes(s);
     return (
@@ -36,12 +40,16 @@ export function StatusMenu({
         aria-pressed={item.status === s}
         disabled={disabled || blocked}
         title={blocked ? "Disponível no dia da consulta" : undefined}
-        onClick={() => onPick(s)}
-        className={itemClass}
+        onClick={() => {
+          if (item.source === "BRIDGE" && NEGATIVE.includes(s) && item.status !== s && confirming !== s) return setConfirming(s);
+          setConfirming(null);
+          onPick(s);
+        }}
+        className={`${itemClass} ${confirming === s ? "bg-rose-50 dark:bg-rose-950/40 text-rose-800 dark:text-rose-200 font-semibold" : ""}`}
       >
         <span className="flex items-center gap-2">
           <StatusIcon status={s} />
-          {AGENDA_STATUS_META[s].label}
+          {confirming === s ? `Toque de novo: ${AGENDA_STATUS_META[s].label.toLowerCase()}` : AGENDA_STATUS_META[s].label}
         </span>
         {item.status === s && <Check className="w-3.5 h-3.5 text-emerald-600" aria-hidden />}
       </button>
@@ -52,6 +60,12 @@ export function StatusMenu({
       {POSITIVE.map(option)}
       <div className="my-1 border-t border-slate-200 dark:border-slate-700" />
       {NEGATIVE.map(option)}
+      {confirming && (
+        <p role="status" className="flex items-start gap-1.5 px-2 pt-1 text-xs text-slate-600 dark:text-slate-300">
+          <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0 text-amber-600" aria-hidden />
+          Também precisa ser feito no sistema da clínica.
+        </p>
+      )}
       {item.isManual && (
         <>
           <div className="my-1 border-t border-slate-200 dark:border-slate-700" />

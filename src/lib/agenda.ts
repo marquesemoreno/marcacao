@@ -159,7 +159,18 @@ export function visibleRowRange(items: AgendaItem[], nowTime?: string | null): [
   return [Math.max(0, Math.min(...rows) - 1), Math.min(AGENDA_ROWS - 1, Math.max(...rows) + 1)];
 }
 
-export type ArrivalEntry = { item: AgendaItem; position: number; waitingMin: number };
+export type ArrivalEntry = {
+  item: AgendaItem;
+  position: number;
+  waitingMin: number;
+  /** Minutos além do horário marcado (0 = ainda não passou). null = ordem de chegada, sem horário. */
+  lateMin: number | null;
+};
+
+/** Agora em minutos do dia no horário de Brasília (UTC−3). */
+function minutesOfDayBR(d: Date): number {
+  return (((d.getUTCHours() - 3 + 24) % 24) * 60) + d.getUTCMinutes();
+}
 
 /** Fila de chegada do dia: quem a recepção marcou "Chegou" (IN_SERVICE), em ordem de
  * chegada, com minutos de espera e posição na fila do próprio médico. */
@@ -169,10 +180,17 @@ export function arrivalQueue(items: AgendaItem[], date: string, now: Date = new 
     .sort((a, b) => a.arrivedAt!.localeCompare(b.arrivedAt!));
   const perDoctor = new Map<string, number>();
   return waiting.map((item) => {
-    const doctor = item.doctor ?? NO_DOCTOR;
+    const doctor = item.doctor?.trim() || NO_DOCTOR;
     const position = (perDoctor.get(doctor) ?? 0) + 1;
     perDoctor.set(doctor, position);
-    return { item, position, waitingMin: Math.max(0, Math.round((now.getTime() - new Date(item.arrivedAt!).getTime()) / 60_000)) };
+    const waitingMin = Math.max(0, Math.round((now.getTime() - new Date(item.arrivedAt!).getTime()) / 60_000));
+    // Crítica 02/11: "atrasado" contava da chegada — quem chegou 1 h adiantado ficava vermelho.
+    let lateMin: number | null = null;
+    if (item.time) {
+      const [h, m] = item.time.split(":").map(Number);
+      lateMin = Math.max(0, minutesOfDayBR(now) - (h * 60 + m));
+    }
+    return { item, position, waitingMin, lateMin };
   });
 }
 
