@@ -108,7 +108,7 @@ export function AppointmentCard({
                   {/* Semana: coluna estreita cortava em "Mari…"; primeiro nome + inicial lê melhor. */}
                   {compact ? compactName(name) : name}
                 </span>
-                {item.phone && <MessageCircle className="w-3.5 h-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" aria-hidden />}
+                {item.phone && !compact && <MessageCircle className="w-3.5 h-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" aria-hidden />}
                 {item.formDone && (
                   <ClipboardCheck className="w-3.5 h-3.5 shrink-0 text-emerald-700 dark:text-emerald-400" role="img" aria-label="Ficha prévia enviada">
                     <title>Ficha prévia enviada</title>
