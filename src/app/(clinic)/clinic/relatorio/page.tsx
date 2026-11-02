@@ -31,6 +31,8 @@ import {
 } from "@/actions/clinic";
 import { CampaignBreakdownTable } from "@/components/clinic/campaign-breakdown-table";
 import { getClinicReportInsights } from "@/actions/clinic-insights";
+import { getClinicNpsReport } from "@/actions/clinic-nps";
+import { NpsCard } from "@/components/clinic/nps-card";
 import { ReportAiSummary } from "@/components/clinic/report-ai-summary";
 import { AgendaRiskBlock, FunnelCard, PatientsCard, WeeklyTrendCard } from "@/components/clinic/report-insights-blocks";
 import { buildInsightFacts, computeFunnel } from "@/lib/report-insights";
@@ -137,6 +139,7 @@ export default async function ClinicReportPage({
     prevManagement,
     campaignBreakdown,
     insights,
+    nps,
   ] = await Promise.all([
     getClinicChatReport(period, tags, params.channel),
     isExclusive
@@ -153,6 +156,7 @@ export default async function ClinicReportPage({
     getClinicManagementReport(period, params.channel, true),
     getClinicCampaignBreakdown(period),
     getClinicReportInsights(period),
+    getClinicNpsReport(period),
   ]);
   const rs = chatReport.responseStats;
   const prevRs = prevChat.responseStats;
@@ -402,6 +406,7 @@ export default async function ClinicReportPage({
           <WeeklyTrendCard weeks={insights.trend} />
           <PatientsCard patients={insights.patients} />
         </div>
+        <NpsCard nps={nps} />
       </section>
 
       {insights.agenda && (

@@ -2,7 +2,7 @@
  * fica em src/lib/automation-rules-run.ts e cria uma campanha de Disparos por passo/dia,
  * então ritmo, consentimento, opt-out e modelo da API oficial são os mesmos das campanhas. */
 
-export type AutomationRuleKind = "POS_CONSULTA" | "RETORNO" | "REATIVACAO" | "ANIVERSARIO";
+export type AutomationRuleKind = "POS_CONSULTA" | "RETORNO" | "REATIVACAO" | "ANIVERSARIO" | "NPS";
 
 export const DEFAULT_RULE_STEPS: {
   kind: AutomationRuleKind;
@@ -31,6 +31,14 @@ export const DEFAULT_RULE_STEPS: {
     daysAfter: 365,
     requireNoFuture: true,
     messageTemplate: "{{saudacao}}! Sentimos sua falta por aqui — já faz 1 ano da sua última consulta. Quer agendar um horário? É só responder.",
+  },
+  {
+    // {{link}} = link pessoal da pesquisa (/p/[token], NPS), gerado na hora do envio.
+    kind: "NPS",
+    name: "Satisfação",
+    daysAfter: 2,
+    requireNoFuture: false,
+    messageTemplate: "{{saudacao}}! De 0 a 10, quanto você recomendaria a clínica a um amigo? Leva 10 segundos: {{link}}",
   },
   {
     // daysAfter não vale aqui: o dia é o do aniversário (ver birthdayKeysFor).

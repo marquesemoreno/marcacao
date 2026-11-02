@@ -983,7 +983,7 @@ model BroadcastCampaign {
 model AutomationRule {
   id                    String   @id @default(cuid())
   clinicId              String   @map("clinic_id")
-  /// POS_CONSULTA | RETORNO | REATIVACAO
+  /// POS_CONSULTA | RETORNO | REATIVACAO | ANIVERSARIO | NPS
   kind                  String
   name                  String
   daysAfter             Int      @map("days_after")
@@ -1388,6 +1388,21 @@ model PatientFormResponse {
   @@index([clinicId, appointmentDate])
   @@index([clinicId, phone])
   @@map("patient_form_responses")
+}
+
+/// Resposta da pesquisa de satisfação (passo NPS da régua, link /p/[token]). Comentário
+/// criptografado (texto livre pode trazer dado de saúde).
+model NpsResponse {
+  id               String   @id @default(cuid())
+  clinicId         String   @map("clinic_id")
+  tokenId          String?  @unique @map("token_id")
+  phone            String?
+  score            Int
+  commentEncrypted String?  @map("comment_encrypted")
+  submittedAt      DateTime @default(now()) @map("submitted_at")
+
+  @@index([clinicId, submittedAt])
+  @@map("nps_responses")
 }
 
 /// Termo de consentimento versionado. clinicId null = termo padrão do Conecta.

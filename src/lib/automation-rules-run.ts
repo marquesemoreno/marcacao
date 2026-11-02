@@ -92,6 +92,16 @@ async function runOne(
   );
   if (recipients.length === 0) return { ...base, status: "ninguém hoje", recipients: 0 };
 
+  // Satisfação: cada paciente ganha um link pessoal (7 dias) pra dar a nota.
+  if (rule.kind === "NPS") {
+    const { issuePatientToken } = await import("@/lib/patient-token-server");
+    const { getBaseUrl } = await import("@/lib/format");
+    for (const r of recipients) {
+      const { raw } = await issuePatientToken({ clinicId: rule.clinicId, kind: "NPS", phone: r.phone });
+      (r.variables as Record<string, string>).link = `${getBaseUrl()}/p/${raw}`;
+    }
+  }
+
   const owner = await prisma.user.findFirst({
     where: { clinicId: rule.clinicId },
     orderBy: [{ isManager: "desc" }, { createdAt: "asc" }],

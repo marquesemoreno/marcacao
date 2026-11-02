@@ -12,6 +12,7 @@ const STEP_HELP: Record<AutomationRuleView["kind"], string> = {
   POS_CONSULTA: "Para quem consultou — pergunta como está e abre espaço para dúvidas.",
   RETORNO: "Para quem não voltou e não tem consulta marcada.",
   REATIVACAO: "Para quem sumiu há muito tempo e não tem consulta marcada.",
+  NPS: "Pede uma nota de 0 a 10 pelo link — use {{link}} num campo do modelo. Resultado em Relatório.",
   ANIVERSARIO: "No dia do aniversário, para quem passou na clínica nos últimos 2 anos.",
 };
 
@@ -194,7 +195,7 @@ function RuleCard({ rule, cloud, onSaved }: { rule: AutomationRuleView; cloud: {
           <p className="whitespace-pre-wrap">
             {renderTemplatePreview(
               tpl.bodyText,
-              params.map((p) => p.replace(/\{\{nome\}\}/gi, "Maria").replace(/\{\{saudacao\}\}/gi, "Oi, Maria")),
+              params.map((p) => p.replace(/\{\{nome\}\}/gi, "Maria").replace(/\{\{saudacao\}\}/gi, "Oi, Maria").replace(/\{\{link\}\}/gi, "https://…/p/abc")),
             )}
           </p>
         </div>
