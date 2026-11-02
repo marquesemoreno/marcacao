@@ -37,6 +37,7 @@ import { AgendaMonth } from "./agenda-month";
 import { AgendaSummary } from "./agenda-summary";
 import { ArrivalQueue } from "./arrival-queue";
 import { SystemPendings } from "./system-pendings";
+import { BookingRequests } from "./booking-requests";
 import { PatientSheet } from "./patient-sheet";
 import { WaitlistDialog } from "./waitlist-dialog";
 
@@ -210,6 +211,7 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
   const summary = useMemo(() => daySummary(doctorItems), [doctorItems]);
 
   const reload = useCallback(() => setReloadKey((k) => k + 1), []);
+  const [bookingCount, setBookingCount] = useState(0);
   // Ao vivo: outra tela ou o "Cheguei" do paciente avisa e recarrega (sem esperar 90 s).
   const live = useAgendaRealtime(() => {
     if (!document.querySelector("[data-status-menu]")) reload();
@@ -635,14 +637,17 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
               />
             )}
           </div>
-          {(pendings.length > 0 || includesToday) && (
-            <aside aria-label="Fila e pendências" className="space-y-3 xl:sticky xl:top-3 xl:w-80 xl:shrink-0">
-              {includesToday && (
-                <ArrivalQueue items={doctorItems} date={today} onSetStatus={handleSetStatus} onOpen={setOpenItem} />
-              )}
-              <SystemPendings items={pendings} onOpen={setOpenItem} />
-            </aside>
-          )}
+          {/* Sempre montado: os pedidos de marcação carregam sozinhos; vazio = coluna some. */}
+          <aside
+            aria-label="Fila e pendências"
+            className={`space-y-3 xl:sticky xl:top-3 xl:shrink-0 ${pendings.length > 0 || includesToday || bookingCount > 0 ? "xl:w-80" : "hidden"}`}
+          >
+            {includesToday && (
+              <ArrivalQueue items={doctorItems} date={today} onSetStatus={handleSetStatus} onOpen={setOpenItem} />
+            )}
+            <BookingRequests refreshKey={reloadKey} onCount={setBookingCount} />
+            <SystemPendings items={pendings} onOpen={setOpenItem} />
+          </aside>
           </div>
         )}
       </div>

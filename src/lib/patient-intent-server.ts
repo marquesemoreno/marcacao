@@ -1,7 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import { askJevChoice } from "@/lib/jev";
-import { intentFromJevAnswer, PATIENT_INTENT_QUESTION } from "@/lib/patient-intent";
+import { intentFromJevAnswer, PATIENT_INTENT_MIN_CONFIDENCE, PATIENT_INTENT_QUESTION } from "@/lib/patient-intent";
 
 /** Classifica a intenção atual do paciente (últimas 3 mensagens de texto recebidas) e
  * grava na conversa. Chamado depois da resposta do webhook (next/server `after`) — nunca
@@ -22,6 +22,11 @@ export async function classifyAndStorePatientIntent(conversationId: string): Pro
       where: { id: conversationId },
       data: { patientIntent: result.intent, patientIntentConfidence: result.confidence, patientIntentAt: new Date() },
     });
+    // Pré-agendamento: só com confiança alta (mesmo corte do selo da fila).
+    if (result.intent === "AGENDAR" && result.confidence >= PATIENT_INTENT_MIN_CONFIDENCE) {
+      const { upsertBookingRequestFromConversation } = await import("@/lib/booking-request-server");
+      await upsertBookingRequestFromConversation(conversationId);
+    }
   } catch (error) {
     console.error("Falha ao classificar intenção do paciente:", error);
   }

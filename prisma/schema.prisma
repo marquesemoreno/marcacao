@@ -1420,6 +1420,30 @@ model ReturnInterval {
   @@map("return_intervals")
 }
 
+/// Pedido de marcação extraído da conversa pela IA (src/lib/booking-request.ts). A recepção
+/// marca no sistema da clínica e dá baixa. status: OPEN | SCHEDULED | DISCARDED.
+model BookingRequest {
+  id              String    @id @default(cuid())
+  clinicId        String    @map("clinic_id")
+  conversationId  String    @map("conversation_id")
+  phone           String?
+  patientName     String?   @map("patient_name")
+  doctorName      String?   @map("doctor_name")
+  procedure       String?
+  period          String    @default("ANY")
+  preferredDates  String?   @map("preferred_dates")
+  notes           String?
+  status          String    @default("OPEN")
+  handledByUserId String?   @map("handled_by_user_id")
+  handledAt       DateTime? @map("handled_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  @@index([clinicId, status])
+  @@index([conversationId])
+  @@map("booking_requests")
+}
+
 /// Termo de consentimento versionado. clinicId null = termo padrão do Conecta.
 model ConsentTerm {
   id          String              @id @default(cuid())
