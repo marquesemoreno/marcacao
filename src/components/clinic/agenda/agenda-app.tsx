@@ -92,8 +92,20 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
   // Pendências e busca não podem depender do período aberto (crítica 02/11, 4ª): janela fixa
   // de 7 dias atrás a ~5 semanas à frente, recarregada junto com a agenda.
   const [wide, setWide] = useState<AgendaItem[]>([]);
+  // Crítica 02/11 (5ª): 42 dias a cada 90 s pesava no PC da clínica — janela larga só a cada 10 min.
+  const [wideKey, setWideKey] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => document.visibilityState === "visible" && setWideKey((k) => k + 1), 10 * 60_000);
+    return () => clearInterval(t);
+  }, []);
   const [helpOpen, setHelpOpen] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
+  const helpTriggerRef = useRef<HTMLButtonElement>(null);
+  const closeHelp = useCallback(() => {
+    setHelpOpen(false);
+    requestAnimationFrame(() => helpTriggerRef.current?.focus());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [openItem, setOpenItem] = useState<AgendaItem | null>(null);
   const [schedule, setSchedule] = useState<{
     date: string;
@@ -157,7 +169,7 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
     return () => {
       cancelled = true;
     };
-  }, [reloadKey]);
+  }, [wideKey]);
 
   const allItems = useMemo(() => current?.items ?? [], [current]);
   const doctors = useMemo(() => agendaDoctors(allItems), [allItems]);
@@ -172,6 +184,18 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
     const statuses = AGENDA_STATUS_GROUPS.filter((g) => selectedGroups.includes(g.id)).flatMap((g) => g.statuses);
     return byQuery.filter((i) => statuses.includes(i.status));
   }, [doctorItems, selectedGroups, query, lateOnly, today, nowTime]);
+  // "atrasados" só existe hoje — não deixar o filtro ligado ao trocar de dia (grade vazia
+  // parecia "ninguém marcado").
+  useEffect(() => {
+    if (!range.days.includes(today)) setLateOnly(false);
+  }, [range.days, today]);
+  const filtersOn = selectedGroups.length > 0 || lateOnly || query.trim() !== "" || selectedDoctors.length > 0;
+  const clearFilters = () => {
+    setSelectedGroups([]);
+    setLateOnly(false);
+    setQuery("");
+    setSelectedDoctors([]);
+  };
   const lateCount = useMemo(() => doctorItems.filter((i) => overdueMinutes(i, today, nowTime) !== null).length, [doctorItems, today, nowTime]);
   // Busca fora do período aberto (telefonema "quando é minha consulta?").
   const otherMatches = useMemo(() => {
@@ -201,11 +225,18 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
       await setAgendaStatus({ source: item.source, externalId: item.externalId, date: item.date, phone: item.phone, status, arrivedAt: keepArrivedAt });
       if (status === "AUTO") {
         reload(); // o automático depende do lembrete — recalcula no servidor
+        setWideKey((k) => k + 1);
         setOpenItem(null);
         return;
       }
       const arrivedAt = status === "IN_SERVICE" ? keepArrivedAt ?? new Date().toISOString() : undefined;
       setData((d) => (d ? { ...d, items: d.items.map((i) => (i.key === item.key ? { ...i, status, isManual: true, arrivedAt } : i)) } : d));
+      // Pendências/busca usam a janela larga: atualiza na hora (antes esperava o recarregamento).
+      setWide((w) => {
+        const has = w.some((i) => i.key === item.key);
+        const next = { ...item, status, isManual: true, arrivedAt };
+        return has ? w.map((i) => (i.key === item.key ? next : i)) : [...w, next];
+      });
       setOpenItem((o) => (o && o.key === item.key ? { ...o, status, isManual: true } : o));
     },
     [reload]
@@ -299,7 +330,7 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
   // modal/painel aberto.
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape" && helpOpen) return setHelpOpen(false);
+      if (e.key === "Escape" && helpOpen) return closeHelp();
       if (e.ctrlKey || e.metaKey || e.altKey || schedule || openItem) return;
       const el = e.target as HTMLElement | null;
       if (el && (el.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName))) return;
@@ -370,7 +401,7 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
       <AgendaSidebar
         date={date}
         onDateChange={setDate}
-        doctors={doctors}
+        doctors={[...doctors, ...selectedDoctors.filter((d) => !doctors.includes(d))]}
         selectedDoctors={selectedDoctors}
         onToggleDoctor={(d) => setSelectedDoctors((prev) => (prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d]))}
         onAllDoctors={() => setSelectedDoctors([])}
@@ -442,6 +473,7 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
           )}
           <button
             type="button"
+            ref={helpTriggerRef}
             onClick={() => setHelpOpen(true)}
             className="ml-auto inline-flex h-9 items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
           >
@@ -523,6 +555,26 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
           />
         )}
 
+        {current && filtersOn && view !== "mes" && visibleItems.length < allItems.length && (
+          <p role="status" className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-3 py-2 text-sm text-slate-700 dark:text-slate-200">
+            <span className="tabular-nums">
+              Mostrando {visibleItems.length} de {allItems.length} {allItems.length === 1 ? "paciente" : "pacientes"} — filtro ativo
+              {[
+                selectedDoctors.length ? `médico: ${selectedDoctors.map((d) => (d === NO_DOCTOR ? d : toTitleCase(d))).join(", ")}` : "",
+                lateOnly ? "só atrasados" : "",
+                selectedGroups.length ? AGENDA_STATUS_GROUPS.filter((g) => selectedGroups.includes(g.id)).map((g) => g.label.toLowerCase()).join(", ") : "",
+                query.trim() ? `busca “${query.trim()}”` : "",
+              ]
+                .filter(Boolean)
+                .map((t) => ` · ${t}`)
+                .join("")}
+            </span>
+            <button type="button" onClick={clearFilters} className="font-semibold text-emerald-700 dark:text-emerald-400 underline underline-offset-2">
+              Limpar filtros
+            </button>
+          </p>
+        )}
+
         {loadError && !current ? (
           <div className={`${panel} p-10 text-center`} role="alert">
             <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">Não foi possível carregar a agenda.</p>
@@ -577,9 +629,9 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
               />
             )}
           </div>
-          {(pendings.length > 0 || date === today) && (
+          {(pendings.length > 0 || includesToday) && (
             <aside aria-label="Fila e pendências" className="space-y-3 xl:sticky xl:top-3 xl:w-80 xl:shrink-0">
-              {date === today && (
+              {includesToday && (
                 <ArrivalQueue items={doctorItems} date={today} onDone={(item) => handleSetStatus(item, "COMPLETED")} onOpen={setOpenItem} />
               )}
               <SystemPendings items={pendings} onOpen={setOpenItem} />
@@ -598,7 +650,7 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
         onChanged={setWaitlistCount}
       />
       {helpOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4" onClick={() => setHelpOpen(false)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4" onClick={() => closeHelp()}>
           <div
             role="dialog"
             aria-modal="true"
@@ -624,7 +676,7 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
             <button
               type="button"
               autoFocus
-              onClick={() => setHelpOpen(false)}
+              onClick={() => closeHelp()}
               className="mt-4 inline-flex h-9 w-full items-center justify-center rounded-lg border border-slate-200 dark:border-slate-700 text-sm font-medium hover:bg-slate-50 dark:hover:bg-slate-800"
             >
               Fechar

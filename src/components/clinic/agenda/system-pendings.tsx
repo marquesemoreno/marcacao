@@ -60,7 +60,7 @@ export function SystemPendings({ items: all, onOpen }: { items: AgendaItem[]; on
                 <button
                   type="button"
                   onClick={() => markDone(i.key)}
-                  className="inline-flex h-7 shrink-0 items-center gap-1 rounded-md border border-amber-300 dark:border-amber-700 px-2 text-xs font-semibold text-amber-900 dark:text-amber-200 hover:bg-amber-100 dark:hover:bg-amber-900/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
+                  className="inline-flex h-8 shrink-0 items-center gap-1 rounded-md border border-amber-300 dark:border-amber-700 px-2 text-xs font-semibold text-amber-900 dark:text-amber-200 hover:bg-amber-100 dark:hover:bg-amber-900/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
                 >
                   <Check className="h-3 w-3" aria-hidden /> Feito
                 </button>

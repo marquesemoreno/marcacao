@@ -35,6 +35,10 @@ export function AgendaGrid({
   onReschedule: (item: AgendaItem) => void;
 }) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  // Toque (tablet, sem hover): 1º toque mostra "+ HH:MM", 2º abre o agendamento — um toque
+  // perdido na grade não abre mais "Novo agendamento" (crítica 02/11, 5ª).
+  const [armed, setArmed] = useState<string | null>(null);
+  const noHover = typeof window !== "undefined" && window.matchMedia?.("(hover: none)").matches;
   const nowRef = useRef<HTMLDivElement>(null);
   const colMin = compact ? "minmax(150px, 1fr)" : "minmax(230px, 1fr)";
   const template = { gridTemplateColumns: `52px repeat(${Math.max(columns.length, 1)}, ${colMin})` };
@@ -169,8 +173,12 @@ export function AgendaGrid({
                       <button
                         type="button"
                         tabIndex={-1}
-                        onClick={() => onSlotClick(col, time)}
-                        className="absolute inset-0 flex items-center gap-1 px-2 text-xs font-medium text-emerald-700 dark:text-emerald-400 opacity-0 hover:opacity-100 hover:bg-emerald-50/70 dark:hover:bg-emerald-950/30 focus:outline-none"
+                        onClick={() => {
+                          if (noHover && armed !== cellKey) return setArmed(cellKey);
+                          setArmed(null);
+                          onSlotClick(col, time);
+                        }}
+                        className={`absolute inset-0 flex items-center gap-1 px-2 text-xs font-medium text-emerald-700 dark:text-emerald-400 ${armed === cellKey ? "opacity-100 bg-emerald-50/70 dark:bg-emerald-950/30" : "opacity-0"} hover:opacity-100 hover:bg-emerald-50/70 dark:hover:bg-emerald-950/30 focus:outline-none`}
                         aria-label={`Novo agendamento às ${time}`}
                       >
                         <Plus className="w-3.5 h-3.5" aria-hidden /> {time}

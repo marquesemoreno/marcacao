@@ -170,6 +170,18 @@ describe("arrivalQueue", () => {
     );
     expect(q.map((x) => x.position)).toEqual([1, 2]);
   });
+  it("agrupa por médico (posições não se repetem misturadas)", () => {
+    const q = arrivalQueue(
+      [
+        qi("a1", "IN_SERVICE", "2026-10-21T12:10:00Z", "Dr. A"),
+        qi("b1", "IN_SERVICE", "2026-10-21T12:15:00Z", "Dr. B"),
+        qi("a2", "IN_SERVICE", "2026-10-21T12:20:00Z", "Dr. A"),
+      ],
+      "2026-10-21",
+      now
+    );
+    expect(q.map((x) => [x.item.key, x.position])).toEqual([["a1", 1], ["a2", 2], ["b1", 1]]);
+  });
   it("posição conta por médico", () => {
     const q = arrivalQueue(
       [qi("a", "IN_SERVICE", "2026-10-21T12:15:00Z", "Dr. A"), qi("b", "IN_SERVICE", "2026-10-21T12:20:00Z", "Dr. B")],

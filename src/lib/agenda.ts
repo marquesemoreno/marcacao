@@ -177,7 +177,15 @@ function minutesOfDayBR(d: Date): number {
 export function arrivalQueue(items: AgendaItem[], date: string, now: Date = new Date()): ArrivalEntry[] {
   const waiting = items
     .filter((i) => i.date === date && i.status === "IN_SERVICE" && i.arrivedAt)
+    // Agrupado por médico (crítica 02/11, 5ª: "1º da fila" aparecia duas vezes misturado),
+    // médico de quem chegou primeiro em cima; dentro do grupo, ordem de chegada.
     .sort((a, b) => a.arrivedAt!.localeCompare(b.arrivedAt!));
+  const docOf = (i: AgendaItem) => i.doctor?.trim() || NO_DOCTOR;
+  const firstArrival = new Map<string, number>();
+  waiting.forEach((i, idx) => {
+    if (!firstArrival.has(docOf(i))) firstArrival.set(docOf(i), idx);
+  });
+  waiting.sort((a, b) => firstArrival.get(docOf(a))! - firstArrival.get(docOf(b))! || a.arrivedAt!.localeCompare(b.arrivedAt!));
   const perDoctor = new Map<string, number>();
   return waiting.map((item) => {
     const doctor = item.doctor?.trim() || NO_DOCTOR;

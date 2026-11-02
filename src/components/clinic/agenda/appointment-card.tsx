@@ -67,7 +67,7 @@ export function AppointmentCard({
     <div
       className={`relative rounded-lg border ${
         item.status === "PENDING" ? "border-dashed border-amber-300 dark:border-amber-700" : "border-slate-200 dark:border-slate-700"
-      } ${lateMin !== null ? "border-l-4 border-l-amber-500 dark:border-l-amber-400" : ""} ${meta.tint} shadow-xs hover:border-slate-300 dark:hover:border-slate-600 transition-colors`}
+      } ${lateMin !== null ? "ring-2 ring-amber-400/80 dark:ring-amber-500/70" : ""} ${meta.tint} shadow-xs hover:border-slate-300 dark:hover:border-slate-600 transition-colors`}
     >
       <div className="flex items-start">
         {compact && (

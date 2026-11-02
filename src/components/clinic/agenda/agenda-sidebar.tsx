@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ChevronDown, Plus, SlidersHorizontal } from "lucide-react";
 import { ptBR } from "react-day-picker/locale";
 import { Calendar } from "@/components/ui/calendar";
@@ -32,6 +32,10 @@ export function AgendaSidebar({
 }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const selected = new Date(`${date}T12:00:00`);
+  // Crítica 02/11 (5ª): trocar o mês do calendário mudava a agenda (e podia cair num domingo).
+  // Agora só folheia; a agenda muda ao escolher um dia.
+  const [month, setMonth] = useState(selected);
+  useEffect(() => setMonth(new Date(`${date}T12:00:00`)), [date]);
   const allDoctors = selectedDoctors.length === 0;
   const filterCount = selectedDoctors.length;
 
@@ -64,13 +68,9 @@ export function AgendaSidebar({
             mode="single"
             locale={ptBR}
             selected={selected}
-            month={selected}
+            month={month}
             disabled={{ dayOfWeek: [0] }}
-            onMonthChange={(m) => {
-              // Mantém o mesmo dia do mês ao trocar de mês (limitado ao último dia).
-              const day = Math.min(selected.getDate(), new Date(m.getFullYear(), m.getMonth() + 1, 0).getDate());
-              onDateChange(toIso(new Date(m.getFullYear(), m.getMonth(), day)));
-            }}
+            onMonthChange={setMonth}
             onSelect={(d) => d && onDateChange(toIso(d))}
           />
         </div>
