@@ -21,7 +21,7 @@ export default async function PatientPortalPage({ params }: { params: Promise<{ 
     const nps = await loadNpsSurvey(token);
     if (nps.state === "VALID" || nps.state === "ANSWERED") {
       return (
-        <main className="mx-auto min-h-screen max-w-lg bg-slate-50 px-4 py-6 text-slate-900">
+        <main className="mx-auto min-h-screen max-w-lg bg-slate-50 px-4 py-6 text-slate-900 [color-scheme:light]">
           {nps.state === "VALID" ? (
             <NpsSurvey token={token} clinicName={nps.clinicName} />
           ) : (
@@ -35,7 +35,7 @@ export default async function PatientPortalPage({ params }: { params: Promise<{ 
     }
   }
   return (
-    <main className="mx-auto min-h-screen max-w-lg bg-slate-50 px-4 py-6 text-slate-900">
+    <main className="mx-auto min-h-screen max-w-lg bg-slate-50 px-4 py-6 text-slate-900 [color-scheme:light]">
       {data.state === "VALID" ? (
         <PatientPortal token={token} data={data} />
       ) : (

@@ -67,7 +67,7 @@ export function NpsSurvey({ token, clinicName }: { token: string; clinicName: st
           onChange={(e) => setComment(e.target.value)}
           maxLength={1000}
           rows={3}
-          className="mt-1 w-full rounded-lg border border-slate-300 p-3 text-base focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
+          className="mt-1 w-full rounded-lg border border-slate-300 bg-white p-3 text-base text-slate-900 placeholder:text-slate-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
         />
       </label>
       {error && <p role="alert" className="text-sm text-rose-700">{error}</p>}

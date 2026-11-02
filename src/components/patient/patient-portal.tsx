@@ -154,7 +154,7 @@ function FormCard({
                 value={answers[q.id] ?? ""}
                 onChange={(e) => set(q.id, e.target.value)}
                 aria-label={q.label}
-                className="mt-2 w-full rounded-lg border border-slate-300 px-3 py-2 text-base focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
+                className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-base text-slate-900 placeholder:text-slate-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
               />
             ) : (
               <div className="mt-2 flex flex-wrap gap-2">
