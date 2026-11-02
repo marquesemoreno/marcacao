@@ -41,7 +41,7 @@ export function StatusMenu({
         disabled={disabled || blocked}
         title={blocked ? "Disponível no dia da consulta" : undefined}
         onClick={() => {
-          if (item.source === "BRIDGE" && NEGATIVE.includes(s) && item.status !== s && confirming !== s) return setConfirming(s);
+          if (NEGATIVE.includes(s) && item.status !== s && confirming !== s) return setConfirming(s);
           setConfirming(null);
           onPick(s);
         }}
@@ -56,14 +56,14 @@ export function StatusMenu({
     );
   };
   return (
-    <div role="group" aria-label="Marcar status">
+    <div role="group" aria-label="Marcar status" data-status-menu>
       {POSITIVE.map(option)}
       <div className="my-1 border-t border-slate-200 dark:border-slate-700" />
       {NEGATIVE.map(option)}
       {confirming && (
         <p role="status" className="flex items-start gap-1.5 px-2 pt-1 text-xs text-slate-600 dark:text-slate-300">
           <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0 text-amber-600" aria-hidden />
-          Também precisa ser feito no sistema da clínica.
+          {item.source === "BRIDGE" ? "Também precisa ser feito no sistema da clínica." : "Tira o paciente da agenda (dá pra desfazer)."}
         </p>
       )}
       {item.isManual && (

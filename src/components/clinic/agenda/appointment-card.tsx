@@ -42,6 +42,8 @@ export function AppointmentCard({
     try {
       await onSetStatus(item, status);
       setOpen(false);
+    } catch {
+      // o erro já aparece em toast (handleSetStatus); o menu fica aberto pra tentar de novo
     } finally {
       setSaving(false);
     }

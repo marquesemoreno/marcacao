@@ -275,6 +275,8 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
       if (e.ctrlKey || e.metaKey || e.altKey || schedule || openItem) return;
       const el = e.target as HTMLElement | null;
       if (el && (el.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName))) return;
+      // Crítica 02/11 (3ª): ← dentro do menu de status trocava o dia por baixo dele.
+      if (el?.closest('[data-status-menu], [role="dialog"], [role="menu"], [data-popup-open]')) return;
       if (e.key === "/") searchRef.current?.focus();
       else if (e.key === "?") setHelpOpen((o) => !o);
       else if (e.key === "ArrowLeft") move(-1);
@@ -331,6 +333,7 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
   }, [view, range.days, visibleItems, selectedDoctors, doctors, date, today]);
 
   const failed = current?.bridgeFailedDays ?? [];
+  const pendings = useMemo(() => systemPendings(allItems, today), [allItems, today]);
   const includesToday = range.days.includes(today) && view !== "mes";
   const emptyPeriod = !!current && allItems.length === 0 && failed.length === 0;
 
@@ -418,8 +421,6 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
           </button>
         </div>
 
-        {current && <SystemPendings items={systemPendings(allItems, today)} onOpen={setOpenItem} />}
-
         {view === "mes" && selectedGroups.length > 0 && (
           <p className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
             Contando só: {AGENDA_STATUS_GROUPS.filter((g) => selectedGroups.includes(g.id)).map((g) => g.label.toLowerCase()).join(", ")}.
@@ -429,10 +430,22 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
           </p>
         )}
         {updatedAt && current && (
-          <p className="text-xs text-slate-500 dark:text-slate-400 tabular-nums" aria-live="off">
-            Atualizado às {updatedAt} · atualiza sozinho a cada minuto e meio
-            {current.hasBridge && " · marcações sem telefone no sistema da clínica não aparecem aqui"}
-          </p>
+          loadError ? (
+            <p role="alert" className="text-xs font-medium text-rose-700 dark:text-rose-300 tabular-nums">
+              Sem conexão — mostrando a agenda das {updatedAt}.{" "}
+              <button type="button" onClick={reload} className="underline underline-offset-2">
+                Tentar de novo
+              </button>
+            </p>
+          ) : (
+            <p
+              className="text-xs text-slate-500 dark:text-slate-400 tabular-nums"
+              aria-live="off"
+              title={current.hasBridge ? "Marcações sem telefone no sistema da clínica não aparecem aqui." : undefined}
+            >
+              Atualizado às {updatedAt} · atualiza sozinho a cada minuto e meio
+            </p>
+          )
         )}
 
         {current && view !== "mes" && (
@@ -441,10 +454,6 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
             activeGroups={selectedGroups}
             onToggle={(id) => setSelectedGroups((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))}
           />
-        )}
-
-        {current && date === today && (
-          <ArrivalQueue items={doctorItems} date={today} onDone={(item) => handleSetStatus(item, "COMPLETED")} onOpen={setOpenItem} />
         )}
 
         {loadError && !current ? (
@@ -475,7 +484,10 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
             }}
           />
         ) : (
-          <>
+          // Crítica 02/11 (3ª): fila e pendências cresciam acima da grade e empurravam os
+          // cartões no meio do toque. Agora ficam numa coluna ao lado (abaixo em tela estreita).
+          <div className="flex flex-col gap-3 xl:flex-row xl:items-start">
+          <div className="min-w-0 flex-1 space-y-3">
             {emptyPeriod && (
               <div className={`${panel} flex items-center gap-3 px-4 py-3`}>
                 <CalendarX2 className="w-5 h-5 shrink-0 text-slate-400" aria-hidden />
@@ -497,7 +509,16 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
                 onReschedule={handleReschedule}
               />
             )}
-          </>
+          </div>
+          {(pendings.length > 0 || date === today) && (
+            <aside aria-label="Fila e pendências" className="space-y-3 xl:sticky xl:top-3 xl:w-80 xl:shrink-0">
+              {date === today && (
+                <ArrivalQueue items={doctorItems} date={today} onDone={(item) => handleSetStatus(item, "COMPLETED")} onOpen={setOpenItem} />
+              )}
+              <SystemPendings items={pendings} onOpen={setOpenItem} />
+            </aside>
+          )}
+          </div>
         )}
       </div>
 
@@ -517,6 +538,10 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
             aria-labelledby="atalhos-agenda"
             className="w-full max-w-sm rounded-xl bg-white dark:bg-slate-900 p-5 shadow-xl"
             onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => {
+              // Só há um botão: Tab fica nele (não sai do diálogo).
+              if (e.key === "Tab") e.preventDefault();
+            }}
           >
             <h2 id="atalhos-agenda" className="text-base font-semibold">Atalhos da Agenda</h2>
             <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
@@ -564,6 +589,19 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
                 .then(() =>
                   toast.success("Remarcado — horário antigo marcado como Cancelado.", {
                     description: from.source === "BRIDGE" ? "Cancele também no sistema da clínica (fica na lista de pendências até lá)." : undefined,
+                    duration: 10000,
+                    action: {
+                      label: "Desfazer",
+                      onClick: () => {
+                        const back: AgendaStatusChoice =
+                          from.isManual && from.status !== "PENDING" && from.status !== "SENT" && from.status !== "RESCHEDULE"
+                            ? (from.status as AgendaStatusChoice)
+                            : "AUTO";
+                        applyStatus({ ...from, status: "CANCELLED", isManual: true }, back)
+                          .then(reload)
+                          .catch(() => toast.error("Não foi possível desfazer o cancelamento do horário antigo."));
+                      },
+                    },
                   })
                 )
                 .catch(() => toast.warning("Remarcado, mas não consegui cancelar o horário antigo — marque-o como Cancelado."))

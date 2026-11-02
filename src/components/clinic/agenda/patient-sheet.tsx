@@ -86,6 +86,8 @@ export function PatientSheet({
               )}
               <section className="rounded-lg border border-slate-200 dark:border-slate-800 p-3 space-y-1.5 text-sm">
                 <Row label="Procedimento" value={item.procedure ? toTitleCase(item.procedure) : "—"} />
+                {/* Crítica 02/11: a ponte ainda não traz convênio nem horário de término — dizer, não calar. */}
+                <Row label="Convênio" value={item.source === "BRIDGE" ? "veja no sistema da clínica" : "—"} />
                 <Row label="Médico" value={item.doctor ? toTitleCase(item.doctor) : "—"} />
                 <Row label="Telefone" value={item.phone ?? "Sem telefone"} />
                 <Row label="Origem" value={item.source === "BRIDGE" ? "Sistema da clínica" : "Conecta Saúde"} />
