@@ -20,6 +20,7 @@ import {
   agendaDoctors,
   daySummary,
   matchesPatientQuery,
+  overdueMinutes,
   systemPendings,
   monthGridDays,
   weekDays,
@@ -87,6 +88,10 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
   const [selectedDoctors, setSelectedDoctors] = useState<string[]>([]);
   const [selectedGroups, setSelectedGroups] = useState<string[]>([]);
   const [query, setQuery] = useState("");
+  const [lateOnly, setLateOnly] = useState(false);
+  // Pendências e busca não podem depender do período aberto (crítica 02/11, 4ª): janela fixa
+  // de 7 dias atrás a ~5 semanas à frente, recarregada junto com a agenda.
+  const [wide, setWide] = useState<AgendaItem[]>([]);
   const [helpOpen, setHelpOpen] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
   const [openItem, setOpenItem] = useState<AgendaItem | null>(null);
@@ -143,6 +148,17 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
   }, [range.from, range.to, rangeKey, reloadKey]);
   const current = loadedKey === rangeKey ? data : null;
 
+  useEffect(() => {
+    let cancelled = false;
+    const t = todayInBahia();
+    getAgenda(addDays(t, -7), addDays(t, 34))
+      .then((r) => !cancelled && setWide(r.items))
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [reloadKey]);
+
   const allItems = useMemo(() => current?.items ?? [], [current]);
   const doctors = useMemo(() => agendaDoctors(allItems), [allItems]);
   const doctorItems = useMemo(
@@ -150,11 +166,22 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
     [allItems, selectedDoctors]
   );
   const visibleItems = useMemo(() => {
-    const byQuery = doctorItems.filter((i) => matchesPatientQuery(i, query));
+    let byQuery = doctorItems.filter((i) => matchesPatientQuery(i, query));
+    if (lateOnly) byQuery = byQuery.filter((i) => overdueMinutes(i, today, nowTime) !== null);
     if (!selectedGroups.length) return byQuery;
     const statuses = AGENDA_STATUS_GROUPS.filter((g) => selectedGroups.includes(g.id)).flatMap((g) => g.statuses);
     return byQuery.filter((i) => statuses.includes(i.status));
-  }, [doctorItems, selectedGroups, query]);
+  }, [doctorItems, selectedGroups, query, lateOnly, today, nowTime]);
+  const lateCount = useMemo(() => doctorItems.filter((i) => overdueMinutes(i, today, nowTime) !== null).length, [doctorItems, today, nowTime]);
+  // Busca fora do período aberto (telefonema "quando é minha consulta?").
+  const otherMatches = useMemo(() => {
+    if (query.trim().length < 2) return [];
+    const inView = new Set(allItems.map((i) => i.key));
+    return wide
+      .filter((i) => !inView.has(i.key) && i.date >= today && matchesPatientQuery(i, query))
+      .sort((a, b) => (a.date + (a.time ?? "")).localeCompare(b.date + (b.time ?? "")))
+      .slice(0, 8);
+  }, [wide, allItems, query, today]);
   const summary = useMemo(() => daySummary(doctorItems), [doctorItems]);
 
   const reload = useCallback(() => setReloadKey((k) => k + 1), []);
@@ -163,7 +190,8 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
   // (sem esqueleto — mesmo período), só com a aba visível e nada aberto por cima.
   useEffect(() => {
     const t = setInterval(() => {
-      if (document.visibilityState === "visible" && !schedule && !openItem) reload();
+      // Também não recarrega com o menu de status de um cartão aberto (2º toque em andamento).
+      if (document.visibilityState === "visible" && !schedule && !openItem && !document.querySelector("[data-status-menu]")) reload();
     }, 90_000);
     return () => clearInterval(t);
   }, [reload, schedule, openItem]);
@@ -333,7 +361,7 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
   }, [view, range.days, visibleItems, selectedDoctors, doctors, date, today]);
 
   const failed = current?.bridgeFailedDays ?? [];
-  const pendings = useMemo(() => systemPendings(allItems, today), [allItems, today]);
+  const pendings = useMemo(() => systemPendings(wide.length ? wide : allItems, today), [wide, allItems, today]);
   const includesToday = range.days.includes(today) && view !== "mes";
   const emptyPeriod = !!current && allItems.length === 0 && failed.length === 0;
 
@@ -421,6 +449,42 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
           </button>
         </div>
 
+        {query.trim() && current && (otherMatches.length > 0 || visibleItems.length === 0) && (
+          <div className={`${panel} px-4 py-2.5 text-sm`}>
+            {otherMatches.length > 0 ? (
+              <>
+                <p className="text-xs font-semibold text-slate-600 dark:text-slate-300">Também nas próximas semanas:</p>
+                <ul className="mt-1 space-y-0.5">
+                  {otherMatches.map((i) => (
+                    <li key={i.key}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDate(i.date);
+                          setView("dia");
+                        }}
+                        className="text-left underline-offset-2 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50 rounded"
+                      >
+                        <span className="font-medium">{toTitleCase(i.patientName || "Paciente")}</span>{" "}
+                        <span className="text-xs tabular-nums text-slate-500 dark:text-slate-400">
+                          {brDate(i.date).slice(0, 5)} {i.time ?? ""} {i.doctor ? `· ${toTitleCase(i.doctor)}` : ""}
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            ) : (
+              <p className="text-slate-600 dark:text-slate-300">Ninguém com esse nome ou telefone de hoje até as próximas 5 semanas.</p>
+            )}
+            {current.hasBridge && (
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                Marcações sem telefone no sistema da clínica não aparecem no Conecta — se não achou, confira lá.
+              </p>
+            )}
+          </div>
+        )}
+
         {view === "mes" && selectedGroups.length > 0 && (
           <p className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
             Contando só: {AGENDA_STATUS_GROUPS.filter((g) => selectedGroups.includes(g.id)).map((g) => g.label.toLowerCase()).join(", ")}.
@@ -450,6 +514,9 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
 
         {current && view !== "mes" && (
           <AgendaSummary
+            lateCount={includesToday ? lateCount : 0}
+            lateActive={lateOnly}
+            onToggleLate={() => setLateOnly((v) => !v)}
             summary={summary}
             activeGroups={selectedGroups}
             onToggle={(id) => setSelectedGroups((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))}

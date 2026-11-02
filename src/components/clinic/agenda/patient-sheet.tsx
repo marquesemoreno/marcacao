@@ -110,6 +110,8 @@ export function PatientSheet({
                       setSaving(true);
                       try {
                         await onSetStatus(item, s);
+                      } catch {
+                        // erro já mostrado em toast (handleSetStatus)
                       } finally {
                         setSaving(false);
                       }

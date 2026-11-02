@@ -198,8 +198,16 @@ export function arrivalQueue(items: AgendaItem[], date: string, now: Date = new 
  * A marcação continua vindo pela ponte enquanto não for cancelada lá — quando a recepção
  * cancela no sistema, ela some da ponte e sai desta lista sozinha. */
 export function systemPendings(items: AgendaItem[], today: string): AgendaItem[] {
+  // Falta também (decisão 02/11): o sistema da clínica precisa registrar. Ela pode continuar
+  // vindo pela ponte depois de ajustada, então a recepção marca "Feito" (ver SystemPendings).
+  const weekAgo = addDays(today, -7);
   return items
-    .filter((i) => i.source === "BRIDGE" && i.isManual && i.status === "CANCELLED" && i.date >= today)
+    .filter(
+      (i) =>
+        i.source === "BRIDGE" &&
+        i.isManual &&
+        ((i.status === "CANCELLED" && i.date >= today) || (i.status === "NO_SHOW" && i.date >= weekAgo && i.date <= today))
+    )
     .sort((a, b) => (a.date + (a.time ?? "")).localeCompare(b.date + (b.time ?? "")));
 }
 
@@ -212,4 +220,18 @@ export function matchesPatientQuery(item: AgendaItem, query: string): boolean {
   if (fold(item.patientName).includes(fold(q))) return true;
   const digits = q.replace(/\D/g, "");
   return digits.length >= 3 && !!item.phone && item.phone.replace(/\D/g, "").includes(digits);
+}
+
+/** Tolerância antes de considerar "já devia ter chegado". */
+export const OVERDUE_GRACE_MIN = 15;
+
+/** Hoje, com horário marcado, ainda aguardando (sem "Chegou") e passado da tolerância:
+ * minutos de atraso. Senão null. Crítica 02/11 (4ª): confirmado que não veio parecia igual
+ * a quem é mais tarde. */
+export function overdueMinutes(item: AgendaItem, today: string, nowHHMM: string): number | null {
+  if (item.date !== today || !item.time) return null;
+  if (!["PENDING", "SENT", "CONFIRMED"].includes(item.status)) return null;
+  const toMin = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
+  const late = toMin(nowHHMM) - toMin(item.time);
+  return late > OVERDUE_GRACE_MIN ? late : null;
 }

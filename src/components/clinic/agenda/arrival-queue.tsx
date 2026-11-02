@@ -54,7 +54,7 @@ export function ArrivalQueue({
       <ol className="divide-y divide-slate-100 dark:divide-slate-800">
         {queue.map(({ item, position, waitingMin, lateMin }) => (
           <li key={item.key} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2 text-sm">
-            <button type="button" onClick={() => onOpen(item)} className="min-w-0 flex-1 text-left hover:underline underline-offset-2">
+            <button type="button" onClick={() => onOpen(item)} className="min-w-0 flex-1 rounded text-left hover:underline underline-offset-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50">
               <span className="font-medium">{toTitleCase(item.patientName || "Paciente")}</span>
               <span className="block text-xs text-slate-500 dark:text-slate-400">
                 {item.doctor ? toTitleCase(item.doctor) : "Sem médico"} · {position}º da fila · chegou {fmt.format(new Date(item.arrivedAt!))}

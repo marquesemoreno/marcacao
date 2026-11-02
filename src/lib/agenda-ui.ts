@@ -57,7 +57,7 @@ export const AGENDA_STATUS_META: Record<AgendaStatus, { label: string; badge: st
 
 /** Grupos do filtro de status e da faixa de resumo (ids batem com daySummary). */
 export const AGENDA_STATUS_GROUPS: { id: "confirmado" | "aguardando" | "remarcar" | "presente" | "atendido" | "falta"; label: string; statuses: AgendaStatus[]; dot: string }[] = [
-  { id: "aguardando", label: "Sem resposta", statuses: ["PENDING", "SENT"], dot: "bg-amber-400" },
+  { id: "aguardando", label: "Aguardando", statuses: ["PENDING", "SENT"], dot: "bg-amber-400" },
   { id: "remarcar", label: "Quer remarcar", statuses: ["RESCHEDULE"], dot: "bg-violet-500" },
   { id: "confirmado", label: "Confirmado", statuses: ["CONFIRMED"], dot: "bg-emerald-500" },
   { id: "presente", label: "Chegou", statuses: ["IN_SERVICE"], dot: "bg-sky-500" },

@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { CalendarClock, ChevronDown, MessageCircle, UserCheck } from "lucide-react";
+import { CalendarClock, ChevronDown, MessageCircle, UserCheck, UserX } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import type { AgendaItem, AgendaStatusChoice } from "@/lib/agenda";
+import { overdueMinutes, type AgendaItem, type AgendaStatusChoice } from "@/lib/agenda";
 import { AGENDA_STATUS_META, initialsOf, toTitleCase, todayInBahia } from "@/lib/agenda-ui";
 import { StatusIcon } from "./status-icon";
 import { StatusMenu } from "./status-menu";
@@ -17,18 +17,22 @@ const AWAITING_ARRIVAL = new Set(["PENDING", "SENT", "CONFIRMED"]);
 export function AppointmentCard({
   item,
   compact = false,
+  nowTime = null,
   onOpen,
   onSetStatus,
   onReschedule,
 }: {
   item: AgendaItem;
   compact?: boolean;
+  /** HH:MM de agora quando a grade inclui hoje — base do "atrasado". */
+  nowTime?: string | null;
   onOpen: (item: AgendaItem) => void;
   onSetStatus: (item: AgendaItem, status: AgendaStatusChoice) => Promise<void>;
   onReschedule: (item: AgendaItem) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [confirmNoShow, setConfirmNoShow] = useState(false);
   const meta = AGENDA_STATUS_META[item.status];
   const name = toTitleCase(item.patientName || "Sem nome");
   const subtitle = [item.procedure, item.doctor].filter(Boolean).map((t) => toTitleCase(t!)).join(" · ");
@@ -36,6 +40,7 @@ export function AppointmentCard({
   const isToday = item.date === todayInBahia();
   const canArrive = isToday && AWAITING_ARRIVAL.has(item.status);
   const wantsReschedule = item.status === "RESCHEDULE";
+  const lateMin = nowTime ? overdueMinutes(item, todayInBahia(), nowTime) : null;
 
   async function pick(status: AgendaStatusChoice) {
     setSaving(true);
@@ -62,7 +67,7 @@ export function AppointmentCard({
     <div
       className={`relative rounded-lg border ${
         item.status === "PENDING" ? "border-dashed border-amber-300 dark:border-amber-700" : "border-slate-200 dark:border-slate-700"
-      } ${meta.tint} shadow-xs hover:border-slate-300 dark:hover:border-slate-600 transition-colors`}
+      } ${lateMin !== null ? "border-l-4 border-l-amber-500 dark:border-l-amber-400" : ""} ${meta.tint} shadow-xs hover:border-slate-300 dark:hover:border-slate-600 transition-colors`}
     >
       <div className="flex items-start">
         {compact && (
@@ -81,7 +86,7 @@ export function AppointmentCard({
           type="button"
           onClick={() => onOpen(item)}
           className="min-w-0 flex-1 text-left px-2 pt-1.5 pb-1 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
-          aria-label={`${item.time ?? "Sem horário"}, ${name}, ${meta.label}. Abrir ficha`}
+          aria-label={`${item.time ?? "Sem horário"}, ${name}, ${meta.label}${lateMin !== null ? `, atrasado ${lateMin} minutos` : ""}. Abrir ficha`}
         >
           <div className="flex items-center gap-2 min-w-0">
             {!compact && (
@@ -97,6 +102,9 @@ export function AppointmentCard({
                 </span>
                 {item.phone && <MessageCircle className="w-3.5 h-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" aria-hidden />}
               </p>
+              {lateMin !== null && (
+                <p className="text-xs font-semibold text-amber-800 dark:text-amber-300 tabular-nums">Atrasado {lateMin} min — ainda não chegou</p>
+              )}
               {!compact && subtitle && <p className="truncate text-xs text-slate-500 dark:text-slate-400">{subtitle}</p>}
             </div>
           </div>
@@ -124,6 +132,27 @@ export function AppointmentCard({
               aria-label={`${name} chegou — marcar como presente`}
             >
               <UserCheck className="w-3 h-3" aria-hidden /> Chegou
+            </button>
+          )}
+          {lateMin !== null && (
+            <button
+              type="button"
+              disabled={saving}
+              onClick={() => {
+                // 2º toque, como no menu de status (Faltou tira da agenda).
+                if (!confirmNoShow) return setConfirmNoShow(true);
+                setConfirmNoShow(false);
+                void pick("NO_SHOW");
+              }}
+              onBlur={() => setConfirmNoShow(false)}
+              className={`${quickBtn} border ${
+                confirmNoShow
+                  ? "border-rose-400 bg-rose-50 text-rose-800 dark:border-rose-700 dark:bg-rose-950/50 dark:text-rose-200"
+                  : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+              }`}
+              aria-label={confirmNoShow ? `Confirmar falta de ${name}` : `${name} faltou`}
+            >
+              <UserX className="w-3 h-3" aria-hidden /> {confirmNoShow ? "Confirmar falta" : "Faltou"}
             </button>
           )}
           {wantsReschedule && (

@@ -109,7 +109,7 @@ export function AgendaGrid({
             {byCell.map((c, i) => (
               <div key={columns[i].id} className="border-b border-l border-slate-200 dark:border-slate-800 p-1 space-y-1 bg-slate-50/70 dark:bg-slate-950/40">
                 {c.unscheduled.map((item) => (
-                  <AppointmentCard key={item.key} item={item} compact={compact} onOpen={onOpen} onSetStatus={onSetStatus} onReschedule={onReschedule} />
+                  <AppointmentCard key={item.key} item={item} compact={compact} nowTime={nowTime} onOpen={onOpen} onSetStatus={onSetStatus} onReschedule={onReschedule} />
                 ))}
               </div>
             ))}
@@ -154,7 +154,7 @@ export function AgendaGrid({
                 return (
                   <div key={col.id} className={`group/cell relative border-t border-l ${line} min-h-8 p-0.5 space-y-0.5`}>
                     {shown.map((item) => (
-                      <AppointmentCard key={item.key} item={item} compact={compact} onOpen={onOpen} onSetStatus={onSetStatus} onReschedule={onReschedule} />
+                      <AppointmentCard key={item.key} item={item} compact={compact} nowTime={nowTime} onOpen={onOpen} onSetStatus={onSetStatus} onReschedule={onReschedule} />
                     ))}
                     {hidden > 0 && (
                       <button

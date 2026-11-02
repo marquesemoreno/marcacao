@@ -88,7 +88,7 @@ export function AgendaMonth({
                   </div>
                 </div>
               ) : (
-                !isSunday && inMonth && <p className="mt-1 text-[11px] text-slate-400 dark:text-slate-600">Livre</p>
+                !isSunday && inMonth && <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Livre</p>
               )}
             </button>
           );

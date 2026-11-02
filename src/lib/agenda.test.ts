@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   arrivalQueue,
   matchesPatientQuery,
+  overdueMinutes,
   systemPendings,
   agendaDoctors,
   daySummary,
@@ -193,6 +194,17 @@ describe("systemPendings", () => {
     );
     expect(list.map((i) => i.key)).toEqual(["a"]);
   });
+  it("falta do sistema marcada no Conecta (até 7 dias atrás) também é pendência", () => {
+    const list = systemPendings(
+      [
+        item({ key: "f1", source: "BRIDGE", status: "NO_SHOW", isManual: true, date: "2026-10-30" }),
+        item({ key: "f2", source: "BRIDGE", status: "NO_SHOW", isManual: true, date: "2026-10-20" }),
+        item({ key: "f3", source: "LOCAL", status: "NO_SHOW", isManual: true, date: "2026-11-02" }),
+      ],
+      "2026-11-02"
+    );
+    expect(list.map((i) => i.key)).toEqual(["f1"]);
+  });
 });
 
 describe("matchesPatientQuery", () => {
@@ -202,5 +214,19 @@ describe("matchesPatientQuery", () => {
     expect(matchesPatientQuery(p, "9970-1234")).toBe(true);
     expect(matchesPatientQuery(p, "joao")).toBe(false);
     expect(matchesPatientQuery(p, "  ")).toBe(true);
+  });
+});
+
+describe("overdueMinutes", () => {
+  const base = { date: "2026-11-02", time: "08:15", status: "CONFIRMED" as const };
+  it("aguardando com horário passado há mais de 15 min = atrasado", () => {
+    expect(overdueMinutes(item(base), "2026-11-02", "08:40")).toBe(25);
+  });
+  it("dentro da tolerância, futuro, outro dia ou já chegou = null", () => {
+    expect(overdueMinutes(item(base), "2026-11-02", "08:25")).toBeNull();
+    expect(overdueMinutes(item({ ...base, time: "10:00" }), "2026-11-02", "08:40")).toBeNull();
+    expect(overdueMinutes(item({ ...base, date: "2026-11-01" }), "2026-11-02", "08:40")).toBeNull();
+    expect(overdueMinutes(item({ ...base, status: "IN_SERVICE" }), "2026-11-02", "08:40")).toBeNull();
+    expect(overdueMinutes(item({ ...base, time: null }), "2026-11-02", "08:40")).toBeNull();
   });
 });

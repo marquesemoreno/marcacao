@@ -11,16 +11,38 @@ export function AgendaSummary({
   summary,
   activeGroups,
   onToggle,
+  lateCount = 0,
+  lateActive = false,
+  onToggleLate,
 }: {
   summary: DaySummary;
   activeGroups: string[];
   onToggle: (id: string) => void;
+  /** Hoje: quem já devia ter chegado (horário + 15 min) e não chegou. */
+  lateCount?: number;
+  lateActive?: boolean;
+  onToggleLate?: () => void;
 }) {
   return (
     <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Resumo e filtro por status">
       <span className="mr-1 text-sm font-semibold text-slate-800 dark:text-slate-100 tabular-nums">
         {summary.total} {summary.total === 1 ? "paciente" : "pacientes"}
       </span>
+      {onToggleLate && (lateCount > 0 || lateActive) && (
+        <button
+          type="button"
+          aria-pressed={lateActive}
+          onClick={onToggleLate}
+          className={`inline-flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-xs font-semibold tabular-nums focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50 ${
+            lateActive
+              ? "border-slate-800 bg-slate-800 text-white dark:border-slate-200 dark:bg-slate-200 dark:text-slate-900"
+              : "border-amber-400 bg-amber-50 text-amber-900 dark:border-amber-700 dark:bg-amber-950/50 dark:text-amber-200"
+          }`}
+        >
+          <span className="size-2 rounded-full bg-amber-500" aria-hidden />
+          {lateCount} {lateCount === 1 ? "atrasado" : "atrasados"}
+        </button>
+      )}
       {AGENDA_STATUS_GROUPS.map((g) => {
         const n = summary[g.id];
         const active = activeGroups.includes(g.id);
