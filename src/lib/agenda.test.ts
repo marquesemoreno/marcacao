@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  weekLoad,
   collapseEmptyRows,
   shortProcedure,
   arrivalQueue,
@@ -302,5 +303,29 @@ describe("shortProcedure", () => {
   });
   it("não deixa o nome vazio quando tudo está entre parênteses", () => {
     expect(shortProcedure("(retorno)")).toBe("(retorno)");
+  });
+});
+
+describe("weekLoad", () => {
+  const it0 = (date: string, doctor: string | null, status: AgendaItem["status"]) =>
+    ({ key: `${date}${doctor}${status}${Math.random()}`, source: "BRIDGE", externalId: "1", date, time: "08:00", patientName: "X", phone: null, procedure: null, doctor, status, bridgeNumero: null }) as AgendaItem;
+  const days = ["2026-11-03", "2026-11-04"];
+
+  it("conta por médico e dia, ignora cancelados/faltas e soma o total do dia", () => {
+    const r = weekLoad(
+      [it0("2026-11-03", "Nilton", "CONFIRMED"), it0("2026-11-03", "Nilton", "SENT"), it0("2026-11-03", "Ademir", "CANCELLED"), it0("2026-11-04", "Ademir", "RESCHEDULE")],
+      days,
+    );
+    expect(r.rows.map((x) => x.doctor)).toEqual(["Nilton", "Ademir"]);
+    expect(r.rows[0].cells["2026-11-03"]).toEqual({ total: 2, aguardando: 1, remarcar: 0 });
+    expect(r.rows[1].cells["2026-11-03"]).toEqual({ total: 0, aguardando: 0, remarcar: 0 });
+    expect(r.rows[1].cells["2026-11-04"]).toEqual({ total: 1, aguardando: 0, remarcar: 1 });
+    expect(r.totals).toEqual({ "2026-11-03": 2, "2026-11-04": 1 });
+    expect(r.max).toBe(2);
+  });
+
+  it("sem médico vira a linha 'Sem médico' no fim; ordena pelo total da semana", () => {
+    const r = weekLoad([it0("2026-11-03", null, "CONFIRMED"), it0("2026-11-03", "B", "CONFIRMED"), it0("2026-11-04", "A", "CONFIRMED"), it0("2026-11-04", "A", "CONFIRMED")], days);
+    expect(r.rows.map((x) => x.doctor)).toEqual(["A", "B", null]);
   });
 });

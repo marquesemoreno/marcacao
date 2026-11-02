@@ -40,6 +40,7 @@ import { SystemPendings } from "./system-pendings";
 import { BookingRequests } from "./booking-requests";
 import { PatientSheet } from "./patient-sheet";
 import { WaitlistDialog } from "./waitlist-dialog";
+import { WeekLoadTable } from "./week-load";
 import { isNationalHolidayYMD } from "@/lib/holidays";
 
 const isHoliday = (iso: string) => isNationalHolidayYMD(+iso.slice(0, 4), +iso.slice(5, 7), +iso.slice(8, 10));
@@ -104,6 +105,19 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
     return () => clearInterval(t);
   }, []);
   const [helpOpen, setHelpOpen] = useState(false);
+  // Semana: tabela de carga (médico × dia) ou grade com os pacientes. Lembra por aparelho.
+  const [weekMode, setWeekModeState] = useState<"carga" | "pacientes">("carga");
+  useEffect(() => {
+    try {
+      if (localStorage.getItem("agenda.weekMode") === "pacientes") setWeekModeState("pacientes");
+    } catch {}
+  }, []);
+  const setWeekMode = (m: "carga" | "pacientes") => {
+    setWeekModeState(m);
+    try {
+      localStorage.setItem("agenda.weekMode", m);
+    } catch {}
+  };
   const searchRef = useRef<HTMLInputElement>(null);
   const helpTriggerRef = useRef<HTMLButtonElement>(null);
   const closeHelp = useCallback(() => {
@@ -668,7 +682,37 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
                 </p>
               </div>
             )}
-            {columns.length === 0 ? (
+            {view === "semana" && (
+              <div role="group" aria-label="Como ver a semana" className="inline-flex rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 p-0.5">
+                {(["carga", "pacientes"] as const).map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    aria-pressed={weekMode === m}
+                    onClick={() => setWeekMode(m)}
+                    className={`h-8 rounded-md px-3 text-sm font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50 ${
+                      weekMode === m ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-xs" : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
+                    }`}
+                  >
+                    {m === "carga" ? "Carga por médico" : "Pacientes"}
+                  </button>
+                ))}
+              </div>
+            )}
+            {view === "semana" && weekMode === "carga" ? (
+              <WeekLoadTable
+                items={doctorItems}
+                days={range.days}
+                today={today}
+                holidays={new Set(range.days.filter(isHoliday))}
+                dayLabel={shortDay}
+                onOpenDay={(d, doctor) => {
+                  setDate(d);
+                  setView("dia");
+                  setSelectedDoctors(doctor ? [doctor] : []);
+                }}
+              />
+            ) : columns.length === 0 ? (
               <div className={`${panel} p-8 text-center text-sm text-slate-500 dark:text-slate-400`}>Nenhum paciente com esses filtros.</div>
             ) : (
               <AgendaGrid

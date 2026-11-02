@@ -283,3 +283,41 @@ export function shortProcedure(name: string | null | undefined): string | null {
   const short = t.replace(/\s*\([^)]*\)\s*/g, " ").replace(/\s+/g, " ").trim();
   return short || t;
 }
+
+export type WeekLoadCell = { total: number; aguardando: number; remarcar: number };
+export type WeekLoad = {
+  /** Médico (null = sem médico), do mais cheio pro mais vazio na semana; "sem médico" por último. */
+  rows: { doctor: string | null; total: number; cells: Record<string, WeekLoadCell> }[];
+  totals: Record<string, number>;
+  /** Maior célula — base da intensidade de cor. */
+  max: number;
+};
+
+/** Semana como tabela de carga: quantos pacientes cada médico tem por dia. Cancelado e
+ * falta não ocupam a agenda; "aguardando" e "quer remarcar" aparecem porque pedem ação. */
+export function weekLoad(items: AgendaItem[], days: string[]): WeekLoad {
+  const byDoctor = new Map<string | null, Record<string, WeekLoadCell>>();
+  const totals: Record<string, number> = Object.fromEntries(days.map((d) => [d, 0]));
+  const blank = () => Object.fromEntries(days.map((d) => [d, { total: 0, aguardando: 0, remarcar: 0 }])) as Record<string, WeekLoadCell>;
+  for (const item of items) {
+    if (!(item.date in totals) || item.status === "CANCELLED" || item.status === "NO_SHOW") {
+      if (item.date in totals) {
+        const doctor = item.doctor?.trim() || null;
+        if (!byDoctor.has(doctor)) byDoctor.set(doctor, blank());
+      }
+      continue;
+    }
+    const doctor = item.doctor?.trim() || null;
+    if (!byDoctor.has(doctor)) byDoctor.set(doctor, blank());
+    const cell = byDoctor.get(doctor)![item.date];
+    cell.total++;
+    if (item.status === "PENDING" || item.status === "SENT") cell.aguardando++;
+    if (item.status === "RESCHEDULE") cell.remarcar++;
+    totals[item.date]++;
+  }
+  const rows = [...byDoctor.entries()]
+    .map(([doctor, cells]) => ({ doctor, cells, total: Object.values(cells).reduce((s, c) => s + c.total, 0) }))
+    .sort((a, b) => (a.doctor === null ? 1 : b.doctor === null ? -1 : b.total - a.total || a.doctor.localeCompare(b.doctor)));
+  const max = Math.max(0, ...rows.flatMap((r) => Object.values(r.cells).map((c) => c.total)));
+  return { rows, totals, max };
+}
