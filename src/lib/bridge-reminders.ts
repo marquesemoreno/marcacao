@@ -1,6 +1,8 @@
 import { reminderRecipient, guardianReminderIntro } from "@/lib/reminder-recipient";
 import { cloudReminderSetup, cloudSendTemplate } from "@/lib/whatsapp-cloud-send";
 import { reminderTemplateParams } from "@/lib/reminder-template";
+import { wrongNumberCheckLine } from "@/lib/appointment-reply";
+import { WRONG_NUMBER_TAG } from "@/lib/conversation-tags";
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import { formatToWhatsAppNumber, sendWhatsAppMessage, sendWhatsAppMedia } from "@/lib/whatsapp";
@@ -118,6 +120,15 @@ export async function dispatchBridgeReminders(options?: { clinicId?: string; dat
         guardianPhone: profile?.guardianPhone ?? null,
       });
       const phone = recipient.toGuardian ? formatToWhatsAppNumber(recipient.phone) : patientPhone;
+      // Número marcado como errado por quem atendeu → não insiste até a recepção corrigir.
+      const knownConversation = await prisma.conversation.findFirst({
+        where: { clinicId: clinic.id, contact: { phone } },
+        select: { tags: true, messages: { where: { direction: "INBOUND" }, take: 1, select: { id: true } } },
+      });
+      if (knownConversation?.tags.includes(WRONG_NUMBER_TAG)) {
+        skipped++;
+        continue;
+      }
       const isUrolaser = (clinic.tradeName || clinic.name).includes("Urolaser");
       const reminderInput = {
         patientName: item.paciente || "Paciente",
@@ -130,9 +141,14 @@ export async function dispatchBridgeReminders(options?: { clinicId?: string; dat
       const baseText = isUrolaser
         ? buildUrolaserLaraReminderMessage(reminderInput)
         : buildBridgeReminderMessage(reminderInput);
-      const messageText = recipient.toGuardian
+      const withGuardian = recipient.toGuardian
         ? `${guardianReminderIntro(recipient.guardianFirstName, reminderInput.patientName)}\n\n${baseText}`
         : baseText;
+      // Número que nunca falou com a clínica pode ser cadastro antigo/errado — pede pra avisar.
+      const messageText =
+        recipient.toGuardian || knownConversation?.messages.length
+          ? withGuardian
+          : `${withGuardian}\n\n${wrongNumberCheckLine(reminderInput.patientName)}`;
 
       // API oficial: lembrete só por modelo aprovado. Conta ativa sem modelo → não envia
       // (fica pra quando configurarem; não consome o paciente).

@@ -1,3 +1,4 @@
+import { toTitleCaseName } from "@/lib/format";
 import { isMinor } from "./minor";
 
 /** Para quem vai o lembrete (auditoria de saúde, item 10): paciente menor de idade com
@@ -15,5 +16,5 @@ export function reminderRecipient(
 
 /** Linha de abertura quando o lembrete vai para o responsável. */
 export function guardianReminderIntro(guardianFirstName: string | null, patientName: string): string {
-  return `Olá${guardianFirstName ? `, ${guardianFirstName}` : ""}! Este lembrete é da consulta de *${patientName}*, que tem você como responsável.`;
+  return `Olá${guardianFirstName ? `, ${guardianFirstName}` : ""}! Este lembrete é da consulta de *${toTitleCaseName(patientName)}*, que tem você como responsável.`;
 }

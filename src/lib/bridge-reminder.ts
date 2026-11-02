@@ -1,5 +1,5 @@
 import { isNationalHolidayYMD } from "./holidays";
-import { toTitleCaseName as toTitleCase } from "@/lib/format";
+import { greetingFirstName, toTitleCaseName as toTitleCase } from "@/lib/format";
 
 export type BridgeReminderInput = {
   patientName: string;
@@ -49,7 +49,7 @@ export function buildBridgeReminderMessage(input: BridgeReminderInput): string {
   const doctorText = input.doctorName ? ` com Dr(a). *${toTitleCase(input.doctorName)}*` : "";
   const timeText = input.time ? ` às ${input.time}` : "";
 
-  return `Olá *${toTitleCase(input.patientName)}*! 👋 Lembrando da sua consulta/exame${procedureText}${doctorText} em ${input.dateFormatted}${timeText} na ${input.clinicName}.
+  return `Olá, *${greetingFirstName(input.patientName) || "tudo bem"}*! 👋 Lembrando da sua consulta/exame${procedureText}${doctorText} em ${input.dateFormatted}${timeText} na ${input.clinicName}.
 
 Por favor, responda com o número da opção desejada:
 1️⃣ Digite 1 para Confirmar presença
@@ -102,7 +102,7 @@ export function buildUrolaserLaraReminderMessage(input: BridgeReminderInput): st
     ? ` a partir de *${input.time}*${attendsByArrivalOrder ? " (atendimento por ordem de chegada)" : ""}`
     : "";
 
-  return `Olá *${toTitleCase(input.patientName)}*! Eu sou a Lara, atendente virtual da Urolaser 😊
+  return `Olá, *${greetingFirstName(input.patientName) || "tudo bem"}*! Eu sou a Lara, atendente virtual da Urolaser 😊
 
 Estou passando para te lembrar que você tem ${appointmentLabel} para o dia *${input.dateFormatted}*${timeText}.
 

@@ -1,4 +1,4 @@
-import { toTitleCaseName } from "@/lib/format";
+import { greetingFirstName, toTitleCaseName } from "@/lib/format";
 
 export type BridgeConfirmationInput = {
   patientName: string;
@@ -31,7 +31,7 @@ export type BridgeConfirmationInput = {
  * inventar um horário. */
 export function buildBridgeConfirmationMessage(input: BridgeConfirmationInput): string {
   const lines = [
-    `Olá, ${input.patientName}! Seu agendamento foi realizado:`,
+    `Olá${greetingFirstName(input.patientName) ? `, ${greetingFirstName(input.patientName)}` : ""}! Seu agendamento foi realizado:`,
     `📅 Data: ${input.dateFormatted}`,
     input.time && input.byArrivalOrder
       ? `⏰ Horário: a partir das ${input.time} (atendimento por ordem de chegada)`

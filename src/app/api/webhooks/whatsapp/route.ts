@@ -27,13 +27,14 @@ import {
   CONFIRMED_TAG,
   CANCELLED_TAG,
   RESCHEDULED_TAG,
+  WRONG_NUMBER_TAG,
   RESCHEDULE_PENDING_TAG,
   nextTagsForOutcome,
 } from "@/lib/conversation-tags";
 import { detectProcedureInterestTag, detectSourceTag } from "@/lib/auto-tags";
 import { isKnownMspLeadPhone } from "@/lib/msp-lead-outreach";
 import { isKnownPartnerLeadPhone } from "@/lib/ai-lead-outreach";
-import { resolveStatusFromReply, isRescheduleReply, wasSentConfirmationPrompt } from "@/lib/appointment-reply";
+import { resolveStatusFromReply, isRescheduleReply, isWrongNumberReply, wasSentConfirmationPrompt } from "@/lib/appointment-reply";
 import { classifyAppointmentReply } from "@/lib/appointment-reply-ai";
 import { buildBridgeConfirmationFollowUp } from "@/lib/bridge-confirmation";
 import { extractBridgeNumeroFromNotes, confirmBridgeAppointment, verifyBridgeAppointmentPersisted } from "@/lib/hospital-bridge";
@@ -1105,6 +1106,33 @@ async function processWhatsappWebhook(body: Prisma.InputJsonValue, forcedClinicI
       })
     : null;
   const isConfirmationContext = wasSentConfirmationPrompt(lastOutbound?.content);
+
+  // "Número errado" vem ANTES de sim/não: o "não" de quem não é o paciente não pode
+  // cancelar consulta. Marca a conversa, tira de campanhas e avisa a recepção.
+  if (isConfirmationContext && conversation && isWrongNumberReply(incoming.text)) {
+    await prisma.conversation.update({
+      where: { id: conversation.id },
+      data: { assignedUserId: null, status: "OPEN", tags: conversation.tags.includes(WRONG_NUMBER_TAG) ? conversation.tags : [...conversation.tags, WRONG_NUMBER_TAG] },
+    });
+    await prisma.contact.updateMany({ where: { phone: incoming.phone, optedOutOfBroadcastsAt: null }, data: { optedOutOfBroadcastsAt: new Date() } });
+    await prisma.message.create({
+      data: {
+        conversationId: conversation.id,
+        direction: "OUTBOUND",
+        type: "INTERNAL_NOTE",
+        content: "📵 Quem recebeu o lembrete disse que este número não é do paciente. Corrija o telefone no sistema da clínica e tire a tag \"📵 Número errado\" — enquanto ela estiver aqui, o lembrete não vai para este número.",
+        status: "SENT",
+      },
+    });
+    const ackText = "Obrigado por avisar, e desculpe o incômodo! Vamos corrigir o cadastro e você não receberá mais essas mensagens.";
+    const ack = await sendWhatsAppMessage(incoming.phone, ackText, "appointment.wrong_number_ack", resolvedClinicId);
+    await prisma.message.create({
+      data: { conversationId: conversation.id, direction: "OUTBOUND", content: ackText, status: ack.success ? "DELIVERED" : "FAILED" },
+    });
+    notifyInboxRealtime(conversation.clinicId).catch(() => {});
+    await logInbound({ phone: incoming.phone, text: incoming.text, reason: "Número errado" }, "SUCCESS");
+    return NextResponse.json({ ok: true, status: "wrong_number" }, { status: 200 });
+  }
 
   let newStatus: AppointmentStatus | null = isConfirmationContext ? resolveStatusFromReply(incoming.text) : null;
   let rescheduleRequested = Boolean(!newStatus && isConfirmationContext && isRescheduleReply(incoming.text));

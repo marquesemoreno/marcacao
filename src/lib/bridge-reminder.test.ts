@@ -18,7 +18,7 @@ describe("buildBridgeReminderMessage", () => {
 
   it("inclui procedimento, médico e horário quando presentes", () => {
     const message = buildBridgeReminderMessage(base);
-    expect(message).toContain("Maria Silva");
+    expect(message).toContain("Maria");
     expect(message).toContain("Ultrassom de Próstata");
     expect(message).toContain("João Souza");
     expect(message).toContain("14:30");
@@ -36,7 +36,7 @@ describe("buildBridgeReminderMessage", () => {
       patientName: "FLORISVALDO DE OLIVEIRA FREITAS",
       doctorName: "MAURICIO FAGNER SANTOS LIMA DIAS",
     });
-    expect(message).toContain("*Florisvaldo de Oliveira Freitas*");
+    expect(message).toContain("*Florisvaldo*");
     expect(message).toContain("*Mauricio Fagner Santos Lima Dias*");
     expect(message).not.toContain("FLORISVALDO");
     expect(message).not.toContain("MAURICIO FAGNER");
@@ -49,7 +49,7 @@ describe("buildBridgeReminderMessage", () => {
       doctorName: null,
       time: null,
     });
-    expect(message).toContain("Maria Silva");
+    expect(message).toContain("Maria");
     expect(message).toContain("04/09/2026");
     expect(message).not.toContain("null");
     expect(message).not.toContain("undefined");
@@ -68,7 +68,7 @@ describe("buildUrolaserLaraReminderMessage", () => {
 
   it("apresenta a Lara e inclui os dados do agendamento", () => {
     const message = buildUrolaserLaraReminderMessage(base);
-    expect(message).toContain("Vivaldo José de Oliveira");
+    expect(message).toContain("Vivaldo");
     expect(message).toContain("Lara");
     expect(message).toContain("Urolaser");
     expect(message).toContain("20/02/2026");
@@ -101,7 +101,7 @@ describe("buildUrolaserLaraReminderMessage", () => {
       procedureName: "CONSULTA UROLOGIA",
       doctorName: "ALAN PASCOAL SILVA SANTOS",
     });
-    expect(message).toContain("*Davi Gralha Pereira*");
+    expect(message).toContain("*Davi*");
     expect(message).toContain("uma Consulta com Dr. *Alan Pascoal Silva Santos*");
     expect(message).not.toContain("CONSULTA UROLOGIA");
     expect(message).not.toContain("ALAN PASCOAL SILVA SANTOS");
@@ -137,7 +137,7 @@ describe("buildUrolaserLaraReminderMessage", () => {
       doctorName: null,
       time: null,
     });
-    expect(message).toContain("Vivaldo José de Oliveira");
+    expect(message).toContain("Vivaldo");
     expect(message).toContain("20/02/2026");
     expect(message).not.toContain("null");
     expect(message).not.toContain("undefined");

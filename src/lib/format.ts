@@ -25,6 +25,12 @@ export function toTitleCaseName(text: string): string {
     .join(" ");
 }
 
+/** Primeiro nome pra saudação de mensagem automática ("JULIO MORENO DA SILVA" → "Julio"):
+ * nome completo em caixa alta, vindo do sistema da clínica, soa robótico. */
+export function greetingFirstName(full: string): string {
+  return toTitleCaseName(full.trim().split(/\s+/)[0] ?? "");
+}
+
 export function formatCurrency(value: number | string) {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(
     Number(value)

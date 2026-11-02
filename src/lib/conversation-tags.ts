@@ -67,4 +67,8 @@ export function nextTagsForOutcome(currentTags: string[], outcomeTag: string): s
 
 /** Conversa que não é de paciente (parceiro, fornecedor, propaganda, feedback): some do CRM
  * e fica fora dos relatórios de atendimento. Aplicada à mão pela recepção. */
+/** Quem recebeu o lembrete disse que o número não é do paciente — a recepção corrige o
+ * telefone no sistema da clínica; enquanto a tag estiver na conversa, o lembrete não vai. */
+export const WRONG_NUMBER_TAG = "📵 Número errado";
+
 export const NON_PATIENT_TAG = "🚫 Não é paciente";

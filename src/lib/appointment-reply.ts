@@ -43,6 +43,26 @@ export function isRescheduleReply(text: string): boolean {
   return RESCHEDULE_REPLIES.includes(normalizeReply(text));
 }
 
+/** Quem recebeu o lembrete no número errado (cadastro desatualizado): a recepção corrige
+ * o telefone no sistema da clínica. Checado ANTES de sim/não — "não" de quem não é o
+ * paciente não pode cancelar a consulta de ninguém. */
+const WRONG_NUMBER_EXACT = ["numero errado", "numero errada", "nao sou eu", "nao sou", "engano", "foi engano", "e engano", "nao conheco", "nao e meu numero", "nao e o meu numero", "contato errado"];
+export function isWrongNumberReply(text: string): boolean {
+  const n = normalizeReply(text);
+  if (WRONG_NUMBER_EXACT.includes(n)) return true;
+  if (/^numero errad[oa]/.test(n)) return true;
+  // "não sou o Julio", "não conheço essa pessoa" — frase curta, sem continuação.
+  if (/^nao sou (o|a) \S+$/.test(n)) return true;
+  if (/^nao conheco (essa|esse|este|esta) pessoa$/.test(n)) return true;
+  return false;
+}
+
+export function wrongNumberCheckLine(patientName: string): string {
+  const first = (patientName.trim().split(/\s+/)[0] ?? "").toLowerCase();
+  const name = first ? first.charAt(0).toUpperCase() + first.slice(1) : "o paciente";
+  return `Se este número não for do(a) ${name}, responda *NÚMERO ERRADO* que corrigimos o cadastro.`;
+}
+
 /** Frases fixas presentes nos templates que pedem confirmação de agendamento (lembrete
  * D-1, confirmação do marketplace, confirmação do bridge) — ver bridge-reminder.ts,
  * bridge-confirmation.ts e sendAppointmentConfirmation em whatsapp.ts. A versão "Lara"
