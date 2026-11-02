@@ -248,3 +248,38 @@ export function overdueMinutes(item: AgendaItem, today: string, nowHHMM: string)
   const late = toMin(nowHHMM) - toMin(item.time);
   return late > OVERDUE_GRACE_MIN ? late : null;
 }
+
+export type GridSegment = { type: "row"; row: number } | { type: "gap"; from: number; to: number };
+
+/** Linhas de 15 min sem ninguém, 4 ou mais seguidas (1 h), viram uma faixa "livre" na
+ * grade (crítica 02/11, 6ª: ~25 linhas vazias empurravam a tarde pra fora da tela).
+ * `keep` = linhas que sempre aparecem ("agora"); `opened` = início de faixas que a recepção
+ * abriu pra marcar. */
+export function collapseEmptyRows(rows: number[], occupied: Set<number>, keep: Set<number> = new Set(), opened: Set<number> = new Set()): GridSegment[] {
+  const out: GridSegment[] = [];
+  let i = 0;
+  while (i < rows.length) {
+    const r = rows[i];
+    if (occupied.has(r) || keep.has(r)) {
+      out.push({ type: "row", row: r });
+      i++;
+      continue;
+    }
+    let j = i;
+    while (j + 1 < rows.length && !occupied.has(rows[j + 1]) && !keep.has(rows[j + 1])) j++;
+    const run = rows.slice(i, j + 1);
+    if (run.length >= 4 && !opened.has(run[0])) out.push({ type: "gap", from: run[0], to: run[run.length - 1] });
+    else for (const x of run) out.push({ type: "row", row: x });
+    i = j + 1;
+  }
+  return out;
+}
+
+/** "CONSULTA EM CONSULTORIO (NO HORARIO NORMAL OU PREESTABELECIDO)" → "CONSULTA EM
+ * CONSULTORIO": o parêntese do sistema da clínica vai pro tooltip. */
+export function shortProcedure(name: string | null | undefined): string | null {
+  const t = name?.trim();
+  if (!t) return null;
+  const short = t.replace(/\s*\([^)]*\)\s*/g, " ").replace(/\s+/g, " ").trim();
+  return short || t;
+}

@@ -46,6 +46,9 @@ export function AgendaSummary({
       {AGENDA_STATUS_GROUPS.map((g) => {
         const n = summary[g.id];
         const active = activeGroups.includes(g.id);
+        // Crítica 02/11 (6ª): 7 chips quase todos em 0 de manhã eram ruído. Zerado some
+        // (a não ser que esteja filtrando).
+        if (n === 0 && !active) return null;
         const urgent = g.id === "remarcar" && n > 0;
         return (
           <button

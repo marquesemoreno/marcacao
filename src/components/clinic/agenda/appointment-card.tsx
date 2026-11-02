@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { CalendarClock, ChevronDown, ClipboardCheck, MessageCircle, UserCheck, UserX } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { overdueMinutes, type AgendaItem, type AgendaStatusChoice } from "@/lib/agenda";
+import { overdueMinutes, shortProcedure, type AgendaItem, type AgendaStatusChoice } from "@/lib/agenda";
 import { AGENDA_STATUS_META, initialsOf, toTitleCase, todayInBahia } from "@/lib/agenda-ui";
 import { StatusIcon } from "./status-icon";
 import { StatusMenu } from "./status-menu";
@@ -35,7 +35,8 @@ export function AppointmentCard({
   const [confirmNoShow, setConfirmNoShow] = useState(false);
   const meta = AGENDA_STATUS_META[item.status];
   const name = toTitleCase(item.patientName || "Sem nome");
-  const subtitle = [item.procedure, item.doctor].filter(Boolean).map((t) => toTitleCase(t!)).join(" · ");
+  // Nome do procedimento sem o parêntese do sistema; o completo fica no title do cartão.
+  const subtitle = [shortProcedure(item.procedure), item.doctor].filter(Boolean).map((t) => toTitleCase(t!)).join(" · ");
   const struck = item.status === "CANCELLED";
   const isToday = item.date === todayInBahia();
   const canArrive = isToday && AWAITING_ARRIVAL.has(item.status);
@@ -110,7 +111,7 @@ export function AppointmentCard({
               {lateMin !== null && (
                 <p className="text-xs font-semibold text-amber-800 dark:text-amber-300 tabular-nums">Atrasado {lateMin} min — ainda não chegou</p>
               )}
-              {!compact && subtitle && <p className="truncate text-xs text-slate-500 dark:text-slate-400">{subtitle}</p>}
+              {!compact && subtitle && <p className="truncate text-xs text-slate-600 dark:text-slate-400" title={item.procedure ?? undefined}>{subtitle}</p>}
             </div>
           </div>
         </button>

@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  collapseEmptyRows,
+  shortProcedure,
   arrivalQueue,
   matchesPatientQuery,
   overdueMinutes,
@@ -253,5 +255,52 @@ describe("IN_ROOM (em atendimento)", () => {
   it("sai da fila de chegada (fila = só quem aguarda)", () => {
     const q = arrivalQueue([item({ key: "x", date: "2026-10-21", status: "IN_ROOM", arrivedAt: "2026-10-21T12:00:00Z" })], "2026-10-21");
     expect(q).toEqual([]);
+  });
+});
+
+describe("collapseEmptyRows", () => {
+  it("junta 4+ linhas vazias seguidas numa faixa livre", () => {
+    const rows = [0, 1, 2, 3, 4, 5, 6, 7];
+    expect(collapseEmptyRows(rows, new Set([0, 7]))).toEqual([
+      { type: "row", row: 0 },
+      { type: "gap", from: 1, to: 6 },
+      { type: "row", row: 7 },
+    ]);
+  });
+  it("trechos curtos (até 3 linhas) continuam abertos", () => {
+    expect(collapseEmptyRows([0, 1, 2, 3, 4], new Set([0, 4]))).toEqual([
+      { type: "row", row: 0 },
+      { type: "row", row: 1 },
+      { type: "row", row: 2 },
+      { type: "row", row: 3 },
+      { type: "row", row: 4 },
+    ]);
+  });
+  it("a linha das horas cheias não força nada; 'agora' e faixas abertas pelo usuário ficam visíveis", () => {
+    const rows = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
+    // linha 5 = agora (fica), 1–4 vazio (4 linhas) junta, 6–9 vazio foi aberto
+    expect(collapseEmptyRows(rows, new Set([0]), new Set([5]), new Set([6]))).toEqual([
+      { type: "row", row: 0 },
+      { type: "gap", from: 1, to: 4 },
+      { type: "row", row: 5 },
+      { type: "row", row: 6 },
+      { type: "row", row: 7 },
+      { type: "row", row: 8 },
+      { type: "row", row: 9 },
+    ]);
+  });
+});
+
+describe("shortProcedure", () => {
+  it("tira o parêntese explicativo do sistema da clínica", () => {
+    expect(shortProcedure("CONSULTA EM CONSULTORIO (NO HORARIO NORMAL OU PREESTABELECIDO)")).toBe("CONSULTA EM CONSULTORIO");
+  });
+  it("mantém nomes curtos e trata vazio", () => {
+    expect(shortProcedure("Colonoscopia")).toBe("Colonoscopia");
+    expect(shortProcedure(null)).toBeNull();
+    expect(shortProcedure("  ")).toBeNull();
+  });
+  it("não deixa o nome vazio quando tudo está entre parênteses", () => {
+    expect(shortProcedure("(retorno)")).toBe("(retorno)");
   });
 });

@@ -401,6 +401,8 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
   const failed = current?.bridgeFailedDays ?? [];
   const pendings = useMemo(() => systemPendings(wide.length ? wide : allItems, today), [wide, allItems, today]);
   const includesToday = range.days.includes(today) && view !== "mes";
+  const railWaiting = includesToday ? doctorItems.filter((i) => i.date === today && i.status === "IN_SERVICE").length : 0;
+  const railInRoom = includesToday ? doctorItems.filter((i) => i.date === today && i.status === "IN_ROOM").length : 0;
   const emptyPeriod = !!current && allItems.length === 0 && failed.length === 0;
 
   return (
@@ -483,7 +485,7 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
             type="button"
             ref={helpTriggerRef}
             onClick={() => setHelpOpen(true)}
-            className="ml-auto inline-flex h-9 items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
+            className="ml-auto inline-flex h-9 items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
           >
             <Keyboard className="h-4 w-4" aria-hidden /> Atalhos <kbd className="rounded border border-slate-300 dark:border-slate-600 px-1 font-mono text-[11px]">?</kbd>
           </button>
@@ -547,9 +549,24 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
               aria-live="off"
               title={current.hasBridge ? "Marcações sem telefone no sistema da clínica não aparecem aqui." : undefined}
             >
-              Atualizado às {updatedAt} · atualiza sozinho a cada minuto e meio
+              {/* Crítica 02/11 (6ª): com "Ao vivo" ligado, o aviso de 90 s contradizia o ponto verde. */}
+              Atualizado às {updatedAt}{live ? "" : " · atualiza sozinho a cada minuto e meio"}
             </p>
           )
+        )}
+
+        {/* Abaixo de xl a coluna da fila cai pra baixo da grade: este atalho mostra o que
+            espera ação sem rolar (crítica 02/11, 6ª). */}
+        {(railWaiting + railInRoom + bookingCount > 0) && (
+          <a
+            href="#fila-recepcao"
+            className="xl:hidden flex min-h-9 flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-sky-200 dark:border-sky-900 bg-sky-50 dark:bg-sky-950/40 px-3 py-1.5 text-sm text-sky-900 dark:text-sky-200 hover:bg-sky-100 dark:hover:bg-sky-950/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
+          >
+            {railWaiting > 0 && <span className="tabular-nums"><strong>{railWaiting}</strong> aguardando</span>}
+            {railInRoom > 0 && <span className="tabular-nums"><strong>{railInRoom}</strong> em atendimento</span>}
+            {bookingCount > 0 && <span className="tabular-nums"><strong>{bookingCount}</strong> {bookingCount === 1 ? "pedido de marcação" : "pedidos de marcação"}</span>}
+            <span className="ml-auto text-xs font-medium underline underline-offset-2">Ver fila</span>
+          </a>
         )}
 
         {current && view !== "mes" && (
@@ -639,6 +656,7 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
           </div>
           {/* Sempre montado: os pedidos de marcação carregam sozinhos; vazio = coluna some. */}
           <aside
+            id="fila-recepcao"
             aria-label="Fila e pendências"
             className={`space-y-3 xl:sticky xl:top-3 xl:shrink-0 ${pendings.length > 0 || includesToday || bookingCount > 0 ? "xl:w-80" : "hidden"}`}
           >

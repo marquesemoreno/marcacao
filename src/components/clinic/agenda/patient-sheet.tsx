@@ -9,6 +9,7 @@ import type { AgendaItem, AgendaStatusChoice } from "@/lib/agenda";
 import { StatusIcon } from "./status-icon";
 import { StatusMenu } from "./status-menu";
 import { ReturnHintRow } from "./return-hint-row";
+import { shortProcedure } from "@/lib/agenda";
 import { FormResponseSection } from "./form-response-section";
 import { AGENDA_STATUS_META, formatLongDate, toTitleCase } from "@/lib/agenda-ui";
 import { appointmentStatusLabels } from "@/lib/format";
@@ -87,9 +88,7 @@ export function PatientSheet({
                 </section>
               )}
               <section className="rounded-lg border border-slate-200 dark:border-slate-800 p-3 space-y-1.5 text-sm">
-                <Row label="Procedimento" value={item.procedure ? toTitleCase(item.procedure) : "—"} />
-                {/* Crítica 02/11: a ponte ainda não traz convênio nem horário de término — dizer, não calar. */}
-                <Row label="Convênio" value={item.source === "BRIDGE" ? "veja no sistema da clínica" : "—"} />
+                <Row label="Procedimento" value={item.procedure ? toTitleCase(shortProcedure(item.procedure)!) : "—"} title={item.procedure ?? undefined} />
                 <Row label="Médico" value={item.doctor ? toTitleCase(item.doctor) : "—"} />
                 <Row label="Telefone" value={item.phone ?? "Sem telefone"} />
                 <Row label="Origem" value={item.source === "BRIDGE" ? "Sistema da clínica" : "Conecta Saúde"} />
@@ -186,9 +185,9 @@ export function PatientSheet({
   );
 }
 
-function Row({ label, value }: { label: string; value: string }) {
+function Row({ label, value, title }: { label: string; value: string; title?: string }) {
   return (
-    <p className="flex justify-between gap-3">
+    <p className="flex justify-between gap-3" title={title}>
       <span className="text-slate-500 dark:text-slate-400">{label}</span>
       <span className="text-right font-medium text-slate-800 dark:text-slate-100">{value}</span>
     </p>

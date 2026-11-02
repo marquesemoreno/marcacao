@@ -33,7 +33,7 @@ Two things a generic WhatsApp CRM or scheduling tool cannot truthfully claim:
 ## Capabilities and Constraints
 
 - Clinic panel: Chat (inbox), CRM kanban, Agenda (marketplace clinics only), Pacientes (list + patient page), Disparos (campaigns), Relatórios, Configurações (prices, hours, parameters; Minha conta).
-- Inside a clinic every user has the same permissions (no per-user roles); all can edit prices — confirmed decision.
+- Each clinic user has one role (since 02/11/2026, `src/lib/clinic-permissions.ts`): **Recepção** (Chat, CRM, Agenda, Pacientes, Marcadores, Ações da IA, ficha prévia answers), **Marketing** (same operation plus Disparos and Relatórios, but no ficha prévia — health data), **Gestão** (everything, incl. Acessos, WhatsApp, Configurações, prices). Pausing campaigns stays open to everyone as a safety brake.
 - Users: ADMIN (TIVDC), CLINIC, PATIENT. Admins cannot open the clinic panel.
 - Stack in place: Next.js (App Router) on Vercel Pro, Prisma + Supabase Postgres, Tailwind + shadcn on Base UI, Evolution API for WhatsApp.
 - Undecided: tela de Médicos; clinical-data fields (would need a medical-role profile); clinic-set default ticket for WhatsApp-only clinics.

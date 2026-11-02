@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Plus } from "lucide-react";
-import { rowToTime, slotRowFor, visibleRowRange, type AgendaItem, type AgendaStatusChoice } from "@/lib/agenda";
+import { ChevronsUpDown, Plus } from "lucide-react";
+import { collapseEmptyRows, rowToTime, slotRowFor, visibleRowRange, type AgendaItem, type AgendaStatusChoice } from "@/lib/agenda";
 import { AppointmentCard } from "./appointment-card";
 
 export type AgendaColumn = { id: string; label: string; sublabel?: string; date: string; doctor: string | null; items: AgendaItem[]; highlight?: boolean };
@@ -35,6 +35,8 @@ export function AgendaGrid({
   onReschedule: (item: AgendaItem) => void;
 }) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  // Faixas "livre" que a recepção abriu pra marcar (chave = 1ª linha da faixa).
+  const [openedGaps, setOpenedGaps] = useState<Set<number>>(new Set());
   // Toque (tablet, sem hover): 1º toque mostra "+ HH:MM", 2º abre o agendamento — um toque
   // perdido na grade não abre mais "Novo agendamento" (crítica 02/11, 5ª).
   const [armed, setArmed] = useState<string | null>(null);
@@ -74,6 +76,8 @@ export function AgendaGrid({
 
   const rows: number[] = [];
   for (let r = firstRow; r <= lastRow; r++) rows.push(r);
+  const occupied = new Set(byCell.flatMap((c) => [...c.cells.keys()]));
+  const segments = collapseEmptyRows(rows, occupied, nowRow != null ? new Set([nowRow]) : new Set(), openedGaps);
 
   return (
     <div ref={scrollRef} className="relative max-h-[calc(100vh-12rem)] min-h-[20rem] overflow-auto rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
@@ -96,7 +100,7 @@ export function AgendaGrid({
             <button
               type="button"
               onClick={() => onSlotClick(col)}
-              className="shrink-0 inline-flex size-7 items-center justify-center rounded-md text-slate-500 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 dark:hover:text-emerald-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
+              className="shrink-0 inline-flex size-9 items-center justify-center rounded-md text-slate-600 dark:text-slate-400 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 dark:hover:text-emerald-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
               aria-label={`Novo agendamento — ${col.label}`}
               title="Novo agendamento"
             >
@@ -120,9 +124,37 @@ export function AgendaGrid({
           </>
         )}
 
-        {rows.map((row) => {
+        {segments.map((seg, si) => {
+          if (seg.type === "gap") {
+            const from = rowToTime(seg.from);
+            const to = rowToTime(seg.to + 1);
+            return (
+              <div key={`gap-${seg.from}`} className="contents">
+                <div className="sticky left-0 z-10 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 pr-2 py-1.5 text-right text-xs tabular-nums text-slate-600 dark:text-slate-400">
+                  {from}
+                </div>
+                <div style={{ gridColumn: "2 / -1" }} className="border-t border-l border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/40">
+                  <button
+                    type="button"
+                    onClick={() => setOpenedGaps((prev) => new Set(prev).add(seg.from))}
+                    className="flex min-h-9 w-full items-center gap-2 px-3 text-left text-xs text-slate-600 dark:text-slate-400 hover:bg-emerald-50/70 hover:text-emerald-800 dark:hover:bg-emerald-950/30 dark:hover:text-emerald-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-500/50"
+                    aria-label={`Horário livre das ${from} às ${to}: mostrar horários para marcar`}
+                  >
+                    <ChevronsUpDown className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                    <span className="tabular-nums">
+                      {from}–{to} · livre
+                    </span>
+                    <span className="ml-auto font-medium">Mostrar horários</span>
+                  </button>
+                </div>
+              </div>
+            );
+          }
+          const row = seg.row;
           const time = rowToTime(row);
-          const isHour = time.endsWith(":00");
+          // Depois de uma faixa livre a hora sempre aparece (senão "13:45" ficava sem rótulo).
+          const afterGap = si === 0 || segments[si - 1].type === "gap";
+          const isHour = time.endsWith(":00") || afterGap;
           const isNow = row === nowRow;
           const line = isNow
             ? "border-emerald-500 dark:border-emerald-400"
@@ -134,7 +166,7 @@ export function AgendaGrid({
               <div
                 ref={isNow ? nowRef : undefined}
                 className={`sticky left-0 z-10 bg-white dark:bg-slate-900 border-t ${line} pr-2 text-right text-xs tabular-nums ${
-                  isNow ? "font-semibold text-emerald-700 dark:text-emerald-400" : "text-slate-500 dark:text-slate-400"
+                  isNow ? "font-semibold text-emerald-700 dark:text-emerald-400" : "text-slate-600 dark:text-slate-400"
                 }`}
               >
                 {isNow ? (
@@ -164,7 +196,7 @@ export function AgendaGrid({
                       <button
                         type="button"
                         onClick={() => setExpanded((prev) => new Set(prev).add(cellKey))}
-                        className="w-full rounded-md px-2 py-1 text-left text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
+                        className="w-full min-h-8 rounded-md px-2 py-1 text-left text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
                       >
                         +{hidden} {hidden === 1 ? "paciente" : "pacientes"} às {time}
                       </button>
@@ -189,7 +221,7 @@ export function AgendaGrid({
                         type="button"
                         tabIndex={-1}
                         onClick={() => onSlotClick(col, time)}
-                        className="absolute right-1 top-1 z-10 hidden group-hover/cell:inline-flex [@media(hover:none)]:inline-flex size-6 items-center justify-center rounded-md bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-emerald-700 dark:text-emerald-400 shadow-xs"
+                        className="absolute right-1 top-1 z-10 hidden group-hover/cell:inline-flex [@media(hover:none)]:inline-flex size-6 [@media(hover:none)]:size-9 items-center justify-center rounded-md bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-emerald-700 dark:text-emerald-400 shadow-xs"
                         aria-label={`Encaixar paciente às ${time}`}
                         title={`Encaixar às ${time}`}
                       >

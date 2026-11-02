@@ -61,7 +61,7 @@ export function AgendaToolbar({
         <button
           type="button"
           onClick={onRefresh}
-          className={`ml-1 inline-flex size-8 items-center justify-center rounded-md text-slate-500 hover:text-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 dark:hover:text-slate-200 ${focusRing}`}
+          className={`ml-1 inline-flex size-9 shrink-0 items-center justify-center rounded-md text-slate-600 dark:text-slate-400 hover:text-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 dark:hover:text-slate-200 ${focusRing}`}
           aria-label={loading ? "Carregando agenda" : "Atualizar agenda"}
           title="Atualizar"
         >
