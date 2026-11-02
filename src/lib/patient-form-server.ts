@@ -3,6 +3,8 @@ import { createHash } from "crypto";
 import { prisma } from "@/lib/prisma";
 import { decryptToken, encryptToken } from "@/lib/token-crypto";
 import { parseFormTemplate, type FormTemplateBody } from "@/lib/patient-form";
+import { DEFAULT_CONSENT_TERM, formLinkLine } from "@/lib/patient-journey";
+import { getBaseUrl } from "@/lib/format";
 
 /** Respostas da ficha prévia são dado de saúde: sempre criptografadas em repouso. */
 export function encryptFormAnswers(answers: Record<string, string>): string {
@@ -32,4 +34,32 @@ export async function getActiveFormTemplate(clinicId: string, kind = "ANAMNESE")
 export async function getCurrentConsentTerm(clinicId: string, kind: string) {
   const own = await prisma.consentTerm.findFirst({ where: { clinicId, kind }, orderBy: { version: "desc" } });
   return own ?? prisma.consentTerm.findFirst({ where: { clinicId: null, kind }, orderBy: { version: "desc" } });
+}
+
+/** Termo vigente, criando o padrão do Conecta (v1) na primeira vez. */
+export async function ensureConsentTerm(clinicId: string, kind = "ANAMNESE") {
+  const current = await getCurrentConsentTerm(clinicId, kind);
+  if (current) return current;
+  return prisma.consentTerm.create({
+    data: { clinicId: null, kind, version: DEFAULT_CONSENT_TERM.version, title: DEFAULT_CONSENT_TERM.title, body: DEFAULT_CONSENT_TERM.body },
+  });
+}
+
+/** Linha com o link da ficha pro lembrete da véspera, ou null (clínica sem ficha ativa,
+ * ou qualquer falha — o lembrete sai sem a linha, nunca deixa de sair). */
+export async function formLinkForReminder(input: {
+  clinicId: string;
+  phone: string;
+  appointment: { source: "BRIDGE" | "LOCAL"; externalId: string; date: string };
+}): Promise<string | null> {
+  try {
+    const template = await prisma.formTemplate.findFirst({ where: { clinicId: input.clinicId, kind: "ANAMNESE", active: true }, select: { id: true } });
+    if (!template) return null;
+    const { issuePatientToken } = await import("@/lib/patient-token-server");
+    const { raw } = await issuePatientToken({ clinicId: input.clinicId, kind: "ANAMNESE", phone: input.phone, appointment: input.appointment });
+    return formLinkLine(`${getBaseUrl()}/p/${raw}`);
+  } catch (e) {
+    console.error("[ficha] não gerou o link do lembrete", e);
+    return null;
+  }
 }

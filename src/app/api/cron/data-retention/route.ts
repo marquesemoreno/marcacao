@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { FORM_RETENTION_DAYS } from "@/lib/patient-journey";
 import { isCronAuthorized } from "@/lib/request-auth";
 
 /** Retenção (auditoria de saúde, 19/10): o log técnico do WhatsApp (webhook_logs) guarda o
@@ -25,5 +26,11 @@ export async function GET(request: Request) {
     if (n < BATCH) break;
   }
   const loginFailures = await prisma.loginFailure.deleteMany({ where: { createdAt: { lt: new Date(Date.now() - 86_400_000) } } });
-  return NextResponse.json({ webhookLogs, loginFailures: loginFailures.count });
+  // Ficha prévia: decisão do dono (02/11/2026) — respostas apagadas após 1 ano; links
+  // vencidos há mais de 30 dias não servem pra nada.
+  const formResponses = await prisma.patientFormResponse.deleteMany({
+    where: { submittedAt: { lt: new Date(Date.now() - FORM_RETENTION_DAYS * 86_400_000) } },
+  });
+  const patientTokens = await prisma.patientToken.deleteMany({ where: { expiresAt: { lt: new Date(Date.now() - 30 * 86_400_000) } } });
+  return NextResponse.json({ webhookLogs, loginFailures: loginFailures.count, formResponses: formResponses.count, patientTokens: patientTokens.count });
 }

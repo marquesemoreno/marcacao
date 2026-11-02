@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { CalendarClock, ChevronDown, MessageCircle, UserCheck, UserX } from "lucide-react";
+import { CalendarClock, ChevronDown, ClipboardCheck, MessageCircle, UserCheck, UserX } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { overdueMinutes, type AgendaItem, type AgendaStatusChoice } from "@/lib/agenda";
 import { AGENDA_STATUS_META, initialsOf, toTitleCase, todayInBahia } from "@/lib/agenda-ui";
@@ -86,7 +86,7 @@ export function AppointmentCard({
           type="button"
           onClick={() => onOpen(item)}
           className="min-w-0 flex-1 text-left px-2 pt-1.5 pb-1 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
-          aria-label={`${item.time ?? "Sem horário"}, ${name}, ${meta.label}${lateMin !== null ? `, atrasado ${lateMin} minutos` : ""}. Abrir ficha`}
+          aria-label={`${item.time ?? "Sem horário"}, ${name}, ${meta.label}${lateMin !== null ? `, atrasado ${lateMin} minutos` : ""}${item.formDone ? ", ficha prévia enviada" : ""}. Abrir ficha`}
         >
           <div className="flex items-center gap-2 min-w-0">
             {!compact && (
@@ -101,6 +101,11 @@ export function AppointmentCard({
                   {name}
                 </span>
                 {item.phone && <MessageCircle className="w-3.5 h-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" aria-hidden />}
+                {item.formDone && (
+                  <ClipboardCheck className="w-3.5 h-3.5 shrink-0 text-emerald-700 dark:text-emerald-400" role="img" aria-label="Ficha prévia enviada">
+                    <title>Ficha prévia enviada</title>
+                  </ClipboardCheck>
+                )}
               </p>
               {lateMin !== null && (
                 <p className="text-xs font-semibold text-amber-800 dark:text-amber-300 tabular-nums">Atrasado {lateMin} min — ainda não chegou</p>

@@ -33,6 +33,8 @@ export type AgendaItem = {
   isManual?: boolean;
   /** ISO de quando a recepção marcou "Chegou" (IN_SERVICE) — base da fila de chegada. */
   arrivedAt?: string;
+  /** Paciente já enviou a ficha prévia pelo link do lembrete. */
+  formDone?: boolean;
 };
 
 /** O que a recepção pode escolher no card: um status manual ou voltar ao automático. */

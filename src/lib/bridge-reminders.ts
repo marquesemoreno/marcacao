@@ -9,6 +9,7 @@ import { formatToWhatsAppNumber, sendWhatsAppMessage, sendWhatsAppMedia } from "
 import { fetchBridgeDailyAgenda } from "@/lib/hospital-bridge";
 import { buildBridgeReminderMessage, buildUrolaserLaraReminderMessage, nextReminderTargetDate } from "@/lib/bridge-reminder";
 import { getBaseUrl } from "@/lib/format";
+import { formLinkForReminder } from "@/lib/patient-form-server";
 import { isWithinReminderWindow, shouldSendReminder } from "@/lib/automated-pacing";
 import { isMarketingGapElapsed } from "@/lib/broadcast-schedule";
 import { lastAutomatedSend, marketingCampaignReady } from "@/lib/automated-pacing-server";
@@ -145,10 +146,18 @@ export async function dispatchBridgeReminders(options?: { clinicId?: string; dat
         ? `${guardianReminderIntro(recipient.guardianFirstName, reminderInput.patientName)}\n\n${baseText}`
         : baseText;
       // Número que nunca falou com a clínica pode ser cadastro antigo/errado — pede pra avisar.
-      const messageText =
+      const baseMessage =
         recipient.toGuardian || knownConversation?.messages.length
           ? withGuardian
           : `${withGuardian}\n\n${wrongNumberCheckLine(reminderInput.patientName)}`;
+      // Ficha prévia (jornada do paciente, fase 2): só se a clínica ativou; vai no mesmo
+      // lembrete, sem mensagem a mais. O modelo da API oficial é fixo — lá não entra.
+      const formLine = await formLinkForReminder({
+        clinicId: clinic.id,
+        phone,
+        appointment: { source: "BRIDGE", externalId: String(item.numero), date: dateIso },
+      });
+      const messageText = formLine ? `${baseMessage}\n\n${formLine}` : baseMessage;
 
       // API oficial: lembrete só por modelo aprovado. Conta ativa sem modelo → não envia
       // (fica pra quando configurarem; não consome o paciente).

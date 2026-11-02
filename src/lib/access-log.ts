@@ -1,11 +1,12 @@
 /** Registro de acesso a dados de paciente (LGPD) — regras puras. A gravação fica em
  * access-log-server.ts. */
-export type AccessAction = "ABRIU_CONVERSA" | "ABRIU_FICHA" | "EDITOU_CADASTRO";
+export type AccessAction = "ABRIU_CONVERSA" | "ABRIU_FICHA" | "EDITOU_CADASTRO" | "VIU_FICHA_PREVIA";
 
 const LABELS: Record<AccessAction, string> = {
   ABRIU_CONVERSA: "Abriu a conversa",
   ABRIU_FICHA: "Abriu a ficha",
   EDITOU_CADASTRO: "Editou o cadastro",
+  VIU_FICHA_PREVIA: "Viu a ficha prévia (anamnese)",
 };
 
 export const READ_DEDUPE_MIN = 60;

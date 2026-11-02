@@ -136,7 +136,17 @@ export async function getAgenda(from: string, to: string): Promise<AgendaResult>
     }),
   }));
 
-  return { items: mergeAgenda(bridgeItems, localItems), hasBridge, bridgeFailedDays: bridgeFailedDays.sort() };
+  const items = mergeAgenda(bridgeItems, localItems);
+  // Ficha prévia enviada (jornada do paciente): selo no cartão. Falha aqui não derruba a agenda.
+  const formDone = await prisma.patientFormResponse
+    .findMany({
+      where: { clinicId, appointmentDate: { gte: fromDate, lte: toDate } },
+      select: { appointmentSource: true, appointmentExternalId: true },
+    })
+    .then((rows) => new Set(rows.map((r) => `${r.appointmentSource}:${r.appointmentExternalId}`)))
+    .catch(() => new Set<string>());
+  for (const i of items) if (formDone.has(`${i.source}:${i.externalId}`)) i.formDone = true;
+  return { items, hasBridge, bridgeFailedDays: bridgeFailedDays.sort() };
 }
 
 /** Recepção marca o status de uma marcação (presente, atendido, falta…). Só no Conecta —
