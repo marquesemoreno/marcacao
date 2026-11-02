@@ -417,7 +417,7 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
         onNewAppointment={() => setSchedule({ date: date < today ? today : date })}
       />
 
-      <div className="flex-1 min-w-0 space-y-3">
+      <div className="flex-1 min-w-0 space-y-3 pb-20 md:pb-0">
         <AgendaToolbar
           label={label}
           view={view}

@@ -8,6 +8,12 @@ import { AGENDA_STATUS_META, initialsOf, toTitleCase, todayInBahia } from "@/lib
 import { StatusIcon } from "./status-icon";
 import { StatusMenu } from "./status-menu";
 
+/** "Maria Vitoria Morais Sena" → "Maria S." (visão Semana). */
+function compactName(name: string): string {
+  const parts = name.trim().split(/\s+/);
+  return parts.length > 1 ? `${parts[0]} ${parts[parts.length - 1][0]}.` : parts[0] ?? name;
+}
+
 /** Ainda não chegou: candidatos ao botão de um toque "Chegou". */
 const AWAITING_ARRIVAL = new Set(["PENDING", "SENT", "CONFIRMED"]);
 
@@ -97,9 +103,10 @@ export function AppointmentCard({
             )}
             <div className="min-w-0 flex-1">
               <p className="flex items-center gap-1.5 text-sm font-semibold text-slate-900 dark:text-slate-100 min-w-0">
-                <span className="tabular-nums text-xs font-medium text-slate-500 dark:text-slate-400 shrink-0">{item.time ?? "—"}</span>
+                <span className="tabular-nums text-xs font-medium text-slate-600 dark:text-slate-400 shrink-0">{item.time ?? "—"}</span>
                 <span className={`truncate ${struck ? "line-through decoration-slate-400" : ""}`} title={name}>
-                  {name}
+                  {/* Semana: coluna estreita cortava em "Mari…"; primeiro nome + inicial lê melhor. */}
+                  {compact ? compactName(name) : name}
                 </span>
                 {item.phone && <MessageCircle className="w-3.5 h-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" aria-hidden />}
                 {item.formDone && (

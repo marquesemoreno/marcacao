@@ -42,7 +42,7 @@ export function AgendaGrid({
   const [armed, setArmed] = useState<string | null>(null);
   const noHover = typeof window !== "undefined" && window.matchMedia?.("(hover: none)").matches;
   const nowRef = useRef<HTMLDivElement>(null);
-  const colMin = compact ? "minmax(150px, 1fr)" : "minmax(230px, 1fr)";
+  const colMin = compact ? "minmax(132px, 1fr)" : "minmax(230px, 1fr)";
   const template = { gridTemplateColumns: `52px repeat(${Math.max(columns.length, 1)}, ${colMin})` };
 
   const allItems = columns.flatMap((c) => c.items);
@@ -80,7 +80,7 @@ export function AgendaGrid({
   const segments = collapseEmptyRows(rows, occupied, nowRow != null ? new Set([nowRow]) : new Set(), openedGaps);
 
   return (
-    <div ref={scrollRef} className="relative max-h-[calc(100vh-12rem)] min-h-[20rem] overflow-auto rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+    <div ref={scrollRef} className="relative h-[calc(100dvh-13rem)] min-h-[20rem] overflow-auto rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
       <div className="grid min-w-fit" style={template}>
         {/* Cabeçalho */}
         <div className="sticky top-0 left-0 z-30 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800" />
@@ -130,9 +130,8 @@ export function AgendaGrid({
             const to = rowToTime(seg.to + 1);
             return (
               <div key={`gap-${seg.from}`} className="contents">
-                <div className="sticky left-0 z-10 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 pr-2 py-1.5 text-right text-xs tabular-nums text-slate-600 dark:text-slate-400">
-                  {from}
-                </div>
+                {/* Sem rótulo de hora aqui: o intervalo já está na faixa (crítica 7ª). */}
+                <div className="sticky left-0 z-10 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800" />
                 <div style={{ gridColumn: "2 / -1" }} className="border-t border-l border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/40">
                   <button
                     type="button"

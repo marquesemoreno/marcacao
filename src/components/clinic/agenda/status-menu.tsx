@@ -58,6 +58,9 @@ export function StatusMenu({
   return (
     <div role="group" aria-label="Marcar status" data-status-menu>
       {POSITIVE.map(option)}
+      {future && (
+        <p className="px-2 pt-0.5 text-xs text-slate-600 dark:text-slate-400">Chegou, Em atendimento, Atendido e Faltou liberam no dia da consulta.</p>
+      )}
       <div className="my-1 border-t border-slate-200 dark:border-slate-700" />
       {NEGATIVE.map(option)}
       {confirming && (

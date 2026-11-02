@@ -10,6 +10,12 @@
 }
 
 @layer base {
+  /* Crítica 02/11 (7ª): o outline padrão sumia na sidebar escura. Quem usa
+     focus:outline-none + ring (utilities) continua com o próprio anel. */
+  :focus-visible {
+    outline: 2px solid oklch(0.696 0.17 162.48);
+    outline-offset: 2px;
+  }
   .theme {
     --font-heading: var(--font-sans);
     --font-sans: var(--font-sans);

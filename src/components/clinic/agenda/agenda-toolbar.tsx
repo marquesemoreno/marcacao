@@ -46,13 +46,13 @@ export function AgendaToolbar({
   return (
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div className="flex items-center gap-2 min-w-0">
-        <button type="button" onClick={onPrev} className={`${navBtn} w-9`} aria-label="Período anterior" title="Anterior (←)">
+        <button type="button" onClick={onPrev} className={`${navBtn} w-9 shrink-0`} aria-label="Período anterior" title="Anterior (←)">
           <ChevronLeft className="w-4 h-4" />
         </button>
         <button type="button" onClick={onToday} className={`${navBtn} px-3 text-sm font-medium`} title="Hoje (H)">
           Hoje
         </button>
-        <button type="button" onClick={onNext} className={`${navBtn} w-9`} aria-label="Próximo período" title="Próximo (→)">
+        <button type="button" onClick={onNext} className={`${navBtn} w-9 shrink-0`} aria-label="Próximo período" title="Próximo (→)">
           <ChevronRight className="w-4 h-4" />
         </button>
         <h1 className="ml-1 truncate text-lg md:text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100 first-letter:uppercase" aria-live="polite">
@@ -68,7 +68,7 @@ export function AgendaToolbar({
           {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
         </button>
         {live && (
-          <span className="hidden sm:inline-flex items-center gap-1.5 text-xs font-medium text-emerald-700 dark:text-emerald-400" title="Mudanças de outras telas e o “Cheguei” do paciente aparecem na hora">
+          <span className="inline-flex shrink-0 items-center gap-1.5 text-xs font-medium text-emerald-700 dark:text-emerald-400" title="Mudanças de outras telas e o “Cheguei” do paciente aparecem na hora">
             <span className="size-2 rounded-full bg-emerald-500" aria-hidden /> Ao vivo
           </span>
         )}
