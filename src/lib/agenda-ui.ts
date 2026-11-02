@@ -29,7 +29,7 @@ export const AGENDA_STATUS_META: Record<AgendaStatus, { label: string; badge: st
     dot: "bg-violet-500",
   },
   IN_SERVICE: {
-    label: "Presente",
+    label: "Chegou",
     badge: "bg-sky-100 text-sky-800 border-sky-300 dark:bg-sky-950/60 dark:text-sky-300 dark:border-sky-800",
     tint: "bg-sky-50/80 dark:bg-sky-950/30",
     dot: "bg-sky-500",
@@ -44,7 +44,8 @@ export const AGENDA_STATUS_META: Record<AgendaStatus, { label: string; badge: st
     label: "Cancelado",
     badge: "bg-slate-100 text-slate-600 border-slate-300 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700",
     tint: "bg-slate-50 dark:bg-slate-900/60",
-    dot: "bg-slate-400",
+    // Crítica 02/11: Atendido e Cancelado tinham o mesmo ponto — cancelado fica escuro.
+    dot: "bg-slate-700 dark:bg-slate-500",
   },
   NO_SHOW: {
     label: "Faltou",
@@ -56,10 +57,10 @@ export const AGENDA_STATUS_META: Record<AgendaStatus, { label: string; badge: st
 
 /** Grupos do filtro de status e da faixa de resumo (ids batem com daySummary). */
 export const AGENDA_STATUS_GROUPS: { id: "confirmado" | "aguardando" | "remarcar" | "presente" | "atendido" | "falta"; label: string; statuses: AgendaStatus[]; dot: string }[] = [
-  { id: "aguardando", label: "Aguardando confirmação", statuses: ["PENDING", "SENT"], dot: "bg-amber-400" },
+  { id: "aguardando", label: "Sem confirmação", statuses: ["PENDING", "SENT"], dot: "bg-amber-400" },
   { id: "remarcar", label: "Quer remarcar", statuses: ["RESCHEDULE"], dot: "bg-violet-500" },
   { id: "confirmado", label: "Confirmado", statuses: ["CONFIRMED"], dot: "bg-emerald-500" },
-  { id: "presente", label: "Presente", statuses: ["IN_SERVICE"], dot: "bg-sky-500" },
+  { id: "presente", label: "Chegou", statuses: ["IN_SERVICE"], dot: "bg-sky-500" },
   { id: "atendido", label: "Atendido", statuses: ["COMPLETED"], dot: "bg-slate-400" },
   { id: "falta", label: "Faltou / cancelado", statuses: ["CANCELLED", "NO_SHOW"], dot: "bg-rose-500" },
 ];

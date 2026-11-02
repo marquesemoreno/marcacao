@@ -54,7 +54,7 @@ export function AppointmentCard({
   );
 
   const quickBtn =
-    "inline-flex h-6 items-center gap-1 rounded-md px-1.5 text-xs font-semibold focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50 disabled:opacity-50";
+    "inline-flex h-8 items-center gap-1 rounded-md px-2 text-xs font-semibold focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50 disabled:opacity-50";
 
   return (
     <div

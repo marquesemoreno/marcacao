@@ -30,9 +30,9 @@ export function AgendaSummary({
             key={g.id}
             type="button"
             aria-pressed={active}
-            onClick={() => onToggle(g.id)}
-            disabled={n === 0 && !active}
-            className={`inline-flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-xs font-medium tabular-nums transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50 disabled:opacity-45 disabled:cursor-default ${
+            onClick={() => { if (n > 0 || active) onToggle(g.id); }}
+            aria-disabled={n === 0 && !active}
+            className={`inline-flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-xs font-medium tabular-nums transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50 aria-disabled:opacity-45 aria-disabled:cursor-default ${
               active
                 ? "border-slate-800 bg-slate-800 text-white dark:border-slate-200 dark:bg-slate-200 dark:text-slate-900"
                 : urgent

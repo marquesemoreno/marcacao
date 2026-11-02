@@ -340,6 +340,25 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
           waitlistCount={waitlistCount}
         />
 
+        {/* Crítica 02/11: o aviso da ponte ficava abaixo da fila — com a ponte fora, a grade parece completa. */}
+        {failed.length > 0 && (
+          <p role="alert" className="flex items-start gap-2 rounded-lg border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/40 px-3 py-2.5 text-sm font-medium text-amber-900 dark:text-amber-200">
+            <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" aria-hidden />
+            <span>
+              Não foi possível ler a agenda do sistema da clínica
+              {failed.length === 1
+                ? ` de ${brDate(failed[0])}`
+                : failed.length <= 3
+                  ? ` de ${failed.map((d) => brDate(d).slice(0, 5)).join(", ")}`
+                  : ` em ${failed.length} dias`}. O computador da clínica pode estar desligado — aparecem só
+              os agendamentos feitos pelo Conecta, não diga ao paciente que ele não está marcado.{" "}
+              <button type="button" onClick={reload} className="font-semibold underline underline-offset-2">
+                Tentar de novo
+              </button>
+            </span>
+          </p>
+        )}
+
         {view === "mes" && selectedGroups.length > 0 && (
           <p className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
             Contando só: {AGENDA_STATUS_GROUPS.filter((g) => selectedGroups.includes(g.id)).map((g) => g.label.toLowerCase()).join(", ")}.
@@ -351,6 +370,7 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
         {updatedAt && current && (
           <p className="text-xs text-slate-500 dark:text-slate-400 tabular-nums" aria-live="off">
             Atualizado às {updatedAt} · atualiza sozinho a cada minuto e meio
+            {current.hasBridge && " · marcações sem telefone no sistema da clínica não aparecem aqui"}
           </p>
         )}
 
@@ -363,25 +383,7 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
         )}
 
         {current && date === today && (
-          <ArrivalQueue items={doctorItems} date={today} onDone={(item) => void handleSetStatus(item, "COMPLETED")} onOpen={setOpenItem} />
-        )}
-
-        {failed.length > 0 && (
-          <p role="alert" className="flex items-start gap-2 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 px-3 py-2 text-sm text-amber-900 dark:text-amber-200">
-            <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" aria-hidden />
-            <span>
-              Não foi possível ler a agenda do sistema da clínica
-              {failed.length === 1
-                ? ` de ${brDate(failed[0])}`
-                : failed.length <= 3
-                  ? ` de ${failed.map((d) => brDate(d).slice(0, 5)).join(", ")}`
-                  : ` em ${failed.length} dias`}. O computador da clínica pode estar desligado — aparecem só
-              os agendamentos feitos pelo Conecta.{" "}
-              <button type="button" onClick={reload} className="font-semibold underline underline-offset-2">
-                Tentar de novo
-              </button>
-            </span>
-          </p>
+          <ArrivalQueue items={doctorItems} date={today} onDone={(item) => handleSetStatus(item, "COMPLETED")} onOpen={setOpenItem} />
         )}
 
         {loadError && !current ? (
@@ -417,14 +419,9 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
               <div className={`${panel} flex items-center gap-3 px-4 py-3`}>
                 <CalendarX2 className="w-5 h-5 shrink-0 text-slate-400" aria-hidden />
                 <p className="text-sm text-slate-600 dark:text-slate-300">
-                  Nenhum paciente {view === "semana" ? "nesta semana" : `em ${brDate(date)}`}. Clique num horário ou em “Novo agendamento” para marcar.
+                  Nenhum paciente {view === "semana" ? "nesta semana" : `em ${brDate(date)}`}. Escolha um horário na grade ou use “Novo agendamento” para marcar.
                 </p>
               </div>
-            )}
-            {current.hasBridge && (
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                Vem do sistema da clínica — marcações sem telefone cadastrado não aparecem aqui.
-              </p>
             )}
             {columns.length === 0 ? (
               <div className={`${panel} p-8 text-center text-sm text-slate-500 dark:text-slate-400`}>Nenhum paciente com esses filtros.</div>
