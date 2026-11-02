@@ -92,7 +92,7 @@ export function AppointmentCard({
         <button
           type="button"
           onClick={() => onOpen(item)}
-          className="min-w-0 flex-1 text-left px-2 pt-1 pb-0.5 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
+          className="min-w-0 flex-1 min-h-8 text-left px-2 pt-1 pb-0.5 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
           aria-label={`${item.time ?? "Sem horário"}, ${name}, ${meta.label}${lateMin !== null ? `, atrasado ${lateMin} minutos` : ""}${item.formDone ? ", ficha prévia enviada" : ""}. Abrir ficha`}
         >
           <div className="flex items-center gap-2 min-w-0">

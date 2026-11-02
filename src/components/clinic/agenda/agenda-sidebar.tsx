@@ -21,6 +21,7 @@ export function AgendaSidebar({
   onToggleDoctor,
   onAllDoctors,
   onNewAppointment,
+  loading = false,
 }: {
   date: string;
   onDateChange: (iso: string) => void;
@@ -29,6 +30,8 @@ export function AgendaSidebar({
   onToggleDoctor: (doctor: string) => void;
   onAllDoctors: () => void;
   onNewAppointment: () => void;
+  /** Agenda ainda carregando: não dizer "nenhum médico". */
+  loading?: boolean;
 }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const selected = new Date(`${date}T12:00:00`);
@@ -45,9 +48,9 @@ export function AgendaSidebar({
         <button
           type="button"
           onClick={onNewAppointment}
-          className="flex-1 inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 px-4 text-sm font-semibold text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-950"
+          className="flex-1 inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-emerald-700 hover:bg-emerald-800 px-4 text-sm font-semibold text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-950"
         >
-          <Plus className="w-4 h-4" aria-hidden /> Novo agendamento
+          <Plus className="w-4 h-4" aria-hidden /> <span className="sm:hidden">Novo</span><span className="hidden sm:inline">Novo agendamento</span>
         </button>
         <button
           type="button"
@@ -77,7 +80,13 @@ export function AgendaSidebar({
 
         <section className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3">
           <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-100 mb-2">Médico</h2>
-          {doctors.length === 0 ? (
+          {loading ? (
+            <div className="space-y-2 py-1" aria-busy="true" aria-label="Carregando médicos">
+              {[0, 1, 2].map((i) => (
+                <div key={i} className="h-5 animate-pulse rounded bg-slate-200 dark:bg-slate-800" style={{ width: `${80 - i * 15}%` }} />
+              ))}
+            </div>
+          ) : doctors.length === 0 ? (
             <p className="text-sm text-slate-500 dark:text-slate-400">Nenhum médico com pacientes neste período.</p>
           ) : (
             <ul className="space-y-0.5 max-h-64 overflow-y-auto">

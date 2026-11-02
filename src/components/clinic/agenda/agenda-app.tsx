@@ -160,18 +160,34 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
       cancelled = true;
     };
   }, [range.from, range.to, rangeKey, reloadKey]);
-  const current = loadedKey === rangeKey ? data : null;
+  const loadedCurrent = loadedKey === rangeKey ? data : null;
+  const [wideLoaded, setWideLoaded] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     const t = todayInBahia();
     getAgenda(addDays(t, -7), addDays(t, 34))
-      .then((r) => !cancelled && setWide(r.items))
+      .then((r) => {
+        if (cancelled) return;
+        setWide(r.items);
+        setWideLoaded(true);
+      })
       .catch(() => {});
     return () => {
       cancelled = true;
     };
   }, [wideKey]);
+
+  // Crítica 02/11 (9ª): trocar data/visão apagava tudo por 3–5 s. Se o período cabe na
+  // janela larga (hoje-7..+34), mostra já esses dados (dia certo, talvez um pouco velhos)
+  // enquanto a ponte responde; esqueleto só fora dela.
+  const provisional = useMemo<AgendaResult | null>(() => {
+    if (loadedCurrent || !wideLoaded) return null;
+    const t = todayInBahia();
+    if (range.from < addDays(t, -7) || range.to > addDays(t, 34)) return null;
+    return { items: wide.filter((i) => i.date >= range.from && i.date <= range.to), hasBridge: true, bridgeFailedDays: [] };
+  }, [loadedCurrent, wideLoaded, wide, range.from, range.to]);
+  const current = loadedCurrent ?? provisional;
 
   const allItems = useMemo(() => current?.items ?? [], [current]);
   const doctors = useMemo(() => agendaDoctors(allItems), [allItems]);
@@ -420,6 +436,7 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
         onToggleDoctor={(d) => setSelectedDoctors((prev) => (prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d]))}
         onAllDoctors={() => setSelectedDoctors([])}
         onNewAppointment={() => setSchedule({ date: date < today ? today : date })}
+        loading={!current}
       />
 
       <div className="flex-1 min-w-0 space-y-3 pb-20 md:pb-0">
@@ -491,7 +508,7 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
             type="button"
             ref={helpTriggerRef}
             onClick={() => setHelpOpen(true)}
-            className="ml-auto inline-flex h-9 items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
+            className="ml-auto hidden md:inline-flex h-9 items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
           >
             <Keyboard className="h-4 w-4" aria-hidden /> Atalhos <kbd className="rounded border border-slate-300 dark:border-slate-600 px-1 font-mono text-[11px]">?</kbd>
           </button>
