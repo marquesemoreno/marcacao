@@ -4,7 +4,7 @@ import { normalizeBroadcastVariants, previewBroadcastVariants } from "@/lib/broa
 import { buildTemplateParams, checkTemplateParamSources, renderTemplatePreview, templateLabel } from "@/lib/broadcast-cloud-template";
 import { PageHeader } from "@/components/clinic/page-header";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { CalendarClock, Copy, FileText, Mail, MessageCircle, MessageSquareText, ShieldCheck, Image as ImageIcon, Loader2, MoreHorizontal, Paperclip, Pause, Phone, Play, Plus, Repeat, Trash2, Upload, X } from "lucide-react";
+import { CalendarClock, Copy, FileText, Mail, MessageCircle, MessageSquareText, ShieldCheck, Image as ImageIcon, Loader2, MoreHorizontal, Paperclip, Pause, Phone, Play, Plus, Repeat, Settings2, Trash2, Upload, X } from "lucide-react";
 import { BROADCAST_ATTACHMENT_ACCEPT, checkBroadcastAttachment } from "@/lib/broadcast-attachment";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "sonner";
@@ -129,6 +129,7 @@ function smsCostText(credits: number): string {
 export function BroadcastManagement() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(true);
+  const [listError, setListError] = useState(false);
   const [creating, setCreating] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
@@ -170,6 +171,8 @@ export function BroadcastManagement() {
   // Saúde do número (crítica 02/11): conexão, volume automático de hoje, queda recente.
   const [health, setHealth] = useState<NumberHealthView | null>(null);
   const [riskAck, setRiskAck] = useState(false);
+  const [configOpen, setConfigOpen] = useState(false);
+  const [startHealth, setStartHealth] = useState<NumberHealthView | null>(null);
   const [pausingAll, setPausingAll] = useState(false);
   const loadHealth = useCallback(() => {
     getClinicNumberHealth().then(setHealth).catch(() => {});
@@ -179,9 +182,10 @@ export function BroadcastManagement() {
     if (!silent) setLoading(true);
     try {
       setCampaigns(await listClinicBroadcastCampaigns());
+      setListError(false);
       getClinicNextAutomatedSend().then(setNextSend).catch(() => {});
     } catch {
-      if (!silent) toast.error("Não foi possível carregar as campanhas. Recarregue a página.");
+      if (!silent) setListError(true);
     } finally {
       if (!silent) setLoading(false);
     }
@@ -340,10 +344,24 @@ export function BroadcastManagement() {
   async function askStart(campaign: Campaign) {
     setConfirming({ campaign, preview: null });
     setRiskAck(false);
-    loadHealth();
+    setStartHealth(null);
     try {
       const preview = await getClinicCampaignStartPreview(campaign.id);
       setConfirming({ campaign, preview });
+      // Saúde do número já somando esta campanha ao volume de hoje.
+      getClinicNumberHealth(preview.isReschedule ? 0 : preview.pending)
+        .then(setStartHealth)
+        .catch(() =>
+          setStartHealth({
+            tone: "warn",
+            reasons: ["Não foi possível conferir o número agora."],
+            needsAck: true,
+            blocksStart: false,
+            connection: "unknown",
+            onCloud: false,
+            automatedToday: 0,
+          }),
+        );
     } catch {
       setConfirming(null);
       toast.error("Não foi possível montar a prévia. Tente de novo.");
@@ -512,32 +530,51 @@ export function BroadcastManagement() {
         actions={
           <div className="flex flex-wrap-reverse justify-end gap-2">
             {channelSetup?.isManager && (
-              <button
-                type="button"
-                onClick={() => setRulesOpen(true)}
-                className="inline-flex h-9 items-center gap-1.5 px-3 text-sm font-medium text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg"
-              >
-                <Repeat className="w-4 h-4" aria-hidden />
-                Régua automática
-              </button>
-            )}
-            {channelSetup?.isManager && (
-              <button
-                type="button"
-                onClick={() => setConsentOpen(true)}
-                className="inline-flex h-9 items-center gap-1.5 px-3 text-sm font-medium text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg"
-              >
-                <ShieldCheck className="w-4 h-4" aria-hidden />
-                Aceites SMS/e-mail
-              </button>
+              <Popover open={configOpen} onOpenChange={setConfigOpen}>
+                <PopoverTrigger className="inline-flex h-9 items-center gap-1.5 px-3 text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg">
+                  <Settings2 className="w-4 h-4" aria-hidden />
+                  Configurar
+                </PopoverTrigger>
+                <PopoverContent align="end" className="w-64 p-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setConfigOpen(false);
+                      setRulesOpen(true);
+                    }}
+                    className="w-full flex items-start gap-2 rounded-md px-2 py-2 text-left text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
+                  >
+                    <Repeat className="w-4 h-4 mt-0.5 shrink-0" aria-hidden />
+                    <span>
+                      Régua automática
+                      <span className="block text-xs text-slate-500 dark:text-slate-400">Pós-consulta, retorno, reativação, aniversário</span>
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setConfigOpen(false);
+                      setConsentOpen(true);
+                    }}
+                    className="w-full flex items-start gap-2 rounded-md px-2 py-2 text-left text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
+                  >
+                    <ShieldCheck className="w-4 h-4 mt-0.5 shrink-0" aria-hidden />
+                    <span>
+                      Aceites SMS/e-mail
+                      <span className="block text-xs text-slate-500 dark:text-slate-400">Quem autorizou receber por esses canais</span>
+                    </span>
+                  </button>
+                </PopoverContent>
+              </Popover>
             )}
             <button
               type="button"
               onClick={() => setRescheduleModalOpen(true)}
+              title="Médico desmarcou um dia: avisa todos os pacientes agendados com ele"
               className="inline-flex h-9 items-center gap-1.5 px-3 text-sm font-medium text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg"
             >
               <CalendarClock className="w-4 h-4" aria-hidden />
-              Aviso de remarcação
+              Médico desmarcou
             </button>
             <button
               type="button"
@@ -557,11 +594,10 @@ export function BroadcastManagement() {
             <p
               role="status"
               className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium ${HEALTH_TONE[health.tone]}`}
-              title={health.reasons.join(" ") || undefined}
             >
-              <span aria-hidden className={`h-2 w-2 rounded-full ${health.tone === "ok" ? "bg-emerald-500" : health.tone === "warn" ? "bg-amber-500" : "bg-red-500"}`} />
+              <span aria-hidden className={`h-2 w-2 shrink-0 rounded-full ${health.tone === "ok" ? "bg-emerald-500" : health.tone === "warn" ? "bg-amber-500" : "bg-red-500"}`} />
               {healthLabel(health)}
-              {health.tone === "warn" && <span className="font-normal">· {health.reasons[0]}</span>}
+              {health.tone === "warn" && <span className="font-normal">· {health.reasons.join(" ")}</span>}
             </p>
           ) : (
             <span />
@@ -677,6 +713,7 @@ export function BroadcastManagement() {
                     type="button"
                     aria-current={current ? "step" : undefined}
                     onClick={() => setFormStep(n)}
+                    disabled={n === 2 && (!name.trim() || recipients.length === 0)}
                     className={`inline-flex items-center gap-1.5 rounded-md px-2 py-1 ${current ? "text-emerald-700 dark:text-emerald-300" : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"}`}
                   >
                     <span
@@ -1009,7 +1046,7 @@ export function BroadcastManagement() {
           </div>
 
           <div className="sticky bottom-0 -mx-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-950/95 backdrop-blur px-4 py-3">
-            <p className="text-sm text-slate-600 dark:text-slate-300 min-w-0 flex-1" aria-live="polite">
+            <p className="text-sm text-slate-600 dark:text-slate-300 min-w-0 flex-1">
               {formStep === 1
                 ? !name.trim()
                   ? "Falta dar um nome à campanha."
@@ -1067,6 +1104,13 @@ export function BroadcastManagement() {
         {loading ? (
           <div className={`${panel} p-6 text-center text-sm text-slate-500 flex items-center justify-center gap-2`}>
             <Loader2 className="w-4 h-4 animate-spin" aria-hidden /> Carregando…
+          </div>
+        ) : listError ? (
+          <div role="alert" className="rounded-lg border border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-950/40 p-4 text-sm text-red-800 dark:text-red-300">
+            Não foi possível carregar as campanhas — as que existem não aparecem aqui.{" "}
+            <button type="button" onClick={() => loadCampaigns()} className="font-semibold underline underline-offset-2">
+              Tentar de novo
+            </button>
           </div>
         ) : campaigns.length === 0 ? (
           <div className={`${panel} p-6 text-center text-sm text-slate-500 dark:text-slate-400`}>
@@ -1150,11 +1194,35 @@ export function BroadcastManagement() {
             </p>
           ) : (
             <div className="space-y-4">
+              {/* Risco primeiro (crítica 02/11 #2): o que pode bloquear o número vem antes da prévia. */}
+              {confirming.preview.channel === "WHATSAPP" && !confirming.preview.isReschedule &&
+                (!startHealth ? (
+                  <p className="flex items-center gap-2 text-xs text-slate-500" role="status">
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden /> Conferindo o número…
+                  </p>
+                ) : (
+                  <div role={startHealth.tone === "ok" ? "status" : "alert"} className={`rounded-lg border p-3 text-sm space-y-2 ${HEALTH_TONE[startHealth.tone]}`}>
+                    <p className="font-semibold">{healthLabel(startHealth)}</p>
+                    {startHealth.reasons.length > 0 && (
+                      <ul className="list-disc pl-5 space-y-0.5">
+                        {startHealth.reasons.map((r) => (
+                          <li key={r}>{r}</li>
+                        ))}
+                      </ul>
+                    )}
+                    {startHealth.needsAck && (
+                      <label className="flex items-start gap-2 font-medium">
+                        <input type="checkbox" checked={riskAck} onChange={(e) => setRiskAck(e.target.checked)} className="mt-0.5 h-4 w-4 accent-amber-600" />
+                        Entendo o risco e quero iniciar mesmo assim
+                      </label>
+                    )}
+                  </div>
+                ))}
               {confirming.preview.isReschedule ? (
                 <div className="space-y-2">
                   <p className="text-sm text-slate-700 dark:text-slate-200">
                     Aviso de remarcação para <strong>{plural(confirming.preview.pending, "paciente", "pacientes")}</strong>: 1 a cada 4–6 min, das 8h às 18h,
-                    todo dia
+                    todo dia (por ser urgente, usa uma janela maior que a das campanhas, 9h–17h em dias úteis)
                     {confirming.preview.urgentLastAt
                       ? ` — o último recebe por volta de ${new Date(confirming.preview.urgentLastAt).toLocaleString("pt-BR", { weekday: "short", hour: "2-digit", minute: "2-digit", timeZone: "America/Bahia" })}`
                       : ""}
@@ -1247,31 +1315,13 @@ export function BroadcastManagement() {
                   <a href="/clinic/precos" className="font-semibold underline underline-offset-2">Configurações › Preços e parâmetros</a>.
                 </div>
               )}
-              {health && confirming.preview.channel === "WHATSAPP" && (
-                <div role={health.tone === "ok" ? "status" : "alert"} className={`rounded-lg border p-3 text-sm space-y-2 ${HEALTH_TONE[health.tone]}`}>
-                  <p className="font-semibold">{healthLabel(health)}</p>
-                  {health.reasons.length > 0 && (
-                    <ul className="list-disc pl-5 space-y-0.5">
-                      {health.reasons.map((r) => (
-                        <li key={r}>{r}</li>
-                      ))}
-                    </ul>
-                  )}
-                  {health.needsAck && (
-                    <label className="flex items-start gap-2 font-medium">
-                      <input type="checkbox" checked={riskAck} onChange={(e) => setRiskAck(e.target.checked)} className="mt-0.5 h-4 w-4 accent-amber-600" />
-                      Entendo o risco e quero iniciar mesmo assim
-                    </label>
-                  )}
-                </div>
-              )}
               <div className="flex justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => setConfirming(null)}
                   className="h-9 px-4 text-sm font-medium rounded-lg text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
                 >
-                  Voltar
+                  Cancelar
                 </button>
                 <button
                   type="button"
@@ -1282,13 +1332,17 @@ export function BroadcastManagement() {
                     confirming.preview.unknownVariables.length > 0 ||
                     confirming.preview.unfilled.length > 0 ||
                     confirming.preview.missingTechnicalDirector ||
-                    (confirming.preview.channel === "WHATSAPP" && !!health && (health.blocksStart || (health.needsAck && !riskAck)))
+                    (confirming.preview.channel === "WHATSAPP" &&
+                      !confirming.preview.isReschedule &&
+                      (!startHealth || startHealth.blocksStart || (startHealth.needsAck && !riskAck)))
                   }
                   onClick={confirmStart}
-                  className="inline-flex h-9 items-center gap-1.5 px-4 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 rounded-lg"
+                  className={`inline-flex h-9 items-center gap-1.5 px-4 text-sm font-semibold text-white disabled:opacity-50 rounded-lg ${
+                    startHealth?.needsAck && confirming.preview.channel === "WHATSAPP" ? "bg-amber-600 hover:bg-amber-700" : "bg-emerald-600 hover:bg-emerald-700"
+                  }`}
                 >
                   {busyId === confirming.campaign.id ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden /> : <Play className="w-4 h-4" aria-hidden />}
-                  Iniciar envio para {confirming.preview.pending}
+                  {startHealth?.needsAck && confirming.preview.channel === "WHATSAPP" ? "Iniciar mesmo assim" : "Iniciar envio"} para {confirming.preview.pending}
                 </button>
               </div>
             </div>
@@ -1477,15 +1531,15 @@ function CampaignCard({
                 label: "Puladas",
                 value: String(c.skipped + c.noConsent),
                 tone: "",
-                hint: [c.skipped && `${c.skipped} pediram para não receber`, c.noConsent && `${c.noConsent} sem consentimento para campanhas`].filter(Boolean).join(" · "),
+                hint: [c.skipped && `${c.skipped} saíram da lista`, c.noConsent && `${c.noConsent} sem aceite`].filter(Boolean).join(" · "),
               },
               { label: "Falhas", value: String(c.failed), tone: c.failed > 0 ? "text-red-700 dark:text-red-400" : "" },
             ] as { label: string; value: string; tone: string; hint?: string }[]
           ).map((s) => (
-            <div key={s.label} className="rounded-md bg-slate-50 dark:bg-slate-800/60 px-2.5 py-1.5" title={s.hint || undefined}>
+            <div key={s.label} className="rounded-md bg-slate-50 dark:bg-slate-800/60 px-2.5 py-1.5">
               <dt className="text-slate-500 dark:text-slate-400">{s.label}</dt>
               <dd className={`text-sm font-semibold tabular-nums text-slate-900 dark:text-slate-100 ${s.tone}`}>{s.value}</dd>
-              {s.hint && <dd className="sr-only">{s.hint}</dd>}
+              {s.hint && <dd className="text-[11px] leading-tight text-slate-500 dark:text-slate-400">{s.hint}</dd>}
             </div>
           ))}
         </dl>
@@ -1496,15 +1550,13 @@ function CampaignCard({
             {c.delivery.complained > 0 && <span className="text-red-700 dark:text-red-400">{` · ${c.delivery.complained} marcaram como spam (saíram da lista)`}</span>}
           </p>
         )}
-        {c.skipped + c.noConsent > 0 && (
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-            Puladas: {[c.skipped && `${c.skipped} ${c.skipped === 1 ? "pediu" : "pediram"} para não receber`, c.noConsent && `${c.noConsent} sem consentimento`].filter(Boolean).join(" · ")}.
-          </p>
-        )}
         {c.sentByVariant && (
-          <p className="mt-0.5 text-xs text-slate-600 dark:text-slate-400 tabular-nums">
-            Por texto: {c.sentByVariant.map((n, i) => `${i === 0 ? "principal" : `variação ${i + 1}`} ${n}`).join(" · ")}
-          </p>
+          <details className="mt-1 text-xs">
+            <summary className="cursor-pointer text-slate-600 dark:text-slate-400">Enviadas por texto</summary>
+            <p className="mt-0.5 text-slate-600 dark:text-slate-400 tabular-nums">
+              {c.sentByVariant.map((n, i) => `${i === 0 ? "principal" : `variação ${i + 1}`} ${n}`).join(" · ")}
+            </p>
+          </details>
         )}
         {c.failed > 0 && (
           <details className="mt-2 text-xs">

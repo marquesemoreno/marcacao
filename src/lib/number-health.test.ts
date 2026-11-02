@@ -34,6 +34,16 @@ describe("numberHealth", () => {
     expect(numberHealth({ ...base, automatedToday: 80 }).needsAck).toBe(true);
   });
 
+  it("conta a própria campanha: dia calmo + campanha grande também alerta", () => {
+    const h = numberHealth({ ...base, automatedToday: 5, campaignPending: 600 });
+    expect(h.needsAck).toBe(true);
+    expect(h.reasons.join(" ")).toContain("~85");
+  });
+
+  it("campanha pequena num dia calmo segue ok", () => {
+    expect(numberHealth({ ...base, automatedToday: 5, campaignPending: 30 }).tone).toBe("ok");
+  });
+
   it("API oficial: sem risco de bloqueio por celular", () => {
     const h = numberHealth({ ...base, onCloud: true, lastDownAt: new Date("2026-10-20T12:00:00Z"), failedToday: 5 });
     expect(h.tone).toBe("ok");

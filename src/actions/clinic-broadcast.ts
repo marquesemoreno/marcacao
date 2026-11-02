@@ -463,7 +463,7 @@ export async function pauseAllClinicBroadcastCampaigns() {
 }
 
 /** Saúde do número pro diálogo de início e o cabeçalho de Disparos (ver number-health.ts). */
-export async function getClinicNumberHealth() {
+export async function getClinicNumberHealth(campaignPending?: number) {
   const { clinicId } = await requireClinicSession();
   const now = new Date();
   const dayStart = startOfBrazilDay(now);
@@ -490,6 +490,7 @@ export async function getClinicNumberHealth() {
     lastDownAt: lastDown?.createdAt ?? null,
     automatedToday: campaignToday + remindersToday,
     failedToday,
+    campaignPending,
     now,
   };
   return { ...numberHealth(input), connection, onCloud: input.onCloud, automatedToday: input.automatedToday };
