@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { normalizeWaitlistInput, openSlotFromStatus, rankWaitlistCandidates, buildSlotOfferMessage, type WaitlistEntryLike, type OpenSlot } from "./waitlist";
+import { normalizeWaitlistInput, openSlotFromStatus, rankWaitlistCandidates, buildSlotOfferMessage, buildAutoSlotOfferMessage, canAutoOffer, parseOfferReply, type WaitlistEntryLike, type OpenSlot } from "./waitlist";
 
 const now = { date: "2026-10-19", time: "10:00" };
 
@@ -118,5 +118,27 @@ describe("normalizeWaitlistInput", () => {
     expect(normalizeWaitlistInput({ patientName: " ", phone: "77999990000" })).toEqual({ ok: false, error: "Informe o nome do paciente." });
     expect(normalizeWaitlistInput({ patientName: "Ana", phone: "9999" })).toEqual({ ok: false, error: "Informe o WhatsApp com DDD." });
     expect(normalizeWaitlistInput({ patientName: "Ana", phone: "77999990000", period: "NOITE" })).toEqual({ ok: false, error: "Período inválido." });
+  });
+});
+
+describe("oferta automática", () => {
+  it("parseOfferReply: sim/não e variações; resto = null", () => {
+    for (const t of ["SIM", "sim!", "Quero", "1", "pode ser", "aceito", "Sim, quero"]) expect(parseOfferReply(t)).toBe("YES");
+    for (const t of ["não", "nao", "2", "Não quero", "não posso"]) expect(parseOfferReply(t)).toBe("NO");
+    for (const t of ["que horas mesmo?", "", "talvez"]) expect(parseOfferReply(t)).toBeNull();
+  });
+  it("canAutoOffer: só 07–20h e vaga a mais de 1 h", () => {
+    const at = (iso: string) => new Date(iso);
+    // 10:00 BRT = 13:00Z
+    expect(canAutoOffer({ date: "2026-11-03", time: "14:00" }, at("2026-11-03T13:00:00Z"))).toBe("SEND");
+    expect(canAutoOffer({ date: "2026-11-03", time: "10:40" }, at("2026-11-03T13:00:00Z"))).toBe("TOO_LATE");
+    // 22:00 BRT: espera até 07h
+    expect(canAutoOffer({ date: "2026-11-04", time: "14:00" }, at("2026-11-04T01:00:00Z"))).toBe("WAIT");
+  });
+  it("mensagem pede SIM/NÃO e diz o prazo", () => {
+    const m = buildAutoSlotOfferMessage({ date: "2026-11-04", time: "14:00", doctor: "Dr. João", procedure: null }, "MARIA SILVA", "Clínica X", 30);
+    expect(m).toContain("Olá, MARIA");
+    expect(m).toContain("SIM");
+    expect(m).toContain("30 minutos");
   });
 });

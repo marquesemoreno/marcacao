@@ -6,6 +6,36 @@ import { toast } from "sonner";
 import { createTvLink, revokeTvLink, saveDoctorRoom } from "@/actions/tv-call";
 import { doctorKey } from "@/lib/tv-call";
 import { toTitleCase } from "@/lib/agenda-ui";
+import { QRCodeSVG } from "qrcode.react";
+
+/** QR Code pra imprimir e colar na recepção: o paciente avisa que chegou / pega senha pelo celular. */
+function ArrivalQr({ url }: { url: string }) {
+  const print = () => {
+    const svg = document.getElementById("arrival-qr")?.outerHTML ?? "";
+    const w = window.open("", "_blank", "width=600,height=800");
+    if (!w) return;
+    w.document.write(`<html><head><title>QR Code da recepção</title></head><body style="font-family:sans-serif;text-align:center;padding:40px">
+      <h1 style="font-size:36px;margin:0">Chegou?</h1>
+      <p style="font-size:22px">Aponte a câmera do celular para avisar a recepção<br>e acompanhar sua vez na fila.</p>
+      <div style="margin:30px auto;width:320px">${svg.replace(/width="\d+"/, 'width="320"').replace(/height="\d+"/, 'height="320"')}</div>
+      </body></html>`);
+    w.document.close();
+    w.focus();
+    w.print();
+  };
+  return (
+    <div className="mt-3 flex items-center gap-4 rounded-lg bg-white p-3 dark:bg-slate-900">
+      <QRCodeSVG id="arrival-qr" value={url} size={110} />
+      <div className="text-xs text-slate-700 dark:text-slate-300">
+        <p className="font-semibold">QR Code da recepção (celular do paciente)</p>
+        <p className="mt-1">Imprima e cole no balcão: o paciente avisa que chegou ou pega a senha pelo celular e acompanha a fila.</p>
+        <button type="button" onClick={print} className="mt-2 inline-flex h-8 items-center rounded-md border border-slate-300 px-2 font-semibold dark:border-slate-700">
+          Imprimir cartaz
+        </button>
+      </div>
+    </div>
+  );
+}
 
 type Settings = {
   rooms: { doctor: string; room: string }[];
@@ -101,6 +131,7 @@ export function TvSettings({ initial, doctors }: { initial: Settings; doctors: s
             <p className="font-medium text-emerald-900 dark:text-emerald-200">
               {newUrl.kind === "TOTEM" ? "Abra este endereço no totem (ele só aparece agora):" : "Abra este endereço na TV (ele só aparece agora):"}
             </p>
+            {newUrl.kind === "TOTEM" && <ArrivalQr url={newUrl.url.replace("/totem/", "/chegada/")} />}
             {newUrl.kind === "TOTEM" && (
               <p className="mt-1 text-xs text-emerald-900/80 dark:text-emerald-200/80">
                 Impressão sem janela: Chrome com --kiosk --kiosk-printing e a impressora térmica (80 mm) como padrão. Sem impressora, coloque ?imprimir=0 no fim do link — o QR Code aparece na tela.

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { matchTicketAppointment, nextTicket, phoneTail, ticketCode, ticketSpoken, ticketsAhead, type QueueTicketLite } from "./queue-ticket";
+import { doctorDelayMin, matchTicketAppointment, nextTicket, phoneTail, ticketCode, ticketSpoken, ticketsAhead, type QueueTicketLite } from "./queue-ticket";
 
 const t = (id: string, type: "N" | "P", min: number, status: QueueTicketLite["status"] = "WAITING"): QueueTicketLite => ({
   id,
@@ -78,5 +78,22 @@ describe("matchTicketAppointment", () => {
   });
   it("sem telefone válido: null", () => {
     expect(matchTicketAppointment(items, [])).toBeNull();
+  });
+});
+
+describe("doctorDelayMin", () => {
+  const list = [
+    { doctor: "Dr. João", appointmentTime: "14:00", status: "WAITING" },
+    { doctor: "DR JOÃO", appointmentTime: "13:30", status: "WAITING" },
+    { doctor: "Dr. João", appointmentTime: "13:00", status: "DONE" },
+    { doctor: "Dra Ana", appointmentTime: "12:00", status: "WAITING" },
+  ];
+  it("minutos que o próximo da fila do médico já passou do horário marcado", () => {
+    expect(doctorDelayMin(list, "dr joão", 14 * 60 + 5)).toBe(35);
+  });
+  it("ninguém atrasado: 0; sem médico: null", () => {
+    expect(doctorDelayMin(list, "Dr. João", 13 * 60)).toBe(0);
+    expect(doctorDelayMin(list, null, 900)).toBeNull();
+    expect(doctorDelayMin(list, "Dr. Pedro", 900)).toBeNull();
   });
 });

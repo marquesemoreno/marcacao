@@ -1,6 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
+import { startSlotOfferForItem } from "@/lib/slot-offer-server";
 import { prisma } from "@/lib/prisma";
 import { requireClinicPermission, requireClinicSession } from "@/lib/session";
 import { createPatientCall } from "@/lib/tv-call-server";
@@ -90,6 +92,10 @@ async function applyAgendaStatus(
   });
   await audit(input.status);
   await notifyAgenda(clinicId);
+  if (input.status === "CANCELLED" || input.status === "NO_SHOW") {
+    // Lista de espera automática (se ligada): roda depois da resposta pra não travar a tela.
+    after(() => startSlotOfferForItem(clinicId, { source: input.source, externalId: input.externalId, date: input.date, phone: input.phone }));
+  }
   revalidatePath("/clinic/agenda");
   return { success: true };
 }

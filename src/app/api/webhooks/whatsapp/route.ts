@@ -1,6 +1,7 @@
 import { isMarketingOptInReply, MARKETING_OPT_IN_REPLY } from "@/lib/marketing-consent";
 import { matchClinicalUrgency, EMERGENCY_GUIDANCE_MESSAGE } from "@/lib/clinical-urgency";
 import { NextResponse, after } from "next/server";
+import { handleSlotOfferReply, startSlotOfferForItem } from "@/lib/slot-offer-server";
 import { classifyAndStorePatientIntent } from "@/lib/patient-intent-server";
 import type { AppointmentStatus, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
@@ -299,6 +300,8 @@ async function recordBridgeReminderResponse(clinicId: string, phone: string, res
     });
     if (log) {
       await prisma.bridgeReminderLog.update({ where: { id: log.id }, data: { response, respondedAt: new Date() } });
+      // Cancelou pelo lembrete: vaga vai pra lista de espera (se a clínica ligou).
+      if (response === "CANCELLED") after(() => startSlotOfferForItem(clinicId, { source: "BRIDGE", externalId: String(log.bridgeNumero), phone }));
     }
   } catch (error) {
     console.error("Falha ao registrar resposta do lembrete do bridge:", error);
@@ -1107,6 +1110,13 @@ async function processWhatsappWebhook(body: Prisma.InputJsonValue, forcedClinicI
     : null;
   const isConfirmationContext = wasSentConfirmationPrompt(lastOutbound?.content);
 
+  // Resposta SIM/NÃO a uma oferta de vaga da lista de espera (src/lib/slot-offer-server.ts).
+  if (!isConfirmationContext && conversation && (await handleSlotOfferReply(conversation.clinicId, incoming.phone, incoming.text, conversation.id).catch(() => false))) {
+    notifyInboxRealtime(conversation.clinicId).catch(() => {});
+    await logInbound({ phone: incoming.phone, text: incoming.text, reason: "resposta à oferta de vaga" }, "SUCCESS");
+    return NextResponse.json({ ok: true, status: "slot_offer_reply" }, { status: 200 });
+  }
+
   // "Número errado" vem ANTES de sim/não: o "não" de quem não é o paciente não pode
   // cancelar consulta. Marca a conversa, tira de campanhas e avisa a recepção.
   if (isConfirmationContext && conversation && isWrongNumberReply(incoming.text)) {
@@ -1348,6 +1358,9 @@ async function processWhatsappWebhook(body: Prisma.InputJsonValue, forcedClinicI
     data: { status: newStatus },
     include: { clinicProcedure: { include: { clinic: true, procedure: true } } },
   });
+  if (newStatus === "CANCELLED") {
+    after(() => startSlotOfferForItem(updated.clinicProcedure.clinicId, { source: "LOCAL", externalId: updated.id, date: updated.date.toISOString().slice(0, 10), phone: incoming.phone }));
+  }
 
   await logInbound(
     { phone: incoming.phone, text: incoming.text, appointmentId: appointment.id, newStatus },

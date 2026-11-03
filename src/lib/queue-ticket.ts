@@ -61,3 +61,24 @@ export function matchTicketAppointment<T extends { phone: string | null; time: s
     .sort((a, b) => (a.time ?? "99:99").localeCompare(b.time ?? "99:99"));
   return hits[0] ?? null;
 }
+
+const docKey = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/\bdra?\b|[.]/g, " ").replace(/\s+/g, " ").trim();
+
+/** Atraso do médico (estimado): quanto o primeiro paciente dele ainda esperando já passou do
+ * horário marcado. null = senha sem médico ou ninguém dele com horário na fila. */
+export function doctorDelayMin(
+  tickets: { doctor: string | null; appointmentTime: string | null; status: string }[],
+  doctor: string | null,
+  nowMinutes: number,
+): number | null {
+  if (!doctor) return null;
+  const k = docKey(doctor);
+  const times = tickets
+    .filter((t) => t.status === "WAITING" && t.doctor && docKey(t.doctor) === k && t.appointmentTime)
+    .map((t) => {
+      const [h, m] = t.appointmentTime!.split(":").map(Number);
+      return h * 60 + m;
+    });
+  if (times.length === 0) return null;
+  return Math.max(0, nowMinutes - Math.min(...times));
+}

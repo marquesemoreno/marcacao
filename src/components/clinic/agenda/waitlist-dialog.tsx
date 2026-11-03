@@ -6,7 +6,10 @@ import { Check, Copy, Loader2, MessageCircle, Undo2, X } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   addWaitlistEntry,
+  getAutoOfferState,
   getSlotCandidates,
+  setAutoWaitlistOffer,
+  type AutoOfferState,
   listWaitlist,
   setWaitlistEntryStatus,
   type SlotCandidate,
@@ -47,6 +50,10 @@ export function WaitlistDialog({
   const [candidates, setCandidates] = useState<SlotCandidate[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [auto, setAuto] = useState<AutoOfferState | null>(null);
+  useEffect(() => {
+    if (open) getAutoOfferState().then(setAuto).catch(() => setAuto(null));
+  }, [open]);
   const [form, setForm] = useState({ patientName: "", phone: "", doctorName: "", period: "ANY" as WaitlistPeriod, notes: "" });
 
   const refreshCandidates = useCallback(async () => {
@@ -106,6 +113,7 @@ export function WaitlistDialog({
         </DialogHeader>
 
         <div className="space-y-5">
+          {auto && <AutoOfferSection state={auto} onChange={setAuto} />}
           {slot && (
             <section aria-label="Vaga aberta" className="rounded-lg border border-emerald-300 dark:border-emerald-800 bg-emerald-50/60 dark:bg-emerald-950/30 p-3 space-y-2">
               <p className="text-sm font-semibold text-emerald-900 dark:text-emerald-200 first-letter:uppercase">Vaga aberta: {slotLabel(slot)}</p>
@@ -247,5 +255,57 @@ export function WaitlistDialog({
         </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+const OFFER_STATUS: Record<"OPEN" | "FILLED" | "EXPIRED", string> = { OPEN: "oferecendo", FILLED: "aceita", EXPIRED: "ninguém aceitou" };
+
+/** Oferta automática: interruptor (gestão) + ofertas de hoje em diante. */
+function AutoOfferSection({ state, onChange }: { state: AutoOfferState; onChange: (s: AutoOfferState) => void }) {
+  const [busy, setBusy] = useState(false);
+  return (
+    <section aria-label="Oferta automática" className="rounded-lg border border-slate-200 p-3 dark:border-slate-800">
+      <label className="flex items-start gap-3">
+        <input
+          type="checkbox"
+          className="mt-1 size-4 accent-emerald-600"
+          checked={state.enabled}
+          disabled={!state.canToggle || busy}
+          onChange={async (e) => {
+            setBusy(true);
+            try {
+              onChange(await setAutoWaitlistOffer(e.target.checked));
+            } catch {
+              toast.error("Só a gestão muda isso.");
+            } finally {
+              setBusy(false);
+            }
+          }}
+        />
+        <span className="text-sm">
+          <span className="font-semibold">Oferecer vagas sozinho pelo WhatsApp</span>
+          <span className="block text-xs text-slate-600 dark:text-slate-400">
+            Quando alguém cancela ou falta, a vaga vai para o 1º da lista que combina. Ele responde SIM (reserva) ou NÃO; sem resposta em 30 min, passa para o próximo.
+            Só entre 7h e 20h e para vagas a mais de 1 h. Quem aceitar aparece no Chat para você agendar no sistema.
+            {!state.canToggle && " (só a gestão liga/desliga)"}
+          </span>
+        </span>
+      </label>
+      {state.offers.length > 0 && (
+        <ul className="mt-3 space-y-1 text-xs">
+          {state.offers.map((o) => (
+            <li key={o.id} className="flex flex-wrap gap-x-2 tabular-nums">
+              <span className="font-medium">{o.date.split("-").reverse().slice(0, 2).join("/")} {o.time}</span>
+              {o.doctor && <span className="text-slate-500">{o.doctor}</span>}
+              <span className={o.status === "FILLED" ? "font-semibold text-emerald-700 dark:text-emerald-300" : "text-slate-600 dark:text-slate-400"}>
+                {OFFER_STATUS[o.status]}
+                {o.patientName && o.status !== "EXPIRED" ? ` · ${o.patientName}` : ""}
+                {o.tried > 1 ? ` · ${o.tried} contatados` : ""}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }

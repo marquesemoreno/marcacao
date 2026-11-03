@@ -8,7 +8,7 @@ import { notifyAgenda } from "@/lib/realtime-server";
 import { recordAudit } from "@/lib/audit-server";
 import { createPatientCall } from "@/lib/tv-call-server";
 import { tvDisplayName, type TvCall } from "@/lib/tv-call";
-import { matchTicketAppointment, nextTicket, ticketCode, ticketsAhead, type QueueTicketLite, type TicketStatus, type TicketType } from "@/lib/queue-ticket";
+import { doctorDelayMin, matchTicketAppointment, nextTicket, ticketCode, ticketsAhead, type QueueTicketLite, type TicketStatus, type TicketType } from "@/lib/queue-ticket";
 
 export type IssuedTicket = {
   code: string;
@@ -205,6 +205,9 @@ export type TicketFollow = {
   room: string | null;
   calledAt: string | null;
   createdAt: string;
+  /** Médico da consulta ligada à senha e atraso estimado dele (min); null = sem dado. */
+  doctor: string | null;
+  delayMin: number | null;
 };
 
 /** Página do QR Code: posição na fila. Só vale no dia da senha. */
@@ -212,10 +215,14 @@ export async function followQueueTicket(raw: string): Promise<TicketFollow | nul
   if (!/^[A-Za-z0-9_-]{16,64}$/.test(raw)) return null;
   const t = await prisma.queueTicket.findUnique({ where: { followTokenHash: hashPatientToken(raw) } });
   if (!t || t.day !== todayInBahia()) return null;
-  const [waiting, clinic] = await Promise.all([
+  const [waiting, clinic, sameDoctor] = await Promise.all([
     t.status === "WAITING" ? waitingToday(t.clinicId, t.day) : Promise.resolve([]),
     prisma.clinic.findUnique({ where: { id: t.clinicId }, select: { name: true } }),
+    t.status === "WAITING" && t.doctor
+      ? prisma.queueTicket.findMany({ where: { clinicId: t.clinicId, day: t.day, status: "WAITING", doctor: { not: null } }, select: { doctor: true, appointmentTime: true, status: true } })
+      : Promise.resolve([]),
   ]);
+  const nowBR = new Date(Date.now() - 3 * 3600_000);
   return {
     code: t.code,
     clinicName: clinic?.name ?? "",
@@ -224,5 +231,7 @@ export async function followQueueTicket(raw: string): Promise<TicketFollow | nul
     room: t.room,
     calledAt: t.calledAt?.toISOString() ?? null,
     createdAt: t.createdAt.toISOString(),
+    doctor: t.doctor,
+    delayMin: doctorDelayMin(sameDoctor, t.doctor, nowBR.getUTCHours() * 60 + nowBR.getUTCMinutes()),
   };
 }

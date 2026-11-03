@@ -2,7 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { requireClinicSession } from "@/lib/session";
+import { requireClinicManager, requireClinicSession } from "@/lib/session";
+import { recentSlotOffers } from "@/lib/slot-offer-server";
 import { formatToWhatsAppNumber } from "@/lib/whatsapp";
 import { buildSlotOfferMessage, normalizeWaitlistInput, rankWaitlistCandidates, type OpenSlot } from "@/lib/waitlist";
 
@@ -84,4 +85,25 @@ export async function getSlotCandidates(slot: OpenSlot, exceptPhone?: string | n
       whatsappUrl: `https://wa.me/${formatToWhatsAppNumber(e.phone)}?text=${encodeURIComponent(message)}`,
     };
   });
+}
+
+// ── Oferta automática da vaga (estilo Luma) ────────────────────────────────────
+
+export type AutoOfferState = { enabled: boolean; canToggle: boolean; offers: Awaited<ReturnType<typeof recentSlotOffers>> };
+
+export async function getAutoOfferState(): Promise<AutoOfferState> {
+  const { clinicId, userId } = await requireClinicSession();
+  const [clinic, offers, user] = await Promise.all([
+    prisma.clinic.findUnique({ where: { id: clinicId }, select: { autoWaitlistOffer: true } }),
+    recentSlotOffers(clinicId),
+    prisma.user.findUnique({ where: { id: userId }, select: { isManager: true } }),
+  ]);
+  return { enabled: !!clinic?.autoWaitlistOffer, canToggle: !!user?.isManager, offers };
+}
+
+/** Gestão liga/desliga: vaga aberta vai sozinha pelo WhatsApp, um candidato por vez. */
+export async function setAutoWaitlistOffer(enabled: boolean) {
+  const { clinicId } = await requireClinicManager();
+  await prisma.clinic.update({ where: { id: clinicId }, data: { autoWaitlistOffer: enabled } });
+  return getAutoOfferState();
 }

@@ -116,3 +116,36 @@ export function normalizeWaitlistInput(raw: {
     value: { patientName, phone, doctorName: clean(raw.doctorName, 80) || null, period, notes: clean(raw.notes, 200) || null },
   };
 }
+
+// ── Oferta automática (estilo Luma): vaga aberta vai sozinha pro 1º da espera; SIM fica com
+// ela, NÃO ou sem resposta no prazo passa pro próximo. ────────────────────────────────────
+
+const fold = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
+
+/** Resposta à oferta: "YES" / "NO" / null (outra coisa → fica pra recepção ler). */
+export function parseOfferReply(text: string): "YES" | "NO" | null {
+  const t = fold(text).replace(/[!.,]+$/g, "");
+  if (!t) return null;
+  if (/^(2|nao|n)\b/.test(t)) return "NO";
+  if (/^(1|sim|s|quero|aceito|pode ser|pode|ok|claro|fico)\b/.test(t)) return "YES";
+  return null;
+}
+
+/** Pode mandar a oferta agora? WAIT = fora de 07–20h (manda depois); TOO_LATE = vaga em menos de 1 h. */
+export function canAutoOffer(slot: { date: string; time: string }, now: Date = new Date()): "SEND" | "WAIT" | "TOO_LATE" {
+  const br = new Date(now.getTime() - 3 * 3600_000);
+  const [h, m] = slot.time.split(":").map(Number);
+  const slotMs = Date.parse(`${slot.date}T00:00:00Z`) + (h * 60 + m) * 60_000;
+  if (slotMs - br.getTime() < 60 * 60_000) return "TOO_LATE";
+  const hour = br.getUTCHours();
+  return hour >= 7 && hour < 20 ? "SEND" : "WAIT";
+}
+
+export function buildAutoSlotOfferMessage(slot: OpenSlot, patientName: string, clinicName: string, minutes: number): string {
+  const base = buildSlotOfferMessage(slot, patientName, clinicName).split("\n")[0];
+  return [
+    base,
+    "",
+    `Você estava na nossa lista de espera. Quer ficar com este horário? Responda *SIM* para reservar ou *NÃO* para liberar. A vaga fica guardada pra você por ${minutes} minutos.`,
+  ].join("\n");
+}

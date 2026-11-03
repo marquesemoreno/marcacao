@@ -16,7 +16,9 @@ const fmtTime = new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-dig
 
 /** Totem: escolhe Normal/Preferencial → CPF ou telefone (ou pula) → senha impressa com QR Code.
  * Impressão silenciosa: Chrome com --kiosk-printing e a térmica como impressora padrão. */
-export function TotemKiosk({ token, clinicName, print }: { token: string; clinicName: string; print: boolean }) {
+/** `mobile` = aberto pelo QR Code da recepção no celular do paciente: depois da senha vai
+ * direto pra página de acompanhamento da fila. */
+export function TotemKiosk({ token, clinicName, print, mobile = false }: { token: string; clinicName: string; print: boolean; mobile?: boolean }) {
   const [step, setStep] = useState<Step>({ kind: "type" });
   const [digits, setDigits] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -32,7 +34,7 @@ export function TotemKiosk({ token, clinicName, print }: { token: string; clinic
   // Volta sozinho pro início (paciente desistiu / já pegou a senha).
   useEffect(() => {
     if (timer.current) clearTimeout(timer.current);
-    if (step.kind === "type") return;
+    if (step.kind === "type" || mobile) return;
     timer.current = setTimeout(reset, step.kind === "ticket" ? TICKET_MS : IDLE_MS);
     return () => {
       if (timer.current) clearTimeout(timer.current);
@@ -51,6 +53,7 @@ export function TotemKiosk({ token, clinicName, print }: { token: string; clinic
       setError(null);
       const res = await takeTicket(token, { type, identifier });
       if (!res.ok) return setError(res.error);
+      if (mobile) return window.location.replace(`/senha/${res.ticket.followToken}`);
       setStep({ kind: "ticket", ticket: res.ticket });
       setDigits("");
     });
@@ -75,7 +78,8 @@ export function TotemKiosk({ token, clinicName, print }: { token: string; clinic
         <section className="flex flex-1 flex-col items-center justify-center gap-[4vh] px-[5vw] py-[4vh]">
           {step.kind === "type" && (
             <>
-              <h1 className="text-center text-[clamp(2rem,4.5vw,4rem)] font-bold tracking-tight">Retire sua senha</h1>
+              <h1 className="text-center text-[clamp(2rem,4.5vw,4rem)] font-bold tracking-tight">{mobile ? "Chegou? Pegue sua senha" : "Retire sua senha"}</h1>
+              {mobile && <p className="-mt-4 text-center text-lg text-slate-600">Com consulta marcada, digite seu CPF ou telefone no próximo passo e a recepção já fica sabendo.</p>}
               <div className="grid w-full max-w-5xl gap-[3vw] md:grid-cols-2">
                 <button
                   type="button"

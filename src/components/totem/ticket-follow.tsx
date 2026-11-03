@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { getTicketFollow } from "@/actions/queue-ticket";
 import type { TicketFollow } from "@/lib/queue-ticket-server";
+import { toTitleCase } from "@/lib/agenda-ui";
 
 const POLL_MS = 15_000;
 
@@ -47,6 +48,12 @@ export function TicketFollowView({ token, initial }: { token: string; initial: T
           <>
             <p className="text-5xl font-bold">{t.ahead}</p>
             <p className="mt-1 text-lg">{t.ahead === 0 ? "Você é o próximo!" : t.ahead === 1 ? "senha na sua frente" : "senhas na sua frente"}</p>
+            {t.doctor && (
+              <p className="mt-4 text-base">
+                {toTitleCase(t.doctor)}
+                {t.delayMin !== null && t.delayMin >= 10 ? <> está com cerca de <strong>{Math.round(t.delayMin / 5) * 5} min</strong> de atraso.</> : " está no horário."}
+              </p>
+            )}
             <p className="mt-6 text-sm text-slate-500">Deixe esta página aberta — ela se atualiza sozinha. Fique atento à TV da sala de espera.</p>
           </>
         )}
