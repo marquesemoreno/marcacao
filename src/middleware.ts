@@ -22,13 +22,18 @@ export default withAuth(
     if (isClinicRoute && role !== "CLINIC") {
       return NextResponse.redirect(new URL("/entrar", req.url));
     }
+    // Login de médico só tem a tela "Meus pacientes" (o servidor também recusa o resto).
+    const isDoctor = role === "CLINIC" && req.nextauth.token?.isDoctor === true;
+    if (isClinicRoute && isDoctor && !pathname.startsWith("/clinic/medico")) {
+      return NextResponse.redirect(new URL("/clinic/medico", req.url));
+    }
 
     // Usuário da clínica já logado batendo na home ou na tela de login: manda
     // direto pro inbox (é a rotina de trabalho dele, não faz sentido ver a
     // landing page do marketplace nem o formulário de login de novo).
     const isEntryRoute = pathname === "/" || pathname === "/entrar";
     if (isEntryRoute && role === "CLINIC") {
-      return NextResponse.redirect(new URL("/clinic/inbox", req.url));
+      return NextResponse.redirect(new URL(isDoctor ? "/clinic/medico" : "/clinic/inbox", req.url));
     }
 
     const response = NextResponse.next();

@@ -41,6 +41,7 @@ export const authOptions: AuthOptions = {
           email: user.email,
           role: user.role,
           clinicId: user.clinicId,
+          isDoctor: user.clinicRole === "MEDICO",
         };
       },
     }),
@@ -50,6 +51,7 @@ export const authOptions: AuthOptions = {
       if (user) {
         token.role = user.role;
         token.clinicId = user.clinicId;
+        token.isDoctor = !!user.isDoctor;
       }
       return token;
     },

@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Check, ClipboardCheck, Clock, Loader2, Stethoscope, UserRound } from "lucide-react";
+import { Check, ClipboardCheck, Clock, Loader2, Megaphone, Stethoscope, UserRound } from "lucide-react";
+import { toast } from "sonner";
+import { callPatientOnTv } from "@/actions/tv-call";
 import { arrivalQueue, type AgendaItem } from "@/lib/agenda";
 import { toTitleCase } from "@/lib/agenda-ui";
 
@@ -27,6 +29,8 @@ export function ArrivalQueue({
     setSaving((s) => new Set(s).add(item.key));
     try {
       await onSetStatus(item, status);
+      // "Chamar" também anuncia na TV da sala de espera (se a clínica tiver uma).
+      if (status === "IN_ROOM") await announce(item);
     } catch {
       // o toast de erro já sai em handleSetStatus
     } finally {
@@ -36,6 +40,24 @@ export function ArrivalQueue({
         return n;
       });
     }
+  };
+  async function announce(item: AgendaItem) {
+    try {
+      await callPatientOnTv({ source: item.source, externalId: item.externalId, patientName: item.patientName, doctor: item.doctor });
+    } catch {
+      toast.error("Não deu pra anunciar na TV — o status foi salvo.");
+    }
+  }
+  const recall = async (item: AgendaItem) => {
+    if (saving.has(item.key)) return;
+    setSaving((s) => new Set(s).add(item.key));
+    await announce(item);
+    toast.success(`${toTitleCase(item.patientName || "Paciente")} chamado de novo na TV`);
+    setSaving((s) => {
+      const n = new Set(s);
+      n.delete(item.key);
+      return n;
+    });
   };
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 60_000);
@@ -107,6 +129,15 @@ export function ArrivalQueue({
                 <button type="button" onClick={() => onOpen(item)} className="min-w-0 flex-1 rounded text-left hover:underline underline-offset-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50">
                   <span className="font-medium">{toTitleCase(item.patientName || "Paciente")}</span>
                   <span className="block text-xs text-slate-500 dark:text-slate-400">{item.doctor ? toTitleCase(item.doctor) : "Sem médico"}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void recall(item)}
+                  disabled={saving.has(item.key)}
+                  className="inline-flex h-9 disabled:opacity-60 items-center gap-1 rounded-md border border-slate-300 dark:border-slate-700 px-2.5 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
+                  title="Anunciar de novo na TV da sala de espera"
+                >
+                  <Megaphone className="h-3.5 w-3.5" aria-hidden /> Chamar de novo
                 </button>
                 <button
                   type="button"

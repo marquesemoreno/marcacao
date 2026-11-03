@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Users, UserPlus, Loader2, Mail, KeyRound, Save, Pencil } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { listClinicUsers, createTeamMember, updateUserMaxConcurrentChats, updateAttendantName, resetAttendantPassword, updateUserIsAttendant, updateUserClinicRole } from "@/actions/admin";
+import { listClinicUsers, createTeamMember, updateUserMaxConcurrentChats, updateAttendantName, resetAttendantPassword, updateUserIsAttendant, updateUserClinicRole, updateUserDoctorName } from "@/actions/admin";
 import { CLINIC_ROLES, CLINIC_ROLE_LABEL, parseClinicRole, type ClinicRole } from "@/lib/clinic-permissions";
 
 type Attendant = {
@@ -15,6 +15,7 @@ type Attendant = {
   isAttendant: boolean;
   isManager: boolean;
   clinicRole?: string;
+  doctorName?: string | null;
   createdAt: Date | string;
 };
 
@@ -290,6 +291,23 @@ export function ClinicAttendantsModal({ clinicId, clinicName }: { clinicId: stri
                             ))}
                           </select>
                         </label>
+                        {attendant.clinicRole === "MEDICO" && (
+                          <label className="mt-1 ml-3 inline-flex items-center gap-1.5 text-[11px] font-medium text-slate-600 dark:text-slate-300">
+                            Nome na agenda
+                            <input
+                              defaultValue={attendant.doctorName ?? ""}
+                              placeholder="igual ao sistema da clínica"
+                              onBlur={async (e) => {
+                                const v = e.target.value.trim();
+                                if (v === (attendant.doctorName ?? "")) return;
+                                await updateUserDoctorName(attendant.id, v);
+                                setAttendants((prev) => prev.map((a) => (a.id === attendant.id ? { ...a, doctorName: v || null } : a)));
+                                toast.success(v ? `Ligado ao médico ${v}` : "Médico desligado");
+                              }}
+                              className="h-6 w-44 rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-1 text-[11px]"
+                            />
+                          </label>
+                        )}
                       </div>
                       {!isEditingNameThis && (
                         <button

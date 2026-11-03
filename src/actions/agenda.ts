@@ -2,7 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { requireClinicSession } from "@/lib/session";
+import { requireClinicPermission, requireClinicSession } from "@/lib/session";
+import { createPatientCall } from "@/lib/tv-call-server";
+import { doctorKey, type TvCall } from "@/lib/tv-call";
+import { todayInBahia } from "@/lib/agenda-ui";
 import { agendaTopicFor, notifyAgenda } from "@/lib/realtime-server";
 import { recordAudit } from "@/lib/audit-server";
 import { extractBridgeNumeroFromNotes, fetchBridgeDailyAgendaOrNull } from "@/lib/hospital-bridge";
@@ -30,6 +33,11 @@ export type AgendaResult = {
  * com o status de cada marcação (ver resolveAgendaStatus). */
 export async function getAgenda(from: string, to: string): Promise<AgendaResult> {
   const { clinicId } = await requireClinicSession();
+  return loadAgenda(clinicId, from, to);
+}
+
+/** Miolo do getAgenda, sem checar sessão — quem chama já checou (ex.: tela do médico). */
+async function loadAgenda(clinicId: string, from: string, to: string): Promise<AgendaResult> {
   const days: string[] = [];
   for (let d = from; d <= to && days.length < MAX_DAYS; d = addDays(d, 1)) days.push(d);
   if (days.length === 0) return { items: [], hasBridge: false, bridgeFailedDays: [] };
@@ -164,6 +172,15 @@ export async function setAgendaStatus(input: {
   arrivedAt?: string | null;
 }): Promise<{ success: true }> {
   const { clinicId, userId } = await requireClinicSession();
+  return applyAgendaStatus(clinicId, userId, input);
+}
+
+/** Miolo do setAgendaStatus, sem checar sessão (a tela do médico checa "chamar"). */
+async function applyAgendaStatus(
+  clinicId: string,
+  userId: string,
+  input: Parameters<typeof setAgendaStatus>[0],
+): Promise<{ success: true }> {
   if (input.status !== "AUTO" && !(MANUAL_AGENDA_STATUSES as readonly string[]).includes(input.status)) {
     throw new Error("Status inválido.");
   }
@@ -259,3 +276,58 @@ export async function getAgendaPatient(phone: string | null) {
 }
 
 export type AgendaPatient = NonNullable<Awaited<ReturnType<typeof getAgendaPatient>>>;
+
+// ── Tela do médico (/clinic/medico): só os pacientes dele, hoje ─────────────────
+
+async function requireDoctor() {
+  const s = await requireClinicPermission("chamar");
+  const user = await prisma.user.findUnique({ where: { id: s.userId }, select: { doctorName: true, clinicRole: true } });
+  return { ...s, doctorName: user?.doctorName?.trim() || null, isDoctor: user?.clinicRole === "MEDICO" };
+}
+
+/** Pacientes de hoje do médico logado. Sem nome de médico ligado ao login → lista vazia
+ * com aviso (o admin liga em Admin › Clínica › Atendentes). */
+export async function getMyPatientsToday(): Promise<{ doctorName: string | null; date: string; items: AgendaItem[] }> {
+  const { clinicId, doctorName } = await requireDoctor();
+  const date = todayInBahia();
+  if (!doctorName) return { doctorName: null, date, items: [] };
+  const key = doctorKey(doctorName);
+  const { items } = await loadAgenda(clinicId, date, date);
+  return { doctorName, date, items: items.filter((i) => i.doctor && doctorKey(i.doctor) === key) };
+}
+
+/** Acha a consulta de hoje do médico logado pelo id — o nome do paciente vem do servidor. */
+async function myItem(ref: { source: "BRIDGE" | "LOCAL"; externalId: string }) {
+  const me = await requireDoctor();
+  const { items } = await getMyPatientsTodayFor(me.clinicId, me.doctorName);
+  const item = items.find((i) => i.source === ref.source && i.externalId === ref.externalId);
+  if (!item) throw new Error("Paciente não está na sua agenda de hoje.");
+  return { me, item };
+}
+
+async function getMyPatientsTodayFor(clinicId: string, doctorName: string | null) {
+  if (!doctorName) return { items: [] as AgendaItem[] };
+  const key = doctorKey(doctorName);
+  const { items } = await loadAgenda(clinicId, todayInBahia(), todayInBahia());
+  return { items: items.filter((i) => i.doctor && doctorKey(i.doctor) === key) };
+}
+
+/** Médico chama: marca "Em atendimento" e anuncia na TV. */
+export async function doctorCallPatient(ref: { source: "BRIDGE" | "LOCAL"; externalId: string; room?: string | null }): Promise<TvCall> {
+  const { me, item } = await myItem(ref);
+  await applyAgendaStatus(me.clinicId, me.userId, { source: item.source, externalId: item.externalId, date: item.date, phone: item.phone, status: "IN_ROOM" });
+  return createPatientCall(me.clinicId, me.userId, { source: item.source, externalId: item.externalId, patientName: item.patientName, doctor: item.doctor, room: ref.room });
+}
+
+/** Médico encerra (Atendido) ou marca falta. */
+export async function doctorSetStatus(ref: { source: "BRIDGE" | "LOCAL"; externalId: string; status: "COMPLETED" | "NO_SHOW" | "IN_SERVICE" }) {
+  if (!["COMPLETED", "NO_SHOW", "IN_SERVICE"].includes(ref.status)) throw new Error("Status inválido.");
+  const { me, item } = await myItem(ref);
+  return applyAgendaStatus(me.clinicId, me.userId, { source: item.source, externalId: item.externalId, date: item.date, phone: item.phone, status: ref.status });
+}
+
+/** Tópico "Agenda mudou" pra tela do médico atualizar sozinha (paciente fez "Cheguei"). */
+export async function getDoctorRealtimeTopic(): Promise<string | null> {
+  const { clinicId } = await requireDoctor();
+  return agendaTopicFor(clinicId);
+}

@@ -3,7 +3,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { can, parseClinicRole, type ClinicPermission, type ClinicRole } from "@/lib/clinic-permissions";
 
-export async function requireClinicSession() {
+async function clinicSessionBase() {
   const session = await getServerSession(authOptions);
   if (!session || session.user.role !== "CLINIC" || !session.user.clinicId) {
     throw new Error("Não autorizado");
@@ -11,11 +11,20 @@ export async function requireClinicSession() {
   return { userId: session.user.id, clinicId: session.user.clinicId };
 }
 
+/** Sessão da equipe da clínica. A função Médico NÃO passa aqui: o login do médico só usa
+ * as ações com requireClinicPermission("chamar") (tela Meus pacientes). */
+export async function requireClinicSession() {
+  const s = await clinicSessionBase();
+  if ((await getClinicRole(s.userId)) === "MEDICO") throw new Error("Não autorizado");
+  return s;
+}
+
 /** Sessão de clínica, ou null (admin / deslogado) — para leituras que só fazem sentido no
  * painel da clínica e não devem virar erro no servidor quando o admin abre a mesma tela. */
 export async function getClinicSessionOrNull() {
   const session = await getServerSession(authOptions);
   if (!session || session.user.role !== "CLINIC" || !session.user.clinicId) return null;
+  if ((await getClinicRole(session.user.id)) === "MEDICO") return null;
   return { userId: session.user.id, clinicId: session.user.clinicId };
 }
 
@@ -41,7 +50,7 @@ export async function getClinicRole(userId: string): Promise<ClinicRole> {
 
 /** Sessão da clínica com a permissão pedida (tabela em clinic-permissions.ts). */
 export async function requireClinicPermission(permission: ClinicPermission) {
-  const session = await requireClinicSession();
+  const session = await clinicSessionBase();
   if (!can(await getClinicRole(session.userId), permission)) throw new Error("Acesso restrito pela sua função na clínica");
   return session;
 }

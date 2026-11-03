@@ -293,7 +293,16 @@ export async function updateUserIsManager(userId: string, isManager: boolean) {
 export async function updateUserClinicRole(userId: string, role: ClinicRole) {
   await requireAdminSession();
   if (!(CLINIC_ROLES as readonly string[]).includes(role)) throw new Error("Função inválida.");
-  await prisma.user.update({ where: { id: userId }, data: { clinicRole: role, isManager: role === "GESTAO" } });
+  // Médico não atende chat (não recebe conversa automática).
+  await prisma.user.update({ where: { id: userId }, data: { clinicRole: role, isManager: role === "GESTAO", ...(role === "MEDICO" ? { isAttendant: false } : {}) } });
+  revalidatePath("/admin/clinicas");
+  return { success: true as const };
+}
+
+/** Função Médico: nome do médico como aparece na agenda (ponte) — filtra "Meus pacientes". */
+export async function updateUserDoctorName(userId: string, doctorName: string) {
+  await requireAdminSession();
+  await prisma.user.update({ where: { id: userId }, data: { doctorName: doctorName.trim().slice(0, 120) || null } });
   revalidatePath("/admin/clinicas");
   return { success: true as const };
 }
@@ -303,7 +312,7 @@ export async function listClinicUsers(clinicId: string) {
   await requireAdminSession();
   return prisma.user.findMany({
     where: { clinicId, role: "CLINIC" },
-    select: { id: true, name: true, email: true, maxConcurrentChats: true, isAttendant: true, isManager: true, clinicRole: true, createdAt: true },
+    select: { id: true, name: true, email: true, maxConcurrentChats: true, isAttendant: true, isManager: true, clinicRole: true, doctorName: true, createdAt: true },
     orderBy: { name: "asc" },
   });
 }

@@ -17,7 +17,7 @@ import {
   Sparkles,
   ShieldCheck,
   Smartphone,
-  type LucideIcon, ClipboardList } from "lucide-react";
+  type LucideIcon, ClipboardList, MonitorPlay } from "lucide-react";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { getMyUnreadCount } from "@/actions/clinic-shell";
 import { can, type ClinicPermission, type ClinicRole } from "@/lib/clinic-permissions";
@@ -53,6 +53,7 @@ const NAV_GROUPS: NavGroup[] = [
       { href: "/clinic/ia", label: "Ações da IA", icon: Sparkles },
       { href: "/clinic/ficha", label: "Ficha prévia", icon: ClipboardList, perm: "config" },
       { href: "/clinic/retorno", label: "Retorno", icon: Repeat, perm: "config" },
+      { href: "/clinic/tv", label: "TV da sala de espera", icon: MonitorPlay, perm: "config" },
       { href: "/clinic/acessos", label: "Acessos", icon: ShieldCheck, perm: "config" },
       { href: "/clinic/whatsapp", label: "WhatsApp", icon: Smartphone, perm: "config" },
       // Visível também pras clínicas só-WhatsApp (horários e ticket médio valem pra elas).
