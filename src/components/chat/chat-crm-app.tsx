@@ -555,7 +555,8 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
       while (photoFetchQueueRef.current.length > 0) {
         const contactId = photoFetchQueueRef.current.shift()!;
         try {
-          const photoUrl = await actions.refreshContactPhoto(contactId);
+          const res = await fetch(`/api/chat/contact-photo?id=${encodeURIComponent(contactId)}&scope=${scope}`);
+          const photoUrl = res.ok ? ((await res.json()) as { url: string | null }).url : null;
           if (photoUrl) {
             setContacts((prev) => prev.map((c) => (c.id === contactId ? { ...c, avatar: photoUrl } : c)));
           }
@@ -946,9 +947,8 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
   async function handleUpdatePatient(data: UpdatePatientData) {
     if (!selectedContact) return { success: false as const, error: "Nenhuma conversa selecionada." };
     const result = await actions.updateContactInfo(selectedContact.id, data);
-    if (result.success) {
-      await refreshContacts();
-    }
+    // Sem await: o cadastro já salvou — recarregar a fila inteira não segura o "Salvar".
+    if (result.success) void refreshContacts().catch(() => {});
     return result;
   }
 

@@ -250,7 +250,7 @@ export function ContactsApp({ scope, basePath }: { scope: Scope; basePath: strin
     const result = await updateContactInfo(sheetContact.id, data);
     if (result.success) {
       setSheetContact((prev) => (prev ? { ...prev, ...data } : prev));
-      await fetchContacts();
+      void fetchContacts().catch(() => {});
     }
     return result;
   }
