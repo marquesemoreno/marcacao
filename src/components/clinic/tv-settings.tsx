@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Copy, Loader2, MonitorPlay, Trash2 } from "lucide-react";
+import { Copy, Loader2, MonitorPlay, Ticket, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { createTvLink, revokeTvLink, saveDoctorRoom } from "@/actions/tv-call";
 import { doctorKey } from "@/lib/tv-call";
@@ -9,7 +9,7 @@ import { toTitleCase } from "@/lib/agenda-ui";
 
 type Settings = {
   rooms: { doctor: string; room: string }[];
-  displays: { id: string; name: string; lastSeenAt: string | null }[];
+  displays: { id: string; name: string; kind: string; lastSeenAt: string | null }[];
 };
 
 const panel = "rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4";
@@ -19,7 +19,7 @@ const fmt = new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit",
 /** Configuração da TV: links (gerar/desligar) e sala fixa de cada médico. */
 export function TvSettings({ initial, doctors }: { initial: Settings; doctors: string[] }) {
   const [settings, setSettings] = useState(initial);
-  const [newUrl, setNewUrl] = useState<string | null>(null);
+  const [newUrl, setNewUrl] = useState<{ url: string; kind: "TV" | "TOTEM" } | null>(null);
   const [tvName, setTvName] = useState("TV da recepção");
   const [pending, start] = useTransition();
   const roomOf = new Map(settings.rooms.map((r) => [doctorKey(r.doctor), r.room]));
@@ -46,6 +46,7 @@ export function TvSettings({ initial, doctors }: { initial: Settings; doctors: s
           {settings.displays.map((d) => (
             <li key={d.id} className="flex items-center gap-3 text-sm">
               <span className="font-medium">{d.name}</span>
+              {d.kind === "TOTEM" && <span className="rounded bg-sky-100 px-1.5 py-0.5 text-[11px] font-semibold text-sky-900 dark:bg-sky-950 dark:text-sky-200">Totem</span>}
               <span className="text-xs text-slate-500">{d.lastSeenAt ? `visto ${fmt.format(new Date(d.lastSeenAt))}` : "ainda não abriu"}</span>
               <button
                 type="button"
@@ -53,7 +54,7 @@ export function TvSettings({ initial, doctors }: { initial: Settings; doctors: s
                   start(async () => {
                     await revokeTvLink(d.id);
                     setSettings((s) => ({ ...s, displays: s.displays.filter((x) => x.id !== d.id) }));
-                    toast.success("Link desligado — a TV para de receber chamadas.");
+                    toast.success(d.kind === "TOTEM" ? "Link desligado — o totem para de emitir senhas." : "Link desligado — a TV para de receber chamadas.");
                   })
                 }
                 className="ml-auto inline-flex h-8 items-center gap-1 rounded-md px-2 text-xs font-medium text-rose-700 hover:bg-rose-50 dark:text-rose-300 dark:hover:bg-rose-950/40"
@@ -72,23 +73,44 @@ export function TvSettings({ initial, doctors }: { initial: Settings; doctors: s
             onClick={() =>
               start(async () => {
                 const { id, url } = await createTvLink(tvName);
-                setNewUrl(url);
-                setSettings((s) => ({ ...s, displays: [...s.displays, { id, name: tvName, lastSeenAt: null }] }));
+                setNewUrl({ url, kind: "TV" });
+                setSettings((s) => ({ ...s, displays: [...s.displays, { id, name: tvName, kind: "TV", lastSeenAt: null }] }));
               })
             }
             className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-emerald-700 px-3 text-sm font-semibold text-white hover:bg-emerald-800 disabled:opacity-60"
           >
             {pending && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />} Gerar link da TV
           </button>
+          <button
+            type="button"
+            disabled={pending}
+            onClick={() =>
+              start(async () => {
+                const { id, url } = await createTvLink("Totem de senhas", "TOTEM");
+                setNewUrl({ url, kind: "TOTEM" });
+                setSettings((s) => ({ ...s, displays: [...s.displays, { id, name: "Totem de senhas", kind: "TOTEM", lastSeenAt: null }] }));
+              })
+            }
+            className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-200 px-3 text-sm font-medium disabled:opacity-60 dark:border-slate-700"
+          >
+            <Ticket className="h-4 w-4" aria-hidden /> Gerar link do totem de senhas
+          </button>
         </div>
         {newUrl && (
           <div className="mt-3 rounded-lg border border-emerald-300 bg-emerald-50 p-3 text-sm dark:border-emerald-800 dark:bg-emerald-950/40">
-            <p className="font-medium text-emerald-900 dark:text-emerald-200">Abra este endereço na TV (ele só aparece agora):</p>
+            <p className="font-medium text-emerald-900 dark:text-emerald-200">
+              {newUrl.kind === "TOTEM" ? "Abra este endereço no totem (ele só aparece agora):" : "Abra este endereço na TV (ele só aparece agora):"}
+            </p>
+            {newUrl.kind === "TOTEM" && (
+              <p className="mt-1 text-xs text-emerald-900/80 dark:text-emerald-200/80">
+                Impressão sem janela: Chrome com --kiosk --kiosk-printing e a impressora térmica (80 mm) como padrão. Sem impressora, coloque ?imprimir=0 no fim do link — o QR Code aparece na tela.
+              </p>
+            )}
             <div className="mt-2 flex items-center gap-2">
-              <code className="min-w-0 flex-1 truncate rounded bg-white px-2 py-1 text-xs dark:bg-slate-900">{newUrl}</code>
+              <code className="min-w-0 flex-1 truncate rounded bg-white px-2 py-1 text-xs dark:bg-slate-900">{newUrl.url}</code>
               <button
                 type="button"
-                onClick={() => void navigator.clipboard.writeText(newUrl).then(() => toast.success("Link copiado"))}
+                onClick={() => void navigator.clipboard.writeText(newUrl.url).then(() => toast.success("Link copiado"))}
                 className="inline-flex h-8 items-center gap-1 rounded-md border border-emerald-300 px-2 text-xs font-semibold text-emerald-800 dark:border-emerald-700 dark:text-emerald-200"
               >
                 <Copy className="h-3.5 w-3.5" aria-hidden /> Copiar

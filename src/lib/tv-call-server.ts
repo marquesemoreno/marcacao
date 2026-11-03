@@ -17,7 +17,7 @@ export async function doctorRoomsMap(clinicId: string): Promise<Map<string, stri
 export async function createPatientCall(
   clinicId: string,
   userId: string,
-  input: { source: string; externalId: string; patientName: string; doctor: string | null; room?: string | null },
+  input: { source: string; externalId: string; patientName: string; doctor: string | null; room?: string | null; ticketCode?: string | null },
 ): Promise<TvCall> {
   const since = new Date(Date.now() - HISTORY_HOURS * 3600_000);
   // Limpeza preguiçosa: o histórico só vale pro dia.
@@ -29,19 +29,20 @@ export async function createPatientCall(
       clinicId,
       source: input.source,
       externalId: input.externalId,
-      displayName: tvDisplayName(input.patientName),
+      displayName: input.ticketCode ?? tvDisplayName(input.patientName),
       spokenName: tvSpokenName(input.patientName),
       doctor: input.doctor?.trim() || null,
       room,
       attempt: previous + 1,
       calledByUserId: userId,
+      ticketCode: input.ticketCode ?? null,
     },
   });
   await notifyTvCall(clinicId, row.id);
   return toTvCall(row);
 }
 
-export function toTvCall(row: { id: string; displayName: string; spokenName: string; doctor: string | null; room: string | null; createdAt: Date; attempt: number }): TvCall {
+export function toTvCall(row: { id: string; displayName: string; spokenName: string; doctor: string | null; room: string | null; createdAt: Date; attempt: number; ticketCode?: string | null }): TvCall {
   return {
     id: row.id,
     displayName: row.displayName,
@@ -50,6 +51,7 @@ export function toTvCall(row: { id: string; displayName: string; spokenName: str
     room: row.room,
     calledAt: row.createdAt.toISOString(),
     attempt: row.attempt,
+    ticketCode: row.ticketCode ?? null,
   };
 }
 
@@ -63,9 +65,9 @@ export async function recentCalls(clinicId: string, take = 6): Promise<TvCall[]>
 }
 
 /** Link novo da TV: devolve o token cru (só aparece uma vez). */
-export async function issueTvDisplay(clinicId: string, name: string): Promise<{ id: string; raw: string }> {
+export async function issueTvDisplay(clinicId: string, name: string, kind: "TV" | "TOTEM" = "TV"): Promise<{ id: string; raw: string }> {
   const raw = randomBytes(24).toString("base64url");
-  const row = await prisma.tvDisplay.create({ data: { clinicId, name: name.trim() || "TV da recepção", tokenHash: hashPatientToken(raw) } });
+  const row = await prisma.tvDisplay.create({ data: { clinicId, name: name.trim() || (kind === "TOTEM" ? "Totem de senhas" : "TV da recepção"), kind, tokenHash: hashPatientToken(raw) } });
   return { id: row.id, raw };
 }
 

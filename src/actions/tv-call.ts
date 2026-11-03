@@ -32,7 +32,7 @@ export async function getTvSettings() {
   ]);
   return {
     rooms: rooms.map((r) => ({ doctor: r.doctor, room: r.room })),
-    displays: displays.map((d) => ({ id: d.id, name: d.name, lastSeenAt: d.lastSeenAt?.toISOString() ?? null })),
+    displays: displays.map((d) => ({ id: d.id, name: d.name, kind: d.kind, lastSeenAt: d.lastSeenAt?.toISOString() ?? null })),
   };
 }
 
@@ -56,11 +56,11 @@ export async function saveDoctorRoom(input: { doctor: string; room: string }) {
 }
 
 /** Gera o link da TV. O endereço completo só aparece agora — guarde ou gere outro. */
-export async function createTvLink(name: string): Promise<{ id: string; url: string }> {
+export async function createTvLink(name: string, kind: "TV" | "TOTEM" = "TV"): Promise<{ id: string; url: string }> {
   const { clinicId } = await requireClinicManager();
-  const { id, raw } = await issueTvDisplay(clinicId, name);
+  const { id, raw } = await issueTvDisplay(clinicId, name, kind === "TOTEM" ? "TOTEM" : "TV");
   revalidatePath("/clinic/tv");
-  return { id, url: `${getBaseUrl()}/tv/${raw}` };
+  return { id, url: `${getBaseUrl()}/${kind === "TOTEM" ? "totem" : "tv"}/${raw}` };
 }
 
 export async function revokeTvLink(id: string) {
@@ -81,14 +81,14 @@ export async function getDoctorRooms(): Promise<{ doctor: string; room: string }
 
 export async function getTvState(token: string): Promise<{ clinicName: string; topic: string | null; calls: TvCall[] } | null> {
   const tv = await resolveTvDisplay(token);
-  if (!tv) return null;
+  if (!tv || tv.kind !== "TV") return null;
   const clinic = await prisma.clinic.findUnique({ where: { id: tv.clinicId }, select: { name: true } });
   return { clinicName: clinic?.name ?? "", topic: tvTopicFor(tv.clinicId), calls: await recentCalls(tv.clinicId) };
 }
 
 export async function getTvCall(token: string, id: string): Promise<TvCall | null> {
   const tv = await resolveTvDisplay(token);
-  if (!tv) return null;
+  if (!tv || tv.kind !== "TV") return null;
   const row = await prisma.patientCall.findFirst({ where: { id, clinicId: tv.clinicId } });
   return row ? toTvCall(row) : null;
 }
@@ -216,7 +216,7 @@ export async function deleteTvMedia(id: string) {
 /** Lado da TV: só itens ativos, URLs assinadas por 12 h (a TV recarrega às 4 h). */
 export async function getTvMedia(token: string): Promise<TvMediaView[] | null> {
   const tv = await resolveTvDisplay(token);
-  if (!tv) return null;
+  if (!tv || tv.kind !== "TV") return null;
   const rows = await prisma.tvMediaItem.findMany({ where: { clinicId: tv.clinicId, active: true }, orderBy: [{ position: "asc" }, { createdAt: "asc" }] });
   return mediaView(rows, 12);
 }

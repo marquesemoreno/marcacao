@@ -32,6 +32,17 @@ A página recarrega sozinha às 4h e confere chamadas a cada 20 s se o tempo rea
 - Música: um link do Spotify, pausa na chamada. Inteira só com Premium logado no navegador da TV.
 - Globoplay/Netflix: impossível (bloqueiam embed).
 
+## Totem de senhas
+- Configurações › TV › **Gerar link do totem de senhas** → abrir em `/totem/<token>` (tablet/PC com tela de toque).
+- Paciente escolhe **Normal** ou **Preferencial**, digita CPF ou telefone (ou pula). Achando a consulta de hoje
+  (telefone; CPF → cadastro/agendamento), a senha fica ligada a ela e a Agenda marca **Chegou**.
+- Senha impressa (térmica 80 mm) com QR Code → `/senha/<token>`: posição na fila, atualiza a cada 15 s, vibra na chamada.
+  Impressão sem janela: `chrome --kiosk --kiosk-printing "<link>"` com a térmica como impressora padrão.
+  Sem impressora: `?imprimir=0` no link (QR na tela).
+- Chamada: **Senhas** no menu (recepção) ou "Senhas do totem" na tela do médico. "Chamar próxima" pega a preferencial
+  mais antiga, senão a normal mais antiga. A TV mostra a senha e fala "Senha preferencial P, 12, favor dirigir-se ao Guichê 1".
+- Numeração recomeça todo dia (N001, P001). A página do QR só vale no dia.
+
 ## Ainda não feito
 - Chamar a partir do sistema da clínica (Firebird): depende de saber o que o médico faz lá ao chamar e se isso grava
   algo no banco que a ponte possa ler.

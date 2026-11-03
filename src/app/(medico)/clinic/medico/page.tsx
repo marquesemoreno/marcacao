@@ -4,6 +4,8 @@ import { DoctorPanel } from "@/components/doctor/doctor-panel";
 import { getMyPatientsToday } from "@/actions/agenda";
 import { getDoctorRooms } from "@/actions/tv-call";
 import { UserMenu } from "@/components/clinic/user-menu";
+import { QueuePanel } from "@/components/clinic/queue-panel";
+import { doctorKey } from "@/lib/tv-call";
 
 export const metadata = { title: "Meus pacientes" };
 export const dynamic = "force-dynamic";
@@ -28,7 +30,18 @@ export default async function MedicoPage() {
       </header>
       <main className="mx-auto max-w-2xl p-4">
         {initial ? (
-          <DoctorPanel initial={initial} rooms={rooms} />
+          <>
+            <DoctorPanel initial={initial} rooms={rooms} />
+            <details className="mt-6">
+              <summary className="cursor-pointer text-sm font-semibold">Senhas do totem</summary>
+              <div className="mt-3">
+                <QueuePanel
+                  compact
+                  defaultRoom={initial.doctorName ? rooms.find((r) => doctorKey(r.doctor) === doctorKey(initial.doctorName!))?.room ?? "" : ""}
+                />
+              </div>
+            </details>
+          </>
         ) : (
           <p className="rounded-lg border border-slate-200 bg-white p-6 text-sm dark:border-slate-800 dark:bg-slate-900">Seu login não tem acesso a esta tela.</p>
         )}

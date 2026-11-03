@@ -1,0 +1,228 @@
+import "server-only";
+import { randomBytes } from "crypto";
+import { prisma } from "@/lib/prisma";
+import { hashPatientToken } from "@/lib/patient-token";
+import { loadAgenda } from "@/lib/agenda-server";
+import { todayInBahia } from "@/lib/agenda-ui";
+import { notifyAgenda } from "@/lib/realtime-server";
+import { recordAudit } from "@/lib/audit-server";
+import { createPatientCall } from "@/lib/tv-call-server";
+import { tvDisplayName, type TvCall } from "@/lib/tv-call";
+import { matchTicketAppointment, nextTicket, ticketCode, ticketsAhead, type QueueTicketLite, type TicketStatus, type TicketType } from "@/lib/queue-ticket";
+
+export type IssuedTicket = {
+  code: string;
+  type: TicketType;
+  followToken: string;
+  /** "Lucas M." quando achou a consulta de hoje; null = sem agendamento. */
+  patient: string | null;
+  appointmentTime: string | null;
+  ahead: number;
+  createdAt: string;
+};
+
+/** Telefones pra procurar a consulta: o número digitado e, se tiver 11 dígitos (pode ser
+ * CPF), os telefones de quem tem esse CPF no cadastro desta clínica ou num agendamento. */
+async function phonesFor(clinicId: string, digits: string, day: string): Promise<string[]> {
+  const phones: string[] = [];
+  if (digits.length >= 10) phones.push(digits);
+  if (digits.length === 11) {
+    const formatted = `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9)}`;
+    const [profiles, appts] = await Promise.all([
+      prisma.contactClinicProfile.findMany({
+        where: { clinicId, cpf: { in: [digits, formatted] } },
+        select: { contact: { select: { phone: true } } },
+        take: 5,
+      }),
+      prisma.appointment.findMany({
+        where: { clinicProcedure: { clinicId }, patientCpf: digits, date: new Date(`${day}T00:00:00Z`) },
+        select: { patientPhone: true },
+        take: 5,
+      }),
+    ]);
+    phones.push(...profiles.map((p) => p.contact.phone ?? ""), ...appts.map((a) => a.patientPhone));
+  }
+  return phones;
+}
+
+async function waitingToday(clinicId: string, day: string): Promise<(QueueTicketLite & { code: string })[]> {
+  const rows = await prisma.queueTicket.findMany({
+    where: { clinicId, day, status: "WAITING" },
+    select: { id: true, type: true, status: true, createdAt: true, code: true },
+  });
+  return rows.map((r) => ({ ...r, type: r.type as TicketType, status: r.status as TicketStatus }));
+}
+
+/** Totem: tira a senha. Se achar a consulta de hoje pelo CPF/telefone, liga a senha a ela
+ * e marca "Chegou" na Agenda (como o "Cheguei" do link do paciente). */
+export async function issueQueueTicket(clinicId: string, input: { type: TicketType; identifier?: string | null }): Promise<IssuedTicket> {
+  const day = todayInBahia();
+  const digits = (input.identifier ?? "").replace(/\D/g, "");
+  let match: Awaited<ReturnType<typeof loadAgenda>>["items"][number] | null = null;
+  if (digits.length >= 10) {
+    const [phones, agenda] = await Promise.all([phonesFor(clinicId, digits, day), loadAgenda(clinicId, day, day)]);
+    match = matchTicketAppointment(agenda.items, phones);
+  }
+
+  const raw = randomBytes(18).toString("base64url");
+  let row: Awaited<ReturnType<typeof prisma.queueTicket.create>> | null = null;
+  for (let attempt = 0; attempt < 5 && !row; attempt++) {
+    const last = await prisma.queueTicket.findFirst({ where: { clinicId, day, type: input.type }, orderBy: { number: "desc" }, select: { number: true } });
+    const number = (last?.number ?? 0) + 1;
+    try {
+      row = await prisma.queueTicket.create({
+        data: {
+          clinicId,
+          day,
+          type: input.type,
+          number,
+          code: ticketCode(input.type, number),
+          followTokenHash: hashPatientToken(raw),
+          patientName: match?.patientName ?? null,
+          phone: match?.phone ?? null,
+          doctor: match?.doctor ?? null,
+          appointmentSource: match?.source ?? null,
+          appointmentExtId: match?.externalId ?? null,
+          appointmentTime: match?.time ?? null,
+        },
+      });
+    } catch (e) {
+      if ((e as { code?: string }).code !== "P2002") throw e; // dois toques ao mesmo tempo: tenta o próximo número
+    }
+  }
+  if (!row) throw new Error("Não deu pra gerar a senha. Tente de novo.");
+
+  if (match) await markArrived(clinicId, match);
+  await notifyAgenda(clinicId);
+  const waiting = await waitingToday(clinicId, day);
+  return {
+    code: row.code,
+    type: input.type,
+    followToken: raw,
+    patient: match ? tvDisplayName(match.patientName) : null,
+    appointmentTime: match?.time ?? null,
+    ahead: ticketsAhead(waiting, row.id),
+    createdAt: row.createdAt.toISOString(),
+  };
+}
+
+async function markArrived(clinicId: string, item: { source: "BRIDGE" | "LOCAL"; externalId: string; date: string; phone: string | null }) {
+  const key = { clinicId_source_externalId: { clinicId, source: item.source, externalId: item.externalId } };
+  const before = await prisma.agendaMark.findUnique({ where: key, select: { status: true } });
+  // Já marcado pela recepção (chegou/atendido/…): não sobrescreve.
+  if (before && before.status !== "CONFIRMED") return;
+  await prisma.agendaMark.upsert({
+    where: key,
+    update: { status: "IN_SERVICE", updatedByUserId: null },
+    create: { clinicId, source: item.source, externalId: item.externalId, date: new Date(`${item.date}T00:00:00Z`), status: "IN_SERVICE", phone: item.phone },
+  });
+  await recordAudit({
+    clinicId,
+    userId: null,
+    action: "totem.checkin",
+    entity: `agenda:${item.source}`,
+    entityId: item.externalId,
+    before: before ? { status: before.status } : null,
+    after: { status: "IN_SERVICE" },
+  });
+}
+
+export type QueueTicketView = {
+  id: string;
+  code: string;
+  type: TicketType;
+  status: TicketStatus;
+  patientName: string | null;
+  doctor: string | null;
+  appointmentTime: string | null;
+  room: string | null;
+  callCount: number;
+  createdAt: string;
+  calledAt: string | null;
+};
+
+/** Senhas de hoje (tela da recepção/médico). */
+export async function queueToday(clinicId: string): Promise<QueueTicketView[]> {
+  const rows = await prisma.queueTicket.findMany({ where: { clinicId, day: todayInBahia() }, orderBy: { createdAt: "asc" } });
+  return rows.map((r) => ({
+    id: r.id,
+    code: r.code,
+    type: r.type as TicketType,
+    status: r.status as TicketStatus,
+    patientName: r.patientName,
+    doctor: r.doctor,
+    appointmentTime: r.appointmentTime,
+    room: r.room,
+    callCount: r.callCount,
+    createdAt: r.createdAt.toISOString(),
+    calledAt: r.calledAt?.toISOString() ?? null,
+  }));
+}
+
+/** Chama uma senha na TV (ticketId) ou a próxima da fila (sem ticketId). */
+export async function callQueueTicket(clinicId: string, userId: string, input: { ticketId?: string | null; room: string }): Promise<{ code: string; call: TvCall } | null> {
+  const room = input.room.trim().slice(0, 40) || null;
+  let ticket = input.ticketId ? await prisma.queueTicket.findFirst({ where: { id: input.ticketId, clinicId } }) : null;
+  if (!input.ticketId) {
+    const waiting = await waitingToday(clinicId, todayInBahia());
+    const next = nextTicket(waiting);
+    if (!next) return null;
+    ticket = await prisma.queueTicket.findUnique({ where: { id: next.id } });
+  }
+  if (!ticket) throw new Error("Senha não encontrada.");
+  // Corrida entre dois guichês chamando "próxima": só um leva a senha.
+  const updated = await prisma.queueTicket.updateMany({
+    where: { id: ticket.id, ...(input.ticketId ? {} : { status: "WAITING" }) },
+    data: { status: "CALLED", room, calledAt: new Date(), calledByUserId: userId, callCount: { increment: 1 } },
+  });
+  if (updated.count === 0) return callQueueTicket(clinicId, userId, input);
+  const call = await createPatientCall(clinicId, userId, {
+    source: "TICKET",
+    externalId: ticket.id,
+    patientName: ticket.patientName ?? "",
+    doctor: null,
+    room,
+    ticketCode: ticket.code,
+  });
+  await notifyAgenda(clinicId);
+  return { code: ticket.code, call };
+}
+
+export async function finishQueueTicket(clinicId: string, id: string, status: "DONE" | "NO_SHOW" | "CANCELLED" | "WAITING") {
+  const res = await prisma.queueTicket.updateMany({
+    where: { id, clinicId },
+    data: { status, finishedAt: status === "WAITING" ? null : new Date() },
+  });
+  if (res.count === 0) throw new Error("Senha não encontrada.");
+  await notifyAgenda(clinicId);
+}
+
+export type TicketFollow = {
+  code: string;
+  clinicName: string;
+  status: TicketStatus;
+  ahead: number;
+  room: string | null;
+  calledAt: string | null;
+  createdAt: string;
+};
+
+/** Página do QR Code: posição na fila. Só vale no dia da senha. */
+export async function followQueueTicket(raw: string): Promise<TicketFollow | null> {
+  if (!/^[A-Za-z0-9_-]{16,64}$/.test(raw)) return null;
+  const t = await prisma.queueTicket.findUnique({ where: { followTokenHash: hashPatientToken(raw) } });
+  if (!t || t.day !== todayInBahia()) return null;
+  const [waiting, clinic] = await Promise.all([
+    t.status === "WAITING" ? waitingToday(t.clinicId, t.day) : Promise.resolve([]),
+    prisma.clinic.findUnique({ where: { id: t.clinicId }, select: { name: true } }),
+  ]);
+  return {
+    code: t.code,
+    clinicName: clinic?.name ?? "",
+    status: t.status as TicketStatus,
+    ahead: t.status === "WAITING" ? ticketsAhead(waiting, t.id) : 0,
+    room: t.room,
+    calledAt: t.calledAt?.toISOString() ?? null,
+    createdAt: t.createdAt.toISOString(),
+  };
+}

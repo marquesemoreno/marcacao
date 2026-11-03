@@ -17,7 +17,7 @@ import {
   Sparkles,
   ShieldCheck,
   Smartphone,
-  type LucideIcon, ClipboardList, MonitorPlay } from "lucide-react";
+  type LucideIcon, ClipboardList, MonitorPlay, Ticket } from "lucide-react";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { getMyUnreadCount } from "@/actions/clinic-shell";
 import { can, type ClinicPermission, type ClinicRole } from "@/lib/clinic-permissions";
@@ -35,6 +35,7 @@ const NAV_GROUPS: NavGroup[] = [
       { href: "/clinic/inbox", label: "Chat", icon: MessageCircle, badge: "unread" },
       { href: "/clinic/crm", label: "CRM", icon: KanbanSquare },
       { href: "/clinic/agenda", label: "Agenda", icon: CalendarDays },
+      { href: "/clinic/senhas", label: "Senhas", icon: Ticket, perm: "chamar" },
       { href: "/clinic/agendamentos", label: "Agendamentos", icon: CalendarCheck, onlyFull: true },
     ],
   },

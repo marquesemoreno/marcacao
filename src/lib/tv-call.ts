@@ -1,3 +1,5 @@
+import { ticketSpoken } from "@/lib/queue-ticket";
+
 /** Painel de chamada da TV da sala de espera — funções puras (ver src/actions/tv-call.ts).
  * A tela é pública: mostra só primeiro nome + inicial; a voz fala primeiro + último nome. */
 
@@ -26,10 +28,11 @@ export function tvSpokenName(name: string): string {
 }
 
 /** Frase da chamada. "Sala"/"recepção" pedem "à"; consultório etc., "ao". */
-export function tvSpokenText(call: { spokenName: string; room: string | null }): string {
+export function tvSpokenText(call: { spokenName: string; room: string | null; ticketCode?: string | null }): string {
   const room = call.room?.trim();
   const where = !room ? "à recepção" : /^(sala|recepç|recepc)/i.test(room) ? `à ${room}` : `ao ${room}`;
-  return `Paciente ${call.spokenName}, favor dirigir-se ${where}.`;
+  const who = call.ticketCode ? ticketSpoken(call.ticketCode) : `Paciente ${call.spokenName}`;
+  return `${who}, favor dirigir-se ${where}.`;
 }
 
 /** Chave do médico pra sala fixa: o nome vem livre da ponte (caixa/acentos variam). */
@@ -67,4 +70,6 @@ export type TvCall = {
   room: string | null;
   calledAt: string;
   attempt: number;
+  /** Chamada de senha do totem (ex.: "N012"); a TV mostra a senha em destaque. */
+  ticketCode?: string | null;
 };

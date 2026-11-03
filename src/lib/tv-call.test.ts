@@ -30,6 +30,9 @@ describe("tvSpokenText", () => {
   it("sem sala: recepção", () => {
     expect(tvSpokenText({ spokenName: "Ana", room: null })).toBe("Paciente Ana, favor dirigir-se à recepção.");
   });
+  it("senha do totem: fala a senha, não o nome", () => {
+    expect(tvSpokenText({ spokenName: "Ana", room: "Guichê 1", ticketCode: "P012" })).toBe("Senha preferencial P, 12, favor dirigir-se ao Guichê 1.");
+  });
 });
 
 describe("doctorKey / resolveRoom", () => {
