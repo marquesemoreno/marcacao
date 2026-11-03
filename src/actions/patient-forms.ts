@@ -9,6 +9,7 @@ import { DEFAULT_ANAMNESE_TEMPLATE } from "@/lib/patient-journey";
 import { decryptFormAnswers, ensureConsentTerm } from "@/lib/patient-form-server";
 import { recordAudit } from "@/lib/audit-server";
 import { recordPatientAccess } from "@/lib/access-log-server";
+import { readAppointmentFormResponse } from "@/lib/patient-form-view-server";
 
 /** Ficha prévia — lado da clínica: configurar (gestão) e ver as respostas (com registro
  * de acesso, LGPD). */
@@ -59,21 +60,5 @@ export async function saveFormTemplate(input: { questions: FormQuestion[]; activ
  * acesso a dado de saúde (PatientAccessLog, ou audit_logs quando não há conversa). */
 export async function getAppointmentFormResponse(ref: { source: "BRIDGE" | "LOCAL"; externalId: string }) {
   const { clinicId, userId } = await requireClinicPermission("ficha.ver");
-  const r = await prisma.patientFormResponse.findFirst({
-    where: { clinicId, appointmentSource: ref.source, appointmentExternalId: ref.externalId },
-    orderBy: { submittedAt: "desc" },
-    include: { template: { select: { body: true, version: true } } },
-  });
-  if (!r) return null;
-  const questions = parseFormTemplate(r.template.body).questions;
-  const answers = decryptFormAnswers(r.answersEncrypted);
-  const conversation = r.phone
-    ? await prisma.conversation.findFirst({ where: { clinicId, contact: { phone: r.phone } }, select: { id: true } })
-    : null;
-  if (conversation) await recordPatientAccess({ clinicId, userId, conversationId: conversation.id, action: "VIU_FICHA_PREVIA" });
-  else await recordAudit({ clinicId, userId, action: "form.view", entity: "patient_form_response", entityId: r.id, before: null, after: { viewed: true } });
-  return {
-    submittedAt: r.submittedAt.toISOString(),
-    items: questions.filter((q) => answers[q.id] !== undefined).map((q) => ({ label: q.label, value: q.type === "yesno" ? (answers[q.id] === "sim" ? "Sim" : "Não") : answers[q.id] })),
-  };
+  return readAppointmentFormResponse(clinicId, userId, ref);
 }

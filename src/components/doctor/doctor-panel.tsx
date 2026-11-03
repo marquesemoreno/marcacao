@@ -4,10 +4,11 @@ import { useCallback, useEffect, useState } from "react";
 import { Check, Loader2, Megaphone, RefreshCw, Stethoscope } from "lucide-react";
 import { toast } from "sonner";
 import { getSupabaseClient } from "@/lib/supabase-client";
-import { doctorCallPatient, doctorSetStatus, getDoctorRealtimeTopic, getMyPatientsToday } from "@/actions/agenda";
+import { doctorCallPatient, doctorFormResponse, doctorSetStatus, getDoctorRealtimeTopic, getMyPatientsToday } from "@/actions/agenda";
 import { AGENDA_STATUS_META, toTitleCase } from "@/lib/agenda-ui";
 import { doctorKey } from "@/lib/tv-call";
 import type { AgendaItem } from "@/lib/agenda";
+import { FormResponseSection } from "@/components/clinic/agenda/form-response-section";
 
 type Data = Awaited<ReturnType<typeof getMyPatientsToday>>;
 
@@ -110,6 +111,7 @@ export function DoctorPanel({ initial, rooms }: { initial: Data; rooms: { doctor
                 <p className="truncate font-semibold">
                   <span className="mr-2 text-sm tabular-nums text-slate-500">{item.time ?? "—"}</span>
                   {name(item)}
+                  {item.formDone && <span className="ml-2 rounded bg-emerald-100 px-1.5 py-0.5 text-[11px] font-semibold text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">ficha</span>}
                 </p>
                 <p className="text-xs text-slate-600 dark:text-slate-400">{meta.label}</p>
               </div>
@@ -142,6 +144,11 @@ export function DoctorPanel({ initial, rooms }: { initial: Data; rooms: { doctor
                     {loading ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Check className="h-4 w-4" aria-hidden />} Atendido
                   </button>
                 </>
+              )}
+              {item.formDone && (
+                <div className="basis-full">
+                  <FormResponseSection item={item} load={doctorFormResponse} />
+                </div>
               )}
             </li>
           );

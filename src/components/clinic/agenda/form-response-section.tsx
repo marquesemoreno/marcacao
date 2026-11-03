@@ -9,7 +9,14 @@ type Response = Awaited<ReturnType<typeof getAppointmentFormResponse>>;
 
 /** Ficha prévia no painel do paciente. Dado de saúde: só carrega quando alguém clica em
  * "Ver respostas" — cada abertura fica registrada em Acessos. */
-export function FormResponseSection({ item }: { item: AgendaItem }) {
+export function FormResponseSection({
+  item,
+  load = getAppointmentFormResponse,
+}: {
+  item: AgendaItem;
+  /** Médico usa a ação dele (só paciente dele de hoje). */
+  load?: (ref: { source: "BRIDGE" | "LOCAL"; externalId: string }) => Promise<Response>;
+}) {
   const [data, setData] = useState<Response | undefined>(undefined);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
@@ -33,7 +40,7 @@ export function FormResponseSection({ item }: { item: AgendaItem }) {
               setLoading(true);
               setError(false);
               try {
-                setData(await getAppointmentFormResponse({ source: item.source, externalId: item.externalId }));
+                setData(await load({ source: item.source, externalId: item.externalId }));
               } catch {
                 setError(true);
               } finally {

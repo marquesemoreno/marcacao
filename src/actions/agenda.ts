@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireClinicPermission, requireClinicSession } from "@/lib/session";
 import { createPatientCall } from "@/lib/tv-call-server";
+import { readAppointmentFormResponse } from "@/lib/patient-form-view-server";
 import { doctorKey, type TvCall } from "@/lib/tv-call";
 import { todayInBahia } from "@/lib/agenda-ui";
 import { agendaTopicFor, notifyAgenda } from "@/lib/realtime-server";
@@ -330,4 +331,10 @@ export async function doctorSetStatus(ref: { source: "BRIDGE" | "LOCAL"; externa
 export async function getDoctorRealtimeTopic(): Promise<string | null> {
   const { clinicId } = await requireDoctor();
   return agendaTopicFor(clinicId);
+}
+
+/** Médico abre a ficha prévia de um paciente DELE, de hoje (registrado em Acessos). */
+export async function doctorFormResponse(ref: { source: "BRIDGE" | "LOCAL"; externalId: string }) {
+  const { me, item } = await myItem(ref);
+  return readAppointmentFormResponse(me.clinicId, me.userId, { source: item.source, externalId: item.externalId });
 }
