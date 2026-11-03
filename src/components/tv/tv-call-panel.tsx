@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Maximize, Volume2 } from "lucide-react";
 import { getSupabaseClient } from "@/lib/supabase-client";
-import { getTvCall, getTvState } from "@/actions/tv-call";
+import { getTvCall, getTvMedia, getTvState, type TvMediaView } from "@/actions/tv-call";
+import { TvMediaStage } from "./tv-media-stage";
 import { pushCallHistory, tvSpokenText, type TvCall } from "@/lib/tv-call";
 import { audioUnlocked, playChime, speak, unlockAudio } from "@/lib/tv-audio";
 
@@ -18,6 +19,7 @@ export function TvCallPanel({ token, clinicName, topic, initialCalls }: { token:
   const [flash, setFlash] = useState(false);
   const [now, setNow] = useState(() => new Date());
   const [revoked, setRevoked] = useState(false);
+  const [media, setMedia] = useState<TvMediaView[]>([]);
   const seen = useRef(new Set(initialCalls.map((c) => c.id)));
   const queue = useRef<TvCall[]>([]);
   const busy = useRef(false);
@@ -86,6 +88,14 @@ export function TvCallPanel({ token, clinicName, topic, initialCalls }: { token:
     return () => clearInterval(t);
   }, [token, enqueue]);
 
+  // Vídeos/propaganda/música: carrega e confere a cada 5 min (mudanças na configuração).
+  useEffect(() => {
+    const load = () => void getTvMedia(token).then((m) => m && setMedia(m)).catch(() => {});
+    load();
+    const t = setInterval(load, 5 * 60_000);
+    return () => clearInterval(t);
+  }, [token]);
+
   // Recarrega a página 1×/dia de madrugada (TV ligada direto, vazamento de memória).
   useEffect(() => {
     const t = setInterval(() => {
@@ -100,6 +110,50 @@ export function TvCallPanel({ token, clinicName, topic, initialCalls }: { token:
   }
 
   const [current, ...history] = calls;
+  const hasMedia = media.length > 0;
+
+  if (hasMedia) {
+    return (
+      <div className="relative flex h-dvh flex-col bg-slate-950 text-white [color-scheme:dark]">
+        <Header clinicName={clinicName} soundOn={soundOn} onUnlock={async () => setSoundOn(await unlockAudio())} now={now} />
+        <div className="grid min-h-0 flex-1 grid-cols-[7fr_3fr] gap-[1.5vw] px-[2vw] pb-[2vh]">
+          <TvMediaStage items={media} ducked={flash} soundOn={soundOn} />
+          <aside className="flex min-h-0 flex-col gap-[1.5vh]" aria-live="assertive">
+            <div className={`rounded-[1.2vw] border-4 px-[1.5vw] py-[3vh] text-center ${flash ? "border-emerald-400 bg-emerald-500/15" : "border-slate-800 bg-slate-900"}`}>
+              <p className="text-[clamp(0.9rem,1.4vw,1.75rem)] uppercase tracking-[0.2em] text-slate-400">{current ? "Chamando" : "Aguarde ser chamado"}</p>
+              {current && (
+                <>
+                  <p className="mt-[1vh] text-[clamp(2rem,4.2vw,5.5rem)] font-bold leading-none">{current.displayName}</p>
+                  <p className="mt-[2vh] text-[clamp(1.25rem,2.6vw,3.25rem)] font-semibold text-emerald-400">{current.room ?? "Recepção"}</p>
+                  {current.doctor && <p className="mt-[0.5vh] text-[clamp(1rem,1.6vw,2rem)] text-slate-300">{current.doctor}</p>}
+                </>
+              )}
+            </div>
+            <p className="text-[clamp(0.8rem,1.1vw,1.25rem)] font-semibold uppercase tracking-widest text-slate-500">Últimas chamadas</p>
+            <ol className="flex min-h-0 flex-col gap-[1vh] overflow-hidden">
+              {history.slice(0, 4).map((c) => (
+                <li key={c.id} className="rounded-xl bg-slate-900 px-[1.2vw] py-[1vh]">
+                  <p className="truncate text-[clamp(1rem,1.8vw,2.25rem)] font-semibold">{c.displayName}</p>
+                  <p className="truncate text-[clamp(0.8rem,1.2vw,1.5rem)] text-emerald-400">
+                    {c.room ?? "Recepção"} <span className="text-slate-500 tabular-nums">· {fmt.format(new Date(c.calledAt))}</span>
+                  </p>
+                </li>
+              ))}
+            </ol>
+          </aside>
+        </div>
+        {/* Na chamada a mensagem toma a tela inteira; o vídeo fica mudo por baixo. */}
+        {flash && current && (
+          <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-slate-950/95 px-[4vw] text-center">
+            <p className="text-[clamp(1rem,2.2vw,2.5rem)] uppercase tracking-[0.2em] text-slate-400">{current.attempt > 1 ? `Chamando de novo · ${current.attempt}ª vez` : "Chamando"}</p>
+            <p className="mt-[2vh] text-[clamp(3rem,10vw,12rem)] font-bold leading-none">{current.displayName}</p>
+            <p className="mt-[4vh] text-[clamp(2rem,5.5vw,6.5rem)] font-semibold text-emerald-400">{current.room ?? "Recepção"}</p>
+            {current.doctor && <p className="mt-[1.5vh] text-[clamp(1.25rem,3vw,3.5rem)] text-slate-300">{current.doctor}</p>}
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-dvh flex-col bg-slate-950 text-white [color-scheme:dark]">
@@ -156,5 +210,24 @@ export function TvCallPanel({ token, clinicName, topic, initialCalls }: { token:
         </ol>
       </footer>
     </div>
+  );
+}
+
+function Header({ clinicName, soundOn, onUnlock, now }: { clinicName: string; soundOn: boolean; onUnlock: () => void; now: Date }) {
+  return (
+    <header className="flex items-center justify-between px-[2vw] py-[1.5vh]">
+      <p className="text-[clamp(1rem,1.8vw,2rem)] font-semibold text-emerald-400">{clinicName}</p>
+      <div className="flex items-center gap-4">
+        {!soundOn && (
+          <button type="button" onClick={onUnlock} className="inline-flex animate-pulse items-center gap-2 rounded-xl bg-amber-500 px-5 py-3 text-lg font-bold text-slate-950">
+            <Volume2 className="h-6 w-6" aria-hidden /> Toque para ativar o som
+          </button>
+        )}
+        <button type="button" onClick={() => void document.documentElement.requestFullscreen?.().catch(() => {})} className="rounded-lg p-2 text-slate-500 hover:text-white" aria-label="Tela cheia">
+          <Maximize className="h-6 w-6" />
+        </button>
+        <p className="text-[clamp(1.25rem,2.6vw,3rem)] font-semibold tabular-nums text-slate-300">{fmt.format(now)}</p>
+      </div>
+    </header>
   );
 }

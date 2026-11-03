@@ -1542,3 +1542,22 @@ model PatientCall {
   @@index([clinicId, createdAt])
   @@map("patient_calls")
 }
+
+/// Mídia da TV da sala de espera (src/lib/tv-media.ts): rodízio de YouTube/vídeo/imagem
+/// + música (Spotify). Arquivos próprios ficam no bucket privado, prefixo tv/<clinicId>/.
+model TvMediaItem {
+  id          String   @id @default(cuid())
+  clinicId    String   @map("clinic_id")
+  kind        String
+  /// YOUTUBE/SPOTIFY: link; VIDEO/IMAGE: caminho no Storage.
+  source      String
+  title       String
+  /// Imagem: segundos na tela.
+  durationSec Int      @default(15) @map("duration_sec")
+  position    Int      @default(0)
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([clinicId, position])
+  @@map("tv_media_items")
+}

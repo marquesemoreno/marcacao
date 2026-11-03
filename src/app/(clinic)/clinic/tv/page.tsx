@@ -1,7 +1,8 @@
 import { ManagerOnly, currentUserIsManager } from "@/components/clinic/manager-only";
 import { PageHeader } from "@/components/clinic/page-header";
 import { TvSettings } from "@/components/clinic/tv-settings";
-import { getTvSettings } from "@/actions/tv-call";
+import { getTvSettings, listTvMedia } from "@/actions/tv-call";
+import { TvMediaSettings } from "@/components/clinic/tv-media-settings";
 import { getAgenda } from "@/actions/agenda";
 import { todayInBahia } from "@/lib/agenda-ui";
 import { addDays } from "@/lib/agenda";
@@ -12,7 +13,7 @@ export const dynamic = "force-dynamic";
 export default async function TvSettingsPage() {
   if (!(await currentUserIsManager())) return <ManagerOnly />;
   const today = todayInBahia();
-  const [settings, agenda] = await Promise.all([getTvSettings(), getAgenda(addDays(today, -7), addDays(today, 7)).catch(() => null)]);
+  const [settings, agenda, media] = await Promise.all([getTvSettings(), getAgenda(addDays(today, -7), addDays(today, 7)).catch(() => null), listTvMedia().catch(() => [])]);
   // Médicos com agenda nas últimas/próximas 2 semanas (o nome vem igual ao da ponte).
   const doctors = [...new Set((agenda?.items ?? []).map((i) => i.doctor?.trim()).filter((d): d is string => !!d))].sort((a, b) => a.localeCompare(b, "pt-BR"));
   return (
@@ -23,6 +24,7 @@ export default async function TvSettingsPage() {
           subtitle="Painel que mostra e anuncia em voz alta o paciente chamado. Abra o link da TV num mini PC, Raspberry ou no navegador da Smart TV."
         />
         <TvSettings initial={settings} doctors={doctors} />
+        <TvMediaSettings initial={media} />
       </div>
     </div>
   );

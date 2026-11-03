@@ -25,6 +25,13 @@
 Sem o `--autoplay-policy`, a TV mostra "Toque para ativar o som" — basta um clique/toque cada vez que a página abre.
 A página recarrega sozinha às 4h e confere chamadas a cada 20 s se o tempo real cair.
 
+## Vídeos, propaganda e música
+- Configurações › TV › "Vídeos e propaganda": links do YouTube (vídeo/playlist) e arquivos próprios (MP4/WEBM até 200 MB,
+  imagem até 10 MB, enviados direto ao Storage `whatsapp-media/tv/<clinicId>/`). Rodízio na ordem da lista, volume 15%.
+- Com mídia, a TV fica 70% vídeo + 30% chamada; na chamada o vídeo fica mudo e o nome toma a tela inteira.
+- Música: um link do Spotify, pausa na chamada. Inteira só com Premium logado no navegador da TV.
+- Globoplay/Netflix: impossível (bloqueiam embed).
+
 ## Ainda não feito
 - Chamar a partir do sistema da clínica (Firebird): depende de saber o que o médico faz lá ao chamar e se isso grava
   algo no banco que a ponte possa ler.
