@@ -16,5 +16,5 @@ export default async function TotemPage({ params, searchParams }: { params: Prom
       </main>
     );
   }
-  return <TotemKiosk token={token} clinicName={info.clinicName} print={sp.imprimir !== "0"} />;
+  return <TotemKiosk token={token} clinicName={info.clinicName} services={info.services} print={sp.imprimir !== "0"} />;
 }

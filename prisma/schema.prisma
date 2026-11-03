@@ -1580,11 +1580,29 @@ model PatientCall {
 
 /// Senha do totem (src/lib/queue-ticket.ts). Numeração por clínica/dia/tipo (N normal,
 /// P preferencial). followTokenHash = QR Code pro paciente acompanhar a fila (/senha/<token>).
+/// Serviço da senha do totem (Consulta, Exame, Resultado…): letra própria, ativa/inativa.
+model QueueService {
+  id        String   @id @default(cuid())
+  clinicId  String   @map("clinic_id")
+  name      String
+  letter    String
+  active    Boolean  @default(true)
+  position  Int      @default(0)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([clinicId, letter])
+  @@map("queue_services")
+}
+
 model QueueTicket {
   id                String    @id @default(cuid())
   clinicId          String    @map("clinic_id")
   /// Dia (AAAA-MM-DD, fuso da clínica).
   day               String
+  /// Série da numeração (C, CP, E… ou N/P sem serviço) — ver seriesFor.
+  series             String    @default("")
+  serviceId          String?   @map("service_id")
+  serviceName        String?   @map("service_name")
   type              String
   number            Int
   code              String
@@ -1604,7 +1622,7 @@ model QueueTicket {
   finishedAt        DateTime? @map("finished_at")
   createdAt         DateTime  @default(now()) @map("created_at")
 
-  @@unique([clinicId, day, type, number])
+  @@unique([clinicId, day, series, number])
   @@index([clinicId, day, status])
   @@map("queue_tickets")
 }

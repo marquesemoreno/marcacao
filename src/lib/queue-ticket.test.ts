@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { doctorDelayMin, matchTicketAppointment, nextTicket, phoneTail, ticketCode, ticketSpoken, ticketsAhead, type QueueTicketLite } from "./queue-ticket";
+import { normalizeServiceInput, seriesFor, doctorDelayMin, matchTicketAppointment, nextTicket, phoneTail, ticketCode, ticketSpoken, ticketsAhead, type QueueTicketLite } from "./queue-ticket";
 
 const t = (id: string, type: "N" | "P", min: number, status: QueueTicketLite["status"] = "WAITING"): QueueTicketLite => ({
   id,
@@ -20,6 +20,32 @@ describe("ticketSpoken", () => {
   it("fala a letra e o número sem zeros à esquerda", () => {
     expect(ticketSpoken("N007")).toBe("Senha N, 7");
     expect(ticketSpoken("P012")).toBe("Senha preferencial P, 12");
+  });
+  it("por serviço: C012 / CP012 (preferencial da Consulta)", () => {
+    expect(ticketSpoken("C012")).toBe("Senha C, 12");
+    expect(ticketSpoken("CP012")).toBe("Senha preferencial C, 12");
+  });
+});
+
+describe("seriesFor", () => {
+  it("letra do serviço + P na preferencial; sem serviço = N/P", () => {
+    expect(seriesFor("C", "N")).toBe("C");
+    expect(seriesFor("C", "P")).toBe("CP");
+    expect(seriesFor(null, "N")).toBe("N");
+    expect(seriesFor(null, "P")).toBe("P");
+    expect(ticketCode(seriesFor("E", "P"), 3)).toBe("EP003");
+  });
+});
+
+describe("normalizeServiceInput", () => {
+  it("nome + letra maiúscula", () => {
+    expect(normalizeServiceInput({ name: "  Vacina ", letter: "v" })).toEqual({ ok: true, value: { name: "Vacina", letter: "V" } });
+  });
+  it("letra precisa ser A–Z e não pode ser N nem P (são da senha normal/preferencial)", () => {
+    expect(normalizeServiceInput({ name: "X", letter: "P" }).ok).toBe(false);
+    expect(normalizeServiceInput({ name: "X", letter: "N" }).ok).toBe(false);
+    expect(normalizeServiceInput({ name: "X", letter: "1" }).ok).toBe(false);
+    expect(normalizeServiceInput({ name: "", letter: "X" }).ok).toBe(false);
   });
 });
 

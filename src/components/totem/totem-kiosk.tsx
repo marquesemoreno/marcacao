@@ -7,7 +7,7 @@ import { takeTicket } from "@/actions/queue-ticket";
 import type { IssuedTicket } from "@/lib/queue-ticket-server";
 import type { TicketType } from "@/lib/queue-ticket";
 
-type Step = { kind: "type" } | { kind: "id"; type: TicketType } | { kind: "ticket"; ticket: IssuedTicket };
+type Step = { kind: "service" } | { kind: "type" } | { kind: "id"; type: TicketType } | { kind: "ticket"; ticket: IssuedTicket };
 
 const IDLE_MS = 45_000; // sem toque no teclado: volta pro início
 const TICKET_MS = 20_000; // tela da senha impressa
@@ -24,6 +24,7 @@ export function TotemKiosk({
   print,
   mobile = false,
   needsLocation = false,
+  services = [],
 }: {
   token: string;
   clinicName: string;
@@ -31,15 +32,21 @@ export function TotemKiosk({
   mobile?: boolean;
   /** QR do celular com ponto da clínica salvo: pede a localização antes de dar a senha. */
   needsLocation?: boolean;
+  /** Serviços ativos (Consulta, Exame…). 2+ = primeiro escolhe o serviço; 1 = já vai nele. */
+  services?: { id: string; name: string; letter: string }[];
 }) {
-  const [step, setStep] = useState<Step>({ kind: "type" });
+  const first: Step = services.length > 1 ? { kind: "service" } : { kind: "type" };
+  const [step, setStep] = useState<Step>(first);
+  const [serviceId, setServiceId] = useState<string | null>(services.length === 1 ? services[0].id : null);
+  const service = services.find((x) => x.id === serviceId) ?? null;
   const [digits, setDigits] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const reset = () => {
-    setStep({ kind: "type" });
+    setStep(first);
+    if (services.length > 1) setServiceId(null);
     setDigits("");
     setError(null);
   };
@@ -47,7 +54,7 @@ export function TotemKiosk({
   // Volta sozinho pro início (paciente desistiu / já pegou a senha).
   useEffect(() => {
     if (timer.current) clearTimeout(timer.current);
-    if (step.kind === "type" || mobile) return;
+    if (step.kind === first.kind || mobile) return;
     timer.current = setTimeout(reset, step.kind === "ticket" ? TICKET_MS : IDLE_MS);
     return () => {
       if (timer.current) clearTimeout(timer.current);
@@ -77,7 +84,7 @@ export function TotemKiosk({
           );
         }
       }
-      const res = await takeTicket(token, { type, identifier, kind: mobile ? "QR" : "TOTEM", location });
+      const res = await takeTicket(token, { type, identifier, serviceId, kind: mobile ? "QR" : "TOTEM", location });
       if (!res.ok) return setError(res.error);
       if (mobile) return window.location.replace(`/senha/${res.ticket.followToken}`);
       setStep({ kind: "ticket", ticket: res.ticket });
@@ -94,7 +101,7 @@ export function TotemKiosk({
       <div className="totem-screen flex flex-1 flex-col">
         <header className="flex items-center justify-between border-b border-slate-200 bg-white px-[4vw] py-[2.5vh]">
           <p className="text-[clamp(1.25rem,2.4vw,2.25rem)] font-semibold">{clinicName}</p>
-          {step.kind !== "type" && (
+          {step.kind !== first.kind && (
             <button type="button" onClick={reset} className="inline-flex h-14 items-center gap-2 rounded-xl px-5 text-xl font-medium text-slate-600 active:bg-slate-100">
               <ArrowLeft className="h-6 w-6" aria-hidden /> Início
             </button>
@@ -102,10 +109,35 @@ export function TotemKiosk({
         </header>
 
         <section className="flex flex-1 flex-col items-center justify-center gap-[4vh] px-[5vw] py-[4vh]">
-          {step.kind === "type" && (
+          {step.kind === "service" && (
             <>
               <h1 className="text-center text-[clamp(2rem,4.5vw,4rem)] font-bold tracking-tight">{mobile ? "Chegou? Pegue sua senha" : "Retire sua senha"}</h1>
               {mobile && needsLocation && <p className="-mt-2 text-center text-base text-slate-500">Vamos pedir sua localização só para confirmar que você está na clínica.</p>}
+              <p className="-mt-2 text-center text-xl text-slate-600">O que você veio fazer?</p>
+              <div className={`grid w-full max-w-5xl gap-[2.5vw] ${services.length >= 3 ? "md:grid-cols-3" : "md:grid-cols-2"}`}>
+                {services.map((sv) => (
+                  <button
+                    key={sv.id}
+                    type="button"
+                    onClick={() => {
+                      setServiceId(sv.id);
+                      setStep({ kind: "type" });
+                    }}
+                    className="flex min-h-[22vh] flex-col items-center justify-center rounded-3xl border-2 border-emerald-700 bg-white p-6 text-emerald-900 shadow-sm active:scale-[0.98] active:bg-emerald-50"
+                  >
+                    <span className="text-[clamp(2rem,4vw,3.75rem)] font-bold">{sv.name}</span>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+
+          {step.kind === "type" && (
+            <>
+              <h1 className="text-center text-[clamp(2rem,4.5vw,4rem)] font-bold tracking-tight">
+                {service && services.length > 1 ? service.name : mobile ? "Chegou? Pegue sua senha" : "Retire sua senha"}
+              </h1>
+              {mobile && needsLocation && services.length <= 1 && <p className="-mt-2 text-center text-base text-slate-500">Vamos pedir sua localização só para confirmar que você está na clínica.</p>}
               {mobile && <p className="-mt-4 text-center text-lg text-slate-600">Com consulta marcada, digite seu CPF ou telefone no próximo passo e a recepção já fica sabendo.</p>}
               <div className="grid w-full max-w-5xl gap-[3vw] md:grid-cols-2">
                 <button
@@ -161,7 +193,7 @@ export function TotemKiosk({
 
           {step.kind === "ticket" && (
             <div className="flex w-full max-w-3xl flex-col items-center gap-[2.5vh] text-center">
-              <p className="text-2xl font-medium text-slate-600">Sua senha</p>
+              <p className="text-2xl font-medium text-slate-600">Sua senha{step.ticket.serviceName ? ` · ${step.ticket.serviceName}` : ""}</p>
               <p className="text-[clamp(5rem,14vw,11rem)] font-black leading-none tracking-tight text-emerald-800">{step.ticket.code}</p>
               <p className="text-2xl">
                 {step.ticket.patient
@@ -193,7 +225,7 @@ export function TotemKiosk({
       {step.kind === "ticket" && (
         <div className="totem-print hidden text-center font-sans text-black">
           <p style={{ fontSize: "12pt", fontWeight: 600 }}>{clinicName}</p>
-          <p style={{ fontSize: "10pt", marginTop: "2mm" }}>{step.ticket.type === "P" ? "PREFERENCIAL" : "NORMAL"}</p>
+          <p style={{ fontSize: "10pt", marginTop: "2mm" }}>{step.ticket.serviceName ? `${step.ticket.serviceName.toUpperCase()} · ` : ""}{step.ticket.type === "P" ? "PREFERENCIAL" : "NORMAL"}</p>
           <p style={{ fontSize: "40pt", fontWeight: 900, lineHeight: 1.1 }}>{step.ticket.code}</p>
           {step.ticket.patient && (
             <p style={{ fontSize: "10pt" }}>

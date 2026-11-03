@@ -5,15 +5,33 @@ export type TicketType = "N" | "P";
 export type TicketStatus = "WAITING" | "CALLED" | "DONE" | "NO_SHOW" | "CANCELLED";
 export type QueueTicketLite = { id: string; type: TicketType; status: TicketStatus; createdAt: Date };
 
-export function ticketCode(type: TicketType, number: number): string {
-  return `${type}${String(number).padStart(3, "0")}`;
+/** Série da senha: com serviço, letra dele (+ "P" na preferencial: C / CP); sem serviço, N / P. */
+export function seriesFor(letter: string | null | undefined, type: TicketType): string {
+  return letter ? `${letter}${type === "P" ? "P" : ""}` : type;
 }
 
-/** O que a voz da TV fala: "Senha N, 7" / "Senha preferencial P, 12". */
+export function ticketCode(series: string, number: number): string {
+  return `${series}${String(number).padStart(3, "0")}`;
+}
+
+/** O que a voz da TV fala: "Senha N, 7" / "Senha preferencial P, 12" / "Senha preferencial C, 12" (CP012). */
 export function ticketSpoken(code: string): string {
-  const type = code.charAt(0);
-  const n = Number(code.slice(1));
-  return `Senha ${type === "P" ? "preferencial " : ""}${type}, ${n}`;
+  const m = code.match(/^([A-Z]+)(\d+)$/);
+  if (!m) return `Senha ${code}`;
+  const [, series, num] = m;
+  const pref = series === "P" || (series.length === 2 && series.endsWith("P"));
+  const letter = series.length === 2 ? series[0] : series;
+  return `Senha ${pref ? "preferencial " : ""}${letter}, ${Number(num)}`;
+}
+
+/** Cadastro de serviço da senha (Consulta, Exame…). N e P são da senha sem serviço. */
+export function normalizeServiceInput(raw: { name: string; letter: string }): { ok: true; value: { name: string; letter: string } } | { ok: false; error: string } {
+  const name = raw.name.trim().replace(/\s+/g, " ").slice(0, 30);
+  const letter = raw.letter.trim().toUpperCase();
+  if (!name) return { ok: false, error: "Informe o nome do serviço." };
+  if (!/^[A-Z]$/.test(letter)) return { ok: false, error: "A letra precisa ser uma única letra (A–Z)." };
+  if (letter === "N" || letter === "P") return { ok: false, error: "N e P já são usadas (normal/preferencial). Escolha outra letra." };
+  return { ok: true, value: { name, letter } };
 }
 
 const byAge = (a: QueueTicketLite, b: QueueTicketLite) => a.createdAt.getTime() - b.createdAt.getTime();

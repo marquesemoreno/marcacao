@@ -8,7 +8,7 @@ import { notifyAgenda } from "@/lib/realtime-server";
 import { recordAudit } from "@/lib/audit-server";
 import { createPatientCall } from "@/lib/tv-call-server";
 import { tvDisplayName, type TvCall } from "@/lib/tv-call";
-import { doctorDelayMin, matchTicketAppointment, nextTicket, ticketCode, ticketsAhead, type QueueTicketLite, type TicketStatus, type TicketType } from "@/lib/queue-ticket";
+import { seriesFor, doctorDelayMin, matchTicketAppointment, nextTicket, ticketCode, ticketsAhead, type QueueTicketLite, type TicketStatus, type TicketType } from "@/lib/queue-ticket";
 
 export type IssuedTicket = {
   code: string;
@@ -19,6 +19,7 @@ export type IssuedTicket = {
   appointmentTime: string | null;
   ahead: number;
   createdAt: string;
+  serviceName: string | null;
 };
 
 /** Telefones pra procurar a consulta: o número digitado e, se tiver 11 dígitos (pode ser
@@ -45,17 +46,23 @@ async function phonesFor(clinicId: string, digits: string, day: string): Promise
   return phones;
 }
 
-async function waitingToday(clinicId: string, day: string): Promise<(QueueTicketLite & { code: string })[]> {
+/** Senhas esperando hoje; com `serviceId` (ou null = sem serviço), só as daquele serviço. */
+async function waitingToday(clinicId: string, day: string, serviceId?: string | null): Promise<(QueueTicketLite & { code: string })[]> {
   const rows = await prisma.queueTicket.findMany({
-    where: { clinicId, day, status: "WAITING" },
-    select: { id: true, type: true, status: true, createdAt: true, code: true },
+    where: { clinicId, day, status: "WAITING", ...(serviceId !== undefined ? { serviceId } : {}) },
+    select: { id: true, type: true, status: true, createdAt: true, code: true, serviceId: true },
   });
   return rows.map((r) => ({ ...r, type: r.type as TicketType, status: r.status as TicketStatus }));
 }
 
 /** Totem: tira a senha. Se achar a consulta de hoje pelo CPF/telefone, liga a senha a ela
  * e marca "Chegou" na Agenda (como o "Cheguei" do link do paciente). */
-export async function issueQueueTicket(clinicId: string, input: { type: TicketType; identifier?: string | null }): Promise<IssuedTicket> {
+export async function issueQueueTicket(clinicId: string, input: { type: TicketType; identifier?: string | null; serviceId?: string | null }): Promise<IssuedTicket> {
+  const service = input.serviceId
+    ? await prisma.queueService.findFirst({ where: { id: input.serviceId, clinicId, active: true }, select: { id: true, name: true, letter: true } })
+    : null;
+  if (input.serviceId && !service) throw new Error("Serviço indisponível.");
+  const series = seriesFor(service?.letter, input.type);
   const day = todayInBahia();
   const digits = (input.identifier ?? "").replace(/\D/g, "");
   let match: Awaited<ReturnType<typeof loadAgenda>>["items"][number] | null = null;
@@ -67,7 +74,7 @@ export async function issueQueueTicket(clinicId: string, input: { type: TicketTy
   const raw = randomBytes(18).toString("base64url");
   let row: Awaited<ReturnType<typeof prisma.queueTicket.create>> | null = null;
   for (let attempt = 0; attempt < 5 && !row; attempt++) {
-    const last = await prisma.queueTicket.findFirst({ where: { clinicId, day, type: input.type }, orderBy: { number: "desc" }, select: { number: true } });
+    const last = await prisma.queueTicket.findFirst({ where: { clinicId, day, series }, orderBy: { number: "desc" }, select: { number: true } });
     const number = (last?.number ?? 0) + 1;
     try {
       row = await prisma.queueTicket.create({
@@ -76,7 +83,10 @@ export async function issueQueueTicket(clinicId: string, input: { type: TicketTy
           day,
           type: input.type,
           number,
-          code: ticketCode(input.type, number),
+          series,
+          serviceId: service?.id ?? null,
+          serviceName: service?.name ?? null,
+          code: ticketCode(series, number),
           followTokenHash: hashPatientToken(raw),
           patientName: match?.patientName ?? null,
           phone: match?.phone ?? null,
@@ -94,7 +104,7 @@ export async function issueQueueTicket(clinicId: string, input: { type: TicketTy
 
   if (match) await markArrived(clinicId, match);
   await notifyAgenda(clinicId);
-  const waiting = await waitingToday(clinicId, day);
+  const waiting = await waitingToday(clinicId, day, service?.id ?? null);
   return {
     code: row.code,
     type: input.type,
@@ -103,6 +113,7 @@ export async function issueQueueTicket(clinicId: string, input: { type: TicketTy
     appointmentTime: match?.time ?? null,
     ahead: ticketsAhead(waiting, row.id),
     createdAt: row.createdAt.toISOString(),
+    serviceName: service?.name ?? null,
   };
 }
 
@@ -139,6 +150,8 @@ export type QueueTicketView = {
   callCount: number;
   createdAt: string;
   calledAt: string | null;
+  serviceId: string | null;
+  serviceName: string | null;
 };
 
 /** Senhas de hoje (tela da recepção/médico). */
@@ -156,15 +169,20 @@ export async function queueToday(clinicId: string): Promise<QueueTicketView[]> {
     callCount: r.callCount,
     createdAt: r.createdAt.toISOString(),
     calledAt: r.calledAt?.toISOString() ?? null,
+    serviceId: r.serviceId,
+    serviceName: r.serviceName,
   }));
 }
 
 /** Chama uma senha na TV (ticketId) ou a próxima da fila (sem ticketId). */
-export async function callQueueTicket(clinicId: string, userId: string, input: { ticketId?: string | null; room: string }): Promise<{ code: string; call: TvCall } | null> {
+/** `serviceIds` = guichê que só atende alguns serviços ("Chamar próxima" só pega deles). */
+export async function callQueueTicket(clinicId: string, userId: string, input: { ticketId?: string | null; room: string; serviceIds?: string[] | null }): Promise<{ code: string; call: TvCall } | null> {
   const room = input.room.trim().slice(0, 40) || null;
   let ticket = input.ticketId ? await prisma.queueTicket.findFirst({ where: { id: input.ticketId, clinicId } }) : null;
   if (!input.ticketId) {
-    const waiting = await waitingToday(clinicId, todayInBahia());
+    const waiting = input.serviceIds?.length
+      ? (await waitingToday(clinicId, todayInBahia())).filter((t) => input.serviceIds!.includes((t as { serviceId?: string | null }).serviceId ?? ""))
+      : await waitingToday(clinicId, todayInBahia());
     const next = nextTicket(waiting);
     if (!next) return null;
     ticket = await prisma.queueTicket.findUnique({ where: { id: next.id } });
@@ -216,7 +234,7 @@ export async function followQueueTicket(raw: string): Promise<TicketFollow | nul
   const t = await prisma.queueTicket.findUnique({ where: { followTokenHash: hashPatientToken(raw) } });
   if (!t || t.day !== todayInBahia()) return null;
   const [waiting, clinic, sameDoctor] = await Promise.all([
-    t.status === "WAITING" ? waitingToday(t.clinicId, t.day) : Promise.resolve([]),
+    t.status === "WAITING" ? waitingToday(t.clinicId, t.day, t.serviceId) : Promise.resolve([]),
     prisma.clinic.findUnique({ where: { id: t.clinicId }, select: { name: true } }),
     t.status === "WAITING" && t.doctor
       ? prisma.queueTicket.findMany({ where: { clinicId: t.clinicId, day: t.day, status: "WAITING", doctor: { not: null } }, select: { doctor: true, appointmentTime: true, status: true } })
@@ -234,4 +252,24 @@ export async function followQueueTicket(raw: string): Promise<TicketFollow | nul
     doctor: t.doctor,
     delayMin: doctorDelayMin(sameDoctor, t.doctor, nowBR.getUTCHours() * 60 + nowBR.getUTCMinutes()),
   };
+}
+
+// ── Serviços (Consulta, Exame, Resultado…) ─────────────────────────────────────
+
+const DEFAULT_SERVICES = [
+  { name: "Consulta", letter: "C" },
+  { name: "Exame", letter: "E" },
+  { name: "Resultado", letter: "R" },
+];
+
+export type QueueServiceView = { id: string; name: string; letter: string; active: boolean };
+
+/** Serviços da clínica; na 1ª vez cria Consulta/Exame/Resultado. */
+export async function listQueueServices(clinicId: string, onlyActive = false): Promise<QueueServiceView[]> {
+  let rows = await prisma.queueService.findMany({ where: { clinicId }, orderBy: [{ position: "asc" }, { createdAt: "asc" }] });
+  if (rows.length === 0) {
+    await prisma.queueService.createMany({ data: DEFAULT_SERVICES.map((d, i) => ({ clinicId, ...d, position: i })), skipDuplicates: true });
+    rows = await prisma.queueService.findMany({ where: { clinicId }, orderBy: [{ position: "asc" }, { createdAt: "asc" }] });
+  }
+  return rows.filter((r) => !onlyActive || r.active).map((r) => ({ id: r.id, name: r.name, letter: r.letter, active: r.active }));
 }

@@ -3,12 +3,14 @@
 import { useCallback, useEffect, useState, useTransition } from "react";
 import { Loader2, Megaphone, RotateCcw, Ticket } from "lucide-react";
 import { toast } from "sonner";
-import { callTicket, getQueue, setTicketStatus } from "@/actions/queue-ticket";
+import { callTicket, getQueue, getQueueServices, setTicketStatus } from "@/actions/queue-ticket";
+import type { QueueServiceView } from "@/lib/queue-ticket-server";
 import type { QueueTicketView } from "@/lib/queue-ticket-server";
 import { toTitleCase } from "@/lib/agenda-ui";
 
 const POLL_MS = 10_000;
 const ROOM_KEY = "senhas.room";
+const SERVICES_KEY = "senhas.services";
 const input = "h-9 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50";
 const ghost = "inline-flex h-8 items-center gap-1 rounded-md px-2 text-xs font-medium hover:bg-slate-100 disabled:opacity-40 dark:hover:bg-slate-800";
 
@@ -28,13 +30,27 @@ export function QueuePanel({ initial, compact = false, defaultRoom = "" }: { ini
   const [list, setList] = useState<QueueTicketView[]>(initial ?? []);
   const [room, setRoom] = useState(defaultRoom);
   const [pending, start] = useTransition();
+  const [services, setServices] = useState<QueueServiceView[]>([]);
+  /** Serviços que este guichê atende (vazio = todos). Fica salvo no computador. */
+  const [mine, setMine] = useState<string[]>([]);
 
   useEffect(() => {
     try {
       const saved = localStorage.getItem(ROOM_KEY);
       if (saved) setRoom(saved);
+      setMine(JSON.parse(localStorage.getItem(SERVICES_KEY) ?? "[]"));
     } catch {}
+    getQueueServices().then(setServices).catch(() => {});
   }, []);
+  const toggleMine = (id: string) =>
+    setMine((cur) => {
+      const next = cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id];
+      try {
+        localStorage.setItem(SERVICES_KEY, JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  const inMine = (t: QueueTicketView) => mine.length === 0 || (!!t.serviceId && mine.includes(t.serviceId));
   const saveRoom = (v: string) => {
     setRoom(v);
     try {
@@ -66,12 +82,12 @@ export function QueuePanel({ initial, compact = false, defaultRoom = "" }: { ini
   const call = (ticketId?: string) =>
     act(async () => {
       if (!room.trim()) throw new Error("Informe o guichê ou a sala antes de chamar.");
-      const res = await callTicket({ ticketId, room });
+      const res = await callTicket({ ticketId, room, serviceIds: ticketId ? null : mine.length ? mine : null });
       if (!res) toast.info("Ninguém esperando.");
       else toast.success(`${res.code} chamada na TV`);
     });
 
-  const waiting = waitOrder(list);
+  const waiting = waitOrder(list.filter(inMine));
   const called = list.filter((t) => t.status === "CALLED").sort((a, b) => (b.calledAt ?? "").localeCompare(a.calledAt ?? ""));
   const done = list.filter((t) => t.status === "DONE").length;
   const pCount = waiting.filter((t) => t.type === "P").length;
@@ -93,6 +109,29 @@ export function QueuePanel({ initial, compact = false, defaultRoom = "" }: { ini
             {pending ? <Loader2 className="h-5 w-5 animate-spin" aria-hidden /> : <Megaphone className="h-5 w-5" aria-hidden />}
             Chamar próxima{waiting[0] ? ` (${waiting[0].code})` : ""}
           </button>
+          {services.filter((sv) => sv.active).length > 1 && (
+            <fieldset className="flex flex-wrap items-center gap-1.5">
+              <legend className="sr-only">Serviços que este guichê atende</legend>
+              <span className="text-xs font-medium text-slate-600 dark:text-slate-400">Atendo:</span>
+              {services
+                .filter((sv) => sv.active)
+                .map((sv) => {
+                  const on = mine.includes(sv.id);
+                  return (
+                    <button
+                      key={sv.id}
+                      type="button"
+                      aria-pressed={on}
+                      onClick={() => toggleMine(sv.id)}
+                      className={`h-8 rounded-full border px-3 text-xs font-medium ${on ? "border-emerald-600 bg-emerald-50 text-emerald-900 dark:bg-emerald-950/50 dark:text-emerald-200" : "border-slate-200 text-slate-600 dark:border-slate-700 dark:text-slate-300"}`}
+                    >
+                      {sv.name}
+                    </button>
+                  );
+                })}
+              {mine.length === 0 && <span className="text-xs text-slate-500">todos</span>}
+            </fieldset>
+          )}
           <p className="text-sm text-slate-600 dark:text-slate-400" aria-live="polite">
             <strong className="text-slate-900 dark:text-slate-100">{waiting.length}</strong> esperando
             {pCount > 0 && <> · {pCount} preferencial</>}
@@ -168,6 +207,7 @@ function Code({ t }: { t: QueueTicketView }) {
     >
       <Ticket className="h-3.5 w-3.5" aria-hidden />
       {t.code}
+      {t.serviceName && <span className="font-sans text-[11px] font-medium opacity-70">{t.serviceName}</span>}
     </span>
   );
 }

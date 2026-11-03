@@ -41,7 +41,11 @@ A página recarrega sozinha às 4h e confere chamadas a cada 20 s se o tempo rea
   Sem impressora: `?imprimir=0` no link (QR na tela).
 - Chamada: **Senhas** no menu (recepção) ou "Senhas do totem" na tela do médico. "Chamar próxima" pega a preferencial
   mais antiga, senão a normal mais antiga. A TV mostra a senha e fala "Senha preferencial P, 12, favor dirigir-se ao Guichê 1".
-- Numeração recomeça todo dia (N001, P001). A página do QR só vale no dia.
+- Serviços (Configurações › TV › "Serviços das senhas"): Consulta (C), Exame (E), Resultado (R) criados na 1ª vez;
+  dá pra adicionar e ativar/desativar. Senha = letra + P na preferencial (C001, CP001). Sem serviço ativo: N/P.
+  Na tela Senhas cada guichê marca "Atendo:" (salvo no computador); "Chamar próxima" só pega desses serviços.
+- QR Code da recepção (celular): link próprio /chegada/<token>; com o ponto da clínica salvo, exige localização (raio 150 m).
+- Numeração recomeça todo dia por série. A página do QR só vale no dia.
 
 ## Ainda não feito
 - Chamar a partir do sistema da clínica (Firebird): depende de saber o que o médico faz lá ao chamar e se isso grava

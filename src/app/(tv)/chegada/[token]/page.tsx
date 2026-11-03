@@ -16,5 +16,5 @@ export default async function ChegadaPage({ params }: { params: Promise<{ token:
       </main>
     );
   }
-  return <TotemKiosk token={token} clinicName={info.clinicName} print={false} mobile needsLocation={info.needsLocation} />;
+  return <TotemKiosk token={token} clinicName={info.clinicName} services={info.services} print={false} mobile needsLocation={info.needsLocation} />;
 }
