@@ -40,6 +40,8 @@ import { SystemPendings } from "./system-pendings";
 import { BookingRequests } from "./booking-requests";
 import { PatientSheet } from "./patient-sheet";
 import { WaitlistDialog } from "./waitlist-dialog";
+import { QueuePanel } from "@/components/clinic/queue-panel";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { WeekLoadTable } from "./week-load";
 import { isNationalHolidayYMD } from "@/lib/holidays";
 
@@ -134,6 +136,7 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
     patient?: { name: string; phone: string; from: AgendaItem };
   } | null>(null);
   const [updatedAt, setUpdatedAt] = useState<string | null>(null);
+  const [senhasOpen, setSenhasOpen] = useState(false);
   const [waitlistOpen, setWaitlistOpen] = useState(false);
   const [waitlistSlot, setWaitlistSlot] = useState<{ slot: OpenSlot; exceptPhone: string | null } | null>(null);
   const [waitlistCount, setWaitlistCount] = useState<number | null>(null);
@@ -475,6 +478,7 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
             setWaitlistOpen(true);
           }}
           waitlistCount={waitlistCount}
+          onSenhas={() => setSenhasOpen(true)}
         />
 
         {/* Crítica 02/11: o aviso da ponte ficava abaixo da fila — com a ponte fora, a grade parece completa. */}
@@ -741,6 +745,15 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
           </div>
         )}
       </div>
+
+      <Sheet open={senhasOpen} onOpenChange={setSenhasOpen}>
+        <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-lg">
+          <SheetHeader>
+            <SheetTitle>Senhas do totem</SheetTitle>
+          </SheetHeader>
+          <div className="px-4 pb-4">{senhasOpen && <QueuePanel />}</div>
+        </SheetContent>
+      </Sheet>
 
       <WaitlistDialog
         open={waitlistOpen}

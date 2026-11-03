@@ -18,7 +18,20 @@ const fmtTime = new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-dig
  * Impressão silenciosa: Chrome com --kiosk-printing e a térmica como impressora padrão. */
 /** `mobile` = aberto pelo QR Code da recepção no celular do paciente: depois da senha vai
  * direto pra página de acompanhamento da fila. */
-export function TotemKiosk({ token, clinicName, print, mobile = false }: { token: string; clinicName: string; print: boolean; mobile?: boolean }) {
+export function TotemKiosk({
+  token,
+  clinicName,
+  print,
+  mobile = false,
+  needsLocation = false,
+}: {
+  token: string;
+  clinicName: string;
+  print: boolean;
+  mobile?: boolean;
+  /** QR do celular com ponto da clínica salvo: pede a localização antes de dar a senha. */
+  needsLocation?: boolean;
+}) {
   const [step, setStep] = useState<Step>({ kind: "type" });
   const [digits, setDigits] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -51,7 +64,20 @@ export function TotemKiosk({ token, clinicName, print, mobile = false }: { token
   const issue = (type: TicketType, identifier: string | null) =>
     start(async () => {
       setError(null);
-      const res = await takeTicket(token, { type, identifier });
+      let location: { lat: number; lng: number; accuracy: number } | null = null;
+      if (mobile && needsLocation) {
+        try {
+          location = await currentPosition();
+        } catch (e) {
+          const denied = (e as GeolocationPositionError)?.code === 1;
+          return setError(
+            denied
+              ? "Sem a localização não conseguimos confirmar que você está na clínica. Libere a localização para este site no navegador — ou retire a senha no balcão."
+              : "Não conseguimos achar sua localização. Ative o GPS e tente de novo — ou retire a senha no balcão.",
+          );
+        }
+      }
+      const res = await takeTicket(token, { type, identifier, kind: mobile ? "QR" : "TOTEM", location });
       if (!res.ok) return setError(res.error);
       if (mobile) return window.location.replace(`/senha/${res.ticket.followToken}`);
       setStep({ kind: "ticket", ticket: res.ticket });
@@ -79,6 +105,7 @@ export function TotemKiosk({ token, clinicName, print, mobile = false }: { token
           {step.kind === "type" && (
             <>
               <h1 className="text-center text-[clamp(2rem,4.5vw,4rem)] font-bold tracking-tight">{mobile ? "Chegou? Pegue sua senha" : "Retire sua senha"}</h1>
+              {mobile && needsLocation && <p className="-mt-2 text-center text-base text-slate-500">Vamos pedir sua localização só para confirmar que você está na clínica.</p>}
               {mobile && <p className="-mt-4 text-center text-lg text-slate-600">Com consulta marcada, digite seu CPF ou telefone no próximo passo e a recepção já fica sabendo.</p>}
               <div className="grid w-full max-w-5xl gap-[3vw] md:grid-cols-2">
                 <button
@@ -196,4 +223,15 @@ function Key({ children, onClick, label }: { children: React.ReactNode; onClick:
       {children}
     </button>
   );
+}
+
+function currentPosition(): Promise<{ lat: number; lng: number; accuracy: number }> {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) return reject(new Error("sem GPS"));
+    navigator.geolocation.getCurrentPosition(
+      (p) => resolve({ lat: p.coords.latitude, lng: p.coords.longitude, accuracy: p.coords.accuracy }),
+      reject,
+      { enableHighAccuracy: true, timeout: 15_000, maximumAge: 60_000 },
+    );
+  });
 }

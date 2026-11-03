@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Copy, Loader2, MonitorPlay, Ticket, Trash2 } from "lucide-react";
+import { Copy, Loader2, MonitorPlay, QrCode, Ticket, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { createTvLink, revokeTvLink, saveDoctorRoom } from "@/actions/tv-call";
 import { doctorKey } from "@/lib/tv-call";
@@ -49,7 +49,7 @@ const fmt = new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit",
 /** Configuração da TV: links (gerar/desligar) e sala fixa de cada médico. */
 export function TvSettings({ initial, doctors }: { initial: Settings; doctors: string[] }) {
   const [settings, setSettings] = useState(initial);
-  const [newUrl, setNewUrl] = useState<{ url: string; kind: "TV" | "TOTEM" } | null>(null);
+  const [newUrl, setNewUrl] = useState<{ url: string; kind: "TV" | "TOTEM" | "QR" } | null>(null);
   const [tvName, setTvName] = useState("TV da recepção");
   const [pending, start] = useTransition();
   const roomOf = new Map(settings.rooms.map((r) => [doctorKey(r.doctor), r.room]));
@@ -76,6 +76,7 @@ export function TvSettings({ initial, doctors }: { initial: Settings; doctors: s
           {settings.displays.map((d) => (
             <li key={d.id} className="flex items-center gap-3 text-sm">
               <span className="font-medium">{d.name}</span>
+              {d.kind === "QR" && <span className="rounded bg-violet-100 px-1.5 py-0.5 text-[11px] font-semibold text-violet-900 dark:bg-violet-950 dark:text-violet-200">QR</span>}
               {d.kind === "TOTEM" && <span className="rounded bg-sky-100 px-1.5 py-0.5 text-[11px] font-semibold text-sky-900 dark:bg-sky-950 dark:text-sky-200">Totem</span>}
               <span className="text-xs text-slate-500">{d.lastSeenAt ? `visto ${fmt.format(new Date(d.lastSeenAt))}` : "ainda não abriu"}</span>
               <button
@@ -84,7 +85,7 @@ export function TvSettings({ initial, doctors }: { initial: Settings; doctors: s
                   start(async () => {
                     await revokeTvLink(d.id);
                     setSettings((s) => ({ ...s, displays: s.displays.filter((x) => x.id !== d.id) }));
-                    toast.success(d.kind === "TOTEM" ? "Link desligado — o totem para de emitir senhas." : "Link desligado — a TV para de receber chamadas.");
+                    toast.success(d.kind !== "TV" ? "Link desligado — o totem para de emitir senhas." : "Link desligado — a TV para de receber chamadas.");
                   })
                 }
                 className="ml-auto inline-flex h-8 items-center gap-1 rounded-md px-2 text-xs font-medium text-rose-700 hover:bg-rose-50 dark:text-rose-300 dark:hover:bg-rose-950/40"
@@ -125,13 +126,27 @@ export function TvSettings({ initial, doctors }: { initial: Settings; doctors: s
           >
             <Ticket className="h-4 w-4" aria-hidden /> Gerar link do totem de senhas
           </button>
+          <button
+            type="button"
+            disabled={pending}
+            onClick={() =>
+              start(async () => {
+                const { id, url } = await createTvLink("QR Code da recepção", "QR");
+                setNewUrl({ url, kind: "QR" });
+                setSettings((s) => ({ ...s, displays: [...s.displays, { id, name: "QR Code da recepção", kind: "QR", lastSeenAt: null }] }));
+              })
+            }
+            className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-200 px-3 text-sm font-medium disabled:opacity-60 dark:border-slate-700"
+          >
+            <QrCode className="h-4 w-4" aria-hidden /> Gerar QR Code da recepção
+          </button>
         </div>
         {newUrl && (
           <div className="mt-3 rounded-lg border border-emerald-300 bg-emerald-50 p-3 text-sm dark:border-emerald-800 dark:bg-emerald-950/40">
             <p className="font-medium text-emerald-900 dark:text-emerald-200">
-              {newUrl.kind === "TOTEM" ? "Abra este endereço no totem (ele só aparece agora):" : "Abra este endereço na TV (ele só aparece agora):"}
+              {newUrl.kind === "QR" ? "QR Code gerado (ele só aparece agora — imprima o cartaz):" : newUrl.kind === "TOTEM" ? "Abra este endereço no totem (ele só aparece agora):" : "Abra este endereço na TV (ele só aparece agora):"}
             </p>
-            {newUrl.kind === "TOTEM" && <ArrivalQr url={newUrl.url.replace("/totem/", "/chegada/")} />}
+            {newUrl.kind === "QR" && <ArrivalQr url={newUrl.url} />}
             {newUrl.kind === "TOTEM" && (
               <p className="mt-1 text-xs text-emerald-900/80 dark:text-emerald-200/80">
                 Impressão sem janela: Chrome com --kiosk --kiosk-printing e a impressora térmica (80 mm) como padrão. Sem impressora, coloque ?imprimir=0 no fim do link — o QR Code aparece na tela.

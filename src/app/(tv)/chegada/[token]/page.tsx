@@ -8,13 +8,13 @@ export const dynamic = "force-dynamic";
 /** QR Code colado na recepção: o celular do paciente vira o totem (avisa que chegou / pega senha) e depois acompanha a fila em /senha/<token>. */
 export default async function ChegadaPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
-  const info = await getTotemInfo(token);
+  const info = await getTotemInfo(token, "QR");
   if (!info) {
     return (
       <main className="flex min-h-dvh items-center justify-center bg-white p-8 text-center text-2xl text-slate-700 [color-scheme:light]">
-        Link do totem inválido ou desligado. Gere um novo em Configurações › TV da sala de espera.
+        Este QR Code foi desligado. Retire a senha no balcão da recepção.
       </main>
     );
   }
-  return <TotemKiosk token={token} clinicName={info.clinicName} print={false} mobile />;
+  return <TotemKiosk token={token} clinicName={info.clinicName} print={false} mobile needsLocation={info.needsLocation} />;
 }

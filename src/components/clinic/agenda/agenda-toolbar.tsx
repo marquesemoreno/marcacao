@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronLeft, ChevronRight, ListChecks, Loader2, RefreshCw } from "lucide-react";
+import { ChevronLeft, ChevronRight, ListChecks, Loader2, RefreshCw, Ticket } from "lucide-react";
 
 export type AgendaView = "dia" | "semana" | "mes" | "medico";
 
@@ -26,6 +26,7 @@ export function AgendaToolbar({
   onView,
   onRefresh,
   onWaitlist,
+  onSenhas,
   waitlistCount,
   live = false,
 }: {
@@ -40,6 +41,8 @@ export function AgendaToolbar({
   onView: (v: AgendaView) => void;
   onRefresh: () => void;
   onWaitlist: () => void;
+  /** Abre a fila de senhas do totem (sem sair da Agenda). */
+  onSenhas?: () => void;
   /** Pacientes aguardando vaga; null enquanto não carregou. */
   waitlistCount: number | null;
   /** Recebendo avisos em tempo real (Realtime conectado). */
@@ -93,6 +96,12 @@ export function AgendaToolbar({
         <ListChecks className="w-4 h-4" aria-hidden />
         <span className="hidden xl:inline">Lista de espera</span>{waitlistCount ? <span className="tabular-nums rounded-md bg-emerald-100 dark:bg-emerald-950/60 px-1.5 text-xs font-semibold text-emerald-800 dark:text-emerald-300">{waitlistCount}</span> : null}
       </button>
+      {onSenhas && (
+        <button type="button" onClick={onSenhas} className={`${navBtn} gap-1.5 px-2.5 text-sm font-medium xl:px-3`} title="Senhas do totem — chamar a próxima na TV" aria-label="Senhas">
+          <Ticket className="w-4 h-4" aria-hidden />
+          <span className="hidden xl:inline">Senhas</span>
+        </button>
+      )}
       <div role="group" aria-label="Visão da agenda" className="inline-flex max-w-full overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 p-0.5">
         {AGENDA_VIEWS.map((v) => (
           <button

@@ -56,11 +56,12 @@ export async function saveDoctorRoom(input: { doctor: string; room: string }) {
 }
 
 /** Gera o link da TV. O endereço completo só aparece agora — guarde ou gere outro. */
-export async function createTvLink(name: string, kind: "TV" | "TOTEM" = "TV"): Promise<{ id: string; url: string }> {
+export async function createTvLink(name: string, kind: "TV" | "TOTEM" | "QR" = "TV"): Promise<{ id: string; url: string }> {
   const { clinicId } = await requireClinicManager();
-  const { id, raw } = await issueTvDisplay(clinicId, name, kind === "TOTEM" ? "TOTEM" : "TV");
+  const k = kind === "TOTEM" || kind === "QR" ? kind : "TV";
+  const { id, raw } = await issueTvDisplay(clinicId, name, k);
   revalidatePath("/clinic/tv");
-  return { id, url: `${getBaseUrl()}/${kind === "TOTEM" ? "totem" : "tv"}/${raw}` };
+  return { id, url: `${getBaseUrl()}/${k === "TOTEM" ? "totem" : k === "QR" ? "chegada" : "tv"}/${raw}` };
 }
 
 export async function revokeTvLink(id: string) {

@@ -241,6 +241,10 @@ model Clinic {
 
   /// Vaga aberta (cancelou/faltou) é oferecida sozinha pelo WhatsApp à lista de espera.
   autoWaitlistOffer Boolean @default(false) @map("auto_waitlist_offer")
+  /// Ponto da clínica pro QR de chegada no celular (src/lib/geo-fence.ts). Null = sem trava.
+  arrivalLat       Float?  @map("arrival_lat")
+  arrivalLng       Float?  @map("arrival_lng")
+  arrivalRadiusM   Int     @default(150) @map("arrival_radius_m")
 
   @@map("clinics")
 }

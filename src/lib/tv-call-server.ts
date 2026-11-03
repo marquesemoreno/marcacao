@@ -65,9 +65,9 @@ export async function recentCalls(clinicId: string, take = 6): Promise<TvCall[]>
 }
 
 /** Link novo da TV: devolve o token cru (só aparece uma vez). */
-export async function issueTvDisplay(clinicId: string, name: string, kind: "TV" | "TOTEM" = "TV"): Promise<{ id: string; raw: string }> {
+export async function issueTvDisplay(clinicId: string, name: string, kind: "TV" | "TOTEM" | "QR" = "TV"): Promise<{ id: string; raw: string }> {
   const raw = randomBytes(24).toString("base64url");
-  const row = await prisma.tvDisplay.create({ data: { clinicId, name: name.trim() || (kind === "TOTEM" ? "Totem de senhas" : "TV da recepção"), kind, tokenHash: hashPatientToken(raw) } });
+  const row = await prisma.tvDisplay.create({ data: { clinicId, name: name.trim() || (kind === "TOTEM" ? "Totem de senhas" : kind === "QR" ? "QR Code da recepção" : "TV da recepção"), kind, tokenHash: hashPatientToken(raw) } });
   return { id: row.id, raw };
 }
 
