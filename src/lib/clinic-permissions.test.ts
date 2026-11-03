@@ -17,7 +17,15 @@ describe("can", () => {
     expect(can("MARKETING", "config")).toBe(false);
   });
   it("gestão pode tudo", () => {
-    for (const p of ["atendimento", "ficha.ver", "disparos", "relatorios", "config"] as const) expect(can("GESTAO", p)).toBe(true);
+    for (const p of ["atendimento", "ficha.ver", "disparos", "relatorios", "config", "chamar"] as const) expect(can("GESTAO", p)).toBe(true);
+  });
+  it("médico: só chama os pacientes dele (painel da TV); sem chat, disparos ou relatórios", () => {
+    expect(can("MEDICO", "chamar")).toBe(true);
+    for (const p of ["atendimento", "ficha.ver", "disparos", "relatorios", "config"] as const) expect(can("MEDICO", p)).toBe(false);
+  });
+  it("recepção também chama na TV; marketing não", () => {
+    expect(can("RECEPCAO", "chamar")).toBe(true);
+    expect(can("MARKETING", "chamar")).toBe(false);
   });
 });
 

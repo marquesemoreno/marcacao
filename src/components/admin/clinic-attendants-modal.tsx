@@ -22,6 +22,7 @@ const ROLE_HINT: Record<ClinicRole, string> = {
   RECEPCAO: "Chat, CRM, Agenda, Pacientes e ficha prévia; sem Disparos nem Relatórios.",
   MARKETING: "Chat, CRM, Agenda, Disparos e Relatórios; sem ficha prévia nem Configurações.",
   GESTAO: "acesso a tudo, inclusive Acessos, WhatsApp e Configurações.",
+  MEDICO: "só a tela Meus pacientes: chama na TV da sala de espera os pacientes dele (ligar ao nome do médico no sistema).",
 };
 
 export function ClinicAttendantsModal({ clinicId, clinicName }: { clinicId: string; clinicName: string }) {
