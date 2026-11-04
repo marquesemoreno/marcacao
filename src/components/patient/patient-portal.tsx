@@ -55,6 +55,7 @@ export function PatientPortal({ token, data }: { token: string; data: Data }) {
 function CheckInCard({ token, window, done, onDone }: { token: string; window: "EARLY" | "OPEN" | "CLOSED"; done: boolean; onDone: () => void }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [ticketCode, setTicketCode] = useState<string | null>(null);
   if (done) {
     return (
       <div className={`${card} flex items-start gap-3 border-sky-200 bg-sky-50`}>
@@ -62,6 +63,11 @@ function CheckInCard({ token, window, done, onDone }: { token: string; window: "
         <div>
           <p className="font-semibold">Chegada avisada</p>
           <p className="text-sm text-slate-600">A recepção já sabe que você está aqui. Aguarde ser chamado.</p>
+          {ticketCode && (
+            <p className="mt-2 text-sm">
+              Sua senha: <strong className="font-mono text-lg">{ticketCode}</strong> — fique atento à TV da sala de espera.
+            </p>
+          )}
         </div>
       </div>
     );
@@ -82,7 +88,12 @@ function CheckInCard({ token, window, done, onDone }: { token: string; window: "
           setError(null);
           const r = await patientCheckIn(token).catch(() => ({ ok: false as const, error: "Sem conexão. Tente de novo." }));
           setBusy(false);
-          if (r.ok) onDone();
+          if (r.ok) {
+            // Clínica com senhas: já abre o acompanhamento da fila.
+            if (r.ticket?.followToken) return globalThis.location.assign(`/senha/${r.ticket.followToken}`);
+            if (r.ticket) setTicketCode(r.ticket.code);
+            onDone();
+          }
           else setError(r.error);
         }}
       >

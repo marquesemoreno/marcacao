@@ -100,3 +100,20 @@ export function doctorDelayMin(
   if (times.length === 0) return null;
   return Math.max(0, nowMinutes - Math.min(...times));
 }
+
+/** Status que a consulta ligada à senha deve ganhar na Agenda quando a senha muda
+ * (null = não mexe). "Atendida" vira atendida; desfazer devolve pra "chegou". */
+export function agendaStatusAfterTicket(ticket: TicketStatus, current: string | null): "COMPLETED" | "IN_SERVICE" | null {
+  if (ticket === "DONE") return current && CLOSED.has(current) ? null : "COMPLETED";
+  if (ticket === "WAITING") return current === "COMPLETED" ? "IN_SERVICE" : null;
+  return null;
+}
+
+/** Régua (satisfação/pós-consulta): tira quem a recepção marcou como faltou/cancelou
+ * na Agenda no dia da consulta — o sistema da clínica nem sempre registra a falta. */
+export function excludeMissedVisits<T extends { phone: string }>(audience: T[], marks: { phone: string | null; status: string }[]): T[] {
+  const missed = new Set(
+    marks.filter((m) => m.status === "NO_SHOW" || m.status === "CANCELLED").map((m) => phoneTail(m.phone)).filter((x): x is string => !!x),
+  );
+  return missed.size ? audience.filter((a) => !missed.has(phoneTail(a.phone) ?? "")) : audience;
+}

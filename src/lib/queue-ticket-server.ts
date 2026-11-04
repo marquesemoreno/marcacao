@@ -8,7 +8,7 @@ import { notifyAgenda } from "@/lib/realtime-server";
 import { recordAudit } from "@/lib/audit-server";
 import { createPatientCall } from "@/lib/tv-call-server";
 import { tvDisplayName, type TvCall } from "@/lib/tv-call";
-import { seriesFor, doctorDelayMin, matchTicketAppointment, nextTicket, ticketCode, ticketsAhead, type QueueTicketLite, type TicketStatus, type TicketType } from "@/lib/queue-ticket";
+import { agendaStatusAfterTicket, seriesFor, doctorDelayMin, matchTicketAppointment, nextTicket, ticketCode, ticketsAhead, type QueueTicketLite, type TicketStatus, type TicketType } from "@/lib/queue-ticket";
 
 export type IssuedTicket = {
   code: string;
@@ -57,7 +57,10 @@ async function waitingToday(clinicId: string, day: string, serviceId?: string | 
 
 /** Totem: tira a senha. Se achar a consulta de hoje pelo CPF/telefone, liga a senha a ela
  * e marca "Chegou" na Agenda (como o "Cheguei" do link do paciente). */
-export async function issueQueueTicket(clinicId: string, input: { type: TicketType; identifier?: string | null; serviceId?: string | null }): Promise<IssuedTicket> {
+export async function issueQueueTicket(
+  clinicId: string,
+  input: { type: TicketType; identifier?: string | null; serviceId?: string | null; appointmentExtId?: string | null },
+): Promise<IssuedTicket> {
   const service = input.serviceId
     ? await prisma.queueService.findFirst({ where: { id: input.serviceId, clinicId, active: true }, select: { id: true, name: true, letter: true } })
     : null;
@@ -68,7 +71,9 @@ export async function issueQueueTicket(clinicId: string, input: { type: TicketTy
   let match: Awaited<ReturnType<typeof loadAgenda>>["items"][number] | null = null;
   if (digits.length >= 10) {
     const [phones, agenda] = await Promise.all([phonesFor(clinicId, digits, day), loadAgenda(clinicId, day, day)]);
-    match = matchTicketAppointment(agenda.items, phones);
+    // "Cheguei" já sabe qual é a consulta: usa ela (familiares no mesmo celular).
+    const own = input.appointmentExtId ? agenda.items.find((i) => i.externalId === input.appointmentExtId) : undefined;
+    match = own ?? matchTicketAppointment(agenda.items, phones);
   }
 
   const raw = randomBytes(18).toString("base64url");
@@ -212,7 +217,49 @@ export async function finishQueueTicket(clinicId: string, id: string, status: "D
     data: { status, finishedAt: status === "WAITING" ? null : new Date() },
   });
   if (res.count === 0) throw new Error("Senha não encontrada.");
+  await syncAgendaWithTicket(clinicId, id, status);
   await notifyAgenda(clinicId);
+}
+
+/** "Atendida" na senha marca a consulta ligada como atendida na Agenda (relatório,
+ * régua de satisfação); desfazer volta pra "chegou". Nunca derruba a ação da senha. */
+async function syncAgendaWithTicket(clinicId: string, id: string, status: TicketStatus) {
+  try {
+    const t = await prisma.queueTicket.findUnique({ where: { id }, select: { appointmentSource: true, appointmentExtId: true, day: true, phone: true } });
+    if (!t?.appointmentSource || !t.appointmentExtId) return;
+    const key = { clinicId_source_externalId: { clinicId, source: t.appointmentSource, externalId: t.appointmentExtId } };
+    const before = await prisma.agendaMark.findUnique({ where: key, select: { status: true } });
+    const next = agendaStatusAfterTicket(status, before?.status ?? null);
+    if (!next) return;
+    await prisma.agendaMark.upsert({
+      where: key,
+      update: { status: next, updatedByUserId: null },
+      create: { clinicId, source: t.appointmentSource, externalId: t.appointmentExtId, date: new Date(`${t.day}T00:00:00Z`), status: next, phone: t.phone },
+    });
+    await recordAudit({
+      clinicId,
+      userId: null,
+      action: "totem.ticket_status",
+      entity: `agenda:${t.appointmentSource}`,
+      entityId: t.appointmentExtId,
+      before: before ? { status: before.status } : null,
+      after: { status: next },
+    });
+  } catch (e) {
+    console.error("[senhas] falha ao atualizar a Agenda", e);
+  }
+}
+
+/** "Cheguei" do link do paciente: se a clínica usa senhas (totem/QR ativo), já entra na
+ * fila (mesma senha se tocar de novo). null = clínica sem senhas. */
+export async function ticketForCheckin(clinicId: string, phone: string | null, appointmentExtId: string): Promise<{ code: string; followToken: string | null } | null> {
+  const usesQueue = await prisma.tvDisplay.count({ where: { clinicId, kind: { in: ["TOTEM", "QR"] }, revokedAt: null } });
+  if (!usesQueue || !phone) return null;
+  const existing = await prisma.queueTicket.findFirst({ where: { clinicId, day: todayInBahia(), appointmentExtId }, select: { code: true } });
+  if (existing) return { code: existing.code, followToken: null };
+  const [service] = await listQueueServices(clinicId, true);
+  const t = await issueQueueTicket(clinicId, { type: "N", identifier: phone, serviceId: service?.id ?? null, appointmentExtId });
+  return { code: t.code, followToken: t.followToken };
 }
 
 export type TicketFollow = {

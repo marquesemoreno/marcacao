@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { normalizeServiceInput, seriesFor, doctorDelayMin, matchTicketAppointment, nextTicket, phoneTail, ticketCode, ticketSpoken, ticketsAhead, type QueueTicketLite } from "./queue-ticket";
+import { agendaStatusAfterTicket, excludeMissedVisits, normalizeServiceInput, seriesFor, doctorDelayMin, matchTicketAppointment, nextTicket, phoneTail, ticketCode, ticketSpoken, ticketsAhead, type QueueTicketLite } from "./queue-ticket";
 
 const t = (id: string, type: "N" | "P", min: number, status: QueueTicketLite["status"] = "WAITING"): QueueTicketLite => ({
   id,
@@ -121,5 +121,45 @@ describe("doctorDelayMin", () => {
     expect(doctorDelayMin(list, "Dr. João", 13 * 60)).toBe(0);
     expect(doctorDelayMin(list, null, 900)).toBeNull();
     expect(doctorDelayMin(list, "Dr. Pedro", 900)).toBeNull();
+  });
+});
+
+describe("agendaStatusAfterTicket", () => {
+  it("senha atendida marca a consulta como atendida", () => {
+    expect(agendaStatusAfterTicket("DONE", "IN_SERVICE")).toBe("COMPLETED");
+    expect(agendaStatusAfterTicket("DONE", "IN_ROOM")).toBe("COMPLETED");
+    expect(agendaStatusAfterTicket("DONE", null)).toBe("COMPLETED");
+    expect(agendaStatusAfterTicket("DONE", "CONFIRMED")).toBe("COMPLETED");
+  });
+  it("não mexe no que a recepção já fechou", () => {
+    expect(agendaStatusAfterTicket("DONE", "COMPLETED")).toBeNull();
+    expect(agendaStatusAfterTicket("DONE", "CANCELLED")).toBeNull();
+    expect(agendaStatusAfterTicket("DONE", "NO_SHOW")).toBeNull();
+  });
+  it("outros desfechos da senha não mudam a Agenda (o paciente já tinha chegado)", () => {
+    expect(agendaStatusAfterTicket("NO_SHOW", "IN_SERVICE")).toBeNull();
+    expect(agendaStatusAfterTicket("CANCELLED", "IN_SERVICE")).toBeNull();
+  });
+  it("desfazer 'Atendida' (volta pra fila) devolve a consulta pra 'chegou'", () => {
+    expect(agendaStatusAfterTicket("WAITING", "COMPLETED")).toBe("IN_SERVICE");
+    expect(agendaStatusAfterTicket("WAITING", "IN_SERVICE")).toBeNull();
+  });
+});
+
+describe("excludeMissedVisits", () => {
+  const r = (phone: string) => ({ phone, variables: { nome: "x" } });
+  it("tira quem faltou ou cancelou no dia (telefone com ou sem 9º dígito/DDI)", () => {
+    const out = excludeMissedVisits([r("5577999998888"), r("5577988887777"), r("557733334444")], [
+      { phone: "77 99999-8888", status: "NO_SHOW" },
+      { phone: "(77) 3333-4444", status: "CANCELLED" },
+    ]);
+    expect(out.map((x) => x.phone)).toEqual(["5577988887777"]);
+  });
+  it("chegou/atendido continua recebendo", () => {
+    const out = excludeMissedVisits([r("5577999998888")], [{ phone: "77999998888", status: "COMPLETED" }]);
+    expect(out).toHaveLength(1);
+  });
+  it("marca sem telefone não exclui ninguém", () => {
+    expect(excludeMissedVisits([r("5577999998888")], [{ phone: null, status: "NO_SHOW" }])).toHaveLength(1);
   });
 });

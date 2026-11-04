@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { fetchBridgeCampaignPatients } from "@/lib/hospital-bridge";
 import { buildCampaignAudience, type BridgeCampaignPatient } from "@/lib/campaign-audience";
+import { excludeMissedVisits } from "@/lib/queue-ticket";
 import { resolveReturnDays, type ReturnInterval } from "@/lib/return-interval";
 import { technicalDirectorLine } from "@/lib/broadcast-csv";
 import { BIRTHDAY_ACTIVE_DAYS, birthdayKeysFor, ruleCampaignName, ruleTargetDate } from "@/lib/automation-rules";
@@ -72,7 +73,19 @@ export async function ruleAudience(
               : ruleTargetDate(now, r.daysAfter),
             futurePhones: r.requireNoFuture ? new Set(futurePhones) : undefined } }),
   });
-  if (!r.ruleId) return audience;
+  // Satisfação/pós-consulta falam da consulta: quem a recepção marcou como faltou ou
+  // cancelou naquele dia não recebe (o sistema da clínica nem sempre registra a falta).
+  const visitDay = r.kind === "NPS" || r.kind === "POS_CONSULTA" ? ruleTargetDate(now, r.daysAfter) : null;
+  const audienceShown = visitDay
+    ? excludeMissedVisits(
+        audience,
+        await prisma.agendaMark.findMany({
+          where: { clinicId: r.clinicId, date: new Date(`${visitDay}T00:00:00Z`), status: { in: ["NO_SHOW", "CANCELLED"] } },
+          select: { phone: true, status: true },
+        }),
+      )
+    : audience;
+  if (!r.ruleId) return audienceShown;
   const since = new Date(now.getTime() - REPEAT_GUARD_DAYS * 86400000);
   const recent = new Set(
     (await prisma.broadcastRecipient.findMany({
@@ -80,7 +93,7 @@ export async function ruleAudience(
       select: { phone: true },
     })).map((x) => x.phone),
   );
-  return audience.filter((x) => !recent.has(x.phone));
+  return audienceShown.filter((x) => !recent.has(x.phone));
 }
 
 async function runOne(

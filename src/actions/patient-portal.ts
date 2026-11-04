@@ -6,6 +6,7 @@ import { recordAudit } from "@/lib/audit-server";
 import { resolvePatientToken } from "@/lib/patient-token-server";
 import { validateFormAnswers } from "@/lib/patient-form";
 import { checkinWindow } from "@/lib/patient-journey";
+import { ticketForCheckin } from "@/lib/queue-ticket-server";
 import { encryptFormAnswers, ensureConsentTerm, getActiveFormTemplate, hashIp } from "@/lib/patient-form-server";
 import { fetchBridgeDailyAgendaOrNull } from "@/lib/hospital-bridge";
 import { greetingFirstName } from "@/lib/format";
@@ -117,7 +118,7 @@ export async function submitPatientForm(
   return { ok: true };
 }
 
-export async function patientCheckIn(raw: string): Promise<{ ok: true } | { ok: false; error: string }> {
+export async function patientCheckIn(raw: string): Promise<{ ok: true; ticket?: { code: string; followToken: string | null } | null } | { ok: false; error: string }> {
   const { state, token } = await resolvePatientToken(raw, "ANAMNESE");
   if (!token || state !== "VALID" || !token.appointmentSource || !token.appointmentExternalId || !token.appointmentDate) {
     return { ok: false, error: "Este link não vale mais. Avise na recepção que você chegou." };
@@ -129,8 +130,16 @@ export async function patientCheckIn(raw: string): Promise<{ ok: true } | { ok: 
   if (win === "CLOSED") return { ok: false, error: "Esta consulta já passou." };
   const key = { clinicId_source_externalId: { clinicId: token.clinicId, source: token.appointmentSource, externalId: token.appointmentExternalId } };
   const before = await prisma.agendaMark.findUnique({ where: key, select: { status: true } });
+  // Clínica com senhas: o "Cheguei" também põe na fila (Senhas/TV), uma vez só.
+  const withTicket = async () => {
+    if (before && ["CANCELLED", "NO_SHOW", "COMPLETED"].includes(before.status)) return null;
+    return ticketForCheckin(token.clinicId, token.phone, token.appointmentExternalId!).catch((e) => {
+      console.error("[cheguei] falha ao gerar senha", e);
+      return null;
+    });
+  };
   // Já chegou/atendido/cancelado/faltou pela recepção: não sobrescreve.
-  if (before && before.status !== "CONFIRMED") return { ok: true };
+  if (before && before.status !== "CONFIRMED") return { ok: true, ticket: await withTicket() };
   await prisma.agendaMark.upsert({
     where: key,
     update: { status: "IN_SERVICE", updatedByUserId: null },
@@ -152,6 +161,7 @@ export async function patientCheckIn(raw: string): Promise<{ ok: true } | { ok: 
     before: before ? { status: before.status } : null,
     after: { status: "IN_SERVICE" },
   });
+  const ticket = await withTicket();
   await notifyAgenda(token.clinicId);
-  return { ok: true };
+  return { ok: true, ticket };
 }
