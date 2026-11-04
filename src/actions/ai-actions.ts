@@ -1,7 +1,8 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
-import { requireClinicSession } from "@/lib/session";
+import { requireClinicManager, requireClinicSession } from "@/lib/session";
+import { URGENCY_TAG } from "@/lib/conversation-tags";
 import { describeAiAction, filterAiActions, type AiActionGroup } from "@/lib/ai-actions";
 
 export type AiActionRow = {
@@ -37,4 +38,24 @@ export async function listAiActions(days = 30, filter: { group?: AiActionGroup; 
     createdAt: r.createdAt.toISOString(),
     ...describeAiAction(r),
   }));
+}
+
+/** Etiqueta "🚨 Urgência Clínica" automática (sintoma grave): estado e quem pode mudar. */
+export async function getUrgencyTagSetting() {
+  const { clinicId, userId } = await requireClinicSession();
+  const [clinic, user] = await Promise.all([
+    prisma.clinic.findUnique({ where: { id: clinicId }, select: { urgencyTagEnabled: true } }),
+    prisma.user.findUnique({ where: { id: userId }, select: { isManager: true } }),
+  ]);
+  return { enabled: !!clinic?.urgencyTagEnabled, canToggle: !!user?.isManager };
+}
+
+/** Gestão liga/desliga. Desligar também tira a etiqueta das conversas desta clínica. */
+export async function setUrgencyTagEnabled(enabled: boolean) {
+  const { clinicId } = await requireClinicManager();
+  await prisma.clinic.update({ where: { id: clinicId }, data: { urgencyTagEnabled: enabled } });
+  if (!enabled) {
+    await prisma.$executeRaw`UPDATE conversations SET tags = array_remove(tags, ${URGENCY_TAG}) WHERE clinic_id = ${clinicId} AND ${URGENCY_TAG} = ANY(tags)`;
+  }
+  return getUrgencyTagSetting();
 }

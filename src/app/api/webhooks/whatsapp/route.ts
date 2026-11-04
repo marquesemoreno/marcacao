@@ -811,8 +811,12 @@ async function processWhatsappWebhook(body: Prisma.InputJsonValue, forcedClinicI
     // =========================================================================
     // Só urgência CLÍNICA (sintoma grave/emergência) — "remarcar urgente", pedido de
     // humano e reclamação não acendem o alarme (ver clinical-urgency.ts).
+    // Gestão liga/desliga em Ações da IA (Clinic.urgencyTagEnabled); desligado por padrão.
     const urgencyReason = matchClinicalUrgency(incoming.text);
-    if (urgencyReason) {
+    const urgencyOn = urgencyReason
+      ? (await prisma.clinic.findUnique({ where: { id: conversation.clinicId }, select: { urgencyTagEnabled: true } }))?.urgencyTagEnabled
+      : false;
+    if (urgencyReason && urgencyOn) {
       await prisma.messageTriage.create({
         data: { conversationId: conversation.id, messageContent: incoming.text, redFlags: [urgencyReason] },
       });
