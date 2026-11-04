@@ -1,5 +1,5 @@
 import { isMarketingOptInReply, MARKETING_OPT_IN_REPLY } from "@/lib/marketing-consent";
-import { matchClinicalUrgency, EMERGENCY_GUIDANCE_MESSAGE } from "@/lib/clinical-urgency";
+import { matchClinicalUrgency } from "@/lib/clinical-urgency";
 import { NextResponse, after } from "next/server";
 import { handleSlotOfferReply, startSlotOfferForItem } from "@/lib/slot-offer-server";
 import { classifyAndStorePatientIntent } from "@/lib/patient-intent-server";
@@ -820,12 +820,6 @@ async function processWhatsappWebhook(body: Prisma.InputJsonValue, forcedClinicI
         await prisma.conversation.update({
           where: { id: conversation.id },
           data: { tags: { push: URGENCY_TAG } },
-        });
-        // Orientação do 192 uma vez por conversa (enquanto a tag não sai) — fora do
-        // horário ninguém da equipe vê a mensagem a tempo.
-        const guidance = await sendWhatsAppMessage(incoming.phone, EMERGENCY_GUIDANCE_MESSAGE, "clinical_urgency.guidance", resolvedClinicId);
-        await prisma.message.create({
-          data: { conversationId: conversation.id, direction: "OUTBOUND", content: EMERGENCY_GUIDANCE_MESSAGE, status: guidance.success ? "DELIVERED" : "FAILED" },
         });
       }
     }
