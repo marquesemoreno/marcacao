@@ -61,6 +61,8 @@ interface CRMKanbanProps {
   profileHref?: (contactId: string) => string;
   /** N2: "+ Adicionar" no fim da coluna (cadastra contato já naquela etapa). */
   onAddToStage?: (stage: FunnelStage) => void;
+  /** Faixa logo abaixo da barra superior (ex.: Orçamentos a cobrar). */
+  topSlot?: React.ReactNode;
 }
 
 const STAGES: { id: KanbanStage; title: string; accent: string }[] = [
@@ -121,6 +123,7 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
   onMoveStage,
   onFinish,
   onReopen,
+  topSlot,
 }) => {
   const [search, setSearch] = useState('');
   const [selectedAgent, setSelectedAgent] = useState<string>('todos');
@@ -386,6 +389,8 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
           )}
         </div>
       )}
+
+      {topSlot}
 
       {groupBy === 'campanha' && (
         <div className="flex-1 min-h-0 overflow-x-auto overflow-y-hidden p-3 sm:p-4">

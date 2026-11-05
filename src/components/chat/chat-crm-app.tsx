@@ -143,6 +143,7 @@ import {
 } from "@/lib/browser-notifications";
 import { InboxLayout } from "./inbox-layout";
 import { CRMKanban } from "./crm-kanban";
+import { BudgetFollowupPanel } from "./budget-followup-panel";
 import type { NewContactExtra } from "@/lib/new-contact-extra";
 import { NewContactDialog } from "./new-contact-dialog";
 import { getClinicDefaultTicket } from "@/actions/clinic";
@@ -1346,6 +1347,11 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
           }}
           profileHref={scope === "admin" ? undefined : (id) => `${basePath}/pacientes/${id}`}
           onAddToStage={(stage) => setAddToStage(stage)}
+          topSlot={
+            scope === "admin" ? undefined : (
+              <BudgetFollowupPanel onOpenChat={(id) => router.push(`${basePath}/inbox?c=${id}`)} />
+            )
+          }
           loadError={contactsLoadError}
           onRetry={() => {
             setIsLoadingContacts(true);
