@@ -340,11 +340,9 @@ const ContactListItem = React.memo(function ContactListItem({
   const rowColorClasses =
     c.queueState === 'URGENCIA_CLINICA'
       ? 'bg-rose-50 dark:bg-rose-950/30 hover:bg-rose-100/70 dark:hover:bg-rose-950/50'
-      : c.queueState === 'SEM_DONO'
-      ? 'bg-amber-50/60 dark:bg-amber-950/20 hover:bg-amber-100/60 dark:hover:bg-amber-950/40'
       : isSelected
-      ? 'bg-white dark:bg-slate-800/70'
-      : 'hover:bg-slate-200/50 dark:hover:bg-slate-800/40';
+      ? 'bg-slate-200/70 dark:bg-slate-800'
+      : 'hover:bg-slate-100 dark:hover:bg-slate-800/50';
   // A espera é o número mais forte da linha: no lugar do horário, na cor da faixa do SLA.
   const waitClass =
     c.sla.variant === 'critical'
@@ -361,9 +359,7 @@ const ContactListItem = React.memo(function ContactListItem({
     <div
       onClick={() => onSelect(c.id)}
       aria-current={isSelected ? 'true' : undefined}
-      className={`group px-3 py-2 transition-colors cursor-pointer relative flex gap-2.5 items-start ${rowColorClasses} ${
-        isSelected ? 'ring-2 ring-inset ring-emerald-600/70' : ''
-      }`}
+      className={`group mx-1.5 my-0.5 rounded-xl px-2.5 py-2.5 transition-colors cursor-pointer relative flex gap-3 items-start ${rowColorClasses}`}
       data-od-id={`contact-card-${c.id}`}
     >
       <button
@@ -374,7 +370,7 @@ const ContactListItem = React.memo(function ContactListItem({
         }}
         aria-label={`Abrir conversa com ${displayName(c)}${c.unreadCount > 0 ? `, ${c.unreadCount} não lida(s)` : ''}`}
         aria-current={isSelected ? 'true' : undefined}
-        className="absolute inset-0 z-0 rounded-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-500"
+        className="absolute inset-0 z-0 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-500"
       />
       <Popover open={isCardMenuOpen} onOpenChange={(open) => { setIsCardMenuOpen(open); if (!open) setIsMuteSubmenuOpen(false); }}>
         <PopoverTrigger
@@ -440,7 +436,7 @@ const ContactListItem = React.memo(function ContactListItem({
         </label>
       )}
       <div className="relative shrink-0">
-        <AvatarBadge name={c.name} photoUrl={c.avatar} size={34} className="ring-2 ring-white dark:ring-slate-900 shadow-sm" />
+        <AvatarBadge name={c.name} photoUrl={c.avatar} size={40} />
         {c.channel === 'instagram' && (
           <span
             className="absolute -bottom-1 -right-1 size-4 bg-pink-700 border-2 border-white dark:border-slate-900 rounded-md flex items-center justify-center text-white"
@@ -463,7 +459,7 @@ const ContactListItem = React.memo(function ContactListItem({
           {showWait ? (
             <span
               className={`shrink-0 inline-flex items-center gap-1 text-xs font-bold tabular-nums ${
-                isCriticalChip ? 'rounded-md bg-rose-700 px-1.5 py-0.5 text-white' : isStaleWait ? 'font-semibold text-slate-500 dark:text-slate-400' : waitClass
+                isCriticalChip ? 'font-semibold text-rose-600 dark:text-rose-400' : isStaleWait ? 'font-semibold text-slate-500 dark:text-slate-400' : waitClass
               }`}
               title={`Paciente aguardando resposta há ${c.sla.formattedTime} · última mensagem ${c.lastMessageTime}`}
             >
@@ -530,7 +526,7 @@ const ContactListItem = React.memo(function ContactListItem({
           </span>
           {c.unreadCount > 0 && (
             <span
-              className="shrink-0 min-w-[20px] h-5 px-1.5 rounded-md bg-emerald-700 text-white text-xs font-bold tabular-nums flex items-center justify-center"
+              className="shrink-0 min-w-[20px] h-5 px-1.5 rounded-full bg-emerald-600 text-white text-xs font-semibold tabular-nums flex items-center justify-center"
               title={`${c.unreadCount} mensagem(ns) não lida(s)`}
               aria-label={`${c.unreadCount} não lida(s)`}
             >
@@ -1580,7 +1576,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
             </button>
 
             {isTagFilterOpen && (
-              <div className="absolute right-0 w-64 mt-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg shadow-lg z-30 max-h-[70vh] overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800">
+              <div className="absolute right-0 w-64 mt-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg shadow-lg z-30 max-h-[70vh] overflow-y-auto py-1">
                 {onAgentFilterChange && ['todas', 'finalizadas', 'arquivadas'].includes(filterTab) && (
                   <div className="p-3 space-y-1.5">
                     <p className="text-xs font-semibold text-slate-600 dark:text-slate-300">Atendente</p>
@@ -1666,7 +1662,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
         </div>
 
         {/* Lista de Conversas */}
-        <div className="flex-1 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800/80">
+        <div className="flex-1 overflow-y-auto py-1">
           {filteredContacts.length === 0 && isLoadingContacts ? (
             <div aria-busy="true" aria-label="Carregando conversas">
               {Array.from({ length: 7 }).map((_, i) => (

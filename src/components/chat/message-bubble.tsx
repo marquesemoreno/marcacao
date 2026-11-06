@@ -521,8 +521,8 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry, 
         <div
           className={`max-w-md w-72 sm:w-80 rounded-2xl p-3 sm:p-3.5 shadow-sm transition-all ${
             isAgent
-              ? 'bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-100 dark:border-emerald-900 text-slate-900 dark:text-slate-100 rounded-tr-sm'
-              : 'bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-tl-sm hover:border-slate-200 dark:hover:border-slate-600'
+              ? 'bg-[#dff5ec] dark:bg-emerald-900/50 text-slate-900 dark:text-slate-50 rounded-br-md'
+              : 'bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-50 rounded-bl-md'
           }`}
         >
           {message.deleted && <DeletedBadge />}
@@ -652,8 +652,8 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry, 
           <div
             className={`max-w-md rounded-2xl p-3.5 shadow-sm transition-all ${hasRealFile ? 'cursor-pointer' : 'cursor-not-allowed opacity-80'} ${
               isAgent
-                ? 'bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-100 dark:border-emerald-900 text-slate-900 dark:text-slate-100 rounded-tr-sm'
-                : 'bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-tl-sm hover:border-slate-200 dark:hover:border-slate-600'
+                ? 'bg-[#dff5ec] dark:bg-emerald-900/50 text-slate-900 dark:text-slate-50 rounded-br-md'
+                : 'bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-50 rounded-bl-md'
             }`}
             onClick={() => hasRealFile && setIsLightboxOpen(true)}
           >
@@ -824,8 +824,8 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry, 
         <div
           className={`max-w-md rounded-2xl p-3.5 shadow-sm ${
             isAgent
-              ? 'bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-100 dark:border-emerald-900 text-slate-900 dark:text-slate-100 rounded-tr-sm'
-              : 'bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-tl-sm'
+              ? 'bg-[#dff5ec] dark:bg-emerald-900/50 text-slate-900 dark:text-slate-50 rounded-br-md'
+              : 'bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-50 rounded-bl-md'
           }`}
         >
           {message.deleted && <DeletedBadge />}
@@ -872,8 +872,8 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry, 
       <div
         className={`relative max-w-[85%] md:max-w-[75%] min-w-0 break-words [overflow-wrap:anywhere] rounded-2xl p-3.5 shadow-sm text-[15px] leading-relaxed transition-all ${
           isAgent
-            ? 'bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-100 dark:border-emerald-900 text-slate-900 dark:text-slate-100 rounded-tr-sm'
-            : 'bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-tl-sm hover:border-slate-200 dark:hover:border-slate-600'
+            ? 'bg-[#dff5ec] dark:bg-emerald-900/50 text-slate-900 dark:text-slate-50 rounded-br-md'
+            : 'bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-50 rounded-bl-md'
         }`}
       >
         {message.deleted && <DeletedBadge />}
