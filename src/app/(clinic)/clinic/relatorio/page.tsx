@@ -33,6 +33,8 @@ import { CampaignBreakdownTable } from "@/components/clinic/campaign-breakdown-t
 import { getClinicReportInsights } from "@/actions/clinic-insights";
 import { getClinicNpsReport } from "@/actions/clinic-nps";
 import { NpsCard } from "@/components/clinic/nps-card";
+import { BudgetConversionCard } from "@/components/clinic/budget-conversion-card";
+import { getBudgetConversionReport } from "@/actions/budget-followup";
 import { ReportAiSummary } from "@/components/clinic/report-ai-summary";
 import { AgendaRiskBlock, FunnelCard, PatientsCard, WeeklyTrendCard } from "@/components/clinic/report-insights-blocks";
 import { buildInsightFacts, computeFunnel } from "@/lib/report-insights";
@@ -140,6 +142,7 @@ export default async function ClinicReportPage({
     campaignBreakdown,
     insights,
     nps,
+    budgetConversion,
   ] = await Promise.all([
     getClinicChatReport(period, tags, params.channel),
     isExclusive
@@ -157,6 +160,7 @@ export default async function ClinicReportPage({
     getClinicCampaignBreakdown(period),
     getClinicReportInsights(period),
     getClinicNpsReport(period),
+    getBudgetConversionReport(period).catch(() => null),
   ]);
   const rs = chatReport.responseStats;
   const prevRs = prevChat.responseStats;
@@ -406,6 +410,7 @@ export default async function ClinicReportPage({
           <WeeklyTrendCard weeks={insights.trend} />
           <PatientsCard patients={insights.patients} />
         </div>
+        {budgetConversion && <BudgetConversionCard data={budgetConversion} />}
         <NpsCard nps={nps} />
       </section>
 

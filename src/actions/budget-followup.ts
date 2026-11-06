@@ -5,8 +5,56 @@ import { requireClinicSession } from "@/lib/session";
 import { recordAudit } from "@/lib/audit-server";
 import { budgetFollowupDue, budgetFollowupMessage } from "@/lib/budget-followup";
 import { sendMessage } from "@/actions/inbox";
+import { computeBudgetConversion, type BudgetConversion, type BudgetRow } from "@/lib/budget-conversion";
+import { periodWindow, type PeriodKey } from "@/lib/report-period";
+import { requireClinicPermission } from "@/lib/session";
 
 const FOLLOWUP_ACTION = "budget.followup";
+
+/** Relatório: orçamentos que entraram no período e o que aconteceu com eles. */
+export async function getBudgetConversionReport(period: PeriodKey = "30"): Promise<BudgetConversion> {
+  const { clinicId } = await requireClinicPermission("relatorios");
+  const { since, until } = periodWindow(period, false);
+  const entries = await prisma.conversationStageChange.findMany({
+    where: {
+      toStage: "ORCAMENTO",
+      createdAt: { gte: since, lt: until ?? new Date() },
+      conversation: { clinicId },
+    },
+    orderBy: { createdAt: "asc" },
+    select: {
+      conversationId: true,
+      createdAt: true,
+      conversation: { select: { status: true, resolutionReason: true, estimatedValue: true } },
+    },
+  });
+  const first = new Map<string, (typeof entries)[number]>();
+  for (const e of entries) if (!first.has(e.conversationId)) first.set(e.conversationId, e);
+  const ids = [...first.keys()];
+  if (ids.length === 0) return computeBudgetConversion([]);
+
+  const [scheduledChanges, followups] = await Promise.all([
+    prisma.conversationStageChange.findMany({
+      where: { conversationId: { in: ids }, toStage: "AGENDADO" },
+      select: { conversationId: true, createdAt: true },
+    }),
+    prisma.auditLog.findMany({
+      where: { clinicId, action: FOLLOWUP_ACTION, entity: "Conversation", entityId: { in: ids } },
+      select: { entityId: true, createdAt: true, changes: true },
+    }),
+  ]);
+
+  const rows: BudgetRow[] = [...first.values()].map((e) => ({
+    value: e.conversation.estimatedValue ? Number(e.conversation.estimatedValue) : null,
+    scheduled: scheduledChanges.some((s) => s.conversationId === e.conversationId && s.createdAt > e.createdAt),
+    status: e.conversation.status,
+    resolutionReason: e.conversation.resolutionReason,
+    followups: followups.filter(
+      (f) => f.entityId === e.conversationId && f.createdAt >= e.createdAt && !JSON.stringify(f.changes).includes("skipped"),
+    ).length,
+  }));
+  return computeBudgetConversion(rows);
+}
 
 export type BudgetFollowupItem = {
   conversationId: string;
