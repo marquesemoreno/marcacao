@@ -51,7 +51,7 @@ function formatIsoDateToBr(iso: string): string {
  * dessa chamada — usado pra disparo manual antecipado (ex: pedir a confirmação
  * de terça numa sexta, por causa de feriado na véspera), por isso ignora
  * skipWeekendReminders: é uma escolha explícita de data, não o cálculo padrão. */
-export async function dispatchBridgeReminders(options?: { clinicId?: string; dateIso?: string; max?: number }) {
+export async function dispatchBridgeReminders(options?: { clinicId?: string; dateIso?: string; max?: number; textOnly?: boolean }) {
   const explicitDate = options?.dateIso
     ? { iso: options.dateIso, formatted: formatIsoDateToBr(options.dateIso) }
     : null;
@@ -176,7 +176,7 @@ export async function dispatchBridgeReminders(options?: { clinicId?: string; dat
             { name: cloudSetup.name, language: cloudSetup.language, bodyParams: reminderTemplateParams(reminderInput) },
             "appointment.bridge_reminder_d1"
           )
-        : isUrolaser
+        : isUrolaser && !options?.textOnly
         ? await sendWhatsAppMedia(
             phone,
             `${getBaseUrl()}${UROLASER_LARA_IMAGE_PATH}`,
