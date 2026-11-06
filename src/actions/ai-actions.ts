@@ -59,3 +59,19 @@ export async function setUrgencyTagEnabled(enabled: boolean) {
   }
   return getUrgencyTagSetting();
 }
+
+/** Pedido de marcação fora do horário pela IA: estado e quem pode mudar. */
+export async function getAfterHoursBookingSetting() {
+  const { clinicId, userId } = await requireClinicSession();
+  const [clinic, user] = await Promise.all([
+    prisma.clinic.findUnique({ where: { id: clinicId }, select: { afterHoursBookingEnabled: true } }),
+    prisma.user.findUnique({ where: { id: userId }, select: { isManager: true } }),
+  ]);
+  return { enabled: !!clinic?.afterHoursBookingEnabled, canToggle: !!user?.isManager };
+}
+
+export async function setAfterHoursBookingEnabled(enabled: boolean) {
+  const { clinicId } = await requireClinicManager();
+  await prisma.clinic.update({ where: { id: clinicId }, data: { afterHoursBookingEnabled: enabled } });
+  return getAfterHoursBookingSetting();
+}

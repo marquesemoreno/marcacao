@@ -22,10 +22,14 @@ export async function classifyAndStorePatientIntent(conversationId: string): Pro
       where: { id: conversationId },
       data: { patientIntent: result.intent, patientIntentConfidence: result.confidence, patientIntentAt: new Date() },
     });
-    // Pré-agendamento: só com confiança alta (mesmo corte do selo da fila).
-    if (result.intent === "AGENDAR" && result.confidence >= PATIENT_INTENT_MIN_CONFIDENCE) {
+    // Pré-agendamento: só com confiança alta (mesmo corte do selo da fila) — ou quando já há
+    // uma conversa de marcação fora do horário em andamento (resposta "de manhã" etc.).
+    const { afterHoursDialogInProgress, replyAfterHoursBooking } = await import("@/lib/after-hours-booking-server");
+    const wantsBooking = result.intent === "AGENDAR" && result.confidence >= PATIENT_INTENT_MIN_CONFIDENCE;
+    if (wantsBooking || (await afterHoursDialogInProgress(conversationId))) {
       const { upsertBookingRequestFromConversation } = await import("@/lib/booking-request-server");
-      await upsertBookingRequestFromConversation(conversationId);
+      const saved = await upsertBookingRequestFromConversation(conversationId);
+      if (saved) await replyAfterHoursBooking(conversationId, saved);
     }
   } catch (error) {
     console.error("Falha ao classificar intenção do paciente:", error);

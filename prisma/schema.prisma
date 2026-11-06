@@ -243,6 +243,8 @@ model Clinic {
   autoWaitlistOffer Boolean @default(false) @map("auto_waitlist_offer")
   /// Marca a conversa com "🚨 Urgência Clínica" quando o paciente relata sintoma grave (gestão liga/desliga).
   urgencyTagEnabled Boolean @default(false) @map("urgency_tag_enabled")
+  /// Fora do expediente, a IA completa o pedido de marcação com o paciente (src/lib/after-hours-booking.ts).
+  afterHoursBookingEnabled Boolean @default(false) @map("after_hours_booking_enabled")
   /// Ponto da clínica pro QR de chegada no celular (src/lib/geo-fence.ts). Null = sem trava.
   arrivalLat       Float?  @map("arrival_lat")
   arrivalLng       Float?  @map("arrival_lng")

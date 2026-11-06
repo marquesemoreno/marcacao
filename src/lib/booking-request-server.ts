@@ -14,22 +14,29 @@ function openai(): OpenAI | null {
 
 /** Depois que o Jev disse "Quer agendar": a IA lê as últimas mensagens do paciente e cria
  * (ou atualiza) o pedido de marcação da recepção. Nunca lança; sem OpenAI não faz nada. */
-export async function upsertBookingRequestFromConversation(conversationId: string): Promise<void> {
+export type SavedBookingRequest = {
+  procedure: string | null;
+  doctorName: string | null;
+  period: string;
+  preferredDates: string | null;
+};
+
+export async function upsertBookingRequestFromConversation(conversationId: string): Promise<SavedBookingRequest | null> {
   try {
     const ai = openai();
-    if (!ai) return;
+    if (!ai) return null;
     const conversation = await prisma.conversation.findUnique({
       where: { id: conversationId },
       select: { clinicId: true, contact: { select: { phone: true, name: true } } },
     });
-    if (!conversation?.clinicId) return;
+    if (!conversation?.clinicId) return null;
     const recent = await prisma.message.findMany({
       where: { conversationId, direction: "INBOUND", type: "TEXT", deletedAt: null },
       orderBy: { createdAt: "desc" },
       take: 6,
       select: { content: true },
     });
-    if (recent.length === 0) return;
+    if (recent.length === 0) return null;
     const completion = await ai.chat.completions.create({
       model: process.env.OPENAI_MODEL || "gpt-4o-mini",
       messages: [
@@ -42,24 +49,29 @@ export async function upsertBookingRequestFromConversation(conversationId: strin
     });
     const raw = completion.choices[0]?.message?.content;
     const data = parseBookingExtraction(raw ? JSON.parse(raw) : null);
-    if (!data) return;
+    if (!data) return null;
     const last = await prisma.bookingRequest.findFirst({
       where: { conversationId },
       orderBy: { createdAt: "desc" },
       select: { id: true, status: true, createdAt: true },
     });
     const fields = { ...data, patientName: data.patientName ?? conversation.contact?.name ?? null };
+    const select = { procedure: true, doctorName: true, period: true, preferredDates: true } as const;
+    let saved: SavedBookingRequest;
     if (bookingRequestAction(last, new Date()) === "UPDATE" && last) {
       // Atualiza só o que veio preenchido (a conversa vai completando o pedido).
       const patch = Object.fromEntries(Object.entries(fields).filter(([k, v]) => v !== null && !(k === "period" && v === "ANY")));
-      await prisma.bookingRequest.update({ where: { id: last.id }, data: patch });
+      saved = await prisma.bookingRequest.update({ where: { id: last.id }, data: patch, select });
     } else {
-      await prisma.bookingRequest.create({
+      saved = await prisma.bookingRequest.create({
         data: { clinicId: conversation.clinicId, conversationId, phone: conversation.contact?.phone ?? null, ...fields },
+        select,
       });
     }
     await notifyAgenda(conversation.clinicId);
+    return saved;
   } catch (error) {
     console.error("[pré-agendamento] falha ao extrair pedido:", error);
+    return null;
   }
 }

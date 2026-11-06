@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { AlertTriangle, CheckCircle2, MessageSquareText } from "lucide-react";
 import { PageHeader } from "@/components/clinic/page-header";
-import { getUrgencyTagSetting, listAiActions } from "@/actions/ai-actions";
+import { getAfterHoursBookingSetting, getUrgencyTagSetting, listAiActions } from "@/actions/ai-actions";
 import { UrgencyTagToggle } from "@/components/clinic/urgency-tag-toggle";
+import { AfterHoursBookingToggle } from "@/components/clinic/after-hours-booking-toggle";
 import type { AiActionGroup } from "@/lib/ai-actions";
 
 export const metadata = { title: "Ações da IA" };
@@ -29,7 +30,11 @@ export default async function AiActionsPage({ searchParams }: { searchParams: Pr
   const days = [7, 30, 90].includes(Number(params.days)) ? Number(params.days) : 30;
   const group = params.grupo === "decisao" || params.grupo === "atendimento" ? params.grupo : undefined;
   const query = params.q?.trim() || undefined;
-  const [rows, urgency] = await Promise.all([listAiActions(days, { group, query }), getUrgencyTagSetting()]);
+  const [rows, urgency, afterHours] = await Promise.all([
+    listAiActions(days, { group, query }),
+    getUrgencyTagSetting(),
+    getAfterHoursBookingSetting(),
+  ]);
 
   const href = (over: { days?: number; grupo?: string }) => {
     const sp = new URLSearchParams();
@@ -53,6 +58,7 @@ export default async function AiActionsPage({ searchParams }: { searchParams: Pr
           title="Ações da IA"
           subtitle="O que a IA decidiu ou respondeu sozinha, com a mensagem do paciente que motivou. Abra a conversa para conferir ou corrigir."
         />
+        <AfterHoursBookingToggle enabled={afterHours.enabled} canToggle={afterHours.canToggle} />
         <UrgencyTagToggle enabled={urgency.enabled} canToggle={urgency.canToggle} />
 
         <div className="flex flex-wrap items-center gap-2">
