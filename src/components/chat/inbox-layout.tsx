@@ -2614,7 +2614,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
          ========================================================================= */}
       {selectedContact && (
         <aside
-          className={`w-full lg:w-[320px] lg:min-w-[320px] lg:max-w-[320px] bg-slate-50 dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 shadow-sm flex-col h-full shrink-0 overflow-y-auto ${
+          className={`w-full lg:w-[320px] lg:min-w-[320px] lg:max-w-[320px] bg-slate-100 dark:bg-slate-950 border-l border-slate-200 dark:border-slate-800 shadow-sm flex-col h-full shrink-0 overflow-y-auto ${
             mobileView === 'crm'
               ? 'flex absolute inset-0 z-40 bg-slate-50 dark:bg-slate-900 animate-in slide-in-from-right duration-200'
               // Esconde enquanto o painel de agendamento está aberto — os dois disputam a
@@ -2629,10 +2629,9 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
           }`}
           data-od-id="inbox-crm-column"
         >
-          <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
-            <h3 className="font-bold text-slate-900 dark:text-slate-100 text-base flex items-center gap-2">
-              <UserPlus className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-              Perfil & CRM do Lead
+          <div className="px-4 pt-4 pb-1 flex items-center justify-between">
+            <h3 className="font-bold tracking-tight text-slate-900 dark:text-slate-100 text-lg">
+              Paciente
             </h3>
             <button
               type="button"
@@ -2642,7 +2641,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
               }}
               aria-label="Fechar painel"
               title="Fechar painel"
-              className="size-11 -mr-2.5 flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+              className="size-11 -mr-2.5 flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-full transition-colors"
             >
               <X className="w-5 h-5" />
             </button>
@@ -2651,7 +2650,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
           <div className="p-4 space-y-4">
             {/* Card 0: Copilot de sugestões de resposta */}
             {onGenerateCopilotSuggestions && (
-              <div className="bg-white dark:bg-slate-800/40 border border-emerald-200/80 dark:border-emerald-800/60 rounded-lg p-4 space-y-3 shadow-sm">
+              <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 space-y-3">
                 <div className="flex items-center justify-between gap-2">
                   <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
                     <Sparkles className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
@@ -2714,7 +2713,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
             )}
 
             {/* Card 1: Perfil do Contato */}
-            <div className="bg-white dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-700/80 rounded-lg p-4 space-y-3 shadow-sm">
+            <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 space-y-3">
               <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-700/60 pb-3">
                 <div className="flex items-center gap-3 min-w-0">
                   <AvatarBadge name={displayName(selectedContact)} photoUrl={selectedContact.avatar} size={44} className="ring-2 ring-white dark:ring-slate-900 shadow-sm shrink-0" />
@@ -2874,7 +2873,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
               const past = selectedContact.consultationHistory.filter((c) => !c.isUpcoming);
 
               return (
-                <div className="bg-white dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-700/80 rounded-lg p-4 shadow-sm space-y-3">
+                <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 space-y-3">
                   {upcoming.length > 0 && (
                     <div className="space-y-1.5">
                       <label className="text-xs font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
@@ -2896,7 +2895,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
             })()}
 
             {/* Card 2: Tags & Observações */}
-            <div className="bg-white dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-700/80 rounded-lg p-4 shadow-sm space-y-2">
+            <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 space-y-2">
               <div className="flex items-center justify-between">
                 <label className="text-sm font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
                   <Tag className="w-3.5 h-3.5 text-slate-400" /> Tags do Paciente
@@ -2962,7 +2961,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
             {/* Card 3: Transferir Atendimento — combobox pesquisável em vez da lista
                 aberta de botões (que, com muitos atendentes, empurrava o resto do
                 CRM pra fora da tela) + confirmação em modal rápido. */}
-            <div className="bg-white dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-700/80 rounded-lg p-4 shadow-sm space-y-2">
+            <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 space-y-2">
               <label className="text-sm font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
                 <UserPlus className="w-3.5 h-3.5 text-slate-400" /> Transferir Atendimento Para
               </label>
@@ -3017,7 +3016,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
 
 
             {/* Card 4: Etapa do Atendimento (seleção única — só a etapa atual fica em destaque) */}
-            <div className="bg-white dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-700/80 rounded-lg p-4 shadow-sm space-y-2.5">
+            <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 space-y-2.5">
               <label className="text-sm font-semibold text-slate-700 dark:text-slate-200">
                 Etapa do Atendimento
               </label>
