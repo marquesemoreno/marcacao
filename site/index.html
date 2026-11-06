@@ -172,6 +172,19 @@ section{padding:120px 0}
 .usage td b{white-space:nowrap}
 .usage td span{display:block;color:var(--mute);font-size:13px;margin-top:2px}
 .note{color:var(--mute);font-size:13px;margin-top:16px;max-width:820px}
+.calc{margin-top:72px;text-align:left;background:#fff;border-radius:var(--radius);padding:36px 32px}
+.calc-grid{display:grid;grid-template-columns:1.2fr 1fr;gap:36px;margin-top:24px}
+.calc .row{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:12px 0;border-bottom:1px solid var(--bg2);font-size:15px}
+.calc .row small{display:block;color:var(--mute);font-size:12.5px}
+.calc input,.calc select{font:inherit;font-size:15px;width:140px;padding:9px 12px;border-radius:12px;border:1px solid var(--line);background:var(--bg);text-align:right;flex:none}
+.calc select{text-align:left;width:190px}
+.calc input:focus,.calc select:focus{outline:2px solid var(--accent);outline-offset:1px}
+.calc-out{background:var(--bg2);border-radius:22px;padding:24px;align-self:start}
+.calc-out .ln{display:flex;justify-content:space-between;padding:8px 0;font-size:15px}
+.calc-out .ln span{color:var(--mute)}
+.calc-out .tot{display:flex;justify-content:space-between;align-items:baseline;border-top:1px solid var(--line);margin-top:10px;padding-top:16px;gap:12px}
+.calc-out .tot b{font-size:34px;letter-spacing:-.04em;color:var(--accent)}
+@media (max-width:900px){.calc-grid{grid-template-columns:1fr}.calc{padding:28px 20px}.calc input{width:110px}.calc select{width:160px}}
 @media (max-width:900px){.plans{grid-template-columns:1fr}.usage th:nth-child(3),.usage td:nth-child(3){display:none}.usage th,.usage td{padding:14px 16px}}
 
 /* cta */
@@ -465,6 +478,33 @@ footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
       </table>
       <p class="note">Valores de referência de 2026, sem margem de gestão. A Meta cobra em dólar e muda a tabela periodicamente, então o valor final acompanha a cotação e o preço vigente do fornecedor. Exemplo: uma clínica com 600 consultas por mês gasta cerca de R$ 30 em lembretes pelo WhatsApp oficial.</p>
     </div>
+
+    <div class="calc rv" id="calc">
+      <h3>Simule o custo da sua clínica</h3>
+      <p class="sub" style="margin-top:6px">Ajuste as quantidades por mês e veja o total estimado.</p>
+      <div class="calc-grid">
+        <div class="calc-in">
+          <label class="row"><span>Plano</span>
+            <select id="c-plan"><option value="497" data-ia="1000">Essencial: R$ 497</option><option value="797" data-ia="3000" selected>Completo: R$ 797</option></select>
+          </label>
+          <label class="row"><span>Lembretes e confirmações (WhatsApp)<small>≈ R$ 0,05 cada</small></span><input type="number" min="0" step="50" id="c-util" value="600"></label>
+          <label class="row"><span>Campanhas de marketing (WhatsApp)<small>≈ R$ 0,40 cada</small></span><input type="number" min="0" step="50" id="c-mkt" value="200"></label>
+          <label class="row"><span>SMS<small>≈ R$ 0,10 cada</small></span><input type="number" min="0" step="50" id="c-sms" value="0"></label>
+          <label class="row"><span>E-mails<small>3.000 grátis, depois ≈ R$ 0,01</small></span><input type="number" min="0" step="500" id="c-mail" value="0"></label>
+          <label class="row"><span>Respostas de IA<small id="c-ia-note">3.000 inclusas, depois R$ 0,05</small></span><input type="number" min="0" step="100" id="c-ia" value="2000"></label>
+        </div>
+        <div class="calc-out">
+          <div class="ln"><span>Plano</span><b id="o-plan"></b></div>
+          <div class="ln"><span>WhatsApp utilidade</span><b id="o-util"></b></div>
+          <div class="ln"><span>WhatsApp marketing</span><b id="o-mkt"></b></div>
+          <div class="ln"><span>SMS</span><b id="o-sms"></b></div>
+          <div class="ln"><span>E-mail</span><b id="o-mail"></b></div>
+          <div class="ln"><span>IA além da franquia</span><b id="o-ia"></b></div>
+          <div class="tot"><span>Total estimado por mês</span><b id="o-tot"></b></div>
+          <p class="note" style="margin-top:12px">Implantação à parte (a partir de R$ 1.500, uma vez). Estimativa: o valor real depende da cotação do dólar e da tabela vigente de cada fornecedor.</p>
+        </div>
+      </div>
+    </div>
   </div>
 </section>
 
@@ -486,6 +526,22 @@ footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
 </footer>
 
 <script>
+(function(){
+  var $=function(id){return document.getElementById(id)};
+  var brl=function(v){return v.toLocaleString("pt-BR",{style:"currency",currency:"BRL"})};
+  var n=function(id){var v=parseFloat($(id).value);return isFinite(v)&&v>0?v:0};
+  function calc(){
+    var opt=$("c-plan").selectedOptions[0], plan=+opt.value, quota=+opt.dataset.ia;
+    $("c-ia-note").textContent=quota.toLocaleString("pt-BR")+" inclusas, depois R$ 0,05";
+    var util=n("c-util")*0.05, mkt=n("c-mkt")*0.40, sms=n("c-sms")*0.10,
+        mail=Math.max(0,n("c-mail")-3000)*0.01, ia=Math.max(0,n("c-ia")-quota)*0.05;
+    $("o-plan").textContent=brl(plan); $("o-util").textContent=brl(util); $("o-mkt").textContent=brl(mkt);
+    $("o-sms").textContent=brl(sms); $("o-mail").textContent=brl(mail); $("o-ia").textContent=brl(ia);
+    $("o-tot").textContent=brl(plan+util+mkt+sms+mail+ia);
+  }
+  document.querySelectorAll("#calc input,#calc select").forEach(function(el){el.addEventListener("input",calc)});
+  calc();
+})();
 (function(){
   var els=document.querySelectorAll('.rv');
   if(!('IntersectionObserver' in window)){els.forEach(function(e){e.classList.add('in')});return;}
