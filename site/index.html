@@ -468,15 +468,15 @@ footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
       <table>
         <thead><tr><th>Serviço</th><th>Preço estimado</th><th>Quando se usa</th></tr></thead>
         <tbody>
-          <tr><td><b>WhatsApp oficial (Meta)</b><span>mensagem de serviço</span></td><td><b>Grátis</b><span>resposta ao paciente em até 24h</span></td><td>Conversa que o paciente iniciou.</td></tr>
-          <tr><td><b>WhatsApp oficial (Meta)</b><span>utilidade</span></td><td><b>≈ R$ 0,05</b><span>por mensagem</span></td><td>Lembretes, confirmações e avisos de remarcação.</td></tr>
-          <tr><td><b>WhatsApp oficial (Meta)</b><span>marketing</span></td><td><b>≈ R$ 0,40</b><span>por mensagem</span></td><td>Campanhas, retorno, aniversário e reativação.</td></tr>
+          <tr><td><b>WhatsApp oficial (Meta)</b><span>serviço</span></td><td><b>1.000/mês grátis</b><span>depois ≈ R$ 0,035 por mensagem</span></td><td>Respostas ao paciente dentro da janela de 24h que ele abriu.</td></tr>
+          <tr><td><b>WhatsApp oficial (Meta)</b><span>utilidade</span></td><td><b>≈ R$ 0,035</b><span>por mensagem</span></td><td>Lembretes, confirmações e avisos de remarcação.</td></tr>
+          <tr><td><b>WhatsApp oficial (Meta)</b><span>marketing</span></td><td><b>≈ R$ 0,32</b><span>por mensagem</span></td><td>Campanhas, retorno, aniversário e reativação.</td></tr>
           <tr><td><b>SMS (Comtele)</b></td><td><b>≈ R$ 0,10</b><span>por SMS</span></td><td>Paciente sem WhatsApp ou como reforço do lembrete.</td></tr>
           <tr><td><b>E-mail (Resend)</b></td><td><b>3.000/mês grátis</b><span>depois ≈ R$ 0,01 por e-mail</span></td><td>Campanhas e avisos por e-mail.</td></tr>
           <tr><td><b>IA acima da franquia</b></td><td><b>R$ 0,05</b><span>por resposta</span></td><td>Só depois de usar as respostas inclusas no plano.</td></tr>
         </tbody>
       </table>
-      <p class="note">Valores de referência de 2026, sem margem de gestão. A Meta cobra em dólar e muda a tabela periodicamente, então o valor final acompanha a cotação e o preço vigente do fornecedor. Exemplo: uma clínica com 600 consultas por mês gasta cerca de R$ 30 em lembretes pelo WhatsApp oficial.</p>
+      <p class="note">Valores de referência da tabela da Meta para o Brasil vigente desde outubro de 2026, cobrados por mensagem entregue (mensagem recebida do paciente nunca é cobrada). <b>Os valores dos fornecedores podem sofrer alterações a qualquer momento</b>, sem aviso prévio, e o valor cobrado acompanha a tabela vigente de cada um. Exemplo: uma clínica com 600 consultas por mês gasta cerca de R$ 21 em lembretes pelo WhatsApp oficial.</p>
     </div>
 
     <div class="calc rv" id="calc">
@@ -487,21 +487,23 @@ footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
           <label class="row"><span>Plano</span>
             <select id="c-plan"><option value="497" data-ia="1000">Essencial: R$ 497</option><option value="797" data-ia="3000" selected>Completo: R$ 797</option></select>
           </label>
-          <label class="row"><span>Lembretes e confirmações (WhatsApp)<small>≈ R$ 0,05 cada</small></span><input type="number" min="0" step="50" id="c-util" value="600"></label>
-          <label class="row"><span>Campanhas de marketing (WhatsApp)<small>≈ R$ 0,40 cada</small></span><input type="number" min="0" step="50" id="c-mkt" value="200"></label>
+          <label class="row"><span>Respostas de atendimento (WhatsApp)<small>1.000 grátis, depois ≈ R$ 0,035</small></span><input type="number" min="0" step="100" id="c-srv" value="1500"></label>
+          <label class="row"><span>Lembretes e confirmações (WhatsApp)<small>≈ R$ 0,035 cada</small></span><input type="number" min="0" step="50" id="c-util" value="600"></label>
+          <label class="row"><span>Campanhas de marketing (WhatsApp)<small>≈ R$ 0,32 cada</small></span><input type="number" min="0" step="50" id="c-mkt" value="200"></label>
           <label class="row"><span>SMS<small>≈ R$ 0,10 cada</small></span><input type="number" min="0" step="50" id="c-sms" value="0"></label>
           <label class="row"><span>E-mails<small>3.000 grátis, depois ≈ R$ 0,01</small></span><input type="number" min="0" step="500" id="c-mail" value="0"></label>
           <label class="row"><span>Respostas de IA<small id="c-ia-note">3.000 inclusas, depois R$ 0,05</small></span><input type="number" min="0" step="100" id="c-ia" value="2000"></label>
         </div>
         <div class="calc-out">
           <div class="ln"><span>Plano</span><b id="o-plan"></b></div>
+          <div class="ln"><span>WhatsApp atendimento</span><b id="o-srv"></b></div>
           <div class="ln"><span>WhatsApp utilidade</span><b id="o-util"></b></div>
           <div class="ln"><span>WhatsApp marketing</span><b id="o-mkt"></b></div>
           <div class="ln"><span>SMS</span><b id="o-sms"></b></div>
           <div class="ln"><span>E-mail</span><b id="o-mail"></b></div>
           <div class="ln"><span>IA além da franquia</span><b id="o-ia"></b></div>
           <div class="tot"><span>Total estimado por mês</span><b id="o-tot"></b></div>
-          <p class="note" style="margin-top:12px">Implantação à parte (a partir de R$ 1.500, uma vez). Estimativa: o valor real depende da cotação do dólar e da tabela vigente de cada fornecedor.</p>
+          <p class="note" style="margin-top:12px">Implantação à parte (a partir de R$ 1.500, uma vez). Estimativa: os valores dos fornecedores podem sofrer alterações a qualquer momento.</p>
         </div>
       </div>
     </div>
@@ -533,11 +535,11 @@ footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
   function calc(){
     var opt=$("c-plan").selectedOptions[0], plan=+opt.value, quota=+opt.dataset.ia;
     $("c-ia-note").textContent=quota.toLocaleString("pt-BR")+" inclusas, depois R$ 0,05";
-    var util=n("c-util")*0.05, mkt=n("c-mkt")*0.40, sms=n("c-sms")*0.10,
+    var srv=Math.max(0,n("c-srv")-1000)*0.035, util=n("c-util")*0.035, mkt=n("c-mkt")*0.32, sms=n("c-sms")*0.10,
         mail=Math.max(0,n("c-mail")-3000)*0.01, ia=Math.max(0,n("c-ia")-quota)*0.05;
-    $("o-plan").textContent=brl(plan); $("o-util").textContent=brl(util); $("o-mkt").textContent=brl(mkt);
+    $("o-plan").textContent=brl(plan); $("o-srv").textContent=brl(srv); $("o-util").textContent=brl(util); $("o-mkt").textContent=brl(mkt);
     $("o-sms").textContent=brl(sms); $("o-mail").textContent=brl(mail); $("o-ia").textContent=brl(ia);
-    $("o-tot").textContent=brl(plan+util+mkt+sms+mail+ia);
+    $("o-tot").textContent=brl(plan+srv+util+mkt+sms+mail+ia);
   }
   document.querySelectorAll("#calc input,#calc select").forEach(function(el){el.addEventListener("input",calc)});
   calc();
