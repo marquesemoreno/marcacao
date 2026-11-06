@@ -9,7 +9,35 @@ const config: Config = {
   ],
   theme: {
     extend: {
+      // Base visual estilo Apple (06/11/2026): Inter + fallback para a fonte do sistema.
+      fontFamily: {
+        sans: ["var(--font-inter)", "-apple-system", "BlinkMacSystemFont", "system-ui", "Segoe UI", "sans-serif"],
+        mono: ["var(--font-geist-mono)", "ui-monospace", "SFMono-Regular", "monospace"],
+      },
+      // Sombras bem suaves, sem contorno escuro.
+      boxShadow: {
+        xs: "0 1px 2px rgba(0,0,0,0.04)",
+        sm: "0 1px 2px rgba(0,0,0,0.04), 0 1px 4px rgba(0,0,0,0.04)",
+        md: "0 2px 8px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)",
+        lg: "0 8px 24px rgba(0,0,0,0.08), 0 2px 6px rgba(0,0,0,0.04)",
+        xl: "0 16px 40px rgba(0,0,0,0.10), 0 4px 10px rgba(0,0,0,0.05)",
+      },
       colors: {
+        // Cinzas neutros da Apple no lugar do slate azulado — as 2.000+ classes slate-* do
+        // sistema mudam juntas, sem tocar nas telas.
+        slate: {
+          50: "#fbfbfd",
+          100: "#f5f5f7",
+          200: "#e8e8ed",
+          300: "#d2d2d7",
+          400: "#aeaeb2",
+          500: "#86868b",
+          600: "#6e6e73",
+          700: "#48484a",
+          800: "#2c2c2e",
+          900: "#1d1d1f",
+          950: "#0b0b0c",
+        },
         background: "var(--background)",
         foreground: "var(--foreground)",
         card: {
