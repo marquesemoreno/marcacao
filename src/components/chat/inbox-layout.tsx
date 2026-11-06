@@ -422,7 +422,8 @@ const ContactListItem = React.memo(function ContactListItem({
       {onToggleCheck && (
         <label
           onClick={(e) => e.stopPropagation()}
-          className={`absolute left-1 top-1 z-10 flex size-5 items-center justify-center rounded-md bg-white/90 dark:bg-slate-900/90 transition-opacity ${
+          /* Cobre a foto inteira (como no app de Mensagens) em vez de ficar torta no canto dela. */
+          className={`absolute left-2.5 top-2.5 z-10 flex size-10 items-center justify-center rounded-full bg-slate-100/95 dark:bg-slate-800/95 cursor-pointer transition-opacity ${
             selectionMode || isChecked ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus-within:opacity-100'
           }`}
         >
@@ -431,7 +432,7 @@ const ContactListItem = React.memo(function ContactListItem({
             checked={isChecked}
             onChange={() => onToggleCheck(c.id)}
             aria-label={`Selecionar conversa com ${displayName(c)}`}
-            className="size-3.5 accent-emerald-600 cursor-pointer"
+            className="size-4 accent-emerald-600 cursor-pointer"
           />
         </label>
       )}
@@ -1913,7 +1914,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                   aria-label={isCrmPanelOpen ? 'Esconder painel do paciente' : 'Mostrar painel do paciente'}
                   title={isCrmPanelOpen ? 'Esconder painel do paciente' : 'Mostrar painel do paciente'}
                   aria-pressed={isCrmPanelOpen}
-                  className="hidden lg:flex size-9 items-center justify-center rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-800 dark:hover:text-slate-100"
+                  className="hidden lg:flex size-9 items-center justify-center rounded-full text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-800 dark:hover:text-slate-100"
                 >
                   {isCrmPanelOpen ? <PanelRightClose className="w-4 h-4" /> : <PanelRightOpen className="w-4 h-4" />}
                 </button>
@@ -1921,7 +1922,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                   onClaimConversation && (
                       <button
                         onClick={() => onClaimConversation()}
-                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all bg-emerald-600 hover:bg-emerald-700 text-white active:scale-95 motion-reduce:active:scale-100"
+                        className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold rounded-full transition-all bg-emerald-600 hover:bg-emerald-700 text-white active:scale-95 motion-reduce:active:scale-100"
                         title={
                           attendantCapacity?.level === "high"
                             ? `Atenção: ${attendantCapacity.awaiting} pacientes já esperam sua resposta. Dá para assumir, mas veja se uma colega está mais livre.`
@@ -1937,7 +1938,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                   // lateral, com a dica num tooltip). Confirmação é a mesma da lateral.
                   <Popover open={isHeaderTransferOpen} onOpenChange={setIsHeaderTransferOpen}>
                     <PopoverTrigger
-                      className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-slate-700 dark:text-slate-200 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg hover:border-slate-300 dark:hover:border-slate-600"
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700"
                       aria-label={`Atendente: ${selectedContact.responsibleAgent}. Transferir conversa`}
                     >
                       <span className="text-slate-500 dark:text-slate-400 font-normal hidden sm:inline">Atendente:</span>
@@ -1973,7 +1974,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
 
                 <button
                   onClick={() => handleOpenScheduleWithProcedure(undefined)}
-                  className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-md shadow-xs transition-all active:scale-[0.98]"
+                  className="hidden sm:flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-900/40 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 rounded-full transition-all active:scale-[0.98]"
                   title="Criar novo agendamento de consulta ou exame"
                 >
                   <Calendar className="w-3.5 h-3.5" />
@@ -1984,7 +1985,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                 <div className="relative" ref={moreMenuRef}>
                   <button
                     onClick={() => setIsMoreMenuOpen(!isMoreMenuOpen)}
-                    className="p-2 text-slate-500 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 transition-colors"
+                    className="p-2 text-slate-500 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors"
                     title="Menu de Ações do Atendimento"
                     aria-label="Menu de Ações do Atendimento"
                   >
@@ -2283,21 +2284,21 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
 
 
                 <div
-                  className={`rounded-lg border overflow-hidden transition-colors ${
+                  className={`rounded-2xl border overflow-hidden shadow-sm transition-colors ${
                     composerMode === 'internal_note'
                       ? 'bg-amber-50 dark:bg-amber-950/40 border-amber-400 dark:border-amber-700 focus-within:ring-2 focus-within:ring-amber-200 dark:focus-within:ring-amber-900'
-                      : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-100'
+                      : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 focus-within:border-slate-300 dark:focus-within:border-slate-700 focus-within:ring-4 focus-within:ring-slate-200/60 dark:focus-within:ring-slate-800/60'
                   }`}
                 >
                   {/* Toggle de Modo: integrado no topo do card do input */}
-                  <div className="flex items-center justify-between px-2 py-1.5 border-b border-slate-200/70 dark:border-slate-800 bg-white/60 dark:bg-slate-900/40">
-                    <div className="inline-flex p-0.5 bg-slate-100 dark:bg-slate-800 rounded-lg text-xs font-medium">
+                  <div className="flex items-center justify-between px-2 py-1.5">
+                    <div className="inline-flex p-0.5 bg-slate-100 dark:bg-slate-800 rounded-full text-xs font-medium">
                       <button
                         type="button"
                         onClick={() => setComposerMode('whatsapp')}
-                        className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-md text-xs transition-all ${
+                        className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-full text-xs transition-all ${
                           composerMode === 'whatsapp'
-                            ? 'bg-emerald-600 text-white font-semibold shadow-sm'
+                            ? 'bg-white dark:bg-slate-700 text-emerald-700 dark:text-emerald-300 font-semibold shadow-sm'
                             : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white'
                         }`}
                       >
@@ -2311,9 +2312,9 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                       <button
                         type="button"
                         onClick={() => setComposerMode('internal_note')}
-                        className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-md text-xs transition-all ${
+                        className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-full text-xs transition-all ${
                           composerMode === 'internal_note'
-                            ? 'bg-amber-500 text-white font-semibold shadow-sm'
+                            ? 'bg-white dark:bg-slate-700 text-amber-700 dark:text-amber-300 font-semibold shadow-sm'
                             : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white'
                         }`}
                       >
@@ -2415,7 +2416,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                     className="w-full p-3 bg-transparent text-base sm:text-sm text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none resize-none"
                   />
 
-                  <div className="flex items-center justify-between gap-2 px-3 py-2 border-t border-slate-200/60 dark:border-slate-800">
+                  <div className="flex items-center justify-between gap-2 px-3 py-2">
                     <div className="flex min-w-0 items-center gap-1.5 overflow-x-auto [scrollbar-width:none]">
                       {composerMode === 'whatsapp' && selectedContact?.channel !== 'instagram' && (
                         <>
@@ -2587,7 +2588,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                       type="submit"
                       disabled={!inputText.trim() || whatsappBlocked}
                       title={whatsappBlocked ? 'WhatsApp desconectado — a mensagem não sairia. Use uma nota interna ou reconecte o WhatsApp.' : undefined}
-                      className={`flex shrink-0 items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-semibold shadow-sm transition-all active:scale-95 motion-reduce:active:scale-100 ${
+                      className={`flex shrink-0 items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-semibold transition-all active:scale-95 motion-reduce:active:scale-100 ${
                         !inputText.trim() || whatsappBlocked
                           ? 'bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-600 cursor-not-allowed'
                           : composerMode === 'internal_note'
