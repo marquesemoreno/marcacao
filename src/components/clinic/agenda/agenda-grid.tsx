@@ -95,7 +95,7 @@ export function AgendaGrid({
   const segments = collapseEmptyRows(rows, occupied, nowRow != null ? new Set([nowRow]) : new Set(), openedGaps);
 
   return (
-    <div ref={scrollRef} className="relative h-[70dvh] min-h-[14rem] overflow-auto rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+    <div ref={scrollRef} className="relative h-[70dvh] min-h-[14rem] overflow-auto rounded-2xl bg-white dark:bg-slate-900 shadow-xs">
       <div className="grid min-w-fit" style={template}>
         {/* Cabeçalho */}
         <div className="sticky top-0 left-0 z-30 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800" />
@@ -115,7 +115,7 @@ export function AgendaGrid({
             <button
               type="button"
               onClick={() => onSlotClick(col)}
-              className="shrink-0 inline-flex size-9 items-center justify-center rounded-md text-slate-600 dark:text-slate-400 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 dark:hover:text-emerald-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
+              className="shrink-0 inline-flex size-9 items-center justify-center rounded-full text-slate-600 dark:text-slate-400 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 dark:hover:text-emerald-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
               aria-label={`Novo agendamento — ${col.label}`}
               title="Novo agendamento"
             >

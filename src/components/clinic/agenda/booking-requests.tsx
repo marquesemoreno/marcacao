@@ -60,7 +60,7 @@ export function BookingRequests({ refreshKey, onCount }: { refreshKey: number; o
 
   if (items.length === 0) return null;
   return (
-    <section aria-labelledby="pedidos-titulo" className="rounded-lg border border-violet-200 dark:border-violet-900 bg-white dark:bg-slate-900">
+    <section aria-labelledby="pedidos-titulo" className="rounded-2xl border border-violet-200 dark:border-violet-900 bg-white dark:bg-slate-900">
       <h2 id="pedidos-titulo" className="flex items-center gap-2 px-4 pt-3 text-sm font-semibold">
         <CalendarPlus className="h-4 w-4 text-violet-700 dark:text-violet-400" aria-hidden />
         Pedidos de marcação
@@ -79,7 +79,7 @@ export function BookingRequests({ refreshKey, onCount }: { refreshKey: number; o
             <div className="flex flex-wrap gap-2 pt-0.5">
               <Link
                 href={`/clinic/inbox?c=${r.conversationId}`}
-                className="inline-flex h-8 items-center gap-1 rounded-md border border-slate-200 dark:border-slate-700 px-2 text-xs font-medium hover:bg-slate-50 dark:hover:bg-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
+                className="inline-flex h-8 items-center gap-1 rounded-full bg-slate-100 dark:bg-slate-800 px-3 text-xs font-medium hover:bg-slate-50 dark:hover:bg-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
               >
                 <MessageCircle className="h-3.5 w-3.5" aria-hidden /> Conversa
               </Link>

@@ -72,9 +72,9 @@ export function AppointmentCard({
 
   return (
     <div
-      className={`relative rounded-lg border ${
-        item.status === "PENDING" ? "border-dashed border-amber-300 dark:border-amber-700" : "border-slate-200 dark:border-slate-700"
-      } ${lateMin !== null ? "ring-2 ring-amber-400/80 dark:ring-amber-500/70" : ""} ${meta.tint} shadow-xs hover:border-slate-300 dark:hover:border-slate-600 transition-colors`}
+      className={`relative rounded-xl border ${
+        item.status === "PENDING" ? "border-dashed border-amber-300 dark:border-amber-700" : "border-transparent"
+      } ${lateMin !== null ? "ring-2 ring-amber-400/80 dark:ring-amber-500/70" : ""} ${meta.tint} shadow-xs hover:shadow-md transition-shadow`}
     >
       <div className="flex items-start">
         {compact && (
@@ -92,7 +92,7 @@ export function AppointmentCard({
         <button
           type="button"
           onClick={() => onOpen(item)}
-          className="min-w-0 flex-1 min-h-8 text-left px-2 pt-1 pb-0.5 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
+          className="min-w-0 flex-1 min-h-8 text-left px-2 pt-1 pb-0.5 rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
           aria-label={`${item.time ?? "Sem horário"}, ${name}, ${meta.label}${lateMin !== null ? `, atrasado ${lateMin} minutos` : ""}${item.formDone ? ", ficha prévia enviada" : ""}. Abrir ficha`}
         >
           <div className="flex items-center gap-2 min-w-0">

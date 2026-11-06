@@ -80,7 +80,7 @@ const SHORTCUTS: [string, string][] = [
   ["?", "Mostrar estes atalhos"],
 ];
 
-const panel = "rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900";
+const panel = "rounded-2xl bg-white dark:bg-slate-900 shadow-xs";
 
 /** Agenda da recepção (/clinic/agenda). Data e visão ficam no endereço (F5 e link
  * compartilhável). Pensada pro pico da manhã: resumo do dia no topo (também filtra),
@@ -483,7 +483,7 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
 
         {/* Crítica 02/11: o aviso da ponte ficava abaixo da fila — com a ponte fora, a grade parece completa. */}
         {failed.length > 0 && (
-          <p role="alert" className="flex items-start gap-2 rounded-lg border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/40 px-3 py-2.5 text-sm font-medium text-amber-900 dark:text-amber-200">
+          <p role="alert" className="flex items-start gap-2 rounded-xl border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/40 px-3 py-2.5 text-sm font-medium text-amber-900 dark:text-amber-200">
             <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" aria-hidden />
             <span>
               Não foi possível ler a agenda do sistema da clínica
@@ -516,7 +516,7 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
                 }
               }}
               placeholder="Buscar paciente"
-              className="h-9 w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 pl-8 pr-3 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
+              className="h-9 w-full rounded-full border border-transparent bg-slate-100 dark:bg-slate-800 pl-8 pr-3 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
             />
           </label>
           {query && current && (
@@ -531,7 +531,7 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
             type="button"
             ref={helpTriggerRef}
             onClick={() => setHelpOpen(true)}
-            className="ml-auto hidden md:inline-flex h-9 items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
+            className="ml-auto hidden md:inline-flex h-9 items-center gap-1.5 rounded-full px-2.5 text-xs font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
           >
             <Keyboard className="h-4 w-4" aria-hidden /> Atalhos <kbd className="rounded border border-slate-300 dark:border-slate-600 px-1 font-mono text-[11px]">?</kbd>
           </button>
@@ -606,7 +606,7 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
         {(railWaiting + railInRoom + bookingCount > 0) && (
           <a
             href="#fila-recepcao"
-            className="xl:hidden flex min-h-9 flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-sky-200 dark:border-sky-900 bg-sky-50 dark:bg-sky-950/40 px-3 py-1.5 text-sm text-sky-900 dark:text-sky-200 hover:bg-sky-100 dark:hover:bg-sky-950/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
+            className="xl:hidden flex min-h-9 flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border border-sky-200 dark:border-sky-900 bg-sky-50 dark:bg-sky-950/40 px-3 py-1.5 text-sm text-sky-900 dark:text-sky-200 hover:bg-sky-100 dark:hover:bg-sky-950/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
           >
             {railWaiting > 0 && <span className="tabular-nums"><strong>{railWaiting}</strong> aguardando</span>}
             {railInRoom > 0 && <span className="tabular-nums"><strong>{railInRoom}</strong> em atendimento</span>}
@@ -627,7 +627,7 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
         )}
 
         {current && filtersOn && view !== "mes" && visibleItems.length < allItems.length && (
-          <p role="status" className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-3 py-2 text-sm text-slate-700 dark:text-slate-200">
+          <p role="status" className="flex flex-wrap items-center gap-2 rounded-xl bg-slate-100 dark:bg-slate-900 px-3 py-2 text-sm text-slate-700 dark:text-slate-200">
             <span className="tabular-nums">
               Mostrando {visibleItems.length} de {allItems.length} {allItems.length === 1 ? "paciente" : "pacientes"} — filtro ativo
               {[
@@ -653,7 +653,7 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
             <button
               type="button"
               onClick={reload}
-              className="mt-4 inline-flex h-9 items-center gap-2 rounded-lg border border-slate-200 dark:border-slate-700 px-3 text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800"
+              className="mt-4 inline-flex h-9 items-center gap-2 rounded-full bg-slate-100 dark:bg-slate-800 px-4 text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700"
             >
               <RefreshCw className="w-4 h-4" aria-hidden /> Tentar de novo
             </button>
@@ -687,15 +687,15 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
               </div>
             )}
             {view === "semana" && (
-              <div role="group" aria-label="Como ver a semana" className="inline-flex rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 p-0.5">
+              <div role="group" aria-label="Como ver a semana" className="inline-flex rounded-full bg-slate-100 dark:bg-slate-800 p-0.5">
                 {(["carga", "pacientes"] as const).map((m) => (
                   <button
                     key={m}
                     type="button"
                     aria-pressed={weekMode === m}
                     onClick={() => setWeekMode(m)}
-                    className={`h-8 rounded-md px-3 text-sm font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50 ${
-                      weekMode === m ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-xs" : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
+                    className={`h-8 rounded-full px-3 text-sm font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50 ${
+                      weekMode === m ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm" : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
                     }`}
                   >
                     {m === "carga" ? "Carga por médico" : "Pacientes"}
@@ -791,7 +791,7 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
               type="button"
               autoFocus
               onClick={() => closeHelp()}
-              className="mt-4 inline-flex h-9 w-full items-center justify-center rounded-lg border border-slate-200 dark:border-slate-700 text-sm font-medium hover:bg-slate-50 dark:hover:bg-slate-800"
+              className="mt-4 inline-flex h-9 w-full items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 text-sm font-medium hover:bg-slate-200 dark:hover:bg-slate-700"
             >
               Fechar
             </button>

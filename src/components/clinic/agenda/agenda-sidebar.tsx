@@ -57,7 +57,7 @@ export function AgendaSidebar({
           onClick={() => setMobileOpen((o) => !o)}
           aria-expanded={mobileOpen}
           aria-controls="agenda-filters"
-          className="lg:hidden inline-flex h-10 items-center gap-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 text-sm font-medium text-slate-700 dark:text-slate-200"
+          className="lg:hidden inline-flex h-10 items-center gap-1.5 rounded-full bg-slate-100 dark:bg-slate-800 px-4 text-sm font-medium text-slate-700 dark:text-slate-200"
         >
           <SlidersHorizontal className="w-4 h-4" aria-hidden />
           Data e médico{filterCount ? ` (${filterCount})` : ""}
@@ -66,7 +66,7 @@ export function AgendaSidebar({
       </div>
 
       <div id="agenda-filters" className={`${mobileOpen ? "block" : "hidden"} lg:block space-y-3`}>
-        <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-2 flex justify-center">
+        <div className="rounded-2xl bg-white dark:bg-slate-900 shadow-xs p-2 flex justify-center">
           <Calendar
             mode="single"
             locale={ptBR}
@@ -78,7 +78,7 @@ export function AgendaSidebar({
           />
         </div>
 
-        <section className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3">
+        <section className="rounded-2xl bg-white dark:bg-slate-900 shadow-xs p-3">
           <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-100 mb-2">Médico</h2>
           {loading ? (
             <div className="space-y-2 py-1" aria-busy="true" aria-label="Carregando médicos">
