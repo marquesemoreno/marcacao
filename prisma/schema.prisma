@@ -204,6 +204,8 @@ model Clinic {
   welcomeMessageText         String?  @map("welcome_message_text")
   /// Despedida enviada sozinha ao finalizar o atendimento (src/lib/closing-message.ts).
   /// Gestão liga em /clinic/ia; null no texto = DEFAULT_CLOSING_MESSAGE.
+  /// Responde sozinho "onde fica?" com endereço + link do Maps (src/lib/welcome-message.ts).
+  addressReplyEnabled        Boolean  @default(false) @map("address_reply_enabled")
   closingMessageEnabled      Boolean  @default(false) @map("closing_message_enabled")
   closingMessageText         String?  @map("closing_message_text")
   commissionRate             Decimal  @map("commission_rate") @db.Decimal(5, 2)

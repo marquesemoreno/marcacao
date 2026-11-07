@@ -38,6 +38,7 @@ import { isKnownPartnerLeadPhone } from "@/lib/ai-lead-outreach";
 import { resolveStatusFromReply, isRescheduleReply, isWrongNumberReply, wasSentConfirmationPrompt } from "@/lib/appointment-reply";
 import { classifyAppointmentReply } from "@/lib/appointment-reply-ai";
 import { buildBridgeConfirmationFollowUp } from "@/lib/bridge-confirmation";
+import { addressReply, renderWelcome, shouldSendAddressReply, shouldSendWelcome } from "@/lib/welcome-message";
 import { extractBridgeNumeroFromNotes, confirmBridgeAppointment, verifyBridgeAppointmentPersisted } from "@/lib/hospital-bridge";
 import {
   getAiAttendantConfig,
@@ -657,6 +658,10 @@ async function processWhatsappWebhook(body: Prisma.InputJsonValue, forcedClinicI
   // 2. REGISTRO E APRESENTAÇÃO NA CAIXA DE ENTRADA DO CHAT (/admin/inbox)
   // =========================================================================
   const { contact, conversation, isNewConversation } = await findOrCreateConversation(incoming.phone, incoming.name, resolvedClinicId);
+  // Estado ANTES desta mensagem — a saudação ampliada (src/lib/welcome-message.ts) cumprimenta
+  // quem volta depois de um atendimento finalizado.
+  const previousStatus = conversation?.status ?? null;
+  const previousLastMessageAt = conversation?.lastMessageAt ?? null;
 
   // Opt-out de disparo em massa (LGPD — saída fácil de mensagem não solicitada, ver
   // src/lib/broadcast.ts). Independente do fluxo de IA/automação abaixo, e permanente
@@ -933,24 +938,59 @@ async function processWhatsappWebhook(body: Prisma.InputJsonValue, forcedClinicI
     // =========================================================================
     const clinic = await prisma.clinic.findUnique({
       where: { id: conversation.clinicId },
-      select: { tradeName: true, welcomeMessageEnabled: true, welcomeMessageText: true },
+      select: {
+        tradeName: true,
+        welcomeMessageEnabled: true,
+        welcomeMessageText: true,
+        addressReplyEnabled: true,
+        address: true,
+        neighborhood: true,
+        city: true,
+      },
     });
 
-    if (isNewConversation) {
-      const welcomeText = clinic?.welcomeMessageEnabled ? clinic.welcomeMessageText?.trim() : null;
-      if (welcomeText) {
-        // `await` — sem isso, uma falha silenciosa (timeout, instância caindo) marcava a
-        // mensagem como "entregue" mesmo sem o paciente nunca ter recebido nada (bug real
-        // encontrado testando a reconexão do TIVDC: a IA seguiu como se o paciente tivesse
-        // visto e recusado uma pergunta que na verdade nunca chegou no WhatsApp dele).
-        const result = await sendWhatsAppMessage(incoming.phone, welcomeText, "welcome_message.sent", resolvedClinicId);
+    // Saudação ampliada (07/11): primeiro contato OU volta depois de atendimento finalizado
+    // há 6 h+ (src/lib/welcome-message.ts). {{saudacao}} e {{nome}} no texto.
+    const nowWelcome = new Date();
+    if (
+      clinic &&
+      shouldSendWelcome({
+        enabled: clinic.welcomeMessageEnabled,
+        text: clinic.welcomeMessageText,
+        isNewConversation,
+        previousStatus,
+        previousLastMessageAt,
+        now: nowWelcome,
+      })
+    ) {
+      const welcomeText = renderWelcome(clinic.welcomeMessageText!.trim(), { name: contact.name ?? "", now: nowWelcome });
+      // `await` — sem isso, uma falha silenciosa (timeout, instância caindo) marcava a
+      // mensagem como "entregue" mesmo sem o paciente nunca ter recebido nada (bug real
+      // encontrado testando a reconexão do TIVDC: a IA seguiu como se o paciente tivesse
+      // visto e recusado uma pergunta que na verdade nunca chegou no WhatsApp dele).
+      const result = await sendWhatsAppMessage(incoming.phone, welcomeText, "welcome_message.sent", resolvedClinicId);
+      await prisma.message.create({
+        data: {
+          conversationId: conversation.id,
+          direction: "OUTBOUND",
+          content: welcomeText,
+          status: result.success ? "DELIVERED" : "FAILED",
+        },
+      });
+    }
+
+    // Endereço automático: "onde fica?" → endereço + Maps, no máximo 1x a cada 12 h.
+    if (clinic?.addressReplyEnabled && clinic.address && !conversation.aiEnabled) {
+      const lastAddress = await prisma.message.findFirst({
+        where: { conversationId: conversation.id, direction: "OUTBOUND", content: { startsWith: "📍 Nosso endereço" } },
+        orderBy: { createdAt: "desc" },
+        select: { createdAt: true },
+      });
+      if (shouldSendAddressReply({ enabled: true, message: incoming.text, lastAddressReplyAt: lastAddress?.createdAt ?? null, now: nowWelcome })) {
+        const text = addressReply(clinic);
+        const result = await sendWhatsAppMessage(incoming.phone, text, "address_reply.sent", resolvedClinicId);
         await prisma.message.create({
-          data: {
-            conversationId: conversation.id,
-            direction: "OUTBOUND",
-            content: welcomeText,
-            status: result.success ? "DELIVERED" : "FAILED",
-          },
+          data: { conversationId: conversation.id, direction: "OUTBOUND", content: text, status: result.success ? "DELIVERED" : "FAILED" },
         });
       }
     }

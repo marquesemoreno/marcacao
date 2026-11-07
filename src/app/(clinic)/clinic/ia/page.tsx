@@ -6,6 +6,8 @@ import { UrgencyTagToggle } from "@/components/clinic/urgency-tag-toggle";
 import { AfterHoursBookingToggle } from "@/components/clinic/after-hours-booking-toggle";
 import { ClosingMessageSetting } from "@/components/clinic/closing-message-setting";
 import { getClosingMessageSetting } from "@/actions/closing-message";
+import { WelcomeSettings } from "@/components/clinic/welcome-settings";
+import { getWelcomeSettings } from "@/actions/welcome-message";
 import type { AiActionGroup } from "@/lib/ai-actions";
 
 export const metadata = { title: "Ações da IA" };
@@ -32,11 +34,12 @@ export default async function AiActionsPage({ searchParams }: { searchParams: Pr
   const days = [7, 30, 90].includes(Number(params.days)) ? Number(params.days) : 30;
   const group = params.grupo === "decisao" || params.grupo === "atendimento" ? params.grupo : undefined;
   const query = params.q?.trim() || undefined;
-  const [rows, urgency, afterHours, closing] = await Promise.all([
+  const [rows, urgency, afterHours, closing, welcome] = await Promise.all([
     listAiActions(days, { group, query }),
     getUrgencyTagSetting(),
     getAfterHoursBookingSetting(),
     getClosingMessageSetting(),
+    getWelcomeSettings(),
   ]);
 
   const href = (over: { days?: number; grupo?: string }) => {
@@ -62,6 +65,7 @@ export default async function AiActionsPage({ searchParams }: { searchParams: Pr
           subtitle="O que a IA decidiu ou respondeu sozinha, com a mensagem do paciente que motivou. Abra a conversa para conferir ou corrigir."
         />
         <AfterHoursBookingToggle enabled={afterHours.enabled} canToggle={afterHours.canToggle} />
+        <WelcomeSettings {...welcome} />
         <ClosingMessageSetting enabled={closing.enabled} text={closing.text} canEdit={closing.canEdit} />
         <UrgencyTagToggle enabled={urgency.enabled} canToggle={urgency.canToggle} />
 
