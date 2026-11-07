@@ -9,7 +9,7 @@ export function UrgencyTagToggle({ enabled: initial, canToggle }: { enabled: boo
   const [enabled, setEnabled] = useState(initial);
   const [pending, start] = useTransition();
   return (
-    <section className="flex flex-wrap items-start justify-between gap-3 rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+    <section className="flex flex-wrap items-start justify-between gap-3 rounded-2xl bg-white p-4 shadow-xs dark:bg-slate-900">
       <div className="min-w-0 flex-1">
         <h2 className="text-sm font-semibold">Etiqueta de urgência clínica</h2>
         <p className="mt-0.5 text-sm text-slate-600 dark:text-slate-400">

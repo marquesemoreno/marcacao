@@ -45,10 +45,10 @@ export default async function AiActionsPage({ searchParams }: { searchParams: Pr
     return `/clinic/ia?${sp.toString()}`;
   };
   const chip = (active: boolean) =>
-    `inline-flex h-8 items-center rounded-md border px-3 text-sm font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50 ${
+    `inline-flex h-8 items-center rounded-full px-3.5 text-sm font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50 ${
       active
-        ? "bg-slate-900 text-white border-slate-900 dark:bg-slate-100 dark:text-slate-900 dark:border-slate-100"
-        : "border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800"
+        ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900"
+        : "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700"
     }`;
 
   return (
@@ -84,19 +84,19 @@ export default async function AiActionsPage({ searchParams }: { searchParams: Pr
             defaultValue={query}
             aria-label="Buscar paciente"
             placeholder="Buscar paciente…"
-            className="h-9 w-full max-w-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+            className="h-9 w-full max-w-xs rounded-full border border-transparent bg-slate-100 dark:bg-slate-800 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
           />
-          <button type="submit" className="h-9 rounded-lg px-4 text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800">
+          <button type="submit" className="h-9 rounded-full px-4 text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800">
             Buscar
           </button>
         </form>
 
         {rows.length === 0 ? (
-          <p className="rounded-lg border border-dashed border-slate-300 dark:border-slate-700 p-6 text-sm text-slate-600 dark:text-slate-400">
+          <p className="rounded-2xl border border-dashed border-slate-300 dark:border-slate-700 p-6 text-sm text-slate-600 dark:text-slate-400">
             Nenhuma ação da IA neste período. Quando ela confirmar, cancelar ou responder sozinha, aparece aqui.
           </p>
         ) : (
-          <ul className="divide-y divide-slate-100 dark:divide-slate-800 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+          <ul className="divide-y divide-slate-100 dark:divide-slate-800 rounded-2xl bg-white dark:bg-slate-900 shadow-xs">
             {rows.map((r) => (
               <li key={r.id}>
                 <Link
