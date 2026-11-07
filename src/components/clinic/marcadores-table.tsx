@@ -14,7 +14,7 @@ function formatPhone(p: string): string {
 }
 
 const pct = (n: number) => `${Math.round(n * 100)}%`;
-const panel = "rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900";
+const panel = "rounded-2xl bg-white dark:bg-slate-900 shadow-xs";
 
 /** Tabela de marcadores: relatório do período (indicados → agendados → atendidos), link
  * pessoal pra copiar e mandar pro marcador, ativar/desativar e importar lista colada. */
@@ -96,7 +96,7 @@ export function MarcadoresTable({ rows, hasClinicWhatsapp, days }: { rows: Marca
       </div>
 
       {!hasClinicWhatsapp && (
-        <p className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 px-3 py-2 text-sm text-amber-900 dark:text-amber-200">
+        <p className="rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 px-3 py-2 text-sm text-amber-900 dark:text-amber-200">
           Cadastre o WhatsApp da clínica em Configurações para gerar os links dos marcadores.
         </p>
       )}
@@ -109,14 +109,14 @@ export function MarcadoresTable({ rows, hasClinicWhatsapp, days }: { rows: Marca
             onChange={(e) => setQuery(e.target.value)}
             aria-label="Buscar marcador"
             placeholder="Buscar por nome ou telefone…"
-            className="h-9 w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+            className="h-9 w-full rounded-full border border-transparent bg-slate-100 dark:bg-slate-800 pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
           />
         </div>
         <button
           type="button"
           onClick={() => setImportOpen((o) => !o)}
           aria-expanded={importOpen}
-          className="inline-flex h-9 items-center gap-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800"
+          className="inline-flex h-9 items-center gap-2 rounded-full bg-slate-100 dark:bg-slate-800 px-4 text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700"
         >
           <Upload className="w-4 h-4" aria-hidden /> Adicionar marcadores
         </button>
@@ -139,14 +139,14 @@ export function MarcadoresTable({ rows, hasClinicWhatsapp, days }: { rows: Marca
             rows={6}
             aria-label="Lista de marcadores"
             placeholder={"Lene – 77 98831-4115\nMais Saúde; (77) 99821-3969"}
-            className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 p-3 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+            className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 p-3 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
           />
           <div className="flex justify-end">
             <button
               type="button"
               disabled={!importText.trim() || importing}
               onClick={runImport}
-              className="inline-flex h-9 items-center gap-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 px-4 text-sm font-semibold text-white"
+              className="inline-flex h-9 items-center gap-2 rounded-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 px-4 text-sm font-semibold text-white"
             >
               {importing && <Loader2 className="w-4 h-4 animate-spin" aria-hidden />} Cadastrar
             </button>
@@ -196,7 +196,7 @@ export function MarcadoresTable({ rows, hasClinicWhatsapp, days }: { rows: Marca
                       <button
                         type="button"
                         onClick={() => copyLink(r)}
-                        className="inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-200 dark:border-slate-700 px-2.5 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
+                        className="inline-flex h-8 items-center gap-1.5 rounded-full bg-slate-100 dark:bg-slate-800 px-3 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
                         aria-label={`Copiar link de ${r.name}`}
                       >
                         {copied === r.id ? <Check className="w-3.5 h-3.5 text-emerald-600" aria-hidden /> : <Copy className="w-3.5 h-3.5" aria-hidden />}
