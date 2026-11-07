@@ -52,7 +52,7 @@ Base: análise de 60 dias (Urolaser ~210 e Santa Clara ~170 mensagens digitadas 
 
 ## Etapa 4 — Receita sem ERP
 
-1. Agendamento pelo próprio paciente (link com horários livres via bridge).
+1. 🟡 **Nível 1 FEITO 07/11 (7c2b54b)**: IA adianta o pedido de marcação também no horário comercial (5 min sem resposta, cron booking-assist). Nível 2 (IA marca sozinha) espera a grade de dias/turnos de cada médico.
 2. 🟡 07/11 00aa7f5: cartão "Vagas recuperadas" no Relatório pronto. Falta a gestão ligar a vaga automática e usar a lista de espera (nenhuma clínica usa ainda).
 3. Envio automático da cobrança de orçamento pelo WhatsApp oficial.
 4. ✔️ **FEITO 07/11 (cda228c)**: NPS 9–10 → botão "Avaliar no Google" (link em Configurações > Parâmetros). Falta cada clínica colar o link.
