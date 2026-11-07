@@ -66,7 +66,7 @@ export function AgendaSidebar({
       </div>
 
       <div id="agenda-filters" className={`${mobileOpen ? "block" : "hidden"} lg:block space-y-3`}>
-        <div className="rounded-2xl bg-white dark:bg-slate-900 shadow-xs p-2 flex justify-center">
+        <div className="rounded-2xl bg-white dark:bg-slate-900 shadow-xs p-2 flex justify-center [&_.group\/calendar]:bg-transparent">
           <Calendar
             mode="single"
             locale={ptBR}

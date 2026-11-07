@@ -78,7 +78,7 @@ export function BudgetFollowupPanel({ onOpenChat }: { onOpenChat: (conversationI
             const id = item.conversationId;
             const disabled = busy === id;
             return (
-              <li key={id} className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3">
+              <li key={id} className="rounded-xl bg-white dark:bg-slate-900 shadow-xs p-3">
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                   <span className="text-sm font-semibold">{item.name}</span>
                   {item.value != null && (
@@ -100,7 +100,7 @@ export function BudgetFollowupPanel({ onOpenChat }: { onOpenChat: (conversationI
                   value={drafts[id] ?? item.message}
                   onChange={(e) => setDrafts((d) => ({ ...d, [id]: e.target.value }))}
                   rows={2}
-                  className="mt-2 w-full resize-y rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 px-2.5 py-1.5 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/50"
+                  className="mt-2 w-full resize-y rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 px-2.5 py-1.5 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/50"
                 />
                 <div className="mt-2 flex items-center justify-end gap-2">
                   <button
