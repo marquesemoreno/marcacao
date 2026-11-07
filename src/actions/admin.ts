@@ -5,6 +5,7 @@ import { CLINIC_ROLES, type ClinicRole } from "@/lib/clinic-permissions";
 import { prisma } from "@/lib/prisma";
 import { requireAdminSession } from "@/lib/session";
 import { updateClinicSchema, createClinicSchema } from "@/lib/schemas/admin";
+import { clinicSetupChecklist } from "@/lib/clinic-setup";
 
 export async function listClinics() {
   await requireAdminSession();
@@ -15,14 +16,31 @@ export async function listClinics() {
         select: {
           clinicProcedures: true,
           users: true,
+          knowledgeEntries: { where: { active: true } },
         },
       },
+      whatsappInstance: { select: { status: true } },
+      whatsappCloudAccount: { select: { active: true } },
+      hospitalIntegration: { select: { active: true } },
     },
   });
 
-  return clinics.map((c) => ({
+  return clinics.map(({ whatsappInstance, whatsappCloudAccount, hospitalIntegration, ...c }) => ({
     ...c,
     commissionRate: Number(c.commissionRate),
+    defaultTicket: c.defaultTicket != null ? Number(c.defaultTicket) : null,
+    setup: clinicSetupChecklist({
+      users: c._count.users,
+      procedures: c._count.clinicProcedures,
+      whatsappConnected: whatsappInstance?.status === "CONNECTED",
+      cloudActive: whatsappCloudAccount?.active === true,
+      hasBusinessHours: c.businessHours != null,
+      hasDefaultTicket: c.defaultTicket != null,
+      hasTechnicalDirector: !!(c.technicalDirectorName && c.technicalDirectorCrm),
+      knowledgeEntries: c._count.knowledgeEntries,
+      hasBridge: hospitalIntegration?.active === true,
+      hasGoogleReview: !!c.googleReviewUrl,
+    }),
   }));
 }
 

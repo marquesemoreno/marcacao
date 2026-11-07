@@ -68,7 +68,7 @@ Base: análise de 60 dias (Urolaser ~210 e Santa Clara ~170 mensagens digitadas 
 ## Etapa 6 — Fundação para vender
 
 1. Login mais seguro: 2FA, redefinir senha, revogar sessão, log; corrigir bug do e-mail com maiúscula.
-2. Cadastro de clínica nova só pela tela de admin (procedimentos, médicos, textos, WhatsApp).
+2. ✔️ 07/11: checklist "Pronta para usar" em cada clínica do /admin/clinicas (equipe, WhatsApp, procedimentos, horário, ticket + extras). Falta: assistente passo a passo, se for vender em escala.
 3. Site no ar: domínio, prints, privacidade e termos.
 4. Materiais de venda e conteúdo sobre a jornada menor (números das clínicas só com autorização ou anonimizados).
 5. API pública v1 — só quando surgir integração real.

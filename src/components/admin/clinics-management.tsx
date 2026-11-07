@@ -1,5 +1,7 @@
 "use client";
 
+import type { clinicSetupChecklist } from "@/lib/clinic-setup";
+import { ClinicSetupChecklist } from "@/components/admin/clinic-setup-checklist";
 import { useState } from "react";
 import { Search, MapPin, Phone, MessageSquare, Percent, Save, Store, MessagesSquare } from "lucide-react";
 import { updateClinicCommission, toggleClinicActive, toggleClinicMarketplaceListing } from "@/actions/admin";
@@ -33,6 +35,7 @@ export type ClinicItem = {
     clinicProcedures: number;
     users: number;
   };
+  setup?: ReturnType<typeof clinicSetupChecklist>;
 };
 
 function getInitials(name: string): string {
@@ -325,6 +328,8 @@ export function ClinicsManagement({ clinics: initialClinics }: { clinics: Clinic
                     )}
                   </div>
                 </div>
+
+                {clinic.setup && <ClinicSetupChecklist setup={clinic.setup} />}
 
                 {/* CONTROLE DE COMISSÃO DA CONECTA SAÚDE */}
                 <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-2xl border border-slate-100 dark:border-slate-800 flex items-center justify-between gap-3">
