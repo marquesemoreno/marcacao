@@ -55,7 +55,7 @@ Base: análise de 60 dias (Urolaser ~210 e Santa Clara ~170 mensagens digitadas 
 1. Agendamento pelo próprio paciente (link com horários livres via bridge).
 2. Ligar vaga automática / lista de espera e medir vagas recuperadas.
 3. Envio automático da cobrança de orçamento pelo WhatsApp oficial.
-4. NPS 9–10 → link de avaliação no Google.
+4. ✔️ **FEITO 07/11 (cda228c)**: NPS 9–10 → botão "Avaliar no Google" (link em Configurações > Parâmetros). Falta cada clínica colar o link.
 5. Mostrar no relatório quanto a régua de retorno/reativação trouxe.
 
 ## Etapa 5 — BI antes do ERP
