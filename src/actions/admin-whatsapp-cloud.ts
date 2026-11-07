@@ -55,7 +55,7 @@ async function requireCloudAccess(clinicId?: string): Promise<{ scope: string | 
 }
 
 function revalidateCloud() {
-  revalidateCloud();
+  revalidatePath("/admin/whatsapp");
   revalidatePath("/clinic/whatsapp");
 }
 
