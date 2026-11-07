@@ -5,9 +5,11 @@
  * testado; quem identifica a clínica (pelo phone_number_id) e grava é a rota. */
 
 type MediaFields = { mediaId?: string; mimeType?: string; fileName?: string };
+/** Anúncio/post de clique para WhatsApp (`referral` da Meta). ctwaClid serve à API de Conversões. */
+export type CloudAd = { sourceId: string | null; sourceUrl: string | null; title: string | null; ctwaClid: string | null };
 
 export type CloudEvent =
-  | ({ kind: "inbound"; phoneNumberId: string; from: string; name?: string; keyId: string; text: string; type: string; at: Date } & MediaFields)
+  | ({ kind: "inbound"; phoneNumberId: string; from: string; name?: string; keyId: string; text: string; type: string; at: Date; ad?: CloudAd } & MediaFields)
   | ({ kind: "device_outbound"; phoneNumberId: string; to: string; keyId: string; text: string; type: string; at: Date } & MediaFields)
   | { kind: "status"; phoneNumberId: string; keyId: string; status: string; at: Date; error?: string };
 
@@ -38,6 +40,13 @@ function readContent(m: RawMsg, direction: "recebid" | "enviad"): { text: string
   return { text: `[${m.type ?? "mensagem"}]` };
 }
 
+function readAd(r: RawMsg | undefined): CloudAd | null {
+  if (!r || typeof r !== "object") return null;
+  const s = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : v != null && typeof v !== "object" ? String(v) : null);
+  const ad = { sourceId: s(r.source_id), sourceUrl: s(r.source_url), title: s(r.headline) ?? s(r.body), ctwaClid: s(r.ctwa_clid) };
+  return ad.sourceId || ad.sourceUrl ? ad : null;
+}
+
 const toDate = (ts: string | number | undefined) => new Date(Number(ts ?? 0) * 1000);
 
 export function parseCloudWebhook(body: unknown): CloudEvent[] {
@@ -62,6 +71,7 @@ export function parseCloudWebhook(body: unknown): CloudEvent[] {
             type: m.type,
             at: toDate(m.timestamp),
             ...readContent(m, "recebid"),
+            ...(readAd(m.referral) ? { ad: readAd(m.referral)! } : {}),
           });
         }
         for (const s of v.statuses ?? []) {
@@ -103,6 +113,7 @@ export function toEvolutionPayload(clinicId: string, event: Extract<CloudEvent, 
     data: {
       key: { remoteJid: `${event.from}@s.whatsapp.net`, fromMe: false, id: event.keyId, ...media },
       ...(event.name ? { pushName: event.name } : {}),
+      ...(event.ad ? { contextInfo: { externalAdReply: { title: event.ad.title, sourceUrl: event.ad.sourceUrl, sourceId: event.ad.sourceId, ctwaClid: event.ad.ctwaClid } } } : {}),
       message,
       messageTimestamp: Math.floor(event.at.getTime() / 1000),
     },

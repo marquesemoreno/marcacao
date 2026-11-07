@@ -111,3 +111,41 @@ describe("nome original do documento", () => {
     expect(p.data.message).toEqual({ documentMessage: { mimetype: "application/pdf", fileName: "pedido-exame.pdf" } });
   });
 });
+
+describe("anúncio de clique para WhatsApp (referral da API oficial)", () => {
+  it("referral vira externalAdReply e o canal do anúncio é detectado", async () => {
+    const [ev] = parseCloudWebhook(
+      entry("messages", {
+        metadata: { phone_number_id: "PN1" },
+        messages: [
+          {
+            id: "wamid.R",
+            from: "5577988887777",
+            timestamp: "1791300000",
+            type: "text",
+            text: { body: "Quero saber da vasectomia" },
+            referral: { source_url: "https://fb.me/abc", source_id: "120200", source_type: "ad", headline: "Vasectomia sem corte", ctwa_clid: "CLID1" },
+          },
+        ],
+      })
+    );
+    expect(ev).toMatchObject({ kind: "inbound", ad: { sourceId: "120200", sourceUrl: "https://fb.me/abc", title: "Vasectomia sem corte", ctwaClid: "CLID1" } });
+    const p = toEvolutionPayload("c", ev as Extract<typeof ev, { kind: "inbound" }>);
+    const { detectAcquisition } = await import("./acquisition");
+    expect(detectAcquisition({ text: "Quero saber da vasectomia", data: p.data }, [])).toEqual({
+      channel: "Facebook Ads",
+      detail: "Vasectomia sem corte",
+      adId: "120200",
+    });
+  });
+
+  it("referral de post (não anúncio) usa o corpo como título e Instagram pela URL", () => {
+    const [ev] = parseCloudWebhook(
+      entry("messages", {
+        metadata: { phone_number_id: "PN1" },
+        messages: [{ id: "w", from: "1", timestamp: "1", type: "text", text: { body: "oi" }, referral: { source_url: "https://www.instagram.com/p/X", source_id: "9", source_type: "post", body: "Check-up" } }],
+      })
+    );
+    expect(ev).toMatchObject({ ad: { sourceId: "9", title: "Check-up" } });
+  });
+});
