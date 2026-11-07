@@ -16,6 +16,7 @@ import {
   Megaphone,
   Sparkles,
   ShieldCheck,
+  BookOpen,
   Wallet,
   Smartphone,
   type LucideIcon, ClipboardList, MonitorPlay, Ticket } from "lucide-react";
@@ -53,6 +54,7 @@ const NAV_GROUPS: NavGroup[] = [
       { href: "/clinic/disparos", label: "Disparos", icon: Megaphone, perm: "disparos" },
       { href: "/clinic/relatorio", label: "Relatórios", icon: BarChart3, perm: "relatorios" },
       { href: "/clinic/ia", label: "Ações da IA", icon: Sparkles },
+      { href: "/clinic/processos", label: "Processos", icon: BookOpen },
       { href: "/clinic/ficha", label: "Ficha prévia", icon: ClipboardList, perm: "config" },
       { href: "/clinic/retorno", label: "Retorno", icon: Repeat, perm: "config" },
       { href: "/clinic/tv", label: "TV da sala de espera", icon: MonitorPlay, perm: "config" },

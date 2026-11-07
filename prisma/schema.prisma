@@ -1658,3 +1658,44 @@ model TvMediaItem {
   @@index([clinicId, position])
   @@map("tv_media_items")
 }
+
+/// Processo de um setor da clínica (src/lib/processes.ts): passo a passo que a equipe consulta.
+/// status DRAFT (só gestão vê) | PUBLISHED. version sobe a cada edição publicada.
+model ClinicProcess {
+  id              String            @id @default(cuid())
+  clinicId        String            @map("clinic_id")
+  sector          String
+  title           String
+  body            String            @db.Text
+  status          String            @default("DRAFT")
+  version         Int               @default(1)
+  changeNote      String?           @map("change_note")
+  updatedByUserId String?           @map("updated_by_user_id")
+  publishedAt     DateTime?         @map("published_at")
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+  feedback        ProcessFeedback[]
+
+  @@unique([clinicId, sector])
+  @@map("clinic_processes")
+}
+
+/// Dúvida, opinião ou reclamação da equipe sobre um processo. status NOVA | VISTA | RESOLVIDA.
+/// anonymous = a gestão não vê quem mandou (userId fica nulo).
+model ProcessFeedback {
+  id           String        @id @default(cuid())
+  clinicId     String        @map("clinic_id")
+  processId    String        @map("process_id")
+  userId       String?       @map("user_id")
+  kind         String
+  text         String        @db.Text
+  status       String        @default("NOVA")
+  aiAnswer     String?       @map("ai_answer") @db.Text
+  managerReply String?       @map("manager_reply") @db.Text
+  createdAt    DateTime      @default(now()) @map("created_at")
+  updatedAt    DateTime      @updatedAt @map("updated_at")
+  process      ClinicProcess @relation(fields: [processId], references: [id], onDelete: Cascade)
+
+  @@index([clinicId, status])
+  @@map("process_feedback")
+}
