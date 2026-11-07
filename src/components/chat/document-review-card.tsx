@@ -47,7 +47,7 @@ export function DocumentReviewCard({
           <FileSearch className="w-3 h-3" />
           {DOCUMENT_TYPE_LABELS[extracted.documentType]}
         </span>
-        <span className={`text-[10px] px-2 py-0.5 rounded-md font-semibold border ${TIER_CLASSES[validation.confidence.tier]}`}>
+        <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold border ${TIER_CLASSES[validation.confidence.tier]}`}>
           {TIER_LABELS[validation.confidence.tier]} · {validation.confidence.total}%
         </span>
       </div>
@@ -58,7 +58,7 @@ export function DocumentReviewCard({
             <span
               key={`${match.rawText}-${index}`}
               title={match.matched ? `${Math.round(match.matched.similarity * 100)}% de similaridade` : "Não reconhecido no catálogo"}
-              className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-md font-medium border ${
+              className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-medium border ${
                 match.matched
                   ? "bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950/40 dark:text-sky-300 dark:border-sky-900"
                   : "bg-slate-100 text-slate-500 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700"
@@ -73,7 +73,7 @@ export function DocumentReviewCard({
 
       {validation.convenioMatch.identified && (
         <span
-          className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-md font-medium border ${
+          className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-medium border ${
             validation.convenioMatch.recognizedAsKnown
               ? "bg-emerald-50 text-emerald-700 border-emerald-200"
               : "bg-amber-50 text-amber-700 border-amber-200"
@@ -103,7 +103,7 @@ export function DocumentReviewCard({
         <button
           type="button"
           onClick={() => onOpenSchedule(undefined)}
-          className="inline-flex items-center justify-center gap-1 h-8 px-3 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 text-[11px] font-semibold transition-colors"
+          className="inline-flex items-center justify-center gap-1 h-8 px-3 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 text-[11px] font-semibold transition-colors"
         >
           <Pencil className="w-3 h-3" />
           Ajustar Dados

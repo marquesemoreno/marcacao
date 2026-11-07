@@ -38,7 +38,7 @@ export function renderConsultationRow(consultation: ConsultationRecord) {
   return (
     <div
       key={consultation.id}
-      className="p-2 rounded-lg border border-slate-100 dark:border-slate-700/60 bg-slate-50 dark:bg-slate-900/40 text-xs"
+      className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800/60 text-xs"
     >
       <div className="flex items-center justify-between gap-2">
         <span className="font-semibold text-slate-800 dark:text-slate-200 truncate">{consultation.specialty}</span>

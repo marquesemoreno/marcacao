@@ -2687,7 +2687,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                     {copilotSuggestions.map((suggestion, index) => (
                       <div
                         key={index}
-                        className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60 p-2.5 space-y-2"
+                        className="rounded-xl bg-slate-100 dark:bg-slate-800/60 p-2.5 space-y-2"
                       >
                         <p className="text-[11.5px] text-slate-700 dark:text-slate-200 leading-relaxed whitespace-pre-wrap">
                           {suggestion}
@@ -2699,7 +2699,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                               setInputText(suggestion);
                               toast.success("Sugestão inserida na resposta!");
                             }}
-                            className="flex-1 px-2 py-1 text-xs font-semibold rounded-md border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                            className="flex-1 px-2 py-1 text-xs font-semibold rounded-full bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
                           >
                             Inserir no chat
                           </button>
@@ -2709,7 +2709,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                               onSendMessage(suggestion, 'whatsapp');
                               setCopilotSuggestions([]);
                             }}
-                            className="flex-1 px-2 py-1 text-xs font-semibold rounded-md bg-emerald-600 hover:bg-emerald-700 text-white transition-colors"
+                            className="flex-1 px-2 py-1 text-xs font-semibold rounded-full bg-emerald-600 hover:bg-emerald-700 text-white transition-colors"
                           >
                             Enviar direto
                           </button>
@@ -2854,7 +2854,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                         value={selectedContact.acquisitionChannel ?? ""}
                         onChange={(e) => onChangeAcquisition(selectedContact.id, e.target.value || null)}
                         title={selectedContact.acquisitionDetail ? `Detectado: ${selectedContact.acquisitionDetail}` : undefined}
-                        className="max-w-[150px] truncate rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-1.5 py-0.5 text-xs font-semibold text-slate-800 dark:text-slate-200"
+                        className="max-w-[150px] truncate rounded-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-1.5 py-0.5 text-xs font-semibold text-slate-800 dark:text-slate-200"
                       >
                         <option value="">Não identificado</option>
                         {[...new Set([...ACQUISITION_CHANNELS, ...(selectedContact.acquisitionChannel ? [selectedContact.acquisitionChannel] : [])])].map((ch) => (
@@ -2982,7 +2982,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                     render={
                       <button
                         type="button"
-                        className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 flex items-center justify-between text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
+                        className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-between text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700"
                       />
                     }
                   >
@@ -3071,7 +3071,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                     <button
                       type="button"
                       onClick={() => setPendingFunnelStage(null)}
-                      className="flex-1 px-2 py-1.5 rounded-md border border-slate-300 dark:border-slate-600 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+                      className="flex-1 px-2 py-1.5 rounded-full bg-slate-100 dark:bg-slate-800 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700"
                     >
                       Cancelar
                     </button>
@@ -3165,7 +3165,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                         <button
                           type="button"
                           onClick={() => setPendingDeleteReplyId(null)}
-                          className="flex-1 px-2 py-1.5 rounded-md border border-slate-300 dark:border-slate-600 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+                          className="flex-1 px-2 py-1.5 rounded-full bg-slate-100 dark:bg-slate-800 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700"
                         >
                           Cancelar
                         </button>
@@ -3177,7 +3177,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                 return (
                   <div
                     key={reply.id}
-                    className="flex items-start justify-between gap-2 p-2.5 rounded-lg border border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/60"
+                    className="flex items-start justify-between gap-2 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/40 hover:bg-slate-100 dark:hover:bg-slate-800"
                   >
                     <div className="min-w-0">
                       <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-400">{reply.shortcut}</p>

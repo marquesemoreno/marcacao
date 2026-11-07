@@ -93,5 +93,5 @@ Agenda → prontuário → financeiro → estoque, guiado pelo que o mapeamento 
 
 ## Melhorias de design pendentes
 
-- Widgets internos do painel lateral do Chat ainda no estilo antigo.
+- ✔️ 07/11: widgets internos do painel lateral do Chat e ficha do paciente no estilo novo (conferir na tela).
 - Modo claro só conferido no Chat.

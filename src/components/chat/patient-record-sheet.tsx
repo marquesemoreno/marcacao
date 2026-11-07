@@ -171,8 +171,8 @@ export function PatientRecordSheet({ contact, open, onOpenChange, onUpdatePatien
           </TabsList>
           </div>
 
-          <TabsContent value="resumo" className="min-h-0 flex-1 overflow-y-auto space-y-3 p-4">
-            <div className="bg-white dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/80 rounded-xl p-4 space-y-3 shadow-sm">
+          <TabsContent value="resumo" className="min-h-0 flex-1 overflow-y-auto space-y-3 p-4 bg-slate-100 dark:bg-slate-950">
+            <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 space-y-3 shadow-xs">
               <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
                 <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                 <span className="font-medium">WhatsApp:</span>
@@ -269,11 +269,11 @@ export function PatientRecordSheet({ contact, open, onOpenChange, onUpdatePatien
             </div>
           </TabsContent>
 
-          <TabsContent value="historico" className="min-h-0 flex-1 overflow-y-auto space-y-3 p-4">
+          <TabsContent value="historico" className="min-h-0 flex-1 overflow-y-auto space-y-3 p-4 bg-slate-100 dark:bg-slate-950">
             {contact.consultationHistory.length === 0 ? (
               <p className="text-xs text-slate-500 dark:text-slate-400">Nenhum agendamento encontrado pra esse paciente.</p>
             ) : (
-              <div className="bg-white dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/80 rounded-xl p-4 shadow-sm space-y-3">
+              <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-xs space-y-3">
                 {upcoming.length > 0 && (
                   <div className="space-y-1.5">
                     <Label className="text-xs font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
@@ -294,7 +294,7 @@ export function PatientRecordSheet({ contact, open, onOpenChange, onUpdatePatien
             )}
           </TabsContent>
 
-          <TabsContent value="documentos" className="min-h-0 flex-1 overflow-y-auto space-y-3 p-4">
+          <TabsContent value="documentos" className="min-h-0 flex-1 overflow-y-auto space-y-3 p-4 bg-slate-100 dark:bg-slate-950">
             {!onLoadMedia ? (
               <p className="text-xs text-slate-500 dark:text-slate-400">Indisponível aqui.</p>
             ) : isLoadingMedia ? (
@@ -302,7 +302,7 @@ export function PatientRecordSheet({ contact, open, onOpenChange, onUpdatePatien
             ) : !media || media.length === 0 ? (
               <p className="text-xs text-slate-500 dark:text-slate-400">Nenhum arquivo trocado com esse paciente ainda.</p>
             ) : (
-              <div className="bg-white dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/80 rounded-xl divide-y divide-slate-100 dark:divide-slate-800 shadow-sm">
+              <div className="bg-white dark:bg-slate-900 rounded-2xl divide-y divide-slate-100 dark:divide-slate-800 shadow-xs">
                 {media.map((item) => (
                   <div key={item.id} className="flex items-center gap-2.5 p-3 text-xs">
                     {item.mimeType?.startsWith("image/") ? (
@@ -333,8 +333,8 @@ export function PatientRecordSheet({ contact, open, onOpenChange, onUpdatePatien
             )}
           </TabsContent>
 
-          <TabsContent value="observacoes" className="min-h-0 flex-1 overflow-y-auto space-y-3 p-4">
-            <div className="bg-white dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/80 rounded-xl p-4 shadow-sm space-y-2">
+          <TabsContent value="observacoes" className="min-h-0 flex-1 overflow-y-auto space-y-3 p-4 bg-slate-100 dark:bg-slate-950">
+            <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-xs space-y-2">
               <Label className="text-xs font-bold text-slate-600 dark:text-slate-300">
                 Observação Interna Permanente
               </Label>
@@ -350,7 +350,7 @@ export function PatientRecordSheet({ contact, open, onOpenChange, onUpdatePatien
               </Button>
             </div>
 
-            <div className="bg-white dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/80 rounded-xl p-4 shadow-sm space-y-2">
+            <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-xs space-y-2">
               <div className="flex items-center justify-between">
                 <Label className="text-xs font-bold text-slate-600 dark:text-slate-300">
                   Tags do Paciente
@@ -373,7 +373,7 @@ export function PatientRecordSheet({ contact, open, onOpenChange, onUpdatePatien
                 {contact.tags.map((tag) => (
                   <span
                     key={tag}
-                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-semibold border ${tagClasses(tag)}`}
+                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold border ${tagClasses(tag)}`}
                   >
                     {tag}
                     <button type="button" onClick={() => onRemoveTag(tag)} aria-label={`Remover tag ${tag}`} className="p-1 -m-1 hover:text-slate-900 dark:hover:text-white">
