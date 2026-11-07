@@ -45,7 +45,7 @@ Base: análise de 60 dias (Urolaser ~210 e Santa Clara ~170 mensagens digitadas 
 ## Etapa 3 — Marketing e rastreamento (módulo novo)
 
 1. 🟡 Pedir já à Meta a permissão de anúncios (`ads_read`/`ads_management`) e ao Google o token do Google Ads (demoram semanas).
-2. Fase 1 — rastreamento: origem do anúncio de clique para WhatsApp (referral da API oficial), UTMs, funil conversa → agendou → compareceu → faturou, custo por paciente atendido.
+2. Fase 1 — rastreamento: ✔️ 07/11 147104b referral da API oficial → canal/anúncio da conversa (igual à Evolution). Falta: UTMs no site, funil conversa → agendou → compareceu → faturou, custo por paciente atendido. Antes: origem do anúncio de clique para WhatsApp (referral da API oficial), UTMs, funil conversa → agendou → compareceu → faturou, custo por paciente atendido.
 3. Fase 2 — gasto automático das contas Meta/Google + painel de ROI por campanha.
 4. Fase 3 — API de Conversões (Meta) e conversões offline (Google): só evento + dados criptografados, **nunca** procedimento/dado de saúde (LGPD).
 5. Fase 4 — regras automáticas (pausar/reforçar verba, campanha quando a agenda esvazia) em modo "propor e confirmar"; sugestões da IA.
