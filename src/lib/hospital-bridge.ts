@@ -555,3 +555,52 @@ export async function fetchBridgeCampaignPatients(
   // telefonesComMarcacaoFutura só existe no bridge de 01/11/2026 em diante.
   return { patients: data.pacientes, futurePhones: data.telefonesComMarcacaoFutura ?? [] };
 }
+
+/** Painel do dono (Etapa 5.2): resumos só leitura dos bancos FINANCEIRO e ALMOXA da clínica.
+ * "unavailable" = ponte antiga (404) ou caminho do banco não configurado (501). */
+export type BridgeFinanceSide = { emitido: number; titulos: number; baixado: number; vencidoEmAberto: number; titulosVencidos: number };
+export type BridgeFinanceSummary = {
+  inicio: string;
+  fim: string;
+  receber: BridgeFinanceSide;
+  pagar: BridgeFinanceSide;
+  planoDeContas: { tipo: string; conta: string; total: number }[];
+  ultimaBaixa: string | null;
+  ultimoMovimento: string | null;
+};
+export type BridgeStockSummary = {
+  locais: { local: string; produtosComSaldo: number }[];
+  consumo: { qtd30: number; qtd90: number; produtos90: number };
+  maisUsados30: { produto: string; qtd: number }[];
+  paradosSemSaida180: number;
+  comprasPorMes: { mes: string; notas: number; total: number }[];
+};
+type OwnerResult<T> = { ok: true; data: T } | { ok: false; reason: "unavailable" | "error" };
+
+async function fetchOwnerEndpoint<T>(clinicId: string, path: string): Promise<OwnerResult<T>> {
+  const config = await getBridgeConfig(clinicId);
+  if (!config) return { ok: false, reason: "unavailable" };
+  try {
+    const response = await fetch(`${config.apiUrl}${path}`, {
+      headers: { "x-api-token": config.apiToken },
+      signal: AbortSignal.timeout(25000),
+      cache: "no-store",
+    });
+    if (response.status === 404 || response.status === 501) return { ok: false, reason: "unavailable" };
+    if (!response.ok) return { ok: false, reason: "error" };
+    return { ok: true, data: (await response.json()) as T };
+  } catch {
+    return { ok: false, reason: "error" };
+  }
+}
+
+export function fetchBridgeFinanceSummary(clinicId: string, inicio: string, fim: string) {
+  return fetchOwnerEndpoint<BridgeFinanceSummary>(
+    clinicId,
+    `/api/financeiro/resumo?inicio=${encodeURIComponent(inicio)}&fim=${encodeURIComponent(fim)}`
+  );
+}
+
+export function fetchBridgeStockSummary(clinicId: string) {
+  return fetchOwnerEndpoint<BridgeStockSummary>(clinicId, "/api/estoque/resumo");
+}

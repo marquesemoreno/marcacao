@@ -16,6 +16,7 @@ import {
   Megaphone,
   Sparkles,
   ShieldCheck,
+  Wallet,
   Smartphone,
   type LucideIcon, ClipboardList, MonitorPlay, Ticket } from "lucide-react";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
@@ -55,6 +56,7 @@ const NAV_GROUPS: NavGroup[] = [
       { href: "/clinic/ficha", label: "Ficha prévia", icon: ClipboardList, perm: "config" },
       { href: "/clinic/retorno", label: "Retorno", icon: Repeat, perm: "config" },
       { href: "/clinic/tv", label: "TV da sala de espera", icon: MonitorPlay, perm: "config" },
+      { href: "/clinic/financeiro", label: "Financeiro", icon: Wallet, perm: "config" },
       { href: "/clinic/acessos", label: "Acessos", icon: ShieldCheck, perm: "config" },
       { href: "/clinic/whatsapp", label: "WhatsApp", icon: Smartphone, perm: "config" },
       // Visível também pras clínicas só-WhatsApp (horários e ticket médio valem pra elas).
