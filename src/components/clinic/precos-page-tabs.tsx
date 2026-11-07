@@ -38,10 +38,10 @@ export function PrecosPageTabs({
   return (
     <Tabs defaultValue="horarios" className="gap-4 min-w-0">
       {/* Fixa no topo do contêiner de rolagem da página (lista de procedimentos é longa). */}
-      <TabsList className="sticky top-0 z-10 h-auto! w-full sm:w-fit flex-wrap justify-start bg-muted shadow-xs">
-        <TabsTrigger value="horarios">Horários de Atendimento</TabsTrigger>
-        <TabsTrigger value="precos">Procedimentos e Preços</TabsTrigger>
-        <TabsTrigger value="parametros">Parâmetros, Links e Campanhas</TabsTrigger>
+      <TabsList className="sticky top-0 z-10 h-auto! w-full sm:w-fit flex-wrap justify-start rounded-full! p-1 bg-slate-100 dark:bg-slate-800">
+        <TabsTrigger value="horarios" className="rounded-full! px-3">Horários de Atendimento</TabsTrigger>
+        <TabsTrigger value="precos" className="rounded-full! px-3">Procedimentos e Preços</TabsTrigger>
+        <TabsTrigger value="parametros" className="rounded-full! px-3">Parâmetros, Links e Campanhas</TabsTrigger>
       </TabsList>
 
       <TabsContent value="horarios" className="min-w-0">

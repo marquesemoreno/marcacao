@@ -13,7 +13,7 @@ export function PageHeader({ title, subtitle, actions }: { title: string; subtit
         <h1 className="text-xl md:text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">{title}</h1>
         {subtitle && <p className="text-sm text-slate-600 dark:text-slate-400 mt-0.5">{subtitle}</p>}
       </div>
-      <div className="flex flex-wrap items-center gap-2 min-w-0">
+      <div className="flex items-center gap-2 shrink-0">
         {actions}
         <button
           type="button"
