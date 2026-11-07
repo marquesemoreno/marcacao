@@ -1,11 +1,24 @@
+import { cache } from "react";
 import { getServerSession } from "next-auth";
+import { sessionStillValid } from "@/lib/auth-security";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { can, parseClinicRole, type ClinicPermission, type ClinicRole } from "@/lib/clinic-permissions";
 
+/** Usuário lido 1x por requisição (cache do React) — ativo, versão da sessão e função. */
+const loadUser = cache((id: string) =>
+  prisma.user.findUnique({ where: { id }, select: { active: true, sessionVersion: true, clinicRole: true } })
+);
+
+/** Sessão ainda vale? Cai na hora se o usuário foi desativado, trocou a senha ou teve as
+ * sessões encerradas (sessionVersion subiu). */
+export async function isLive(session: { user: { id: string; sessionVersion?: number } }) {
+  return sessionStillValid(session.user.sessionVersion, await loadUser(session.user.id));
+}
+
 async function clinicSessionBase() {
   const session = await getServerSession(authOptions);
-  if (!session || session.user.role !== "CLINIC" || !session.user.clinicId) {
+  if (!session || session.user.role !== "CLINIC" || !session.user.clinicId || !(await isLive(session))) {
     throw new Error("Não autorizado");
   }
   return { userId: session.user.id, clinicId: session.user.clinicId };
@@ -23,14 +36,14 @@ export async function requireClinicSession() {
  * painel da clínica e não devem virar erro no servidor quando o admin abre a mesma tela. */
 export async function getClinicSessionOrNull() {
   const session = await getServerSession(authOptions);
-  if (!session || session.user.role !== "CLINIC" || !session.user.clinicId) return null;
+  if (!session || session.user.role !== "CLINIC" || !session.user.clinicId || !(await isLive(session))) return null;
   if ((await getClinicRole(session.user.id)) === "MEDICO") return null;
   return { userId: session.user.id, clinicId: session.user.clinicId };
 }
 
 export async function requireAdminSession() {
   const session = await getServerSession(authOptions);
-  if (!session || session.user.role !== "ADMIN") {
+  if (!session || session.user.role !== "ADMIN" || !(await isLive(session))) {
     throw new Error("Não autorizado");
   }
   return { userId: session.user.id };
@@ -44,8 +57,7 @@ export async function isClinicManager(userId: string): Promise<boolean> {
 
 /** Função do usuário (lida do banco a cada chamada — troca vale na hora). */
 export async function getClinicRole(userId: string): Promise<ClinicRole> {
-  const user = await prisma.user.findUnique({ where: { id: userId }, select: { clinicRole: true } });
-  return parseClinicRole(user?.clinicRole);
+  return parseClinicRole((await loadUser(userId))?.clinicRole);
 }
 
 /** Sessão da clínica com a permissão pedida (tabela em clinic-permissions.ts). */

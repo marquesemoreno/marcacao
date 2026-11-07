@@ -16,6 +16,10 @@ function LoginForm() {
   const searchParams = useSearchParams();
   const [formError, setFormError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+  // Verificação em duas etapas: a senha conferiu e o servidor pediu o código do app.
+  const [needCode, setNeedCode] = useState(false);
+  const [code, setCode] = useState("");
+  const expired = searchParams.get("expirada") === "1";
 
   const {
     register,
@@ -28,9 +32,18 @@ function LoginForm() {
     const result = await signIn("credentials", {
       email: values.email,
       password: values.password,
+      code: needCode ? code : "",
       redirect: false,
     });
 
+    if (result?.error === "2FA_REQUIRED") {
+      setNeedCode(true);
+      return;
+    }
+    if (result?.error === "2FA_INVALID") {
+      setFormError("Código incorreto. Use o código que aparece agora no app autenticador.");
+      return;
+    }
     if (!result || result.error) {
       const message = "E-mail ou senha inválidos.";
       setFormError(message);
@@ -111,6 +124,32 @@ function LoginForm() {
           )}
         </div>
 
+        {needCode && (
+          <div className="space-y-1.5">
+            <label htmlFor="code" className="text-xs font-semibold text-slate-700">
+              Código do app autenticador
+            </label>
+            <input
+              id="code"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              autoFocus
+              maxLength={7}
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              className="h-12 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-center text-lg tracking-[0.4em] tabular-nums text-slate-900 focus:border-teal-600 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-500/20"
+              placeholder="000000"
+            />
+            <p className="text-xs text-slate-500">Abra o Google Authenticator (ou outro app) e digite os 6 números do Conecta Saúde.</p>
+          </div>
+        )}
+
+        {expired && !formError && (
+          <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs font-medium text-amber-700">
+            Sua sessão foi encerrada (senha trocada ou acesso revisto). Entre de novo.
+          </p>
+        )}
+
         {formError && (
           <p className="rounded-lg bg-rose-50 px-3 py-2 text-xs font-medium text-rose-600">
             {formError}
@@ -124,6 +163,9 @@ function LoginForm() {
         >
           {isSubmitting ? "Entrando..." : "Entrar"}
         </Button>
+        <a href="/esqueci-senha" className="text-center text-xs font-medium text-slate-500 hover:text-teal-700">
+          Esqueci minha senha
+        </a>
       </form>
 
       <div className="mt-7 border-t border-slate-100 pt-5 text-center">

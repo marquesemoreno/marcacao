@@ -1,6 +1,8 @@
 import { getServerSession } from "next-auth";
 import { PanelDarkDefault } from "@/components/panel-dark-default";
 import { authOptions } from "@/lib/auth";
+import { isLive } from "@/lib/session";
+import { redirect } from "next/navigation";
 import { SignOutButton } from "@/components/sign-out-button";
 import { Logo } from "@/components/brand/logo";
 import { AdminNav } from "@/components/admin/admin-nav";
@@ -16,6 +18,7 @@ export default async function AdminLayout({
   children: React.ReactNode;
 }>) {
   const session = await getServerSession(authOptions);
+  if (session && !(await isLive(session))) redirect("/sair");
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100">

@@ -169,6 +169,11 @@ model User {
   /// Função MEDICO: nome do médico como vem da agenda (ponte/Conecta) — filtra "Meus pacientes".
   doctorName         String?  @map("doctor_name")
   active             Boolean  @default(true)
+  /// Sobe a cada troca de senha / "encerrar sessões" — JWT com versão antiga deixa de valer.
+  sessionVersion     Int      @default(0) @map("session_version")
+  /// Segredo TOTP (verificação em duas etapas), criptografado (token-crypto). Vale só com totpEnabledAt.
+  totpSecret         String?  @map("totp_secret")
+  totpEnabledAt      DateTime? @map("totp_enabled_at")
   createdAt          DateTime @default(now()) @map("created_at")
   updatedAt          DateTime @updatedAt @map("updated_at")
 
@@ -1698,4 +1703,35 @@ model ProcessFeedback {
 
   @@index([clinicId, status])
   @@map("process_feedback")
+}
+
+/// Histórico de entradas no sistema (login certo e errado), para a gestão e o admin.
+model LoginEvent {
+  id        String   @id @default(cuid())
+  userId    String?  @map("user_id")
+  clinicId  String?  @map("clinic_id")
+  email     String
+  success   Boolean
+  /// SENHA | BLOQUEADO | INATIVO | CODIGO_2FA (falha) — null no sucesso.
+  reason    String?
+  ip        String?
+  userAgent String?  @map("user_agent")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([clinicId, createdAt])
+  @@index([userId, createdAt])
+  @@map("login_events")
+}
+
+/// "Esqueci a senha": link por e-mail, uso único, 1 hora. Guarda só o hash do token.
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String    @map("user_id")
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@map("password_reset_tokens")
 }

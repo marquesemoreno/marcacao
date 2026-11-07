@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { KeyRound, Loader2, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
+import { useSession } from "next-auth/react";
 import { changeMyPassword } from "@/actions/account";
 
 function PasswordField({
@@ -49,6 +50,7 @@ function PasswordField({
 }
 
 export function ChangePasswordForm() {
+  const { update } = useSession();
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -56,8 +58,8 @@ export function ChangePasswordForm() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (newPassword.length < 6) {
-      toast.error("A nova senha precisa ter pelo menos 6 caracteres.");
+    if (newPassword.length < 8) {
+      toast.error("A nova senha precisa ter pelo menos 8 caracteres, com letra e número.");
       return;
     }
     if (newPassword !== confirmPassword) {
@@ -67,7 +69,9 @@ export function ChangePasswordForm() {
     setSaving(true);
     try {
       await changeMyPassword(currentPassword, newPassword);
-      toast.success("Senha alterada com sucesso!");
+      // A troca derruba as sessões; update() renova a deste aparelho.
+      await update();
+      toast.success("Senha alterada. Os outros aparelhos foram desconectados.");
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");

@@ -32,5 +32,15 @@ export async function GET(request: Request) {
     where: { submittedAt: { lt: new Date(Date.now() - FORM_RETENTION_DAYS * 86_400_000) } },
   });
   const patientTokens = await prisma.patientToken.deleteMany({ where: { expiresAt: { lt: new Date(Date.now() - 30 * 86_400_000) } } });
-  return NextResponse.json({ webhookLogs, loginFailures: loginFailures.count, formResponses: formResponses.count, patientTokens: patientTokens.count });
+  // Histórico de login: 6 meses. Links de "esqueci a senha": apagados 1 dia depois de vencer.
+  const loginEvents = await prisma.loginEvent.deleteMany({ where: { createdAt: { lt: new Date(Date.now() - 180 * 86_400_000) } } });
+  const resetTokens = await prisma.passwordResetToken.deleteMany({ where: { expiresAt: { lt: new Date(Date.now() - 86_400_000) } } });
+  return NextResponse.json({
+    webhookLogs,
+    loginFailures: loginFailures.count,
+    formResponses: formResponses.count,
+    patientTokens: patientTokens.count,
+    loginEvents: loginEvents.count,
+    resetTokens: resetTokens.count,
+  });
 }

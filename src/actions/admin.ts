@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { requireAdminSession } from "@/lib/session";
 import { updateClinicSchema, createClinicSchema } from "@/lib/schemas/admin";
 import { clinicSetupChecklist } from "@/lib/clinic-setup";
+import { passwordProblem } from "@/lib/auth-security";
 
 export async function listClinics() {
   await requireAdminSession();
@@ -265,12 +266,12 @@ export async function createTeamMember(formData: FormData) {
 /** Admin redefine a senha de uma atendente (ex: esqueceu a senha) — não exige a senha atual. */
 export async function resetAttendantPassword(userId: string, newPassword: string) {
   await requireAdminSession();
-  if (newPassword.length < 6) {
-    throw new Error("A senha precisa ter pelo menos 6 caracteres.");
-  }
+  const problem = passwordProblem(newPassword);
+  if (problem) throw new Error(problem);
   const bcrypt = (await import("bcryptjs")).default;
   const passwordHash = await bcrypt.hash(newPassword, 10);
-  await prisma.user.update({ where: { id: userId }, data: { passwordHash } });
+  // Senha redefinida pelo admin derruba as sessões abertas dessa pessoa.
+  await prisma.user.update({ where: { id: userId }, data: { passwordHash, sessionVersion: { increment: 1 } } });
   return { success: true as const };
 }
 

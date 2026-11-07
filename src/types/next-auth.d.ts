@@ -8,6 +8,7 @@ declare module "next-auth" {
     clinicId: string | null;
     /** Função Médico: só para o middleware mandar pra /clinic/medico (a regra vale no servidor). */
     isDoctor?: boolean;
+    sessionVersion?: number;
   }
 
   interface Session {
@@ -17,6 +18,7 @@ declare module "next-auth" {
       email?: string | null;
       role: UserRole;
       clinicId: string | null;
+      sessionVersion?: number;
     };
   }
 }
@@ -26,5 +28,6 @@ declare module "next-auth/jwt" {
     role: UserRole;
     clinicId: string | null;
     isDoctor?: boolean;
+    sessionVersion?: number;
   }
 }

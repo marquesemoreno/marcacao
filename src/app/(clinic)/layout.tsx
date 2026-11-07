@@ -9,7 +9,8 @@ import { ClinicNav } from "@/components/clinic/clinic-nav";
 import { ClinicSidebar } from "@/components/clinic/clinic-sidebar";
 import { CopilotLauncher } from "@/components/clinic/copilot/copilot-launcher";
 import { getClinicInfo } from "@/actions/clinic";
-import { getClinicRole } from "@/lib/session";
+import { getClinicRole, isLive } from "@/lib/session";
+import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -18,7 +19,8 @@ export const revalidate = 0;
  * só o próprio nome em `metadata.title`). Antes todas herdavam o título do site dos
  * pacientes ("Consultas e Exames Perto de Você"). */
 export async function generateMetadata(): Promise<Metadata> {
-  const clinic = await getClinicInfo();
+  const clinic = await getClinicInfo().catch(() => null);
+  if (!clinic) return { title: "Conecta Saúde" };
   return { title: { template: `%s · ${clinic.tradeName} · Conecta Saúde`, default: `${clinic.tradeName} · Conecta Saúde` } };
 }
 
@@ -27,7 +29,9 @@ export default async function ClinicLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const [clinic, session] = await Promise.all([getClinicInfo(), getServerSession(authOptions)]);
+  const session = await getServerSession(authOptions);
+  if (session && !(await isLive(session))) redirect("/sair");
+  const clinic = await getClinicInfo();
   const isExclusive = Boolean(clinic.whatsappInstance);
   const role = session?.user.id ? await getClinicRole(session.user.id) : "RECEPCAO";
 
