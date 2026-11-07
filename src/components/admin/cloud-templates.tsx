@@ -103,7 +103,7 @@ export function CloudTemplates({ assets, lang, base = "/admin/whatsapp" }: { ass
     }
   }
 
-  const panel = "rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900";
+  const panel = "rounded-2xl bg-white dark:bg-slate-900 shadow-xs";
   const input = "mt-1 w-full h-9 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500";
   const managerUrl = asset ? `https://business.facebook.com/wa/manage/message-templates/?waba_id=${asset.wabaId}` : "#";
 
@@ -176,7 +176,7 @@ export function CloudTemplates({ assets, lang, base = "/admin/whatsapp" }: { ass
                               setSendFor(tp);
                               setParams(Array.from({ length: tp.variableCount }, () => ""));
                             }}
-                            className="inline-flex h-8 items-center gap-1 rounded-md bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 px-2.5 text-xs font-semibold text-white"
+                            className="inline-flex h-8 items-center gap-1 rounded-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 px-2.5 text-xs font-semibold text-white"
                           >
                             <Send className="w-3.5 h-3.5" aria-hidden /> {tt("tpl.send")}
                           </button>
@@ -211,7 +211,7 @@ export function CloudTemplates({ assets, lang, base = "/admin/whatsapp" }: { ass
                 {sendFor.bodyText.replace(/\{\{(\d+)\}\}/g, (_, n: string) => params[Number(n) - 1] || `{{${n}}}`)}
               </p>
               <div className="flex gap-2">
-                <button type="button" disabled={sending || !to.trim() || params.some((p) => !p.trim())} onClick={sendTemplate} className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 px-4 text-sm font-semibold text-white">
+                <button type="button" disabled={sending || !to.trim() || params.some((p) => !p.trim())} onClick={sendTemplate} className="inline-flex h-9 items-center gap-1.5 rounded-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 px-4 text-sm font-semibold text-white">
                   {sending ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden /> : <Send className="w-4 h-4" aria-hidden />} {tt("send.button")}
                 </button>
                 <button type="button" onClick={() => setSendFor(null)} className="h-9 px-3 text-sm text-slate-600 dark:text-slate-300">
@@ -268,7 +268,7 @@ export function CloudTemplates({ assets, lang, base = "/admin/whatsapp" }: { ass
                 <input value={examples[i] ?? ""} onChange={(e) => setExamples((prev) => { const n = [...prev]; n[i] = e.target.value; return n; })} className={input} />
               </label>
             ))}
-            <button type="button" disabled={creating || !name.trim() || !body.trim()} onClick={create} title={tt("tpl.createTip")} className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 px-4 text-sm font-semibold text-white">
+            <button type="button" disabled={creating || !name.trim() || !body.trim()} onClick={create} title={tt("tpl.createTip")} className="inline-flex h-9 items-center gap-1.5 rounded-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 px-4 text-sm font-semibold text-white">
               {creating ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden /> : <Plus className="w-4 h-4" aria-hidden />} {tt("tpl.create")}
             </button>
           </section>

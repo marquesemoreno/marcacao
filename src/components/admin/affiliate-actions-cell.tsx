@@ -109,7 +109,7 @@ export function AffiliateActionsCell({
         href={whatsappUrl}
         target="_blank"
         rel="noopener noreferrer"
-        className="inline-flex h-8 items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50/80 px-2.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800 transition-colors"
+        className="inline-flex h-8 items-center gap-1 rounded-xl border border-emerald-200 bg-emerald-50/80 px-2.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800 transition-colors"
         title="Chamar marcador no WhatsApp"
       >
         <MessageSquare className="size-3.5 text-emerald-600 fill-current" />

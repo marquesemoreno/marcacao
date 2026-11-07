@@ -63,7 +63,7 @@ export function LgpdDeletion({ records }: { records: Rec[] }) {
           </p>
         </div>
 
-        <section className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 space-y-3">
+        <section className="rounded-2xl bg-white dark:bg-slate-900 shadow-xs p-4 space-y-3">
           <label className="block text-xs font-medium text-slate-600 dark:text-slate-400">
             Telefone do titular (com DDD)
             <span className="mt-1 flex gap-2">
@@ -105,7 +105,7 @@ export function LgpdDeletion({ records }: { records: Rec[] }) {
           )}
 
           {target && (
-            <div className="space-y-2 rounded-md border border-rose-300 dark:border-rose-800 bg-rose-50/60 dark:bg-rose-950/30 p-3">
+            <div className="space-y-2 rounded-xl border border-rose-300 dark:border-rose-800 bg-rose-50/60 dark:bg-rose-950/30 p-3">
               <p className="text-sm font-semibold text-rose-900 dark:text-rose-200">Confirmar exclusão</p>
               <label className="block text-xs font-medium text-slate-700 dark:text-slate-300">
                 Registro do pedido (de onde veio, data)
@@ -137,7 +137,7 @@ export function LgpdDeletion({ records }: { records: Rec[] }) {
           {records.length === 0 ? (
             <p className="text-sm text-slate-600 dark:text-slate-400">Nenhuma ainda.</p>
           ) : (
-            <ul className="divide-y divide-slate-100 dark:divide-slate-800 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-sm">
+            <ul className="divide-y divide-slate-100 dark:divide-slate-800 rounded-2xl bg-white dark:bg-slate-900 shadow-xs text-sm">
               {records.map((r) => (
                 <li key={r.id} className="px-4 py-2">
                   <span className="tabular-nums text-slate-500">{fmt.format(new Date(r.createdAt))}</span> · {r.clinic} · {r.maskedPhone ?? "sem telefone"} ·{" "}

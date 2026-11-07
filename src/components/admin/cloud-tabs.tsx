@@ -30,14 +30,14 @@ export function CloudTabs({ lang, active, base = "/admin/whatsapp" }: { lang: La
           </Link>
         ))}
       </nav>
-      <div role="group" aria-label="Language / Idioma" className="inline-flex rounded-lg border border-slate-200 dark:border-slate-700 p-0.5 text-xs">
+      <div role="group" aria-label="Language / Idioma" className="inline-flex rounded-full bg-slate-100 dark:bg-slate-800 p-0.5 text-xs">
         {(["pt", "en"] as const).map((l) => (
           <Link
             key={l}
             href={`${current}${l === "en" ? "?lang=en" : ""}`}
             aria-current={lang === l ? "true" : undefined}
-            className={`px-2.5 h-7 inline-flex items-center rounded-md font-semibold ${
-              lang === l ? "bg-emerald-600 text-white" : "text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+            className={`px-3 h-7 inline-flex items-center rounded-full font-semibold ${
+              lang === l ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm" : "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100"
             }`}
           >
             {l.toUpperCase()}

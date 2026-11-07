@@ -80,7 +80,7 @@ export function CloudSendMessage({ assets, lang, base = "/admin/whatsapp" }: { a
     }
   }
 
-  const panel = "rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900";
+  const panel = "rounded-2xl bg-white dark:bg-slate-900 shadow-xs";
   const input = "mt-1 w-full h-9 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500";
 
   return (
@@ -150,7 +150,7 @@ export function CloudSendMessage({ assets, lang, base = "/admin/whatsapp" }: { a
             disabled={sending || !to.trim() || !text.trim()}
             onClick={send}
             title={tt("send.buttonTip")}
-            className="inline-flex h-9 items-center gap-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 px-4 text-sm font-semibold text-white"
+            className="inline-flex h-9 items-center gap-2 rounded-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 px-4 text-sm font-semibold text-white"
           >
             {sending ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden /> : <Send className="w-4 h-4" aria-hidden />}
             {tt("send.button")}
