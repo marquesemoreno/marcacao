@@ -17,7 +17,7 @@ const inputClass =
 const textareaClass = `${inputClass} h-auto py-2 resize-y`;
 const labelClass = "text-xs font-medium text-slate-600 dark:text-slate-400";
 const primaryBtn =
-  "inline-flex h-9 items-center gap-1.5 px-4 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 rounded-lg";
+  "inline-flex h-9 items-center gap-1.5 px-4 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 rounded-full";
 
 export type ChannelSetup = Awaited<ReturnType<typeof getChannelSetup>>;
 type Channel = "SMS" | "EMAIL";
@@ -128,7 +128,7 @@ export function ChannelCampaignFields({
       <fieldset className="space-y-2">
         <legend className="text-sm font-semibold text-slate-800 dark:text-slate-100">1. Para quem</legend>
         {sources.length > 1 && (
-          <div role="radiogroup" aria-label="Público" className="inline-flex flex-wrap rounded-lg border border-slate-200 dark:border-slate-700 p-0.5 text-sm">
+          <div role="radiogroup" aria-label="Público" className="inline-flex flex-wrap rounded-full bg-slate-100 dark:bg-slate-800 p-0.5 text-sm">
             {sources.map(([value, label]) => (
               <button
                 key={value}
@@ -136,8 +136,8 @@ export function ChannelCampaignFields({
                 role="radio"
                 aria-checked={source === value}
                 onClick={() => setSource(value)}
-                className={`px-3 h-8 rounded-md font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50 ${
-                  source === value ? "bg-emerald-600 text-white" : "text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+                className={`px-3 h-8 rounded-full font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50 ${
+                  source === value ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm" : "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100"
                 }`}
               >
                 {label}
@@ -148,7 +148,7 @@ export function ChannelCampaignFields({
         {source === "bridge" ? (
           <BridgeAudiencePicker onRecipients={setBridgeRecipients} />
         ) : ready ? (
-          <p className="rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 p-3 text-sm text-emerald-900 dark:text-emerald-200">
+          <p className="rounded-xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 p-3 text-sm text-emerald-900 dark:text-emerald-200">
             <strong>{ready.length}</strong> {ready.length === 1 ? "contato" : "contatos"} {source === "marcadores" ? "dos Marcadores" : "selecionados na lista de pacientes"}.
           </p>
         ) : (
@@ -236,7 +236,7 @@ export function ChannelCampaignFields({
         )}
       </fieldset>
 
-      <fieldset className="space-y-2 rounded-lg border border-slate-200 dark:border-slate-700 p-3">
+      <fieldset className="space-y-2 rounded-xl bg-slate-100 dark:bg-slate-800/60 p-3">
         <legend className="px-1 text-sm font-semibold text-slate-800 dark:text-slate-100">Enviar teste para mim</legend>
         <p className="text-xs text-slate-500 dark:text-slate-400">
           Manda 1 {channel === "EMAIL" ? "e-mail" : "SMS"} agora, a qualquer horário, para conferir como chega. Não cria a campanha nem conta como envio.
@@ -256,7 +256,7 @@ export function ChannelCampaignFields({
             type="button"
             onClick={sendTest}
             disabled={testing || !testTo.trim() || !template.trim() || (channel === "EMAIL" && !subject.trim())}
-            className="inline-flex h-9 items-center gap-1.5 px-3 text-sm font-medium rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-50"
+            className="inline-flex h-9 items-center gap-1.5 px-3 text-sm font-medium rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-50"
           >
             {testing && <Loader2 className="w-4 h-4 animate-spin" aria-hidden />} Enviar teste
           </button>

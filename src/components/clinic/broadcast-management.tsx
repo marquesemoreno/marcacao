@@ -103,7 +103,7 @@ Qualquer dúvida, estamos à disposição!`;
 const inputClass =
   "w-full mt-1 h-9 px-3 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500";
 const labelClass = "text-xs font-medium text-slate-600 dark:text-slate-400";
-const panel = "rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900";
+const panel = "rounded-2xl bg-white dark:bg-slate-900 shadow-xs";
 
 function brDate(iso: string | null): string {
   if (!iso) return "";
@@ -605,7 +605,7 @@ export function BroadcastManagement() {
             <button
               type="button"
               onClick={() => setFormOpen(true)}
-              className={`inline-flex h-9 items-center gap-1.5 px-3 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg ${FOCUS_RING}`}
+              className={`inline-flex h-9 items-center gap-1.5 px-3 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-full ${FOCUS_RING}`}
             >
               <Plus className="w-4 h-4" aria-hidden />
               Nova campanha
@@ -623,7 +623,7 @@ export function BroadcastManagement() {
       </p>
 
       {health?.tone === "danger" && (
-        <div role="alert" className="rounded-lg border border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-950/40 p-3 text-sm text-red-800 dark:text-red-300">
+        <div role="alert" className="rounded-xl border border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-950/40 p-3 text-sm text-red-800 dark:text-red-300">
           <p className="font-semibold">O número de WhatsApp está desconectado — nenhuma campanha, lembrete ou mensagem do Chat sai agora.</p>
           <p className="mt-0.5">Reconecte o celular da clínica no WhatsApp ou fale com o suporte da Conecta Saúde. Os envios voltam sozinhos quando ele reconectar.</p>
         </div>
@@ -656,7 +656,7 @@ export function BroadcastManagement() {
               type="button"
               onClick={pauseAll}
               disabled={pausingAll}
-              className={`inline-flex h-9 items-center gap-1.5 px-3 text-sm font-semibold rounded-lg border border-red-300 dark:border-red-800 text-red-700 dark:text-red-300 bg-white dark:bg-slate-900 hover:bg-red-50 dark:hover:bg-red-950/40 disabled:opacity-60 ${FOCUS_RING}`}
+              className={`inline-flex h-9 items-center gap-1.5 px-3 text-sm font-semibold rounded-xl border border-red-300 dark:border-red-800 text-red-700 dark:text-red-300 bg-white dark:bg-slate-900 hover:bg-red-50 dark:hover:bg-red-950/40 disabled:opacity-60 ${FOCUS_RING}`}
             >
               {pausingAll ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden /> : <Pause className="w-4 h-4" aria-hidden />}
               Pausar todos os envios
@@ -743,7 +743,7 @@ export function BroadcastManagement() {
                 }}
               />
             ) : (
-              <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 p-4 text-sm text-slate-700 dark:text-slate-200 space-y-1">
+              <div className="rounded-xl bg-slate-100 dark:bg-slate-800/60 p-4 text-sm text-slate-700 dark:text-slate-200 space-y-1">
                 <p className="font-semibold">{formChannel === "SMS" ? "SMS" : "E-mail"} ainda não foi ativado para a clínica.</p>
                 <p>Fale com o suporte da Conecta Saúde para ativar. Enquanto isso, as campanhas seguem pelo WhatsApp.</p>
               </div>
@@ -833,11 +833,11 @@ export function BroadcastManagement() {
             </div>
 
             {audienceSource === "selecao" ? (
-              <p className="rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 p-3 text-sm text-emerald-900 dark:text-emerald-200">
+              <p className="rounded-xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 p-3 text-sm text-emerald-900 dark:text-emerald-200">
                 <strong>{plural(recipients.length, "paciente selecionado", "pacientes selecionados")}</strong> na lista de pacientes.
               </p>
             ) : audienceSource === "marcadores" ? (
-              <div className="rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 p-3 text-sm space-y-1 text-emerald-900 dark:text-emerald-200">
+              <div className="rounded-xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 p-3 text-sm space-y-1 text-emerald-900 dark:text-emerald-200">
                 <p>
                   <strong>{plural(recipients.length, "marcador ativo", "marcadores ativos")}</strong> — cadastro em Marcadores. Use {"{{link}}"} para o link pessoal de cada um: quem
                   chegar por ele conta no relatório do marcador.
@@ -924,7 +924,7 @@ export function BroadcastManagement() {
                 {selectedTemplate && (
                   <>
                     <div className="grid gap-3 md:grid-cols-2">
-                    <div className="whitespace-pre-wrap rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 p-3 text-sm text-slate-700 dark:text-slate-200 md:sticky md:top-0 md:self-start">
+                    <div className="whitespace-pre-wrap rounded-xl bg-slate-100 dark:bg-slate-800/60 p-3 text-sm text-slate-700 dark:text-slate-200 md:sticky md:top-0 md:self-start">
                       {selectedTemplate.bodyText.split(/(\{\{\d+\}\})/).map((part, k) =>
                         /^\{\{\d+\}\}$/.test(part) ? (
                           <mark key={k} className="rounded bg-emerald-100 px-0.5 font-semibold text-emerald-900 dark:bg-emerald-900/50 dark:text-emerald-100">
@@ -980,7 +980,7 @@ export function BroadcastManagement() {
               placeholder={"Ex.: Olá {{nome}}, temos novidades para você…"}
               className="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 resize-y"
             />
-            <details className="rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2" open={extraVariants.some((v) => v.trim() !== "")}>
+            <details className="rounded-xl bg-slate-100 dark:bg-slate-800/60 px-3 py-2" open={extraVariants.some((v) => v.trim() !== "")}>
               <summary className="cursor-pointer text-sm font-medium text-slate-700 dark:text-slate-200">
                 Variações da mensagem (opcional) — cada paciente recebe um dos textos, sorteado
               </summary>
@@ -1013,7 +1013,7 @@ export function BroadcastManagement() {
                     key={c}
                     type="button"
                     onClick={() => insertVariable(c)}
-                    className="rounded-md border border-slate-200 dark:border-slate-700 px-2 py-0.5 font-mono text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800"
+                    className="rounded-full bg-slate-100 dark:bg-slate-800 px-2.5 py-0.5 font-mono text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800"
                   >
                     {`{{${c}}}`}
                   </button>
@@ -1057,7 +1057,7 @@ export function BroadcastManagement() {
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={imagePreviewUrl} alt="Prévia da imagem da campanha" className="w-16 h-16 rounded-lg object-cover border border-slate-200 dark:border-slate-800" />
                 ) : (
-                  <div className="flex items-center gap-2 rounded-lg border border-slate-200 dark:border-slate-800 px-3 py-2 min-w-0">
+                  <div className="flex items-center gap-2 rounded-xl bg-slate-100 dark:bg-slate-800/60 px-3 py-2 min-w-0">
                     <FileText className="w-6 h-6 shrink-0 text-slate-500 dark:text-slate-400" aria-hidden />
                     <div className="min-w-0 text-sm">
                       <p className="truncate font-medium text-slate-900 dark:text-slate-100">
@@ -1122,7 +1122,7 @@ export function BroadcastManagement() {
                 disabled={!name.trim() || recipients.length === 0}
                 aria-describedby="broadcast-footer-status"
                 onClick={() => setFormStep(2)}
-                className={`inline-flex h-9 items-center gap-1.5 px-4 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 rounded-lg ${FOCUS_RING}`}
+                className={`inline-flex h-9 items-center gap-1.5 px-4 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 rounded-full ${FOCUS_RING}`}
               >
                 Continuar
               </button>
@@ -1140,7 +1140,7 @@ export function BroadcastManagement() {
               disabled={creating || unknownVars.length > 0 || unfilled.length > 0 || Boolean(variantError) || !name.trim() || !hasMessage}
               aria-describedby="broadcast-footer-status"
               onClick={handleCreate}
-              className={`inline-flex h-9 items-center gap-1.5 px-4 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 rounded-lg ${FOCUS_RING}`}
+              className={`inline-flex h-9 items-center gap-1.5 px-4 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 rounded-full ${FOCUS_RING}`}
             >
               {creating && <Loader2 className="w-4 h-4 animate-spin" aria-hidden />}
               Criar rascunho
@@ -1162,7 +1162,7 @@ export function BroadcastManagement() {
             <Loader2 className="w-4 h-4 animate-spin" aria-hidden /> Carregando…
           </div>
         ) : listError ? (
-          <div role="alert" className="rounded-lg border border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-950/40 p-4 text-sm text-red-800 dark:text-red-300">
+          <div role="alert" className="rounded-xl border border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-950/40 p-4 text-sm text-red-800 dark:text-red-300">
             Não foi possível carregar as campanhas — as que existem não aparecem aqui.{" "}
             <button type="button" onClick={() => loadCampaigns()} className="font-semibold underline underline-offset-2">
               Tentar de novo
@@ -1309,7 +1309,7 @@ export function BroadcastManagement() {
                     .
                   </p>
                   {confirming.preview.needsCall.filter((n) => !n.called).length > 0 && (
-                    <p className="rounded-md border border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-950/40 p-2 text-sm text-red-800 dark:text-red-300">
+                    <p className="rounded-xl border border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-950/40 p-2 text-sm text-red-800 dark:text-red-300">
                       {plural(confirming.preview.needsCall.filter((n) => !n.called).length, "paciente ainda precisa", "pacientes ainda precisam")} de ligação —
                       a lista fica no card da campanha.
                     </p>
@@ -1327,7 +1327,7 @@ export function BroadcastManagement() {
                   <p
                     className={
                       (confirming.preview.withConsent ?? 0) < confirming.preview.pending
-                        ? "rounded-md border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 p-2 text-amber-900 dark:text-amber-200"
+                        ? "rounded-xl border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 p-2 text-amber-900 dark:text-amber-200"
                         : ""
                     }
                   >
@@ -1370,7 +1370,7 @@ export function BroadcastManagement() {
                     Ver as {confirming.preview.variantMessages.length} variações (cada paciente recebe uma)
                   </summary>
                   {confirming.preview.variantMessages.slice(1).map((m, i) => (
-                    <div key={i} className="mt-2 max-h-48 overflow-y-auto whitespace-pre-wrap rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 p-3 text-slate-900 dark:text-slate-100">
+                    <div key={i} className="mt-2 max-h-48 overflow-y-auto whitespace-pre-wrap rounded-xl bg-slate-100 dark:bg-slate-800/60 p-3 text-slate-900 dark:text-slate-100">
                       <p className="mb-1 text-xs font-semibold text-slate-500 dark:text-slate-400">Variação {i + 2}</p>
                       {m}
                     </div>
@@ -1378,7 +1378,7 @@ export function BroadcastManagement() {
                 </details>
               )}
               {(confirming.preview.unknownVariables.length > 0 || confirming.preview.unfilled.length > 0) && (
-                <div role="alert" className="rounded-lg border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/40 p-3 text-sm text-red-800 dark:text-red-300 space-y-2">
+                <div role="alert" className="rounded-xl border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/40 p-3 text-sm text-red-800 dark:text-red-300 space-y-2">
                   <p>
                     O texto tem trechos que sairiam assim para o paciente:{" "}
                     <strong>{[...confirming.preview.unknownVariables.map((v) => `{{${v}}}`), ...confirming.preview.unfilled].join(", ")}</strong>. Não dá para
@@ -1398,7 +1398,7 @@ export function BroadcastManagement() {
                 </div>
               )}
               {confirming.preview.missingTechnicalDirector && (
-                <div role="alert" className="rounded-lg border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 p-3 text-sm text-amber-900 dark:text-amber-200">
+                <div role="alert" className="rounded-xl border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 p-3 text-sm text-amber-900 dark:text-amber-200">
                   Falta o responsável técnico (nome e CRM), exigido pelo CFM em campanhas. A gestão cadastra em{" "}
                   <a href="/clinic/precos" className="font-semibold underline underline-offset-2">Configurações › Preços e parâmetros</a>.
                 </div>
@@ -1501,7 +1501,7 @@ function CampaignCard({
   // Falha não conta como progresso (não chegou ao paciente).
   const progress = c.total ? Math.round(((c.sent + c.skipped + c.noConsent) / c.total) * 100) : 0;
   const actionBtn =
-    "inline-flex h-8 items-center gap-1.5 px-3 text-xs font-medium rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50";
+    "inline-flex h-8 items-center gap-1.5 px-3 text-xs font-medium rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50";
   return (
     <article
       className={`rounded-lg border bg-white dark:bg-slate-900 p-4 space-y-3 ${
@@ -1515,7 +1515,7 @@ function CampaignCard({
             <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 truncate">{c.name}</h3>
             <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border ${STATUS_CLASS[c.status]}`}>{STATUS_LABEL[c.status]}</span>
             {c.channel !== "WHATSAPP" && (
-              <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border border-sky-300 dark:border-sky-800 bg-sky-50 dark:bg-sky-950/40 text-sky-800 dark:text-sky-300">
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border border-sky-300 dark:border-sky-800 bg-sky-50 dark:bg-sky-950/40 text-sky-800 dark:text-sky-300">
                 {c.channel === "SMS" ? "SMS" : "E-mail"}
               </span>
             )}
@@ -1551,7 +1551,7 @@ function CampaignCard({
               type="button"
               disabled={busy}
               onClick={onStart}
-              className={`inline-flex h-8 items-center gap-1.5 px-3 text-xs font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50 ${FOCUS_RING}`}
+              className={`inline-flex h-8 items-center gap-1.5 px-3 text-xs font-semibold rounded-full bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50 ${FOCUS_RING}`}
               aria-label={`${c.status === "PAUSED" ? "Retomar" : "Iniciar"} ${c.name}`}
             >
               {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden /> : <Play className="w-3.5 h-3.5" aria-hidden />}
@@ -1669,7 +1669,7 @@ function CampaignCard({
               type="button"
               disabled={busy}
               onClick={onRetry}
-              className="mt-2 inline-flex h-8 items-center gap-1.5 px-3 text-xs font-medium rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-50"
+              className="mt-2 inline-flex h-8 items-center gap-1.5 px-3 text-xs font-medium rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-50"
             >
               Devolver falhas à fila e retomar
             </button>
