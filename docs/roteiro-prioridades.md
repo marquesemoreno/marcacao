@@ -53,7 +53,7 @@ Base: análise de 60 dias (Urolaser ~210 e Santa Clara ~170 mensagens digitadas 
 ## Etapa 4 — Receita sem ERP
 
 1. Agendamento pelo próprio paciente (link com horários livres via bridge).
-2. Ligar vaga automática / lista de espera e medir vagas recuperadas.
+2. 🟡 07/11 00aa7f5: cartão "Vagas recuperadas" no Relatório pronto. Falta a gestão ligar a vaga automática e usar a lista de espera (nenhuma clínica usa ainda).
 3. Envio automático da cobrança de orçamento pelo WhatsApp oficial.
 4. ✔️ **FEITO 07/11 (cda228c)**: NPS 9–10 → botão "Avaliar no Google" (link em Configurações > Parâmetros). Falta cada clínica colar o link.
 5. ✔️ **FEITO 07/11**: cartão "O que a régua trouxe" no Relatório (enviados/responderam/agendaram em 30 dias, × ticket médio). Só aparece quando a régua rodar (API oficial).
