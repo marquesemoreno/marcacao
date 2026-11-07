@@ -29,7 +29,7 @@ const CONSENT: Record<string, { label: string; tone: string }> = {
 };
 const APPT_STATUS: Record<string, string> = { agendada: "Agendada", confirmada: "Confirmada", concluida: "Realizada", cancelada: "Cancelada", no_show: "Faltou" };
 
-const card = "rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5";
+const card = "rounded-2xl bg-white dark:bg-slate-900 shadow-xs p-5";
 const pill = "inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium";
 
 function ageFrom(birth: string | null): number | null {
@@ -157,7 +157,7 @@ export function PatientPage({ profile, autoSchedule = false }: { profile: Patien
           <div className="flex items-center gap-2 shrink-0">
             <Link
               href={`/clinic/inbox?c=${p.conversationId}`}
-              className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 px-4 py-2 text-sm font-semibold text-white"
+              className="inline-flex items-center gap-2 rounded-full bg-emerald-600 hover:bg-emerald-700 px-4 py-2 text-sm font-semibold text-white"
             >
               <MessageCircle className="w-4 h-4" /> Abrir conversa
             </Link>
@@ -165,7 +165,7 @@ export function PatientPage({ profile, autoSchedule = false }: { profile: Patien
               <button
                 type="button"
                 onClick={() => setScheduling(true)}
-                className="inline-flex items-center gap-2 rounded-lg border border-slate-200 dark:border-slate-700 px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
+                className="inline-flex items-center gap-2 rounded-full bg-slate-100 dark:bg-slate-800 px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
               >
                 <CalendarPlus className="w-4 h-4" /> Agendar
               </button>
@@ -173,7 +173,7 @@ export function PatientPage({ profile, autoSchedule = false }: { profile: Patien
             <Popover>
               <PopoverTrigger
                 aria-label="Mais ações"
-                className="size-9 inline-flex items-center justify-center rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+                className="size-9 inline-flex items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
               >
                 <MoreHorizontal className="w-4 h-4" />
               </PopoverTrigger>
@@ -255,10 +255,10 @@ export function PatientPage({ profile, autoSchedule = false }: { profile: Patien
                     </div>
                   ))}
                   <div className="flex justify-end gap-2 pt-1">
-                    <button type="button" onClick={() => setEditing(false)} className="px-4 py-2 rounded-lg text-sm hover:bg-slate-100 dark:hover:bg-slate-800">
+                    <button type="button" onClick={() => setEditing(false)} className="px-4 py-2 rounded-full text-sm hover:bg-slate-100 dark:hover:bg-slate-800">
                       Cancelar
                     </button>
-                    <button type="submit" disabled={saving} className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-sm font-semibold text-white disabled:opacity-60">
+                    <button type="submit" disabled={saving} className="px-4 py-2 rounded-full bg-emerald-600 hover:bg-emerald-700 text-sm font-semibold text-white disabled:opacity-60">
                       {saving ? "Salvando…" : "Salvar"}
                     </button>
                   </div>
@@ -377,7 +377,7 @@ export function PatientPage({ profile, autoSchedule = false }: { profile: Patien
             ) : (
               <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {p.media.map((m) => (
-                  <li key={m.id} className="rounded-lg border border-slate-200 dark:border-slate-800 p-3 flex items-center gap-3">
+                  <li key={m.id} className="rounded-xl bg-slate-100 dark:bg-slate-800/60 p-3 flex items-center gap-3">
                     {m.mimeType?.startsWith("image/") && m.url ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={m.url} alt={m.attachmentName ?? "Imagem"} className="w-14 h-14 rounded object-cover" />
