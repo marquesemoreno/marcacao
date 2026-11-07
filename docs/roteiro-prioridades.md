@@ -35,7 +35,7 @@ Base: análise de 60 dias (Urolaser ~210 e Santa Clara ~170 mensagens digitadas 
 1. ~~Recusa automática de ligação~~ — revisado 07/11: só 4 em 60 dias; as outras 64 eram telefones de médicos de fora (vai no item 5).
 2. ✔️ **FEITO 07/11 (d4885e7)**: despedida automática ao finalizar (Ações da IA, desligada por padrão; caixa no modal). Falta a gestão ligar em cada clínica.
 3. ✔️ **FEITO 07/11 (93acc7b)**: saudação no 1º contato e na volta após atendimento finalizado ({{saudacao}}, {{nome}}) + endereço com Google Maps quando perguntam "onde fica". Ações da IA, desligados por padrão.
-4. ✔️ **FEITO 07/11 (4da8acb)**: agendar pela ponte manda confirmação ao paciente (caixa marcada no modal). Falta: instruções de cirurgia por procedimento (Santa Clara) e agendar pela grade da Agenda.
+4. ✔️ **FEITO 07/11 (4da8acb)**: agendar pela ponte manda confirmação ao paciente (caixa marcada no modal). Pela grade da Agenda também ✔️ 07/11. Falta: instruções de cirurgia por procedimento (Santa Clara, depende da validação).
 5. IA de preços e regras por procedimento, lendo Configurações (~440 conversas), **incluindo médicos que só operam na clínica e o telefone da secretária deles** (Santa Clara ~64x). Textos validados com as clínicas.
 6. Triagem automática (idade, sonda/cadeirante, comorbidades, exames pré-op) com respostas na ficha (~180x).
 7. Lista de convênios aceitos para a IA responder (Santa Clara 168 conversas).
