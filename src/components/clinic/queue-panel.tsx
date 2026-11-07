@@ -11,8 +11,8 @@ import { toTitleCase } from "@/lib/agenda-ui";
 const POLL_MS = 10_000;
 const ROOM_KEY = "senhas.room";
 const SERVICES_KEY = "senhas.services";
-const input = "h-9 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50";
-const ghost = "inline-flex h-8 items-center gap-1 rounded-md px-2 text-xs font-medium hover:bg-slate-100 disabled:opacity-40 dark:hover:bg-slate-800";
+const input = "h-9 rounded-full border border-transparent bg-slate-100 dark:bg-slate-800 px-4 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50";
+const ghost = "inline-flex h-8 items-center gap-1 rounded-full px-3 text-xs font-medium hover:bg-slate-100 disabled:opacity-40 dark:hover:bg-slate-800";
 
 function waitOrder(list: QueueTicketView[]) {
   const age = (a: QueueTicketView, b: QueueTicketView) => a.createdAt.localeCompare(b.createdAt);
@@ -94,7 +94,7 @@ export function QueuePanel({ initial, compact = false, defaultRoom = "" }: { ini
 
   return (
     <div className="space-y-4">
-      <section className="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+      <section className="rounded-2xl bg-white p-4 shadow-xs dark:bg-slate-900">
         <div className="flex flex-wrap items-end gap-3">
           <label className="flex flex-col gap-1 text-xs font-medium text-slate-600 dark:text-slate-400">
             Guichê / sala
@@ -104,7 +104,7 @@ export function QueuePanel({ initial, compact = false, defaultRoom = "" }: { ini
             type="button"
             disabled={pending || waiting.length === 0}
             onClick={() => call()}
-            className="inline-flex h-11 items-center gap-2 rounded-lg bg-emerald-700 px-5 text-base font-semibold text-white hover:bg-emerald-800 disabled:bg-slate-300 dark:disabled:bg-slate-700"
+            className="inline-flex h-11 items-center gap-2 rounded-full bg-emerald-700 px-5 text-base font-semibold text-white hover:bg-emerald-800 disabled:bg-slate-300 dark:disabled:bg-slate-700"
           >
             {pending ? <Loader2 className="h-5 w-5 animate-spin" aria-hidden /> : <Megaphone className="h-5 w-5" aria-hidden />}
             Chamar próxima{waiting[0] ? ` (${waiting[0].code})` : ""}
@@ -143,7 +143,7 @@ export function QueuePanel({ initial, compact = false, defaultRoom = "" }: { ini
       {called.length > 0 && (
         <section aria-labelledby="q-called">
           <h2 id="q-called" className="mb-2 text-sm font-semibold">Chamadas</h2>
-          <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200 bg-white dark:divide-slate-800 dark:border-slate-800 dark:bg-slate-900">
+          <ul className="divide-y divide-slate-100 rounded-2xl bg-white shadow-xs dark:divide-slate-800 dark:bg-slate-900">
             {called.slice(0, compact ? 3 : 20).map((t) => (
               <li key={t.id} className="flex flex-wrap items-center gap-2 px-3 py-2 text-sm">
                 <Code t={t} />
@@ -164,11 +164,11 @@ export function QueuePanel({ initial, compact = false, defaultRoom = "" }: { ini
         <section aria-labelledby="q-waiting">
           <h2 id="q-waiting" className="mb-2 text-sm font-semibold">Esperando (ordem de chamada)</h2>
           {waiting.length === 0 ? (
-            <p className="rounded-lg border border-dashed border-slate-300 p-4 text-sm text-slate-500 dark:border-slate-700">
+            <p className="rounded-2xl border border-dashed border-slate-300 p-4 text-sm text-slate-500 dark:border-slate-700">
               Ninguém na fila. As senhas aparecem aqui quando o paciente tira no totem.
             </p>
           ) : (
-            <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200 bg-white dark:divide-slate-800 dark:border-slate-800 dark:bg-slate-900">
+            <ul className="divide-y divide-slate-100 rounded-2xl bg-white shadow-xs dark:divide-slate-800 dark:bg-slate-900">
               {waiting.map((t) => (
                 <li key={t.id} className="flex flex-wrap items-center gap-2 px-3 py-2 text-sm">
                   <Code t={t} />
@@ -202,7 +202,7 @@ function Code({ t }: { t: QueueTicketView }) {
   const p = t.type === "P";
   return (
     <span
-      className={`inline-flex h-7 min-w-16 items-center justify-center gap-1 rounded-md px-2 font-mono text-sm font-bold ${p ? "bg-sky-100 text-sky-900 dark:bg-sky-950 dark:text-sky-200" : "bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-100"}`}
+      className={`inline-flex h-7 min-w-16 items-center justify-center gap-1 rounded-full px-2.5 font-mono text-sm font-bold ${p ? "bg-sky-100 text-sky-900 dark:bg-sky-950 dark:text-sky-200" : "bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-100"}`}
       title={p ? "Preferencial" : "Normal"}
     >
       <Ticket className="h-3.5 w-3.5" aria-hidden />
