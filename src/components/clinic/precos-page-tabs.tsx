@@ -14,6 +14,9 @@ import type { Procedure } from "@prisma/client";
  * props. Só reorganiza em abas o que já existia em /clinic/precos antes: Horários
  * (BusinessHoursForm), Preços (agora ProceduresTable em vez dos cards empilhados) e
  * Parâmetros/Links (ReportSettingsForm + TrackedLinksCard). */
+// Aba ativa bem visível também no modo escuro (o padrão do shadcn é quase invisível no trilho cinza).
+const trig = "rounded-full! px-3 data-active:bg-white! data-active:text-slate-900! data-active:shadow-sm dark:data-active:bg-slate-600! dark:data-active:text-white! dark:data-active:border-transparent!";
+
 export function PrecosPageTabs({
   businessHours,
   clinicProcedures,
@@ -39,20 +42,20 @@ export function PrecosPageTabs({
     <Tabs defaultValue="horarios" className="gap-4 min-w-0">
       {/* Fixa no topo do contêiner de rolagem da página (lista de procedimentos é longa). */}
       <TabsList className="sticky top-0 z-10 h-auto! w-full sm:w-fit flex-wrap justify-start rounded-full! p-1 bg-slate-100 dark:bg-slate-800">
-        <TabsTrigger value="horarios" className="rounded-full! px-3">Horários de Atendimento</TabsTrigger>
-        <TabsTrigger value="precos" className="rounded-full! px-3">Procedimentos e Preços</TabsTrigger>
-        <TabsTrigger value="parametros" className="rounded-full! px-3">Parâmetros, Links e Campanhas</TabsTrigger>
+        <TabsTrigger value="horarios" className={trig}>Horários de Atendimento</TabsTrigger>
+        <TabsTrigger value="precos" className={trig}>Procedimentos e Preços</TabsTrigger>
+        <TabsTrigger value="parametros" className={trig}>Parâmetros, Links e Campanhas</TabsTrigger>
       </TabsList>
 
-      <TabsContent value="horarios" className="min-w-0">
+      <TabsContent value="horarios" className="min-w-0 outline-none! focus:outline-none! focus-visible:ring-0!">
         <BusinessHoursForm businessHours={businessHours} />
       </TabsContent>
 
-      <TabsContent value="precos" className="min-w-0">
+      <TabsContent value="precos" className="min-w-0 outline-none! focus:outline-none! focus-visible:ring-0!">
         <ProceduresTable clinicProcedures={clinicProcedures} availableProcedures={availableProcedures} />
       </TabsContent>
 
-      <TabsContent value="parametros" className="min-w-0 space-y-3">
+      <TabsContent value="parametros" className="min-w-0 outline-none! focus:outline-none! focus-visible:ring-0! space-y-3">
         <ReportSettingsForm defaultTicket={defaultTicket} rules={acquisitionRules} technicalDirectorName={technicalDirectorName} technicalDirectorCrm={technicalDirectorCrm} />
         {trackedLinks.length > 0 && <TrackedLinksCard links={trackedLinks} whatsapp={whatsapp} />}
         <CampaignExclusionsCard />

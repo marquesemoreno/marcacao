@@ -236,7 +236,7 @@ export default async function AdminDashboardPage() {
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
                         <p className="truncate font-bold text-slate-900 dark:text-slate-100 text-sm">{procedure.name}</p>
-                        <span className="rounded-md bg-teal-50 dark:bg-teal-950/60 px-2 py-0.5 text-[10px] font-bold text-teal-800 dark:text-teal-300 font-mono border border-teal-200/60 dark:border-teal-800">
+                        <span className="rounded-full bg-teal-50 dark:bg-teal-950/60 px-2 py-0.5 text-[10px] font-bold text-teal-800 dark:text-teal-300 font-mono border border-teal-200/60 dark:border-teal-800">
                           {procedure.specialty}
                         </span>
                       </div>

@@ -821,10 +821,10 @@ export function BroadcastManagement() {
                   aria-checked={audienceSource === value}
                   tabIndex={audienceSource === value ? 0 : -1}
                   onClick={() => switchSource(value)}
-                  className={`px-3 h-9 rounded-lg border font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50 ${
+                  className={`px-4 h-9 rounded-full font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50 ${
                     audienceSource === value
-                      ? "border-emerald-600 bg-emerald-50 text-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-100"
-                      : "border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+                      ? "bg-emerald-600 text-white"
+                      : "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700"
                   }`}
                 >
                   {label}

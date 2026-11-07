@@ -36,7 +36,7 @@ export function AdminSidebar({ userName }: { userName: string | null }) {
         <Logo variant={isCollapsed ? "icon-only" : "white"} size="sm" />
       </div>
       <span
-        className={`mt-3 inline-flex w-fit items-center gap-1 rounded-md bg-sky-500/10 border border-sky-500/20 px-2 py-0.5 text-[10px] font-extrabold text-sky-300 font-mono ${
+        className={`mt-3 inline-flex w-fit items-center gap-1 rounded-full bg-sky-500/10 border border-sky-500/20 px-2 py-0.5 text-[10px] font-extrabold text-sky-300 font-mono ${
           isCollapsed ? "mx-auto" : "mx-4"
         }`}
         title="Admin"

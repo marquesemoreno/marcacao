@@ -304,7 +304,7 @@ export function ClinicsManagement({ clinics: initialClinics }: { clinics: Clinic
                 <div className="space-y-2 text-xs font-medium text-slate-600 dark:text-slate-300 pt-2 border-t border-slate-100 dark:border-slate-800">
                   <div className="flex items-center justify-between">
                     <span className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">CNPJ: {clinic.cnpj}</span>
-                    <span className="inline-flex items-center gap-1 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-2 py-0.5 rounded-md border border-slate-200 dark:border-slate-700 text-[11px] font-semibold">
+                    <span className="inline-flex items-center gap-1 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-2 py-0.5 rounded-full border border-slate-200 dark:border-slate-700 text-[11px] font-semibold">
                       <MapPin className="w-3 h-3 text-slate-400 dark:text-slate-500" />
                       {clinic.neighborhood}, {clinic.city}
                     </span>
