@@ -40,7 +40,7 @@ Base: análise de 60 dias (Urolaser ~210 e Santa Clara ~170 mensagens digitadas 
 6. Triagem automática (idade, sonda/cadeirante, comorbidades, exames pré-op) com respostas na ficha (~180x).
 7. Lista de convênios aceitos para a IA responder (Santa Clara 168 conversas).
 8. ~~**Relatório "horas poupadas"**~~ ✅ 07/11 79e45ec — cartão no Relatório (Urolaser 30 dias: 1.073 msgs ≈ 13,4 h).
-9. Urolaser: reduzir encerramentos por inatividade (~80%) para o relatório de conversão ficar confiável.
+9. ✔️ **FEITO 07/11 (93e11dd)**: encerramento automático agora reconhece "Agendado(a)…" da recepção (→ Agendamento concluído) e informação entregue (Jev → Dúvida esclarecida). Urolaser tinha 374/766 (49%) como inatividade em 30 dias. Retroativo não aplicado.
 
 ## Etapa 3 — Marketing e rastreamento (módulo novo)
 
