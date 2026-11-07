@@ -11,6 +11,7 @@ export function NpsSurvey({ token, clinicName }: { token: string; clinicName: st
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
+  const [reviewUrl, setReviewUrl] = useState<string | null>(null);
 
   if (done) {
     return (
@@ -18,6 +19,19 @@ export function NpsSurvey({ token, clinicName }: { token: string; clinicName: st
         <CheckCircle2 className="mx-auto h-8 w-8 text-emerald-600" aria-hidden />
         <h1 className="mt-2 text-lg font-semibold">Obrigado!</h1>
         <p className="mt-1 text-sm text-slate-600">Sua resposta ajuda {clinicName} a cuidar melhor de você.</p>
+        {reviewUrl && (
+          <>
+            <p className="mt-4 text-sm text-slate-700">Que bom que gostou! Pode contar isso no Google? Leva menos de um minuto e ajuda outras pessoas a nos encontrar.</p>
+            <a
+              href={reviewUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-3 inline-flex h-12 w-full items-center justify-center rounded-lg bg-emerald-600 px-4 text-base font-semibold text-white hover:bg-emerald-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50 focus-visible:ring-offset-2"
+            >
+              Avaliar no Google
+            </a>
+          </>
+        )}
       </div>
     );
   }
@@ -32,7 +46,10 @@ export function NpsSurvey({ token, clinicName }: { token: string; clinicName: st
         setError(null);
         const r = await submitNps(token, score, comment).catch(() => ({ ok: false as const, error: "Sem conexão. Tente de novo." }));
         setBusy(false);
-        if (r.ok) setDone(true);
+        if (r.ok) {
+          setReviewUrl(r.reviewUrl ?? null);
+          setDone(true);
+        }
         else setError(r.error);
       }}
     >

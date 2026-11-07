@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { updateClinicDefaultTicket, updateClinicTechnicalDirector, addAcquisitionRule, deleteAcquisitionRule } from "@/actions/clinic";
+import { updateClinicDefaultTicket, updateClinicTechnicalDirector, updateClinicGoogleReviewUrl, addAcquisitionRule, deleteAcquisitionRule } from "@/actions/clinic";
 import { useActionFeedback } from "@/hooks/use-action-feedback";
 import { ACQUISITION_CHANNELS, DIRECT_CHANNEL } from "@/lib/acquisition";
 
@@ -17,11 +17,13 @@ export function ReportSettingsForm({
   rules,
   technicalDirectorName = null,
   technicalDirectorCrm = null,
+  googleReviewUrl = null,
 }: {
   defaultTicket: string | null;
   rules: { id: string; keyword: string; channel: string }[];
   technicalDirectorName?: string | null;
   technicalDirectorCrm?: string | null;
+  googleReviewUrl?: string | null;
 }) {
   const { isPending, run } = useActionFeedback();
   const ruleFormRef = useRef<HTMLFormElement>(null);
@@ -81,6 +83,34 @@ export function ReportSettingsForm({
             <div className="space-y-1">
               <Label htmlFor="rt-crm" className="text-xs">CRM</Label>
               <Input id="rt-crm" name="technicalDirectorCrm" defaultValue={technicalDirectorCrm ?? ""} placeholder="CRM-BA 12345" className="h-9" />
+            </div>
+            <Button type="submit" size="sm" disabled={isPending}>
+              Salvar
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">Avaliação no Google</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          <p className="text-xs text-muted-foreground">
+            Quem der nota 9 ou 10 na pesquisa de satisfação vê o botão “Avaliar no Google” com este link. No Perfil da Empresa no Google,
+            use “Pedir avaliações” e copie o link.
+          </p>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              const fd = new FormData(e.currentTarget);
+              run(() => updateClinicGoogleReviewUrl(fd), { successMessage: "Link de avaliação salvo." });
+            }}
+            className="flex items-end gap-2"
+          >
+            <div className="space-y-1 flex-1">
+              <Label htmlFor="google-review" className="text-xs">Link de avaliação</Label>
+              <Input id="google-review" name="googleReviewUrl" defaultValue={googleReviewUrl ?? ""} placeholder="https://g.page/r/.../review" className="h-9" />
             </div>
             <Button type="submit" size="sm" disabled={isPending}>
               Salvar

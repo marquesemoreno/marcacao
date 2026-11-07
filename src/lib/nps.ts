@@ -27,3 +27,24 @@ export function npsSummary(scores: number[]) {
   const nps = total ? Math.round(((promoters - detractors) / total) * 100) : null;
   return { total, promoters, passives, detractors, nps };
 }
+
+/** Link de avaliação no Google digitado em Configurações. Só https e com domínio de verdade;
+ * "g.page/…" colado sem protocolo vira https. Inválido = null. */
+export function normalizeReviewUrl(raw: string | null | undefined): string | null {
+  const s = (raw ?? "").trim();
+  if (!s) return null;
+  const withProto = /^https?:\/\//i.test(s) ? s.replace(/^http:/i, "https:") : /^[a-z]+:/i.test(s) ? null : `https://${s}`;
+  if (!withProto) return null;
+  try {
+    const u = new URL(withProto);
+    if (u.protocol !== "https:" || !u.hostname.includes(".") || /\s/.test(s)) return null;
+    return u.toString();
+  } catch {
+    return null;
+  }
+}
+
+/** Passo 4.4 do roteiro: promotor (9–10) é convidado a avaliar no Google. */
+export function reviewLinkFor(score: number, url: string | null | undefined): string | null {
+  return npsBucket(score) === "PROMOTER" ? normalizeReviewUrl(url) : null;
+}

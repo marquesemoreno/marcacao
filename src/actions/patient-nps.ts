@@ -2,7 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { resolvePatientToken, consumePatientToken } from "@/lib/patient-token-server";
-import { parseNpsScore } from "@/lib/nps";
+import { parseNpsScore, reviewLinkFor } from "@/lib/nps";
 import { encryptFormAnswers } from "@/lib/patient-form-server";
 
 /** Pesquisa de satisfação pelo link do passo "Satisfação" da régua (/p/[token], sem login).
@@ -16,7 +16,7 @@ export async function loadNpsSurvey(raw: string) {
   return { state: "VALID" as const, clinicName: clinic?.tradeName || clinic?.name || "a clínica" };
 }
 
-export async function submitNps(raw: string, score: unknown, comment: string): Promise<{ ok: true } | { ok: false; error: string }> {
+export async function submitNps(raw: string, score: unknown, comment: string): Promise<{ ok: true; reviewUrl?: string | null } | { ok: false; error: string }> {
   const n = parseNpsScore(score);
   if (n === null) return { ok: false, error: "Escolha uma nota de 0 a 10." };
   const { state, token } = await resolvePatientToken(raw, "NPS");
@@ -33,5 +33,6 @@ export async function submitNps(raw: string, score: unknown, comment: string): P
       commentEncrypted: text ? encryptFormAnswers({ comment: text }) : null,
     },
   });
-  return { ok: true };
+  const clinic = await prisma.clinic.findUnique({ where: { id: token.clinicId }, select: { googleReviewUrl: true } });
+  return { ok: true, reviewUrl: reviewLinkFor(n, clinic?.googleReviewUrl) };
 }

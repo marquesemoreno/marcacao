@@ -38,3 +38,22 @@ describe("parseNpsScore", () => {
     expect(parseNpsScore(null)).toBeNull();
   });
 });
+import { describe as d2, expect as e2, it as i2 } from "vitest";
+import { normalizeReviewUrl, reviewLinkFor } from "./nps";
+
+d2("link de avaliação no Google (4.4)", () => {
+  i2("só promotores (9–10) recebem o link", () => {
+    e2(reviewLinkFor(9, "https://g.page/r/abc/review")).toBe("https://g.page/r/abc/review");
+    e2(reviewLinkFor(10, "https://g.page/r/abc/review")).toBe("https://g.page/r/abc/review");
+    e2(reviewLinkFor(8, "https://g.page/r/abc/review")).toBeNull();
+    e2(reviewLinkFor(10, null)).toBeNull();
+  });
+  i2("aceita só https; completa quem colou sem protocolo", () => {
+    e2(normalizeReviewUrl("  g.page/r/abc/review ")).toBe("https://g.page/r/abc/review");
+    e2(normalizeReviewUrl("https://search.google.com/local/writereview?placeid=X")).toBe("https://search.google.com/local/writereview?placeid=X");
+    e2(normalizeReviewUrl("")).toBeNull();
+    e2(normalizeReviewUrl("javascript:alert(1)")).toBeNull();
+    e2(normalizeReviewUrl("http://g.page/x")).toBe("https://g.page/x");
+    e2(normalizeReviewUrl("não é link")).toBeNull();
+  });
+});

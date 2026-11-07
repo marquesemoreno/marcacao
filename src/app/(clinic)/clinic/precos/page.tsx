@@ -55,6 +55,7 @@ export default async function ClinicSettingsPage() {
         whatsapp={clinic.whatsapp}
         technicalDirectorName={clinic.technicalDirectorName}
         technicalDirectorCrm={clinic.technicalDirectorCrm}
+        googleReviewUrl={clinic.googleReviewUrl}
         />
       </div>
     </div>

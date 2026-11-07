@@ -219,6 +219,7 @@ model Clinic {
   /// das campanhas de marketing; sem ele a campanha não inicia.
   technicalDirectorName      String?  @map("technical_director_name")
   technicalDirectorCrm       String?  @map("technical_director_crm")
+  googleReviewUrl            String?  @map("google_review_url")
   defaultTicket              Decimal? @map("default_ticket") @db.Decimal(10, 2)
   /// Códigos de paciente do sistema da clínica (PACIENTE.CODIGOPAC no Firebird) que nunca
   /// entram em campanha pelo público "Pacientes do sistema da clínica" — ex: cadastro com

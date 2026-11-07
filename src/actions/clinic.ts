@@ -1,5 +1,6 @@
 "use server";
 
+import { normalizeReviewUrl } from "@/lib/nps";
 import { revalidatePath } from "next/cache";
 import type { AppointmentStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
@@ -806,4 +807,14 @@ export async function saveCampaignSpend(input: { campaign: string; month: string
   }
   revalidatePath("/clinic/relatorio");
   return { success: true as const };
+}
+
+/** Link de avaliação no Google — oferecido a quem dá nota 9–10 na pesquisa (roteiro 4.4). */
+export async function updateClinicGoogleReviewUrl(formData: FormData) {
+  const { clinicId } = await requireClinicManager();
+  const raw = String(formData.get("googleReviewUrl") ?? "").trim();
+  const url = normalizeReviewUrl(raw);
+  if (raw && !url) throw new Error("Link inválido. Cole o link de avaliação do Google (começa com https://).");
+  await prisma.clinic.update({ where: { id: clinicId }, data: { googleReviewUrl: url } });
+  revalidatePath("/clinic/precos");
 }
