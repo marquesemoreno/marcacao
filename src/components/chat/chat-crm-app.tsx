@@ -177,7 +177,7 @@ const ACTIONS_BY_SCOPE = {
     updateContactInfo: (id: string, data: UpdatePatientData) => updateContactInfo(id, data),
     refreshContactPhoto: (id: string) => refreshContactPhoto(id),
     assignConversationToUser: (id: string, userId: string | null) => assignConversationToUser(id, userId ?? ""),
-    resolveConversation: (id: string, data?: { reason: string; notes?: string }) => resolveConversation(id, data),
+    resolveConversation: (id: string, data?: { reason: string; notes?: string; sendClosing?: boolean }) => resolveConversation(id, data),
     reopenConversation: (id: string) => reopenConversation(id),
     listCannedResponses: () => listCannedResponses(),
     createCannedResponse: (shortcut: string, content: string) => createCannedResponse(shortcut, content),
@@ -222,7 +222,7 @@ const ACTIONS_BY_SCOPE = {
     updateContactInfo: (id: string, data: UpdatePatientData) => updateContactInfoAdmin(id, data),
     refreshContactPhoto: (id: string) => refreshContactPhotoAdmin(id),
     assignConversationToUser: (id: string, userId: string | null) => assignConversationToUserAdmin(id, userId),
-    resolveConversation: (id: string, data?: { reason: string; notes?: string }) => resolveConversationAdmin(id, data),
+    resolveConversation: (id: string, data?: { reason: string; notes?: string; sendClosing?: boolean }) => resolveConversationAdmin(id, data),
     reopenConversation: (id: string) => reopenConversationAdmin(id),
     listCannedResponses: () => listCannedResponsesAdmin(),
     createCannedResponse: (shortcut: string, content: string) => createCannedResponseAdmin(shortcut, content),
@@ -964,7 +964,7 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
     await refreshContacts();
   }
 
-  async function handleFinish(contactId: string, resolution?: { reason: string; notes?: string }) {
+  async function handleFinish(contactId: string, resolution?: { reason: string; notes?: string; sendClosing?: boolean }) {
     await actions.resolveConversation(contactId, resolution);
     forceFinalizedRef.current = true;
     await refreshContacts();
@@ -976,7 +976,7 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
     await refreshContacts();
   }
 
-  async function handleFinishAttendance(resolutionData?: { reason: string; notes?: string }) {
+  async function handleFinishAttendance(resolutionData?: { reason: string; notes?: string; sendClosing?: boolean }) {
     if (!selectedContactId) return;
     await actions.resolveConversation(selectedContactId, resolutionData);
     toast.success("Atendimento finalizado com sucesso!");

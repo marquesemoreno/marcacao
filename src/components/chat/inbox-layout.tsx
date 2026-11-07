@@ -6,6 +6,7 @@ import { ACQUISITION_CHANNELS } from "@/lib/acquisition";
 import { CANNED_VARIABLES, fillCannedVariables } from "@/lib/canned-variables";
 import { customLossReasonLabel } from "@/lib/loss-reasons";
 import { listLossReasons } from "@/actions/loss-reasons";
+import { getClosingMessageSetting } from "@/actions/closing-message";
 import { PatientSuggestionBanner } from "./patient-suggestion-banner";
 import { AcquisitionBadge } from "@/components/chat/acquisition-badge";
 import { InstagramGlyph } from "@/components/chat/instagram-glyph";
@@ -272,7 +273,7 @@ interface InboxLayoutProps {
   onCreateContact?: (name: string, phone: string, clinicId?: string, extra?: NewContactExtra) => Promise<void>;
   /** F2 — número já cadastrado? (null = livre) */
   onCheckContactPhone?: (phone: string, clinicId?: string) => Promise<{ name: string; conversationId: string | null } | null>;
-  onFinishAttendance: (resolutionData?: { reason: string; notes?: string }) => Promise<void> | void;
+  onFinishAttendance: (resolutionData?: { reason: string; notes?: string; sendClosing?: boolean }) => Promise<void> | void;
   fetchProcedures: (convenioId?: string) => Promise<PlainClinicProcedureItem[]>;
   fetchDoctors?: () => Promise<{ id: number; nome: string; crm: string; especialidade: string | null }[]>;
   fetchConvenios?: () => Promise<{ id: number; nome: string }[]>;
@@ -793,6 +794,14 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- só ao abrir
   }, [isFinishModalOpen]);
   const [finishNotes, setFinishNotes] = useState('');
+  // Despedida automática ao finalizar (src/lib/closing-message.ts): só aparece se a clínica ligou.
+  const [closingSetting, setClosingSetting] = useState<{ enabled: boolean; text: string } | null>(null);
+  const [sendClosing, setSendClosing] = useState(true);
+  useEffect(() => {
+    if (!isFinishModalOpen) return;
+    setSendClosing(true);
+    getClosingMessageSetting().then(setClosingSetting).catch(() => setClosingSetting(null));
+  }, [isFinishModalOpen]);
   const [isFinishingAttendance, setIsFinishingAttendance] = useState(false);
 
 
@@ -3474,6 +3483,24 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
               />
             </div>
 
+            {closingSetting?.enabled && (
+              <label className="flex items-start gap-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 p-3 text-xs cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="mt-0.5 h-4 w-4 accent-emerald-600"
+                  checked={sendClosing}
+                  onChange={(e) => setSendClosing(e.target.checked)}
+                />
+                <span className="min-w-0">
+                  <span className="block font-semibold text-slate-800 dark:text-slate-200">Enviar despedida ao paciente</span>
+                  <span className="mt-0.5 block whitespace-pre-line text-slate-500 dark:text-slate-400 line-clamp-3">{closingSetting.text}</span>
+                  <span className="mt-0.5 block text-slate-400 dark:text-slate-500">
+                    Não sai se o paciente não respondeu, se passou de 24 h ou se você já mandou a despedida.
+                  </span>
+                </span>
+              </label>
+            )}
+
             <div className="flex flex-col items-end gap-1.5 pt-2 border-t border-slate-100 dark:border-slate-800">
               {!selectedReason && (
                 <p className="text-xs text-amber-600 dark:text-amber-400 font-medium">
@@ -3498,7 +3525,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                   // a menos que a atendente tenha desligado (preferência deste navegador).
                   const nextInQueue = autoAdvance ? filteredContacts.find((c) => c.id !== selectedContact?.id) : undefined;
                   try {
-                    await onFinishAttendance({ reason: selectedReason, notes: finishNotes });
+                    await onFinishAttendance({ reason: selectedReason, notes: finishNotes, sendClosing });
                     setIsFinishModalOpen(false);
                     if (nextInQueue) {
                       handleSelectContactMobile(nextInQueue.id);

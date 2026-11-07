@@ -202,6 +202,10 @@ model Clinic {
   /// mesmo resolvidas, pra não parecer robótico com quem já é conhecido.
   welcomeMessageEnabled      Boolean  @default(false) @map("welcome_message_enabled")
   welcomeMessageText         String?  @map("welcome_message_text")
+  /// Despedida enviada sozinha ao finalizar o atendimento (src/lib/closing-message.ts).
+  /// Gestão liga em /clinic/ia; null no texto = DEFAULT_CLOSING_MESSAGE.
+  closingMessageEnabled      Boolean  @default(false) @map("closing_message_enabled")
+  closingMessageText         String?  @map("closing_message_text")
   commissionRate             Decimal  @map("commission_rate") @db.Decimal(5, 2)
   rating                     Float    @default(0)
   reviewCount                Int      @default(0) @map("review_count")

@@ -41,6 +41,7 @@ const MESSAGE_PAGE_SIZE = 50;
 const CONTACT_PHOTO_CACHE_DAYS = 30;
 import type { Department, FunnelStage, InboxFilter } from "@/types/chat-crm";
 import { applyMessageVariables } from "@/lib/format";
+import { DEFAULT_CLOSING_MESSAGE, shouldSendClosingMessage } from "@/lib/closing-message";
 import {
   sendMessageSchema,
   updateTagsSchema,
@@ -1577,13 +1578,13 @@ const REASON_LABELS: Record<string, string> = {
 
 export async function resolveConversation(
   conversationId: string,
-  resolutionData?: { reason: string; notes?: string }
+  resolutionData?: { reason: string; notes?: string; sendClosing?: boolean }
 ) {
   const { clinicId, userId } = await requireClinicSession();
 
   const conversation = await prisma.conversation.findUnique({
     where: { id: conversationId },
-    select: { clinicId: true, status: true },
+    select: { clinicId: true, status: true, clinic: { select: { closingMessageEnabled: true, closingMessageText: true } } },
   });
   if (!conversation || conversation.clinicId !== clinicId) {
     throw new Error("Conversa não encontrada");
@@ -1596,6 +1597,30 @@ export async function resolveConversation(
   // Já estar RESOLVED é o sinal de que a primeira chamada já fez o trabalho.
   if (conversation.status === "RESOLVED") {
     return;
+  }
+
+  // Despedida automática (src/lib/closing-message.ts) — antes de marcar RESOLVED, pelo
+  // mesmo caminho do envio normal. Falha no envio nunca impede de finalizar.
+  if (conversation.clinic.closingMessageEnabled && resolutionData?.sendClosing !== false) {
+    const text = conversation.clinic.closingMessageText?.trim() || DEFAULT_CLOSING_MESSAGE;
+    const now = new Date();
+    const [lastInbound, recentOutbound] = await Promise.all([
+      prisma.message.findFirst({ where: { conversationId, direction: "INBOUND" }, orderBy: { createdAt: "desc" }, select: { createdAt: true } }),
+      prisma.message.findMany({
+        where: { conversationId, direction: "OUTBOUND", type: { not: "INTERNAL_NOTE" }, createdAt: { gte: new Date(now.getTime() - 30 * 60_000) } },
+        select: { content: true, createdAt: true },
+      }),
+    ]);
+    const ok = shouldSendClosingMessage({
+      enabled: true,
+      text,
+      requested: true, // desmarcado no modal já saiu no if acima
+      reason: resolutionData?.reason || "DUVIDA_ESCLARECIDA",
+      lastInboundAt: lastInbound?.createdAt ?? null,
+      recentOutbound: recentOutbound.map((m) => ({ content: m.content ?? "", createdAt: m.createdAt })),
+      now,
+    });
+    if (ok) await sendMessage(conversationId, text).catch((e) => console.error("[despedida] falha ao enviar:", e));
   }
 
   const currentUser = await prisma.user.findUnique({
