@@ -107,7 +107,7 @@ function ProcedureRow({ item }: { item: PlainClinicProcedureItem }) {
           onClick={handleSave}
           disabled={isPending}
           title="Salvar alterações"
-          className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 px-2.5 py-1.5 text-xs font-medium text-white transition-colors"
+          className="inline-flex items-center gap-1.5 rounded-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 px-2.5 py-1.5 text-xs font-medium text-white transition-colors"
         >
           <Save className="w-3.5 h-3.5" />
           {isPending ? "Salvando..." : "Salvar"}
@@ -149,7 +149,7 @@ export function ProceduresTable({
               className="h-9 pl-9"
             />
           </div>
-          <div className="flex items-center gap-0.5 p-0.5 bg-slate-100 dark:bg-slate-800 rounded-lg text-xs font-medium">
+          <div className="flex items-center gap-0.5 p-0.5 bg-slate-100 dark:bg-slate-800 rounded-full text-xs font-medium">
             {CATEGORY_FILTERS.map((f) => (
               <button
                 key={f.value}
@@ -169,7 +169,7 @@ export function ProceduresTable({
         <AddProcedureDialog availableProcedures={availableProcedures} />
       </div>
 
-      <div className="w-full overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs">
+      <div className="w-full overflow-x-auto rounded-2xl bg-white dark:bg-slate-900 shadow-xs">
         <Table className="w-full">
           <TableHeader>
             <TableRow className="bg-slate-50/70 dark:bg-slate-800/70">

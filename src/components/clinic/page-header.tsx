@@ -7,17 +7,18 @@ import { openGlobalSearch } from "@/components/clinic/global-search";
  * ("833 pacientes", "38 em aberto") e a busca global (atalho "/"). */
 export function PageHeader({ title, subtitle, actions }: { title: string; subtitle?: string; actions?: React.ReactNode }) {
   return (
-    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-      <div className="min-w-0">
+    <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+      {/* min-w de ~16rem: com muitos filtros à direita (Relatório), o subtítulo não quebra palavra a palavra. */}
+      <div className="min-w-0 lg:min-w-[16rem]">
         <h1 className="text-xl md:text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">{title}</h1>
         {subtitle && <p className="text-sm text-slate-600 dark:text-slate-400 mt-0.5">{subtitle}</p>}
       </div>
-      <div className="flex items-center gap-2 shrink-0">
+      <div className="flex flex-wrap items-center gap-2 min-w-0">
         {actions}
         <button
           type="button"
           onClick={openGlobalSearch}
-          className="inline-flex items-center gap-2 h-9 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 text-sm text-slate-500 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-600"
+          className="inline-flex items-center gap-2 h-9 rounded-full bg-slate-100 dark:bg-slate-800 px-4 text-sm text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700"
           aria-label="Buscar paciente, telefone ou conversa (atalho /)"
         >
           <Search className="w-4 h-4" />

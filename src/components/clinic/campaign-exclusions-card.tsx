@@ -43,7 +43,7 @@ export function CampaignExclusionsCard() {
   }
 
   return (
-    <section className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 space-y-2">
+    <section className="rounded-2xl bg-white dark:bg-slate-900 shadow-xs p-4 space-y-2">
       <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-100">Pacientes que nunca recebem campanha</h2>
       <p className="text-sm text-slate-500 dark:text-slate-400">
         Códigos de paciente do sistema da clínica (separados por vírgula). Vale para todas as campanhas com público do sistema da clínica.
@@ -63,7 +63,7 @@ export function CampaignExclusionsCard() {
           type="button"
           disabled={saving || value === saved}
           onClick={save}
-          className="h-9 px-4 text-sm font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-40"
+          className="h-9 px-4 text-sm font-semibold rounded-full bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-40"
         >
           {saving ? "Salvando…" : "Salvar"}
         </button>

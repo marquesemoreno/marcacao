@@ -24,7 +24,7 @@ function CopyLinkRow({ channel, url }: TrackedLink) {
   }
 
   return (
-    <div className="flex items-center justify-between gap-2 rounded-md border border-slate-200 dark:border-slate-800 px-3 py-2">
+    <div className="flex items-center justify-between gap-2 rounded-xl bg-slate-100 dark:bg-slate-800 px-3 py-2">
       <div className="min-w-0">
         <p className="text-xs font-medium text-slate-800 dark:text-slate-200">{channel}</p>
         <p className="text-xs text-muted-foreground truncate">{url}</p>
