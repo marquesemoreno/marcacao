@@ -782,14 +782,26 @@ export async function getClinicCampaignBreakdown(period: PeriodKey = "30") {
   const [conversations, clinic, spends] = await Promise.all([
     prisma.conversation.findMany({
       where: { clinicId, createdAt: { gte: since, ...(until ? { lt: until } : {}) }, AND: [NOT_ADMINISTRATIVE] },
-      select: { acquisitionChannel: true, acquisitionDetail: true, status: true, resolutionReason: true },
+      select: {
+        acquisitionChannel: true,
+        acquisitionDetail: true,
+        status: true,
+        resolutionReason: true,
+        funnelStage: true,
+        stageChanges: { where: { toStage: { in: ["ORCAMENTO", "AGENDADO"] } }, select: { toStage: true } },
+      },
     }),
     prisma.clinic.findUniqueOrThrow({ where: { id: clinicId }, select: { defaultTicket: true } }),
     month ? prisma.campaignSpend.findMany({ where: { clinicId, month }, select: { campaign: true, amount: true } }) : Promise.resolve([]),
   ]);
   const spendByLabel = Object.fromEntries(spends.map((s) => [s.campaign, Number(s.amount)]));
   const ticket = clinic.defaultTicket !== null ? Number(clinic.defaultTicket) : null;
-  return { month, rows: computeCampaignReport(conversations, ticket, spendByLabel) };
+  // Etapas alcançadas: a atual + as que passou (a conversa pode ter voltado de etapa).
+  const withStages = conversations.map(({ funnelStage, stageChanges, ...c }) => ({
+    ...c,
+    stagesReached: [funnelStage as string, ...stageChanges.map((s) => s.toStage as string)],
+  }));
+  return { month, rows: computeCampaignReport(withStages, ticket, spendByLabel) };
 }
 
 /** Investimento de uma campanha no mês (R$). Valor vazio/0 apaga. */

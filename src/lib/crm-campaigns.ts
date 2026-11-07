@@ -37,6 +37,8 @@ export type CampaignReportRow = {
   label: string;
   channel: string | null;
   leads: number;
+  /** Receberam valor (etapa Orçamento do CRM em algum momento). */
+  budget: number;
   scheduled: number;
   conversionRate: number | null;
   revenue: number | null;
@@ -50,20 +52,25 @@ export type CampaignReportRow = {
  * resto do relatório). Receita = agendaram × ticket médio (estimativa). Investimento vem do
  * que a clínica informou pro mês (spendByLabel); sem ele, custo e retorno ficam null. */
 export function computeCampaignReport(
-  conversations: (WithAcquisition & { status: string; resolutionReason: string | null })[],
+  conversations: (WithAcquisition & { status: string; resolutionReason: string | null; stagesReached?: string[] })[],
   ticket: number | null,
   spendByLabel: Record<string, number>
 ): CampaignReportRow[] {
   return groupByCampaign(conversations).map(({ label, channel, items }) => {
     const leads = items.length;
-    const withOutcome = items.filter(hasOutcome).length;
-    const scheduled = items.filter((c) => c.resolutionReason === "AGENDAMENTO_CONCLUIDO").length;
+    const isScheduled = (c: (typeof items)[number]) =>
+      c.resolutionReason === "AGENDAMENTO_CONCLUIDO" || (c.stagesReached ?? []).includes("AGENDADO");
+    const scheduled = items.filter(isScheduled).length;
+    const budget = items.filter((c) => (c.stagesReached ?? []).includes("ORCAMENTO")).length;
+    // Base da conversão: com desfecho ou já agendada (etapa) — nunca passa de 100%.
+    const withOutcome = items.filter((c) => hasOutcome(c) || isScheduled(c)).length;
     const revenue = ticket !== null ? scheduled * ticket : null;
     const spend = spendByLabel[label] ?? null;
     return {
       label,
       channel,
       leads,
+      budget,
       scheduled,
       conversionRate: withOutcome > 0 ? round1((scheduled / withOutcome) * 100) : null,
       revenue,

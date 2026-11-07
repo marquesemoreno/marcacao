@@ -50,6 +50,7 @@ describe("computeCampaignReport", () => {
     );
     expect(rows[0]).toEqual({
       label: "Google Ads · vasectomia",
+      budget: 0,
       channel: "Google Ads",
       leads: 4,
       scheduled: 1,
@@ -61,5 +62,23 @@ describe("computeCampaignReport", () => {
       roi: -37.5,
     });
     expect(rows[1]).toMatchObject({ label: "Site da Clínica", leads: 1, spend: null, costPerLead: null, roi: null });
+  });
+});
+
+describe("funil por anúncio", () => {
+  it("conta orçamento e agendamento pela etapa do CRM, não só pelo motivo de finalização", () => {
+    const base = { acquisitionChannel: "Instagram Ads", acquisitionDetail: "Vasectomia", status: "OPEN", resolutionReason: null };
+    const rows = computeCampaignReport(
+      [
+        { ...base, stagesReached: [] },
+        { ...base, stagesReached: ["ORCAMENTO"] },
+        { ...base, stagesReached: ["ORCAMENTO", "AGENDADO"] },
+        { ...base, stagesReached: ["AGENDADO"] },
+        { ...base, status: "RESOLVED", resolutionReason: "AGENDAMENTO_CONCLUIDO" },
+      ],
+      100,
+      {}
+    );
+    expect(rows[0]).toMatchObject({ leads: 5, budget: 2, scheduled: 3, revenue: 300 });
   });
 });
