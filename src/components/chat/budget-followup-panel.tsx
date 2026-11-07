@@ -20,6 +20,7 @@ export function BudgetFollowupPanel({ onOpenChat }: { onOpenChat: (conversationI
   const [open, setOpen] = useState(false);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState<string | null>(null);
+  const [sending, setSending] = useState(false);
 
   const load = useCallback(() => {
     listBudgetFollowups()
@@ -35,10 +36,12 @@ export function BudgetFollowupPanel({ onOpenChat }: { onOpenChat: (conversationI
 
   async function send(item: BudgetFollowupItem) {
     setBusy(item.conversationId);
+    setSending(true);
     const r = await sendBudgetFollowup(item.conversationId, item.step, drafts[item.conversationId] ?? item.message).catch(
       () => ({ ok: false, error: "Não foi possível enviar." }),
     );
     setBusy(null);
+    setSending(false);
     if (!r.ok) return void toast.error(r.error ?? "Não foi possível enviar.");
     toast.success(`Cobrança enviada para ${item.name.split(" ")[0]}.`);
     remove(item.conversationId);
@@ -118,7 +121,7 @@ export function BudgetFollowupPanel({ onOpenChat }: { onOpenChat: (conversationI
                     onClick={() => send(item)}
                     className="h-8 px-3 rounded-md inline-flex items-center gap-1.5 bg-violet-600 text-white text-sm font-medium hover:bg-violet-700 disabled:opacity-50"
                   >
-                    <Send className="h-3.5 w-3.5" aria-hidden /> {disabled ? "Enviando…" : "Enviar"}
+                    <Send className="h-3.5 w-3.5" aria-hidden /> {disabled && sending ? "Enviando…" : "Enviar"}
                   </button>
                 </div>
               </li>

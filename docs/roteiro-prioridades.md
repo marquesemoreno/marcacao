@@ -14,7 +14,7 @@ Legenda: 🔴 bloqueia outros itens · 🟡 depende de terceiros · ✅ código 
 |---|------|----------|---------------|
 | 0.1 | ✔️ WhatsApp oficial — teste ponta a ponta pelo número da TIVDC | **FEITO 07/11**: texto recebido e respondido pelo Chat; áudio, PDF e imagem recebidos e salvos; resposta pelo celular (coexistência) apareceu no Chat; histórico sincronizado na conexão | Falta só o modelo `appointment_reminder` → vai na Etapa 1 |
 | 0.2 | ✔️ Calculadora de preços do site | **FEITO 07/11**: totais conferidos (padrão R$ 899,50; Essencial R$ 649,50; franquias e negativos OK) | — |
-| 0.3 | ✅ Fila de orçamentos 3/7/15 dias + card de conversão | Não testados no navegador | Abrir CRM e Relatório com dados reais |
+| 0.3 | ✔️ Fila de orçamentos 3/7/15 dias + card de conversão | **FEITO 07/11** na clínica demo (fila, Pular, cartão do Relatório OK). Nenhuma clínica real usa a etapa Orçamento ainda | Etapa 2: marcar Orçamento sozinho quando a IA detectar valor enviado |
 | 0.4 | ✅ Marcação fora do horário | Desligada em todas | Ligar na TIVDC, testar à noite, depois Urolaser |
 | 0.5 | ✅ Jornada do paciente (ficha prévia, Cheguei, TV, senhas, QR, NPS, vaga automática) | Nada ligado em clínica real | Piloto na Urolaser seguindo docs/piloto-jornada-urolaser.md |
 
