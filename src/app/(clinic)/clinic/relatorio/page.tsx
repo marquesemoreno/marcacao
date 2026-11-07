@@ -35,6 +35,8 @@ import { getClinicNpsReport } from "@/actions/clinic-nps";
 import { NpsCard } from "@/components/clinic/nps-card";
 import { BudgetConversionCard } from "@/components/clinic/budget-conversion-card";
 import { getBudgetConversionReport } from "@/actions/budget-followup";
+import { HoursSavedCard } from "@/components/clinic/hours-saved-card";
+import { getHoursSavedReport } from "@/actions/hours-saved";
 import { ReportAiSummary } from "@/components/clinic/report-ai-summary";
 import { AgendaRiskBlock, FunnelCard, PatientsCard, WeeklyTrendCard } from "@/components/clinic/report-insights-blocks";
 import { buildInsightFacts, computeFunnel } from "@/lib/report-insights";
@@ -143,6 +145,7 @@ export default async function ClinicReportPage({
     insights,
     nps,
     budgetConversion,
+    hoursSaved,
   ] = await Promise.all([
     getClinicChatReport(period, tags, params.channel),
     isExclusive
@@ -161,6 +164,7 @@ export default async function ClinicReportPage({
     getClinicReportInsights(period),
     getClinicNpsReport(period),
     getBudgetConversionReport(period).catch(() => null),
+    getHoursSavedReport(period).catch(() => null),
   ]);
   const rs = chatReport.responseStats;
   const prevRs = prevChat.responseStats;
@@ -410,6 +414,7 @@ export default async function ClinicReportPage({
           <WeeklyTrendCard weeks={insights.trend} />
           <PatientsCard patients={insights.patients} />
         </div>
+        {hoursSaved && <HoursSavedCard data={hoursSaved} />}
         {budgetConversion && <BudgetConversionCard data={budgetConversion} />}
         <NpsCard nps={nps} />
       </section>
