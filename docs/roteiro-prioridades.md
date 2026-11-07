@@ -39,7 +39,7 @@ Base: análise de 60 dias (Urolaser ~210 e Santa Clara ~170 mensagens digitadas 
 5. IA de preços e regras por procedimento, lendo Configurações (~440 conversas), **incluindo médicos que só operam na clínica e o telefone da secretária deles** (Santa Clara ~64x). Textos validados com as clínicas.
 6. Triagem automática (idade, sonda/cadeirante, comorbidades, exames pré-op) com respostas na ficha (~180x).
 7. Lista de convênios aceitos para a IA responder (Santa Clara 168 conversas).
-8. **Relatório "horas poupadas"** por clínica (mensagens automáticas × 45 s) — número de venda e de conteúdo.
+8. ~~**Relatório "horas poupadas"**~~ ✅ 07/11 79e45ec — cartão no Relatório (Urolaser 30 dias: 1.073 msgs ≈ 13,4 h).
 9. Urolaser: reduzir encerramentos por inatividade (~80%) para o relatório de conversão ficar confiável.
 
 ## Etapa 3 — Marketing e rastreamento (módulo novo)
