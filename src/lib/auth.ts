@@ -26,11 +26,13 @@ export const authOptions: AuthOptions = {
         });
         if (isLoginLocked(failures.map((f) => f.createdAt))) return null;
 
-        const user = await prisma.user.findUnique({
-          where: { email: credentials.email },
+        // E-mail sem diferenciar maiúscula (cadastros antigos podem ter maiúscula salva).
+        const user = await prisma.user.findFirst({
+          where: { email: { equals: email, mode: "insensitive" } },
         });
         const passwordMatches = user ? await bcrypt.compare(credentials.password, user.passwordHash) : false;
-        if (!user || !passwordMatches) {
+        // Usuário desativado não entra (antes só sumia das listas).
+        if (!user || !passwordMatches || !user.active) {
           await prisma.loginFailure.create({ data: { email } }).catch(() => {});
           return null;
         }
