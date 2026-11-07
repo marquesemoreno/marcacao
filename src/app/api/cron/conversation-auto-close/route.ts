@@ -8,6 +8,9 @@ import { NO_RESPONSE_TAG } from "@/lib/conversation-tags";
 import { isCronAuthorized } from "@/lib/request-auth";
 import {
   AUTO_CLOSE_CONCLUDED_REASON,
+  AUTO_CLOSE_INFO_REASON,
+  AUTO_CLOSE_NOTES,
+  AUTO_CLOSE_SCHEDULED_REASON,
   AUTO_CLOSE_HOURS,
   AUTO_CLOSE_NOTICE,
   AUTO_CLOSE_REASON,
@@ -15,6 +18,7 @@ import {
   CONVERSATION_ENDING_QUESTION,
   decideAutoClose,
   endingFromJevAnswer,
+  hasSchedulingMessage,
   type ConversationEnding,
 } from "@/lib/conversation-auto-close";
 
@@ -70,6 +74,10 @@ export async function GET(request: Request) {
   for (let i = 0; i < candidates.length; i += 10) {
     await Promise.all(
       candidates.slice(i, i + 10).map(async (c) => {
+        if (hasSchedulingMessage(c.messages)) {
+          endings.set(c.id, "SCHEDULED");
+          return;
+        }
         const mensagens = [...c.messages]
           .reverse()
           .map((m) => ({ de: m.direction === "INBOUND" ? "paciente" : "clínica", texto: (m.content || "[mídia]").slice(0, 400) }));
@@ -109,12 +117,19 @@ export async function GET(request: Request) {
       notified++;
     }
 
-    const isConcluded = decision === "close_concluded";
+    const OUTCOMES = {
+      close_concluded: { reason: AUTO_CLOSE_CONCLUDED_REASON, note: "✅ Conversa já tinha terminado (sem pendência para o paciente)" },
+      close_info: { reason: AUTO_CLOSE_INFO_REASON, note: "💬 Informação entregue (paciente não voltou a perguntar)" },
+      close_scheduled: { reason: AUTO_CLOSE_SCHEDULED_REASON, note: "📅 Recepção já tinha confirmado o agendamento" },
+    } as const;
+    const outcome = decision in OUTCOMES ? OUTCOMES[decision as keyof typeof OUTCOMES] : null;
+    const isConcluded = !!outcome;
     await prisma.conversation.update({
       where: { id: c.id },
       data: {
         status: "RESOLVED",
-        resolutionReason: isConcluded ? AUTO_CLOSE_CONCLUDED_REASON : AUTO_CLOSE_REASON,
+        resolutionReason: outcome ? outcome.reason : AUTO_CLOSE_REASON,
+        resolutionNotes: AUTO_CLOSE_NOTES,
         resolvedAt: now,
         // Terminou bem — não é "sem retorno" do paciente.
         ...(isConcluded ? { tags: c.tags.filter((t) => t !== NO_RESPONSE_TAG) } : {}),
@@ -125,8 +140,8 @@ export async function GET(request: Request) {
         conversationId: c.id,
         direction: "OUTBOUND",
         type: "INTERNAL_NOTE",
-        content: isConcluded
-          ? "🏁 Atendimento finalizado automaticamente • Motivo: ✅ Conversa já tinha terminado (sem pendência para o paciente)"
+        content: outcome
+          ? `🏁 Atendimento finalizado automaticamente • Motivo: ${outcome.note}`
           : `🏁 Atendimento finalizado automaticamente • Motivo: ⌛ Inatividade (sem resposta do paciente há mais de ${AUTO_CLOSE_HOURS}h úteis)`,
         status: "SENT",
       },

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { autoCloseHint, businessHoursBetween, decideAutoClose, endingFromJevAnswer } from "./conversation-auto-close";
+import { autoCloseHint, businessHoursBetween, decideAutoClose, endingFromJevAnswer, hasSchedulingMessage } from "./conversation-auto-close";
 
 // America/Bahia = UTC-3 fixo. 2026-10-09 é sexta.
 const br = (iso: string) => new Date(`${iso}-03:00`);
@@ -74,5 +74,24 @@ describe("autoCloseHint", () => {
     expect(autoCloseHint({ lastDirection: "OUTBOUND", lastAt: br("2026-10-09T14:00:00"), pinned: false, now })).toBeNull();
     expect(autoCloseHint({ lastDirection: "INBOUND", lastAt: br("2026-10-09T10:00:00"), pinned: false, now })).toBeNull();
     expect(autoCloseHint({ lastDirection: "OUTBOUND", lastAt: br("2026-10-09T10:00:00"), pinned: true, now })).toBeNull();
+  });
+});
+
+describe("desfechos novos (07/11: Urolaser ~50% inatividade)", () => {
+  it("informação entregue fecha como dúvida esclarecida, sem aviso", () => {
+    expect(decideAutoClose({ ...base, idleBusinessHours: 4, ending: "INFO_GIVEN" })).toBe("close_info");
+    expect(endingFromJevAnswer({ type: "choice", choice: "INFO_GIVEN", confidence: 0.9 })).toBe("INFO_GIVEN");
+  });
+  it("agendado pela recepção fecha como agendamento concluído", () => {
+    expect(decideAutoClose({ ...base, idleBusinessHours: 25, ending: "SCHEDULED" })).toBe("close_scheduled");
+  });
+  it("detecta 'Agendado/Agendada' da recepção nas últimas mensagens", () => {
+    const m = (direction: "INBOUND" | "OUTBOUND", content: string) => ({ direction, content });
+    expect(hasSchedulingMessage([m("OUTBOUND", "Agendada CONSULTA com Dr (a) ALAN para o dia 10/11"), m("INBOUND", "obg")])).toBe(true);
+    expect(hasSchedulingMessage([m("OUTBOUND", "Agendado 25-09 às 08:00h ordem de chegada")])).toBe(true);
+    expect(hasSchedulingMessage([m("OUTBOUND", "*Agendado* para terça")])).toBe(true);
+    expect(hasSchedulingMessage([m("INBOUND", "Agendado já?")])).toBe(false);
+    expect(hasSchedulingMessage([m("OUTBOUND", "Você já tem exame agendado?")])).toBe(false);
+    expect(hasSchedulingMessage([m("OUTBOUND", null as unknown as string)])).toBe(false);
   });
 });

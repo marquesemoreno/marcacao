@@ -12,6 +12,11 @@ export const AUTO_CLOSE_HOURS = 4;
 export const AUTO_CLOSE_NOTIFY_MAX_HOURS = 20;
 export const AUTO_CLOSE_REASON = "INATIVIDADE";
 export const AUTO_CLOSE_CONCLUDED_REASON = "ATENDIMENTO_CONCLUIDO";
+export const AUTO_CLOSE_INFO_REASON = "DUVIDA_ESCLARECIDA";
+export const AUTO_CLOSE_SCHEDULED_REASON = "AGENDAMENTO_CONCLUIDO";
+/** Marca em resolutionNotes: os motivos de desfecho também são escolhidos à mão, e só o
+ * fechamento automático mantém a atendente quando o paciente volta (conversation-reopen). */
+export const AUTO_CLOSE_NOTES = "Finalizado automaticamente";
 export const AUTO_CLOSE_NOTICE =
   "Vamos finalizar este atendimento por aqui. Se precisar de algo, é só mandar uma mensagem que retomamos. 😊";
 
@@ -19,18 +24,32 @@ export const AUTO_CLOSE_NOTICE =
  * ~0,8; ambíguos ~0,2–0,4. Abaixo disso = dúvida → fecha sem aviso. */
 export const AUTO_CLOSE_MIN_CONFIDENCE = 0.75;
 
-export type ConversationEnding = "CONCLUDED" | "AWAITING" | "UNSURE";
-export type AutoCloseDecision = "skip" | "notify_and_close" | "close_inactive" | "close_concluded";
+export type ConversationEnding = "CONCLUDED" | "INFO_GIVEN" | "AWAITING" | "SCHEDULED" | "UNSURE";
+export type AutoCloseDecision =
+  | "skip"
+  | "notify_and_close"
+  | "close_inactive"
+  | "close_concluded"
+  | "close_info"
+  | "close_scheduled";
+
+/** Recepção confirmou a marcação ("Agendada CONSULTA com Dr(a)…", "Agendado 25-09 às 08h"):
+ * 65 de 374 encerramentos por inatividade da Urolaser em 30 dias (07/11). Não depende do Jev. */
+export function hasSchedulingMessage(messages: { direction: string; content: string | null }[]): boolean {
+  return messages.some((m) => m.direction === "OUTBOUND" && /^\s*\*?agendad[oa]s?\b/i.test(m.content ?? ""));
+}
 
 export const CONVERSATION_ENDING_QUESTION = {
   type: "choice",
   instructions:
-    "Conversa de WhatsApp entre a recepção de uma clínica médica e um paciente (`mensagens`, da mais antiga para a mais recente; `de` diz quem escreveu). A última mensagem é da clínica e o paciente não escreve há mais de um dia. A conversa terminou ou a clínica ficou esperando uma resposta do paciente?",
+    "Conversa de WhatsApp entre a recepção de uma clínica médica e um paciente (`mensagens`, da mais antiga para a mais recente; `de` diz quem escreveu). A última mensagem é da clínica e o paciente parou de responder. Como a conversa terminou?",
   criteria: {
     CONCLUDED:
-      "A conversa terminou naturalmente: despedida, agradecimento, \"ok\"/👍, confirmação feita, informação entregue sem nenhuma pergunta ou pendência para o paciente responder.",
+      "Terminou naturalmente: despedida, agradecimento, \"ok\"/👍, confirmação feita, aviso recebido, sem nenhuma pendência.",
+    INFO_GIVEN:
+      "O paciente perguntou algo (preço, horário, médico, convênio, endereço, resultado) e a clínica respondeu com a informação; não ficou pergunta da clínica para o paciente.",
     AWAITING:
-      "A clínica fez uma pergunta, pediu um dado/documento ou enviou orçamento/opções e o paciente não respondeu — ficou esperando o paciente.",
+      "A clínica fez uma pergunta, pediu dado/documento ou ofereceu horário/opções para o paciente escolher e ele não respondeu.",
   },
 };
 
@@ -38,7 +57,7 @@ export function endingFromJevAnswer(
   answer: { type: string; choice?: string; confidence?: number } | undefined
 ): ConversationEnding {
   if (!answer || answer.type !== "choice") return "UNSURE";
-  if (answer.choice !== "CONCLUDED" && answer.choice !== "AWAITING") return "UNSURE";
+  if (answer.choice !== "CONCLUDED" && answer.choice !== "AWAITING" && answer.choice !== "INFO_GIVEN") return "UNSURE";
   if ((answer.confidence ?? 0) < AUTO_CLOSE_MIN_CONFIDENCE) return "UNSURE";
   return answer.choice;
 }
@@ -78,7 +97,9 @@ export function decideAutoClose(input: {
   if (input.pinned || input.lastDirection !== "OUTBOUND") return "skip";
   const hours = input.idleBusinessHours;
   if (hours < AUTO_CLOSE_HOURS) return "skip";
+  if (input.ending === "SCHEDULED") return "close_scheduled";
   if (input.ending === "CONCLUDED") return "close_concluded";
+  if (input.ending === "INFO_GIVEN") return "close_info";
   if (input.ending === "UNSURE" || hours >= AUTO_CLOSE_NOTIFY_MAX_HOURS || input.paused) return "close_inactive";
   return input.inWindow ? "notify_and_close" : "skip";
 }

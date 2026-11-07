@@ -1,4 +1,5 @@
 import type { ConversationStatus } from "@prisma/client";
+import { AUTO_CLOSE_NOTES } from "./conversation-auto-close";
 
 /** Chamado quando uma nova mensagem do paciente chega (webhook do WhatsApp). Se a
  * conversa estava RESOLVED, reabre e libera o atendente (assignedUserId: null) —
@@ -13,7 +14,7 @@ const AUTO_CLOSE_REASONS = ["INATIVIDADE", "ATENDIMENTO_CONCLUIDO"];
 const KEEP_ASSIGNEE_MS = 48 * 3600_000;
 
 export function reopenIfResolved(
-  conversation: { status: ConversationStatus; resolutionReason?: string | null; resolvedAt?: Date | null },
+  conversation: { status: ConversationStatus; resolutionReason?: string | null; resolutionNotes?: string | null; resolvedAt?: Date | null },
   now: Date = new Date()
 ) {
   if (conversation.status !== "RESOLVED") {
@@ -21,7 +22,7 @@ export function reopenIfResolved(
   }
   const recentAutoClose =
     !!conversation.resolutionReason &&
-    AUTO_CLOSE_REASONS.includes(conversation.resolutionReason) &&
+    (AUTO_CLOSE_REASONS.includes(conversation.resolutionReason) || conversation.resolutionNotes === AUTO_CLOSE_NOTES) &&
     !!conversation.resolvedAt &&
     now.getTime() - conversation.resolvedAt.getTime() < KEEP_ASSIGNEE_MS;
   if (recentAutoClose) {

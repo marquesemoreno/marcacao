@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { reopenIfResolved } from "./conversation-reopen";
+import { AUTO_CLOSE_NOTES } from "./conversation-auto-close";
 
 describe("reopenIfResolved", () => {
   it("ao reabrir uma conversa RESOLVED, libera o atendente e limpa os campos de resolução", () => {
@@ -42,5 +43,13 @@ describe("reopenIfResolved", () => {
     expect(
       reopenIfResolved({ status: "RESOLVED", resolutionReason: "DUVIDA_ESCLARECIDA", resolvedAt: new Date("2026-10-09T14:00:00Z") }, now)
     ).toHaveProperty("assignedUserId", null);
+  });
+  it("motivo de desfecho (dúvida/agendamento) dado pelo cron também mantém a atendente", () => {
+    const now = new Date("2026-10-09T15:00:00Z");
+    const r = reopenIfResolved(
+      { status: "RESOLVED", resolutionReason: "DUVIDA_ESCLARECIDA", resolutionNotes: AUTO_CLOSE_NOTES, resolvedAt: new Date("2026-10-09T14:00:00Z") },
+      now
+    );
+    expect(r).not.toHaveProperty("assignedUserId");
   });
 });
