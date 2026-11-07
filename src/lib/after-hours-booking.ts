@@ -85,12 +85,34 @@ export function afterHoursBookingReply(input: {
   name: string;
   opening: string;
   summary?: string;
+  /** "open" = horário comercial, recepção ocupada (nível 1 do 4.1). */
+  mode?: "closed" | "open";
 }): string {
   const n = firstName(input.name);
   const hi = n ? `Oi, ${n}!` : "Oi!";
+  if (input.mode === "open") {
+    if (input.missing === "O_QUE")
+      return `${hi} Nossa recepção está terminando outro atendimento, então já vou adiantando seu pedido de marcação. É consulta ou exame? Se tiver preferência de médico, me diga também.`;
+    if (input.missing === "QUANDO") return `${hi} Anotado. Você prefere manhã ou tarde? E tem algum dia da semana melhor para você?`;
+    return `Pronto${n ? `, ${n}` : ""}! Seu pedido ficou assim: ${input.summary ?? "marcação"}. A recepção confirma o horário com você em instantes. Se quiser acrescentar algo (convênio, por exemplo), é só mandar aqui.`;
+  }
   if (input.missing === "O_QUE")
     return `${hi} Nossa recepção está fechada agora, mas já vou deixar seu pedido de marcação pronto. É consulta ou exame? Se tiver preferência de médico, me diga também.`;
   if (input.missing === "QUANDO")
     return `${hi} Anotado. Você prefere manhã ou tarde? E tem algum dia da semana melhor para você?`;
   return `Pronto${n ? `, ${n}` : ""}! Seu pedido ficou assim: ${input.summary ?? "marcação"}. A recepção confirma o horário com você ${input.opening}. Se quiser acrescentar algo (convênio, por exemplo), é só mandar aqui.`;
+}
+
+/** Horário comercial: a IA só entra se o pedido de marcação ficou BOOKING_ASSIST_WAIT_MIN sem
+ * ninguém da equipe responder (recepção ocupada). Mais de 2h parado é pendência da recepção. */
+export const BOOKING_ASSIST_WAIT_MIN = 5;
+const BOOKING_ASSIST_MAX_MIN = 120;
+
+export function shouldAssistDuringHours(input: {
+  minutesSinceLastInbound: number;
+  lastDirection: "INBOUND" | "OUTBOUND" | null;
+  humanReplied: boolean;
+}): boolean {
+  if (input.lastDirection !== "INBOUND" || input.humanReplied) return false;
+  return input.minutesSinceLastInbound >= BOOKING_ASSIST_WAIT_MIN && input.minutesSinceLastInbound <= BOOKING_ASSIST_MAX_MIN;
 }

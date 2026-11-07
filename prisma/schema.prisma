@@ -252,6 +252,8 @@ model Clinic {
   urgencyTagEnabled Boolean @default(false) @map("urgency_tag_enabled")
   /// Fora do expediente, a IA completa o pedido de marcação com o paciente (src/lib/after-hours-booking.ts).
   afterHoursBookingEnabled Boolean @default(false) @map("after_hours_booking_enabled")
+  /// Nível 1 do 4.1: a IA também adianta o pedido no horário comercial, depois de 5 min sem resposta.
+  bookingAssistEnabled     Boolean @default(false) @map("booking_assist_enabled")
   /// Ponto da clínica pro QR de chegada no celular (src/lib/geo-fence.ts). Null = sem trava.
   arrivalLat       Float?  @map("arrival_lat")
   arrivalLng       Float?  @map("arrival_lng")

@@ -91,3 +91,27 @@ describe("afterHoursBookingReply", () => {
     expect(AFTER_HOURS_MAX_REPLIES).toBe(3);
   });
 });
+
+import { BOOKING_ASSIST_WAIT_MIN, shouldAssistDuringHours } from "./after-hours-booking";
+
+describe("IA no horário comercial (nível 1 do 4.1)", () => {
+  it("entra só se o paciente ficou 5 min sem resposta da equipe", () => {
+    expect(BOOKING_ASSIST_WAIT_MIN).toBe(5);
+    expect(shouldAssistDuringHours({ minutesSinceLastInbound: 6, lastDirection: "INBOUND", humanReplied: false })).toBe(true);
+    expect(shouldAssistDuringHours({ minutesSinceLastInbound: 3, lastDirection: "INBOUND", humanReplied: false })).toBe(false);
+    expect(shouldAssistDuringHours({ minutesSinceLastInbound: 9, lastDirection: "OUTBOUND", humanReplied: false })).toBe(false);
+    expect(shouldAssistDuringHours({ minutesSinceLastInbound: 9, lastDirection: "INBOUND", humanReplied: true })).toBe(false);
+  });
+  it("não pega conversa velha (mais de 2h parada é coisa da recepção)", () => {
+    expect(shouldAssistDuringHours({ minutesSinceLastInbound: 121, lastDirection: "INBOUND", humanReplied: false })).toBe(false);
+  });
+  it("texto do horário comercial não diz que a recepção está fechada", () => {
+    const t = afterHoursBookingReply({ missing: "O_QUE", name: "maria silva", opening: "", mode: "open" });
+    expect(t).toContain("Oi, Maria!");
+    expect(t).not.toMatch(/fechada/);
+    expect(t).toMatch(/consulta ou exame/);
+    const done = afterHoursBookingReply({ missing: null, name: "Maria", opening: "", summary: "consulta, manhã", mode: "open" });
+    expect(done).toContain("consulta, manhã");
+    expect(done).toMatch(/em instantes/);
+  });
+});

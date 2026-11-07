@@ -28,7 +28,13 @@ export async function afterHoursDialogInProgress(conversationId: string): Promis
 
 /** Com a clínica fechada e a opção ligada, responde ao paciente pedindo o que falta do pedido
  * de marcação ou confirmando o pedido completo. Nunca lança; nunca promete horário. */
-export async function replyAfterHoursBooking(conversationId: string, request: SavedBookingRequest): Promise<void> {
+/** trigger "cron": horário comercial, pedido parado há 5 min (src/app/api/cron/booking-assist).
+ * trigger "message": nova mensagem do paciente — de dia só segue um diálogo já começado. */
+export async function replyAfterHoursBooking(
+  conversationId: string,
+  request: SavedBookingRequest,
+  trigger: "message" | "cron" = "message",
+): Promise<void> {
   try {
     const conversation = await prisma.conversation.findUnique({
       where: { id: conversationId },
@@ -37,16 +43,21 @@ export async function replyAfterHoursBooking(conversationId: string, request: Sa
         channel: true,
         aiEnabled: true,
         contact: { select: { name: true, phone: true } },
-        clinic: { select: { afterHoursBookingEnabled: true, businessHours: true } },
+        clinic: { select: { afterHoursBookingEnabled: true, bookingAssistEnabled: true, businessHours: true } },
       },
     });
-    if (!conversation?.clinic?.afterHoursBookingEnabled) return;
+    if (!conversation?.clinic) return;
     if (conversation.channel !== "WHATSAPP" || !conversation.contact.phone) return;
     // O atendente de IA (com consentimento) já conversa sozinho; não falar por cima dele.
     if (conversation.aiEnabled) return;
     const now = new Date();
     const hours = conversation.clinic.businessHours as Record<string, { open?: string; close?: string; closed?: boolean }> | null;
-    if (isClinicOpenAt(hours, now)) return;
+    const open = isClinicOpenAt(hours, now);
+    if (!open && !conversation.clinic.afterHoursBookingEnabled) return;
+    if (open) {
+      if (!conversation.clinic.bookingAssistEnabled) return;
+      if (trigger === "message" && !(await afterHoursDialogInProgress(conversationId))) return;
+    }
 
     const since = new Date(now.getTime() - WINDOW_MS);
     // Alguém da equipe respondeu há pouco (plantão, celular): deixa com a pessoa.
@@ -72,6 +83,7 @@ export async function replyAfterHoursBooking(conversationId: string, request: Sa
       name: conversation.contact.name,
       opening: nextOpening(hours, now),
       summary,
+      mode: open ? "open" : "closed",
     });
     const result = await sendWhatsAppMessage(conversation.contact.phone, text, ACTION, conversation.clinicId);
     await prisma.message.create({

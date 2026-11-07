@@ -64,14 +64,21 @@ export async function setUrgencyTagEnabled(enabled: boolean) {
 export async function getAfterHoursBookingSetting() {
   const { clinicId, userId } = await requireClinicSession();
   const [clinic, user] = await Promise.all([
-    prisma.clinic.findUnique({ where: { id: clinicId }, select: { afterHoursBookingEnabled: true } }),
+    prisma.clinic.findUnique({ where: { id: clinicId }, select: { afterHoursBookingEnabled: true, bookingAssistEnabled: true } }),
     prisma.user.findUnique({ where: { id: userId }, select: { isManager: true } }),
   ]);
-  return { enabled: !!clinic?.afterHoursBookingEnabled, canToggle: !!user?.isManager };
+  return { enabled: !!clinic?.afterHoursBookingEnabled, duringHours: !!clinic?.bookingAssistEnabled, canToggle: !!user?.isManager };
 }
 
 export async function setAfterHoursBookingEnabled(enabled: boolean) {
   const { clinicId } = await requireClinicManager();
   await prisma.clinic.update({ where: { id: clinicId }, data: { afterHoursBookingEnabled: enabled } });
+  return getAfterHoursBookingSetting();
+}
+
+/** Nível 1 do 4.1: também no horário comercial, depois de 5 min sem resposta da equipe. */
+export async function setBookingAssistEnabled(enabled: boolean) {
+  const { clinicId } = await requireClinicManager();
+  await prisma.clinic.update({ where: { id: clinicId }, data: { bookingAssistEnabled: enabled } });
   return getAfterHoursBookingSetting();
 }

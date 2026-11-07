@@ -64,7 +64,7 @@ export default async function AiActionsPage({ searchParams }: { searchParams: Pr
           title="Ações da IA"
           subtitle="O que a IA decidiu ou respondeu sozinha, com a mensagem do paciente que motivou. Abra a conversa para conferir ou corrigir."
         />
-        <AfterHoursBookingToggle enabled={afterHours.enabled} canToggle={afterHours.canToggle} />
+        <AfterHoursBookingToggle enabled={afterHours.enabled} duringHours={afterHours.duringHours} canToggle={afterHours.canToggle} />
         <WelcomeSettings {...welcome} />
         <ClosingMessageSetting enabled={closing.enabled} text={closing.text} canEdit={closing.canEdit} />
         <UrgencyTagToggle enabled={urgency.enabled} canToggle={urgency.canToggle} />
