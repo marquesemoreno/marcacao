@@ -2,6 +2,7 @@ import { PageHeader } from "@/components/clinic/page-header";
 import { ManagerOnly, currentUserIsManager } from "@/components/clinic/manager-only";
 import { getOwnerPanel } from "@/actions/owner-panel";
 import { formatCurrency } from "@/lib/format";
+import type { BridgeBillingSummary } from "@/lib/hospital-bridge";
 
 export const metadata = { title: "Financeiro" };
 export const dynamic = "force-dynamic";
@@ -26,7 +27,7 @@ function lastMonths(n: number) {
 export default async function FinanceiroPage({ searchParams }: { searchParams: Promise<{ mes?: string }> }) {
   if (!(await currentUserIsManager())) return <ManagerOnly />;
   const params = await searchParams;
-  const { month, finance, stock } = await getOwnerPanel(params.mes ?? "");
+  const { month, billing, billingPrev, finance, stock } = await getOwnerPanel(params.mes ?? "");
   const staleDays =
     finance.ok && finance.data.ultimaBaixa
       ? Math.floor((Date.now() - new Date(finance.data.ultimaBaixa).getTime()) / 86_400_000)
@@ -35,7 +36,7 @@ export default async function FinanceiroPage({ searchParams }: { searchParams: P
   return (
     <div className="h-full overflow-y-auto">
       <div className="space-y-5 p-4 sm:p-6 max-w-5xl">
-        <PageHeader title="Financeiro e estoque" subtitle="Lido do sistema da clínica, só leitura. Só a gestão vê esta página." />
+        <PageHeader title="Financeiro e estoque" subtitle="Faturamento, financeiro e estoque lidos do sistema da clínica (só leitura). Só a gestão vê esta página." />
         <form action="/clinic/financeiro" className="flex items-end gap-2">
           <label className="text-xs font-medium text-slate-600 dark:text-slate-400">
             Mês
@@ -55,6 +56,8 @@ export default async function FinanceiroPage({ searchParams }: { searchParams: P
             Ver
           </button>
         </form>
+
+        {billing.ok && <BillingSection data={billing.data} prev={billingPrev} month={month} />}
 
         {!finance.ok ? (
           <section className={card}>
@@ -193,5 +196,83 @@ export default async function FinanceiroPage({ searchParams }: { searchParams: P
         )}
       </div>
     </div>
+  );
+}
+
+function Delta({ now, before }: { now: number; before: number | null }) {
+  if (before === null || before <= 0) return null;
+  const pct = Math.round(((now - before) / before) * 100);
+  if (pct === 0) return <span className="ml-1.5 text-xs text-slate-500">= mês anterior</span>;
+  return (
+    <span className={`ml-1.5 text-xs ${pct > 0 ? "text-emerald-700 dark:text-emerald-400" : "text-rose-700 dark:text-rose-400"}`}>
+      {pct > 0 ? "↑" : "↓"} {Math.abs(pct)}% vs mês anterior
+    </span>
+  );
+}
+
+/** Faturamento do mês (guias ambulatoriais + internações + recibos), por convênio e por médico. */
+function BillingSection({ data, prev, month }: { data: BridgeBillingSummary; prev: BridgeBillingSummary | null; month: string }) {
+  const total = data.ambulatorial.valor + data.internacao.valor;
+  const prevTotal = prev ? prev.ambulatorial.valor + prev.internacao.valor : null;
+  const glosa = data.ambulatorial.glosa + data.internacao.glosa;
+  return (
+    <>
+      <section className={card} aria-label="Faturamento">
+        <h2 className="font-semibold">Faturamento — {monthLabel(month)}</h2>
+        <p className="mt-3">
+          <span className="text-4xl font-semibold tabular-nums">{formatCurrency(total)}</span>
+          <Delta now={total} before={prevTotal} />
+        </p>
+        <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-3">
+          <div>
+            <dt className="text-slate-500">Ambulatorial</dt>
+            <dd className="font-semibold tabular-nums">{formatCurrency(data.ambulatorial.valor)}</dd>
+            <dd className="text-xs text-slate-500">{data.ambulatorial.guias} guias</dd>
+          </div>
+          <div>
+            <dt className="text-slate-500">Internação</dt>
+            <dd className="font-semibold tabular-nums">{formatCurrency(data.internacao.valor)}</dd>
+            <dd className="text-xs text-slate-500">{data.internacao.internacoes} internações</dd>
+          </div>
+          <div>
+            <dt className="text-slate-500">Recibos particulares</dt>
+            <dd className="font-semibold tabular-nums">{formatCurrency(data.recibos.valor)}</dd>
+            <dd className="text-xs text-slate-500">{data.recibos.quantidade} recibos</dd>
+          </div>
+        </dl>
+        <p className="mt-3 text-xs text-slate-400">
+          {glosa > 0 ? `Glosa lançada no mês: ${formatCurrency(glosa)}.` : "Nenhuma glosa lançada no sistema neste mês."} Ambulatorial + internação pela
+          data do atendimento.
+        </p>
+      </section>
+      <div className="grid gap-4 lg:grid-cols-2">
+        <section className={card}>
+          <h2 className="font-semibold">Por convênio</h2>
+          <ul className="mt-3 space-y-1 text-sm">
+            {data.porConvenio.map((c) => (
+              <li key={c.convenio} className="flex justify-between gap-3">
+                <span className="truncate">{c.convenio}</span>
+                <span className="tabular-nums text-slate-500">
+                  {formatCurrency(c.total)} · {c.quantidade}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+        <section className={card}>
+          <h2 className="font-semibold">Por médico (procedimentos ambulatoriais)</h2>
+          <ul className="mt-3 space-y-1 text-sm">
+            {data.porMedico.map((m) => (
+              <li key={m.medico} className="flex justify-between gap-3">
+                <span className="truncate">{m.medico}</span>
+                <span className="tabular-nums text-slate-500">
+                  {formatCurrency(m.total)} · {m.procedimentos}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      </div>
+    </>
   );
 }
