@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { notifyInboxRealtime } from "@/lib/supabase-server";
+import { formatToWhatsAppNumber, toggleNinthDigit } from "@/lib/whatsapp";
 import { verifyMetaSignature } from "@/lib/instagram-webhook";
 import { parseCloudWebhook, toEvolutionPayload, type CloudEvent } from "@/lib/whatsapp-cloud-webhook";
 
@@ -31,12 +32,16 @@ const STATUS_MAP: Record<string, "SENT" | "DELIVERED" | "READ" | "FAILED"> = {
   failed: "FAILED",
 };
 
-async function conversationFor(clinicId: string, phone: string, name: string | undefined, at: Date) {
-  const contact = await prisma.contact.upsert({
-    where: { phone },
-    update: {},
-    create: { phone, name: name ?? phone },
-  });
+async function conversationFor(clinicId: string, rawPhone: string, name: string | undefined, at: Date) {
+  // A Meta manda o número no formato do wa_id (às vezes SEM o 9º dígito, ex. 557799311841),
+  // enquanto as recebidas passam pela automação e ficam no formato normalizado (com o 9).
+  // Procura o contato nos dois formatos pra mensagem enviada pelo celular (eco da
+  // coexistência) cair na MESMA conversa do paciente, e não num contato duplicado.
+  const phone = formatToWhatsAppNumber(rawPhone);
+  const alt = toggleNinthDigit(phone);
+  const contact =
+    (await prisma.contact.findFirst({ where: { phone: { in: alt ? [phone, alt] : [phone] } }, orderBy: { createdAt: "asc" } })) ??
+    (await prisma.contact.create({ data: { phone, name: name ?? phone } }));
   const existing = await prisma.conversation.findFirst({ where: { clinicId, contactId: contact.id }, orderBy: { createdAt: "desc" } });
   if (existing) return existing;
   return prisma.conversation.create({ data: { clinicId, contactId: contact.id, status: "OPEN", lastMessageAt: at } });
