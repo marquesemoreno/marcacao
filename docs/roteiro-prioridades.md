@@ -72,6 +72,7 @@ Base: análise de 60 dias (Urolaser ~210 e Santa Clara ~170 mensagens digitadas 
 3. Site no ar: domínio, prints, privacidade e termos.
 4. Materiais de venda e conteúdo sobre a jornada menor (números das clínicas só com autorização ou anonimizados).
 5. API pública v1 — só quando surgir integração real.
+6. Painel de uso por clínica no admin (logins, conversas finalizadas, Copiloto, agendamentos pelo Chat, disparos por semana) — medir adoção sem Amplitude (LGPD); Amplitude/PostHog só com 10+ clínicas. Adiado 07/11.
 
 ## Etapa 7 — ERP
 
