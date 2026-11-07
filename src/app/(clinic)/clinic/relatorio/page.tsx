@@ -39,6 +39,8 @@ import { HoursSavedCard } from "@/components/clinic/hours-saved-card";
 import { getHoursSavedReport } from "@/actions/hours-saved";
 import { ReguaReturnCard } from "@/components/clinic/regua-return-card";
 import { getReguaReturnReport } from "@/actions/regua-return";
+import { SlotRecoveryCard } from "@/components/clinic/slot-recovery-card";
+import { getSlotRecoveryReport } from "@/actions/slot-recovery";
 import { ReportAiSummary } from "@/components/clinic/report-ai-summary";
 import { AgendaRiskBlock, FunnelCard, PatientsCard, WeeklyTrendCard } from "@/components/clinic/report-insights-blocks";
 import { buildInsightFacts, computeFunnel } from "@/lib/report-insights";
@@ -149,6 +151,7 @@ export default async function ClinicReportPage({
     budgetConversion,
     hoursSaved,
     reguaReturn,
+    slotRecovery,
   ] = await Promise.all([
     getClinicChatReport(period, tags, params.channel),
     isExclusive
@@ -169,6 +172,7 @@ export default async function ClinicReportPage({
     getBudgetConversionReport(period).catch(() => null),
     getHoursSavedReport(period).catch(() => null),
     getReguaReturnReport(period).catch(() => null),
+    getSlotRecoveryReport(period).catch(() => null),
   ]);
   const rs = chatReport.responseStats;
   const prevRs = prevChat.responseStats;
@@ -420,6 +424,7 @@ export default async function ClinicReportPage({
         </div>
         {hoursSaved && <HoursSavedCard data={hoursSaved} />}
         {reguaReturn && <ReguaReturnCard data={reguaReturn} />}
+        {slotRecovery && <SlotRecoveryCard data={slotRecovery} />}
         {budgetConversion && <BudgetConversionCard data={budgetConversion} />}
         <NpsCard nps={nps} />
       </section>
