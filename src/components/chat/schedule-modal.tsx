@@ -64,6 +64,9 @@ interface ScheduleModalProps {
     arrivalOrder?: boolean;
     priceValue?: number | null;
     sendToPatient?: boolean;
+    /** Agenda (sem conversa aberta): pra mandar a confirmação pelo telefone. */
+    patientName?: string;
+    patientPhone?: string;
   }) => void;
 }
 
@@ -359,6 +362,8 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
           arrivalOrder: timeMode === 'arrival',
           priceValue: Number(selectedProcedure.promotionalPrice ?? selectedProcedure.price) || null,
           sendToPatient,
+          patientName,
+          patientPhone: phone,
         });
         setIsSuccess(false);
         onClose();

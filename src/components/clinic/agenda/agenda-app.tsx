@@ -30,6 +30,7 @@ import {
 } from "@/lib/agenda";
 import { AGENDA_STATUS_GROUPS, AGENDA_STATUS_META, formatLongDate, toTitleCase, todayInBahia } from "@/lib/agenda-ui";
 import { ScheduleModal } from "@/components/chat/schedule-modal";
+import { sendBookingConfirmationToPhone } from "@/actions/booking-confirmation";
 import { AgendaSidebar } from "./agenda-sidebar";
 import { AGENDA_VIEWS, AgendaToolbar, type AgendaView } from "./agenda-toolbar";
 import { AgendaGrid, type AgendaColumn } from "./agenda-grid";
@@ -813,7 +814,22 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
           fetchConvenios={listClinicConveniosForAppointment}
           fetchAgenda={getClinicDoctorAgenda}
           fetchPatients={listClinicPatientsForAppointment}
-          onConfirmSchedule={() => {
+          onConfirmSchedule={(data) => {
+            // Etapa 2.4: agendamento da ponte pela grade também confirma ao paciente.
+            // (Catálogo: createAppointment já manda a própria confirmação.)
+            if (data.appointmentId.startsWith("bridge:") && data.sendToPatient !== false && data.patientPhone) {
+              sendBookingConfirmationToPhone(data.patientPhone, {
+                patientName: data.patientName ?? "",
+                procedure: data.specialty,
+                doctorName: data.doctorName,
+                date: data.date,
+                time: data.rawTime,
+                arrivalOrder: data.arrivalOrder,
+                price: data.priceValue,
+              }).catch((error) =>
+                toast.error(error instanceof Error ? `Agendado, mas a confirmação não saiu: ${error.message}` : "Agendado, mas a confirmação não saiu.")
+              );
+            }
             const from = schedule.patient?.from;
             if (from) {
               // Crítica 02/11: o horário antigo ficava "Quer remarcar" e o lembrete era um toast.

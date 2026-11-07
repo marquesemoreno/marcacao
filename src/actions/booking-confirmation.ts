@@ -3,7 +3,8 @@
 import { prisma } from "@/lib/prisma";
 import { requireClinicSession } from "@/lib/session";
 import { buildBookingConfirmation } from "@/lib/booking-confirmation";
-import { sendMessage } from "@/actions/inbox";
+import { createContact, sendMessage } from "@/actions/inbox";
+import { formatToWhatsAppNumber, toggleNinthDigit } from "@/lib/whatsapp";
 
 /** Envia ao paciente a confirmação do agendamento recém-criado pela ponte (Etapa 2.4).
  * Agendamento do catálogo já manda a própria confirmação em createAppointment — aqui só
@@ -41,4 +42,21 @@ export async function sendBookingConfirmation(
   });
   await sendMessage(conversationId, text);
   return text;
+}
+
+/** Agendamento pela grade da Agenda: não há conversa aberta — acha o contato pelo telefone
+ * (com e sem o 9º dígito, pra não duplicar) ou cria, e manda a mesma confirmação. */
+export async function sendBookingConfirmationToPhone(
+  phone: string,
+  data: Parameters<typeof sendBookingConfirmation>[1],
+) {
+  const { clinicId } = await requireClinicSession();
+  const full = formatToWhatsAppNumber(phone);
+  const alt = toggleNinthDigit(full);
+  const contact = await prisma.contact.findFirst({
+    where: { phone: { in: alt ? [full, alt] : [full] } },
+    select: { id: true, conversations: { where: { clinicId }, select: { id: true }, take: 1 } },
+  });
+  const conversationId = contact?.conversations[0]?.id ?? (await createContact(data.patientName || "Paciente", full));
+  return sendBookingConfirmation(conversationId, data);
 }
