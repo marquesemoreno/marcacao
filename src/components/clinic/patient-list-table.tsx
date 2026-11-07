@@ -190,7 +190,7 @@ export function PatientListTable({
   return (
     <div className="space-y-2">
       {selected.size > 0 && (
-        <div className="sticky top-0 z-10 flex flex-wrap items-center gap-2 rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/60 px-3 py-2 text-sm">
+        <div className="sticky top-0 z-10 flex flex-wrap items-center gap-2 rounded-xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/60 px-3 py-2 text-sm">
           <span className="font-semibold text-emerald-900 dark:text-emerald-200">
             {plural(selected.size, "selecionado", "selecionados")}
             {withoutPhone > 0 && <span className="font-normal"> · {plural(withoutPhone, "sem telefone (fica fora do disparo)", "sem telefone (ficam fora do disparo)")}</span>}
@@ -208,7 +208,7 @@ export function PatientListTable({
           <button
             type="button"
             onClick={handleBroadcast}
-            className="inline-flex h-8 items-center gap-1.5 rounded-md bg-emerald-600 hover:bg-emerald-700 px-3 font-medium text-white"
+            className="inline-flex h-8 items-center gap-1.5 rounded-full bg-emerald-600 hover:bg-emerald-700 px-3 font-medium text-white"
           >
             <Megaphone className="w-4 h-4" aria-hidden /> Enviar disparo
           </button>
@@ -222,7 +222,7 @@ export function PatientListTable({
               disabled={assigning}
               value={assignTo}
               onChange={(e) => setAssignTo(e.target.value)}
-              className="h-8 rounded-md border border-emerald-300 dark:border-emerald-700 bg-white dark:bg-slate-900 px-2 text-sm text-slate-900 dark:text-slate-100"
+              className="h-8 rounded-full border border-emerald-300 dark:border-emerald-700 bg-white dark:bg-slate-900 px-2 text-sm text-slate-900 dark:text-slate-100"
             >
               <option value="">Atribuir a…</option>
               {agents.map((a) => (
@@ -235,7 +235,7 @@ export function PatientListTable({
               <button
                 type="button"
                 onClick={() => setConfirmAssign(true)}
-                className="inline-flex h-8 items-center rounded-md border border-emerald-300 dark:border-emerald-700 bg-white dark:bg-slate-900 px-3 font-medium text-emerald-800 dark:text-emerald-300"
+                className="inline-flex h-8 items-center rounded-full border border-emerald-300 dark:border-emerald-700 bg-white dark:bg-slate-900 px-3 font-medium text-emerald-800 dark:text-emerald-300"
               >
                 Atribuir
               </button>
@@ -255,7 +255,7 @@ export function PatientListTable({
       {/* Mesmo layout das marcações da Agenda: cartão com iniciais, nome em Nome Próprio, subtítulo,
           selos de situação/etapa e um botão de ação. */}
       {loadError ? (
-        <div role="alert" className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 py-10 px-4 text-center">
+        <div role="alert" className="rounded-2xl bg-white dark:bg-slate-900 shadow-xs py-10 px-4 text-center">
           <p className="flex items-center justify-center gap-2 text-sm font-semibold text-slate-800 dark:text-slate-100">
             <AlertTriangle className="w-4 h-4 text-amber-600" aria-hidden /> Não foi possível carregar os pacientes.
           </p>
@@ -263,19 +263,19 @@ export function PatientListTable({
           <button
             type="button"
             onClick={onRetry}
-            className="mt-3 inline-flex h-9 items-center gap-2 rounded-lg border border-slate-200 dark:border-slate-700 px-3 text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800"
+            className="mt-3 inline-flex h-9 items-center gap-2 rounded-full bg-slate-100 dark:bg-slate-800 px-3 text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700"
           >
             <RefreshCw className="w-4 h-4" aria-hidden /> Tentar de novo
           </button>
         </div>
       ) : isLoading ? (
-        <div role="status" className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 py-10 text-center text-sm text-slate-500">
+        <div role="status" className="rounded-2xl bg-white dark:bg-slate-900 shadow-xs py-10 text-center text-sm text-slate-500">
           <span className="inline-flex items-center gap-2">
             <Loader2 className="w-4 h-4 animate-spin" aria-hidden /> Carregando pacientes…
           </span>
         </div>
       ) : rows.length === 0 ? (
-        <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 py-10 px-4 text-center text-sm text-slate-500">{emptyMessage}</div>
+        <div className="rounded-2xl bg-white dark:bg-slate-900 shadow-xs py-10 px-4 text-center text-sm text-slate-500">{emptyMessage}</div>
       ) : (
         <>
           <label className="flex w-fit items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
@@ -295,16 +295,16 @@ export function PatientListTable({
               const isSelected = selected.has(r.conversationId);
               const tone =
                 r.status === "RESOLVED"
-                  ? "border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60"
+                  ? "border-transparent bg-slate-50 dark:bg-slate-900/60"
                   : waitingMin !== null
                     ? "border-dashed border-amber-300 dark:border-amber-700 bg-white dark:bg-slate-900"
-                    : "border-slate-200 dark:border-slate-700 bg-emerald-50/70 dark:bg-emerald-950/25";
-              const badge = "inline-flex h-6 items-center gap-1 rounded-md border px-1.5 text-xs font-semibold";
+                    : "border-transparent bg-emerald-50/70 dark:bg-emerald-950/25";
+              const badge = "inline-flex h-6 items-center gap-1 rounded-full border px-2 text-xs font-semibold";
               return (
                 <li
                   key={r.conversationId}
                   data-state={isSelected ? "selected" : undefined}
-                  className={`relative rounded-lg border ${tone} shadow-xs transition-colors hover:border-slate-300 dark:hover:border-slate-600 ${isSelected ? "ring-2 ring-emerald-500/40" : ""}`}
+                  className={`relative rounded-xl border ${tone} shadow-xs transition-shadow hover:shadow-md ${isSelected ? "ring-2 ring-emerald-500/40" : ""}`}
                 >
                   <div className="flex items-start">
                     <input
@@ -368,7 +368,7 @@ export function PatientListTable({
                     <Link
                       href={`/clinic/inbox?c=${r.conversationId}`}
                       aria-label={`Abrir conversa com ${name}`}
-                      className="inline-flex h-6 items-center gap-1 rounded-md border border-sky-300 dark:border-sky-800 bg-white dark:bg-slate-900 px-1.5 text-xs font-semibold text-sky-800 dark:text-sky-300 hover:bg-sky-50 dark:hover:bg-sky-950/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
+                      className="inline-flex h-6 items-center gap-1 rounded-full border border-sky-300 dark:border-sky-800 bg-white dark:bg-slate-900 px-1.5 text-xs font-semibold text-sky-800 dark:text-sky-300 hover:bg-sky-50 dark:hover:bg-sky-950/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
                     >
                       <MessageCircle className="w-3 h-3" aria-hidden /> Abrir conversa
                     </Link>
@@ -403,7 +403,7 @@ export function PatientListTable({
               type="button"
               disabled={assigning}
               onClick={runAssign}
-              className="inline-flex h-9 items-center gap-1.5 px-4 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 rounded-lg"
+              className="inline-flex h-9 items-center gap-1.5 px-4 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 rounded-full"
             >
               {assigning && <Loader2 className="w-4 h-4 animate-spin" aria-hidden />} Atribuir
             </button>
