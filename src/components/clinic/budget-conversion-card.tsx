@@ -11,7 +11,7 @@ export function BudgetConversionCard({ data }: { data: BudgetConversion }) {
   ];
   const showCompare = data.withFollowup.count > 0 && data.withoutFollowup.count > 0;
   return (
-    <section aria-labelledby="orc-titulo" className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-xs">
+    <section aria-labelledby="orc-titulo" className="rounded-2xl bg-white dark:bg-slate-900 p-5 shadow-xs">
       <h3 id="orc-titulo" className="font-semibold">Conversão de orçamentos</h3>
       <p className="mt-3">
         <span className="text-4xl font-semibold tabular-nums">{data.rate}%</span>

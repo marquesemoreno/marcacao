@@ -85,7 +85,7 @@ const OUTCOME_COLOR: Record<OutcomeGroup, string> = {
 const pctBR = (n: number) => `${n.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%`;
 
 const BASE = "/clinic/relatorio";
-const card = "bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 shadow-xs";
+const card = "bg-white dark:bg-slate-900 rounded-2xl shadow-xs";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -322,7 +322,7 @@ export default async function ClinicReportPage({
               <Link
                 key={f.key}
                 href={urlWithout(f.key)}
-                className="inline-flex items-center gap-1 rounded-md border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 px-2 py-1 font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700"
+                className="inline-flex items-center gap-1 rounded-full bg-slate-100 dark:bg-slate-800 px-3 py-1 font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700"
                 aria-label={`Remover filtro ${f.label}`}
               >
                 {f.label}
@@ -586,7 +586,7 @@ export default async function ClinicReportPage({
         <div className="space-y-3">
           <h3 className="flex items-center gap-2 text-base font-semibold text-slate-900 dark:text-slate-100">
             Valores estimados
-            <span className="rounded-md border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/40 px-1.5 py-px text-xs font-semibold text-amber-800 dark:text-amber-300">
+            <span className="rounded-full border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/40 px-1.5 py-px text-xs font-semibold text-amber-800 dark:text-amber-300">
               Estimativa
             </span>
           </h3>

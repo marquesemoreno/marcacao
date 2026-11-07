@@ -13,7 +13,7 @@ export function NpsCard({ nps }: { nps: Nps }) {
   if (!nps.total || nps.nps === null) return null;
   const pct = (n: number) => Math.round((n / nps.total) * 100);
   return (
-    <section aria-labelledby="nps-titulo" className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-xs">
+    <section aria-labelledby="nps-titulo" className="rounded-2xl bg-white dark:bg-slate-900 p-5 shadow-xs">
       <h3 id="nps-titulo" className="font-semibold">Satisfação (NPS)</h3>
       <div className="mt-3 flex flex-wrap items-end gap-x-8 gap-y-3">
         <p>

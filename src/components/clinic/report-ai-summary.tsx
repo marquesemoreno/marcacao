@@ -22,7 +22,7 @@ export function ReportAiSummary({ clinicName, periodLabel, facts }: { clinicName
   }
 
   return (
-    <section aria-labelledby="ia-resumo-titulo" className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 shadow-xs p-5 space-y-3">
+    <section aria-labelledby="ia-resumo-titulo" className="bg-white dark:bg-slate-900 rounded-2xl shadow-xs p-5 space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 id="ia-resumo-titulo" className="flex items-center gap-2 text-base font-semibold text-slate-900 dark:text-slate-100">
           <Sparkles className="w-4 h-4 text-violet-600 dark:text-violet-400" aria-hidden />
@@ -33,7 +33,7 @@ export function ReportAiSummary({ clinicName, periodLabel, facts }: { clinicName
             type="button"
             onClick={generate}
             disabled={state === "loading"}
-            className="inline-flex h-8 items-center gap-1.5 px-3 text-sm font-medium text-violet-700 dark:text-violet-300 border border-violet-200 dark:border-violet-800 rounded-lg hover:bg-violet-50 dark:hover:bg-violet-950/40 disabled:opacity-60"
+            className="inline-flex h-8 items-center gap-1.5 px-3 text-sm font-medium text-violet-700 dark:text-violet-300 bg-violet-50 dark:bg-violet-950/40 rounded-full hover:bg-violet-50 dark:hover:bg-violet-950/40 disabled:opacity-60"
           >
             {state === "loading" && <Loader2 className="w-4 h-4 animate-spin" aria-hidden />}
             {state === "done" ? "Gerar de novo" : "Gerar resumo com IA"}

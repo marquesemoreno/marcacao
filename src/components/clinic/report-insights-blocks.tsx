@@ -1,7 +1,7 @@
 import type { AgendaRiskRow, computeFunnel, computeWeeklyTrend } from "@/lib/report-insights";
 import { formatCurrency } from "@/lib/format";
 
-const card = "bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 shadow-xs";
+const card = "bg-white dark:bg-slate-900 rounded-2xl shadow-xs";
 const pctBR = (n: number) => `${n.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%`;
 
 /** Funil conversa → agendamento, com a etapa que mais perde e o valor parado. */

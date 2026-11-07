@@ -71,7 +71,7 @@ export function CampaignBreakdownTable({ rows, month }: { rows: CampaignReportRo
                       onBlur={() => draft[r.label] !== undefined && save(r.label)}
                       onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
                       disabled={pending}
-                      className="h-8 w-28 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 px-2 text-right text-sm tabular-nums"
+                      className="h-8 w-28 rounded-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 px-2 text-right text-sm tabular-nums"
                     />
                   </td>
                   <td className="px-3 text-right tabular-nums">{r.costPerLead !== null ? formatCurrency(r.costPerLead) : "—"}</td>
