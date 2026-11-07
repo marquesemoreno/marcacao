@@ -63,7 +63,7 @@ Base: análise de 60 dias (Urolaser ~210 e Santa Clara ~170 mensagens digitadas 
 1. 🟡 **Santa Clara mapeada 07/11** (docs/mapeamento-firebird-santa-clara.md, local): FINANCEIRO (CPR1/2/3, MOVIMEN, CUSTOS) e ALMOXA (PRODUTOS, PRODSTOK, ENTRA/SAIDA). Falta a clínica explicar por que não há baixas desde 10/10/2026; estoque mínimo não cadastrado. Urolaser depois.
 2. Painel do dono: faturamento estimado, faltas, conversão por canal/campanha, ocupação por médico, horas poupadas.
 3. Se o Firebird tiver dados: financeiro real (receber/pagar, caixa, ticket por médico/procedimento, inadimplência) e estoque (consumo, mínimo, validade) via bridge. Acesso só gestão, registrado em Acessos.
-4. Previsão da semana (agenda × taxa de falta por médico).
+4. ✔️ 07/11: Previsão da semana no Relatório (agenda da ponte 7 dias × resposta ao lembrete por médico nas últimas 3 semanas; falta real não medível).
 
 ## Etapa 6 — Fundação para vender
 

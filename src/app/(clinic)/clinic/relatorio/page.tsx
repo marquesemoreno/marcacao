@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { ManagerOnly, currentUserCan } from "@/components/clinic/manager-only";
 import { PeriodFilter } from "@/components/clinic/period-filter";
 import { PageHeader } from "@/components/clinic/page-header";
@@ -37,6 +38,7 @@ import { BudgetConversionCard } from "@/components/clinic/budget-conversion-card
 import { getBudgetConversionReport } from "@/actions/budget-followup";
 import { HoursSavedCard } from "@/components/clinic/hours-saved-card";
 import { getHoursSavedReport } from "@/actions/hours-saved";
+import { WeekForecastSection } from "@/components/clinic/week-forecast-card";
 import { ReguaReturnCard } from "@/components/clinic/regua-return-card";
 import { getReguaReturnReport } from "@/actions/regua-return";
 import { SlotRecoveryCard } from "@/components/clinic/slot-recovery-card";
@@ -422,6 +424,9 @@ export default async function ClinicReportPage({
           <WeeklyTrendCard weeks={insights.trend} />
           <PatientsCard patients={insights.patients} />
         </div>
+        <Suspense fallback={null}>
+          <WeekForecastSection />
+        </Suspense>
         {hoursSaved && <HoursSavedCard data={hoursSaved} />}
         {reguaReturn && <ReguaReturnCard data={reguaReturn} />}
         {slotRecovery && <SlotRecoveryCard data={slotRecovery} />}
