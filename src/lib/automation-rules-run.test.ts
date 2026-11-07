@@ -12,6 +12,7 @@ const { prismaMock, bridge } = vi.hoisted(() => ({
     user: { findFirst: vi.fn() },
     webhookLog: { create: vi.fn() },
     returnInterval: { findMany: vi.fn() },
+    agendaMark: { findMany: vi.fn().mockResolvedValue([]) },
   },
 }));
 vi.mock("@/lib/prisma", () => ({ prisma: prismaMock }));
