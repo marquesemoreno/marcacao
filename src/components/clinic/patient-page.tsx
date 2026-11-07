@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { sendBookingConfirmation } from "@/actions/booking-confirmation";
 import { toast } from "sonner";
 import {
   ArrowLeft, CalendarPlus, ClipboardList, Copy, FileText, KanbanSquare, MessageCircle, MoreHorizontal, Pencil, ShieldCheck,
@@ -418,8 +419,33 @@ export function PatientPage({ profile, autoSchedule = false }: { profile: Patien
           fetchPatients={listClinicPatientsForAppointment}
           onConfirmSchedule={async (data) => {
             const isBridge = data.appointmentId.startsWith("bridge:");
-            const guide = isBridge ? "" : `\n\n📎 Guia com QR Code enviada ao paciente pelo WhatsApp: ${window.location.origin}/comprovante/${data.appointmentId}`;
-            await sendMessage(p.conversationId, `✅ Consulta confirmada!\n${data.specialty} — ${data.doctor}\nData: ${data.date} às ${data.time}\nValor: ${data.price}${guide}`, true);
+            // Ponte: confirmação formatada ao paciente (Etapa 2.4); catálogo já envia a dele.
+            let sent = false;
+            if (isBridge && data.sendToPatient !== false) {
+              try {
+                await sendBookingConfirmation(p.conversationId, {
+                  patientName: name,
+                  procedure: data.specialty,
+                  doctorName: data.doctorName,
+                  date: data.date,
+                  time: data.rawTime,
+                  arrivalOrder: data.arrivalOrder,
+                  price: data.priceValue,
+                });
+                sent = true;
+              } catch (error) {
+                toast.error(error instanceof Error ? `Agendado, mas a confirmação não saiu: ${error.message}` : "Agendado, mas a confirmação não saiu.");
+              }
+            }
+            if (!sent) {
+              const guide = isBridge ? "" : `\n\n📎 Guia com QR Code enviada ao paciente pelo WhatsApp: ${window.location.origin}/comprovante/${data.appointmentId}`;
+              const doctor = data.doctorName || data.doctor;
+              await sendMessage(
+                p.conversationId,
+                `✅ Agendado (nota interna)\n${data.specialty}${doctor ? ` — ${doctor}` : ""}\nData: ${data.date.split("-").reverse().join("/")} às ${data.time}${data.priceValue ? `\nValor: ${data.price}` : ""}${guide}`,
+                true,
+              );
+            }
             await updateConversationFunnelStage(p.conversationId, "agendado");
             toast.success("Agendamento confirmado!");
             router.refresh();

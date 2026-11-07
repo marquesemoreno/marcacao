@@ -58,6 +58,12 @@ interface ScheduleModalProps {
     date: string;
     time: string;
     price: string;
+    /** Dados crus pra confirmação ao paciente (src/lib/booking-confirmation.ts). */
+    doctorName?: string | null;
+    rawTime?: string | null;
+    arrivalOrder?: boolean;
+    priceValue?: number | null;
+    sendToPatient?: boolean;
   }) => void;
 }
 
@@ -94,6 +100,8 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
   const [date, setDate] = useState('');
   const [time, setTime] = useState('');
   const [notes, setNotes] = useState('');
+  // Confirmação ao paciente pelo WhatsApp ao agendar (Etapa 2.4) — marcada por padrão.
+  const [sendToPatient, setSendToPatient] = useState(true);
   const [timeMode, setTimeMode] = useState<'scheduled' | 'arrival'>('scheduled');
   // Horário sugerido (último da agenda do médico + 10 min) — só vale enquanto a atendente não
   // digitou nem veio da grade da agenda com um horário já escolhido.
@@ -342,10 +350,15 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
         onConfirmSchedule({
           appointmentId: appointment.id,
           specialty: selectedProcedure.procedure.name,
-          doctor: 'Clínica Conecta Saúde',
+          doctor: doctors.find((d) => String(d.id) === String(doctorId))?.nome ?? '',
           date,
           time: time ? (timeMode === 'arrival' ? `${time} (ordem de chegada)` : time) : 'Ordem de chegada',
           price,
+          doctorName: doctors.find((d) => String(d.id) === String(doctorId))?.nome ?? null,
+          rawTime: time || null,
+          arrivalOrder: timeMode === 'arrival',
+          priceValue: Number(selectedProcedure.promotionalPrice ?? selectedProcedure.price) || null,
+          sendToPatient,
         });
         setIsSuccess(false);
         onClose();
@@ -770,7 +783,16 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
                 Confira os campos destacados acima antes de continuar.
               </p>
             )}
-            <div className="flex items-center gap-2.5">
+            <div className="flex flex-wrap items-center justify-end gap-2.5">
+              <label className="mr-auto inline-flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300 cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 accent-emerald-600"
+                  checked={sendToPatient}
+                  onChange={(e) => setSendToPatient(e.target.checked)}
+                />
+                Enviar confirmação ao paciente
+              </label>
               <button
                 type="button"
                 onClick={onClose}

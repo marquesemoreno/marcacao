@@ -131,6 +131,7 @@ import {
   listGlpiEntitiesAdmin,
   updateContactGlpiEntity,
 } from "@/actions/admin-inbox";
+import { sendBookingConfirmation } from "@/actions/booking-confirmation";
 import { toast } from "sonner";
 import { useInboxRealtime } from "@/hooks/use-inbox-realtime";
 import { shouldRefreshFinalized } from "@/lib/crm-load";
@@ -1041,19 +1042,46 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
     date: string;
     time: string;
     price: string;
+    doctorName?: string | null;
+    rawTime?: string | null;
+    arrivalOrder?: boolean;
+    priceValue?: number | null;
+    sendToPatient?: boolean;
   }) {
     if (!selectedContactId) return;
     // Agendamentos gravados no sistema hospitalar da Santa Clara (via bridge) não têm
     // guia/QR Code no Postgres do Conecta Saúde — não faz sentido mandar esse link.
     const isBridgeAppointment = data.appointmentId.startsWith("bridge:");
-    const guideLine = isBridgeAppointment
-      ? ""
-      : `\n\n📎 Guia com QR Code enviada ao paciente pelo WhatsApp: ${window.location.origin}/comprovante/${data.appointmentId}`;
-    await actions.sendMessage(
-      selectedContactId,
-      `✅ Consulta confirmada!\n${data.specialty} — ${data.doctor}\nData: ${data.date} às ${data.time}\nValor: ${data.price}${guideLine}`,
-      true
-    );
+    // Ponte: o paciente recebe a confirmação formatada (Etapa 2.4, src/lib/booking-confirmation.ts).
+    // Catálogo: createAppointment já mandou a própria confirmação com a guia.
+    let sentToPatient = false;
+    if (isBridgeAppointment && scope !== "admin" && data.sendToPatient !== false) {
+      try {
+        await sendBookingConfirmation(selectedContactId, {
+          patientName: selectedContact?.name ?? "",
+          procedure: data.specialty,
+          doctorName: data.doctorName,
+          date: data.date,
+          time: data.rawTime,
+          arrivalOrder: data.arrivalOrder,
+          price: data.priceValue,
+        });
+        sentToPatient = true;
+      } catch (error) {
+        toast.error(error instanceof Error ? `Agendado, mas a confirmação não saiu: ${error.message}` : "Agendado, mas a confirmação não saiu.");
+      }
+    }
+    if (!sentToPatient) {
+      const guideLine = isBridgeAppointment
+        ? ""
+        : `\n\n📎 Guia com QR Code enviada ao paciente pelo WhatsApp: ${window.location.origin}/comprovante/${data.appointmentId}`;
+      const doctor = data.doctorName || data.doctor;
+      await actions.sendMessage(
+        selectedContactId,
+        `✅ Agendado (nota interna)\n${data.specialty}${doctor ? ` — ${doctor}` : ""}\nData: ${data.date.split("-").reverse().join("/")} às ${data.time}${data.priceValue ? `\nValor: ${data.price}` : ""}${guideLine}`,
+        true
+      );
+    }
     await handleUpdateFunnelStage("agendado");
     await refreshMessages();
   }

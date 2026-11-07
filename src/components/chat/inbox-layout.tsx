@@ -279,7 +279,7 @@ interface InboxLayoutProps {
   fetchConvenios?: () => Promise<{ id: number; nome: string }[]>;
   fetchAgenda?: (medicoId: number, date: string) => Promise<string[]>;
   fetchPatients?: (query: string) => Promise<{ id: number; nome: string; cpf: string | null }[]>;
-  onScheduleConfirmed: (data: { appointmentId: string; specialty: string; doctor: string; date: string; time: string; price: string }) => void;
+  onScheduleConfirmed: (data: { appointmentId: string; specialty: string; doctor: string; date: string; time: string; price: string; doctorName?: string | null; rawTime?: string | null; arrivalOrder?: boolean; priceValue?: number | null; sendToPatient?: boolean }) => void;
   onSuggestIaReply?: (quotedMessageContent?: string) => Promise<string>;
   /** Copilot: 2-3 rascunhos de resposta pro atendente escolher (nunca envia
    * sozinho) — ver ai-copilot.ts. Diferente de onSuggestIaReply (1 sugestão
