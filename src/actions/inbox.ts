@@ -1,5 +1,6 @@
 "use server";
 
+import { applyAutoFunnelStage } from "@/lib/auto-funnel-stage-server";
 import { recordPatientAccess } from "@/lib/access-log-server";
 import { CONTACT_WITH_PROFILES, profileOf, profileWhere, upsertProfile } from "@/lib/contact-profile";
 import { sortPatientList, type PatientSort } from "@/lib/patient-list";
@@ -705,6 +706,8 @@ export async function sendMessage(
   } catch {
     await prisma.message.update({ where: { id: message.id }, data: { status: "FAILED" } }).catch(() => {});
   }
+  // Valor enviado → Orçamento; "Agendado(a)…" → Agendado (src/lib/auto-funnel-stage.ts).
+  await applyAutoFunnelStage(data.conversationId, data.content, userId);
 
   revalidatePath("/clinic/inbox");
   revalidatePath("/admin/inbox");

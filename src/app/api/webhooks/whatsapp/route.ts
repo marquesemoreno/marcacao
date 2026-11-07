@@ -1,3 +1,4 @@
+import { applyAutoFunnelStage } from "@/lib/auto-funnel-stage-server";
 import { isMarketingOptInReply, MARKETING_OPT_IN_REPLY } from "@/lib/marketing-consent";
 import { matchClinicalUrgency } from "@/lib/clinical-urgency";
 import { NextResponse, after } from "next/server";
@@ -482,6 +483,8 @@ async function handleDeviceOutbound(
     },
   });
   await prisma.conversation.update({ where: { id: conversation.id }, data: { lastMessageAt: at } });
+  // Valor/agendamento mandado pelo celular também move a etapa do CRM.
+  if (content) await applyAutoFunnelStage(conversation.id, content);
   // Respondeu pelo celular = viu as mensagens do paciente (como no WhatsApp). Sem isso
   // elas ficavam "não lidas" pra sempre no painel e inflavam os contadores.
   await prisma.message.updateMany({
