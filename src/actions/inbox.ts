@@ -333,6 +333,8 @@ export async function listContactsPage(params: ContactsListParams) {
       waitingSince: waitingOf.get(c.id)?.toISOString() ?? null,
       attendant: c.assignedUser?.name ?? null,
       instagramUsername: c.contact.instagramUsername,
+      // Foto já guardada no contato (WhatsApp ao abrir a conversa, ou Instagram) — sem buscar de novo.
+      photoUrl: c.contact.photoUrl ?? null,
       inClinicSystem: tail.length === 8 && inClinicSystem.has(tail),
     };
   });

@@ -13,11 +13,14 @@ export function AvatarBadge({
   photoUrl,
   size = 40,
   className = "",
+  fallbackClassName = "bg-emerald-700 text-white",
 }: {
   name: string;
   photoUrl?: string | null;
   size?: number;
   className?: string;
+  /** Cor das iniciais quando não há foto (ex.: avatarTone do paciente). */
+  fallbackClassName?: string;
 }) {
   const [imageFailed, setImageFailed] = useState(false);
   // Foto do WhatsApp expirada falha ANTES da hidratação quando a página vem do servidor:
@@ -44,7 +47,7 @@ export function AvatarBadge({
 
   return (
     <div
-      className={`flex shrink-0 items-center justify-center rounded-full bg-emerald-700 font-bold tracking-tight text-white shadow-2xs select-none ${className}`}
+      className={`flex shrink-0 items-center justify-center rounded-full font-bold tracking-tight shadow-2xs select-none ${fallbackClassName} ${className}`}
       style={{ width: size, height: size, fontSize: Math.max(10, size * 0.38) }}
     >
       {avatarInitials(name) || <User style={{ width: size * 0.5, height: size * 0.5 }} aria-hidden />}

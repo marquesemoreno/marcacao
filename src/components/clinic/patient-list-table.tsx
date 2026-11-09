@@ -1,14 +1,15 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { avatarTone } from "@/lib/avatar-tone";
+import { AvatarBadge } from "@/components/chat/avatar-badge";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { AlertTriangle, CalendarCheck, Clock, Loader2, Megaphone, MessageCircle, RefreshCw, User, UserCheck, X } from "lucide-react";
+import { AlertTriangle, CalendarCheck, Clock, Loader2, Megaphone, MessageCircle, RefreshCw, UserCheck, X } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { displayName, isUsableContactName } from "@/lib/contact-display";
 import { formatPhone } from "@/lib/format";
-import { initialsOf } from "@/lib/agenda-ui";
 import { PROCEDURE_INTEREST_TAG_PREFIX } from "@/lib/conversation-tags";
 import { formatDurationHuman } from "@/lib/sla-calculator";
 import {
@@ -35,6 +36,8 @@ export type PatientListRow = {
   attendant?: string | null;
   /** Já recebeu lembrete da agenda do sistema da clínica (ponte). */
   inClinicSystem?: boolean;
+  /** Foto do perfil (WhatsApp/Instagram) já guardada no contato. */
+  photoUrl?: string | null;
 };
 
 /** O mínimo pra disparo/atribuição — vale pra linha da página e pro "selecionar todos". */
@@ -44,6 +47,14 @@ type Selected = { conversationId: string; name: string; phone: string; instagram
 export const SELECTION_BROADCAST_KEY = "disparo-selecao";
 
 const STAGE_LABEL: Record<string, string> = { NOVOS: "Novo", TRIAGEM: "Em atendimento", ORCAMENTO: "Orçamento", AGENDADO: "Agendado" };
+/** Cor de cada etapa — as mesmas bolinhas das colunas do CRM (faixa lateral + selo). */
+const STAGE_TONE: Record<string, { bar: string; chip: string }> = {
+  Novo: { bar: "bg-amber-400", chip: "bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-400/10 dark:text-amber-300 dark:border-amber-400/20" },
+  "Em atendimento": { bar: "bg-sky-400", chip: "bg-sky-50 text-sky-800 border-sky-200 dark:bg-sky-400/10 dark:text-sky-300 dark:border-sky-400/20" },
+  Orçamento: { bar: "bg-violet-400", chip: "bg-violet-50 text-violet-800 border-violet-200 dark:bg-violet-400/10 dark:text-violet-300 dark:border-violet-400/20" },
+  Agendado: { bar: "bg-emerald-500", chip: "bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-400/10 dark:text-emerald-300 dark:border-emerald-400/20" },
+  Finalizado: { bar: "bg-slate-300 dark:bg-slate-600", chip: "bg-slate-100 text-slate-600 border-slate-200 dark:bg-white/[0.06] dark:text-slate-400 dark:border-white/10" },
+};
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
 function relative(iso?: string | null) {
@@ -190,7 +201,7 @@ export function PatientListTable({
   return (
     <div className="space-y-2">
       {selected.size > 0 && (
-        <div className="sticky top-0 z-10 flex flex-wrap items-center gap-2 rounded-xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/60 px-3 py-2 text-sm">
+        <div className="sticky top-0 z-10 flex flex-wrap items-center gap-2 rounded-2xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50/90 dark:bg-emerald-950/70 backdrop-blur-xl px-4 py-2.5 text-sm">
           <span className="font-semibold text-emerald-900 dark:text-emerald-200">
             {plural(selected.size, "selecionado", "selecionados")}
             {withoutPhone > 0 && <span className="font-normal"> · {plural(withoutPhone, "sem telefone (fica fora do disparo)", "sem telefone (ficam fora do disparo)")}</span>}
@@ -255,7 +266,7 @@ export function PatientListTable({
       {/* Mesmo layout das marcações da Agenda: cartão com iniciais, nome em Nome Próprio, subtítulo,
           selos de situação/etapa e um botão de ação. */}
       {loadError ? (
-        <div role="alert" className="rounded-2xl bg-white dark:bg-slate-900 shadow-xs py-10 px-4 text-center">
+        <div role="alert" className="glass-surface py-10 px-4 text-center">
           <p className="flex items-center justify-center gap-2 text-sm font-semibold text-slate-800 dark:text-slate-100">
             <AlertTriangle className="w-4 h-4 text-amber-600" aria-hidden /> Não foi possível carregar os pacientes.
           </p>
@@ -263,26 +274,26 @@ export function PatientListTable({
           <button
             type="button"
             onClick={onRetry}
-            className="mt-3 inline-flex h-9 items-center gap-2 rounded-full bg-slate-100 dark:bg-slate-800 px-3 text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700"
+            className="mt-3 inline-flex h-9 items-center gap-2 rounded-full bg-white/80 ring-1 ring-slate-900/5 shadow-xs dark:bg-white/[0.08] dark:ring-white/10 hover:bg-white dark:hover:bg-white/[0.14] px-4 text-sm font-medium text-slate-700 dark:text-slate-200"
           >
             <RefreshCw className="w-4 h-4" aria-hidden /> Tentar de novo
           </button>
         </div>
       ) : isLoading ? (
-        <div role="status" className="rounded-2xl bg-white dark:bg-slate-900 shadow-xs py-10 text-center text-sm text-slate-500">
+        <div role="status" className="glass-surface py-10 text-center text-sm text-slate-500">
           <span className="inline-flex items-center gap-2">
             <Loader2 className="w-4 h-4 animate-spin" aria-hidden /> Carregando pacientes…
           </span>
         </div>
       ) : rows.length === 0 ? (
-        <div className="rounded-2xl bg-white dark:bg-slate-900 shadow-xs py-10 px-4 text-center text-sm text-slate-500">{emptyMessage}</div>
+        <div className="glass-surface py-10 px-4 text-center text-sm text-slate-500">{emptyMessage}</div>
       ) : (
         <>
           <label className="flex w-fit items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
             <input type="checkbox" aria-label="Selecionar todos desta página" checked={pageAllSelected} onChange={togglePage} className="size-4 accent-emerald-600" />
             Selecionar todos desta página
           </label>
-          <ul className="grid gap-2 xl:grid-cols-2" aria-label="Pacientes">
+          <ul className="grid gap-3 xl:grid-cols-2" aria-label="Pacientes">
             {rows.map((r) => {
               const hasName = isUsableContactName(r.name);
               const name = displayName(r);
@@ -295,34 +306,43 @@ export function PatientListTable({
               const isSelected = selected.has(r.conversationId);
               const tone =
                 r.status === "RESOLVED"
-                  ? "border-transparent bg-slate-50 dark:bg-slate-900/60"
+                  ? "border-white/60 bg-white/55 dark:border-white/[0.05] dark:bg-white/[0.03]"
                   : waitingMin !== null
-                    ? "border-dashed border-amber-300 dark:border-amber-700 bg-white dark:bg-slate-900"
-                    : "border-transparent bg-emerald-50/70 dark:bg-emerald-950/25";
+                    ? "border-dashed border-amber-300 dark:border-amber-700 bg-white/85 dark:bg-[rgb(26_27_33/0.66)]"
+                    : "border-white/60 bg-white/75 dark:border-white/[0.05] dark:bg-[rgb(26_27_33/0.66)]";
+              const stageTone = stage ? STAGE_TONE[stage] : undefined;
               const badge = "inline-flex h-6 items-center gap-1 rounded-full border px-2 text-xs font-semibold";
               return (
                 <li
                   key={r.conversationId}
                   data-state={isSelected ? "selected" : undefined}
-                  className={`relative rounded-xl border ${tone} shadow-xs transition-shadow hover:shadow-md ${isSelected ? "ring-2 ring-emerald-500/40" : ""}`}
+                  className={`relative overflow-hidden rounded-[1.25rem] border ${tone} backdrop-blur-xl shadow-[0_1px_2px_rgb(15_23_42/0.04),0_12px_28px_-18px_rgb(15_23_42/0.25)] transition-shadow hover:shadow-md ${isSelected ? "ring-2 ring-emerald-500/40" : ""}`}
                 >
+                  {/* Faixa da etapa do funil: dá pra bater o olho na lista e ver quem está onde. */}
+                  {stageTone && <span aria-hidden className={`absolute inset-y-3 left-0 w-1 rounded-r-full ${stageTone.bar}`} />}
                   <div className="flex items-start">
                     <input
                       type="checkbox"
                       aria-label={`Selecionar ${name}`}
                       checked={isSelected}
                       onChange={() => toggle(r)}
-                      className="ml-2 mt-3 size-4 shrink-0 accent-emerald-600"
+                      className="ml-3 mt-[1.15rem] size-4 shrink-0 accent-emerald-600"
                     />
                     <Link
                       href={`/clinic/pacientes/${r.conversationId}`}
                       aria-label={`Abrir ficha de ${name}`}
-                      className="min-w-0 flex-1 rounded-lg px-2 pt-1.5 pb-1 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
+                      className="min-w-0 flex-1 rounded-lg px-2.5 pt-2.5 pb-1.5 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
                     >
-                      <div className="flex min-w-0 items-center gap-2">
-                        <span className="flex size-7 shrink-0 items-center justify-center rounded-full border border-slate-200 dark:border-slate-700 bg-white/80 dark:bg-slate-800 text-[11px] font-semibold text-slate-600 dark:text-slate-300">
-                          {hasName ? initialsOf(name) : <User className="w-3.5 h-3.5" aria-hidden />}
-                        </span>
+                      <div className="flex min-w-0 items-center gap-3">
+                        <AvatarBadge
+                          name={hasName ? name : ""}
+                          photoUrl={r.photoUrl}
+                          size={40}
+                          className="ring-2 ring-white/80 shadow-[0_6px_14px_-8px_rgb(15_23_42/0.6)] dark:ring-white/10"
+                          fallbackClassName={
+                            r.status === "RESOLVED" ? "bg-slate-200 text-slate-500 dark:bg-white/10 dark:text-slate-400" : avatarTone(r.conversationId)
+                          }
+                        />
                         <div className="min-w-0 flex-1">
                           <p className="flex min-w-0 items-center gap-1.5 text-sm font-semibold text-slate-900 dark:text-slate-100">
                             <span className="truncate" title={name}>
@@ -335,7 +355,7 @@ export function PatientListTable({
                       </div>
                     </Link>
                   </div>
-                  <div className="flex flex-wrap items-center gap-1 px-2 pb-1.5 pl-9">
+                  <div className="flex flex-wrap items-center gap-1.5 px-2.5 pb-3 pl-[4.75rem]">
                     {waitingMin !== null ? (
                       <span
                         className={`${badge} bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800`}
@@ -345,21 +365,24 @@ export function PatientListTable({
                       </span>
                     ) : (
                       <span
-                        className={`${badge} bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700`}
+                        className={`${badge} bg-white/70 dark:bg-white/[0.06] text-slate-600 dark:text-slate-300 border-slate-200/80 dark:border-white/10`}
                         title={r.lastInteractionAt ? new Date(r.lastInteractionAt).toLocaleString("pt-BR") : undefined}
                       >
                         última conversa {relative(r.lastInteractionAt)}
                       </span>
                     )}
                     {stage && (
-                      <span className={`${badge} bg-slate-100 text-slate-700 border-slate-300 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700`}>{stage}</span>
+                      <span className={`${badge} ${stageTone?.chip ?? "bg-slate-100 text-slate-700 border-slate-300 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700"}`}>
+                        <span aria-hidden className={`size-1.5 rounded-full ${stageTone?.bar ?? "bg-slate-400"}`} />
+                        {stage}
+                      </span>
                     )}
                     {interest && (
-                      <span className={`${badge} bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700`}>{interest}</span>
+                      <span className={`${badge} bg-white/70 dark:bg-white/[0.06] text-slate-700 dark:text-slate-200 border-slate-200/80 dark:border-white/10`}>{interest}</span>
                     )}
                     {r.inClinicSystem && (
                       <span
-                        className={`${badge} bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700`}
+                        className={`${badge} bg-white/70 dark:bg-white/[0.06] text-slate-600 dark:text-slate-300 border-slate-200/80 dark:border-white/10`}
                         title="Está na agenda do sistema da clínica (já recebeu lembrete de consulta)"
                       >
                         <CalendarCheck className="w-3 h-3" aria-hidden /> agenda da clínica
@@ -368,7 +391,7 @@ export function PatientListTable({
                     <Link
                       href={`/clinic/inbox?c=${r.conversationId}`}
                       aria-label={`Abrir conversa com ${name}`}
-                      className="inline-flex h-6 items-center gap-1 rounded-full border border-sky-300 dark:border-sky-800 bg-white dark:bg-slate-900 px-1.5 text-xs font-semibold text-sky-800 dark:text-sky-300 hover:bg-sky-50 dark:hover:bg-sky-950/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
+                      className="inline-flex h-6 items-center gap-1 rounded-full border border-sky-300 dark:border-sky-800 bg-white/70 dark:bg-white/[0.06] px-2 text-xs font-semibold text-sky-800 dark:text-sky-300 hover:bg-sky-50 dark:hover:bg-sky-950/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
                     >
                       <MessageCircle className="w-3 h-3" aria-hidden /> Abrir conversa
                     </Link>
