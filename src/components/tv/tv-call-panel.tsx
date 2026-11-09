@@ -3,7 +3,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Maximize, Volume2 } from "lucide-react";
 import { getSupabaseClient } from "@/lib/supabase-client";
-import { getTvCall, getTvMedia, getTvState, type TvMediaView } from "@/actions/tv-call";
+import { getTvCall, getTvMedia, getTvState, getTvTicker, type TvMediaView } from "@/actions/tv-call";
+import { TvTicker } from "./tv-ticker";
+import type { TickerItem } from "@/lib/tv-ticker";
 import { TvMediaStage } from "./tv-media-stage";
 import { pushCallHistory, tvSpokenText, type TvCall } from "@/lib/tv-call";
 import { audioUnlocked, playChime, speak, unlockAudio } from "@/lib/tv-audio";
@@ -20,6 +22,7 @@ export function TvCallPanel({ token, clinicName, topic, initialCalls }: { token:
   const [now, setNow] = useState(() => new Date());
   const [revoked, setRevoked] = useState(false);
   const [media, setMedia] = useState<TvMediaView[]>([]);
+  const [ticker, setTicker] = useState<TickerItem[]>([]);
   const seen = useRef(new Set(initialCalls.map((c) => c.id)));
   const queue = useRef<TvCall[]>([]);
   const busy = useRef(false);
@@ -96,6 +99,14 @@ export function TvCallPanel({ token, clinicName, topic, initialCalls }: { token:
     return () => clearInterval(t);
   }, [token]);
 
+  // Letreiro (avisos + notícias de saúde): confere a cada 15 min.
+  useEffect(() => {
+    const load = () => void getTvTicker(token).then((t) => t && setTicker(t)).catch(() => {});
+    load();
+    const t = setInterval(load, 15 * 60_000);
+    return () => clearInterval(t);
+  }, [token]);
+
   // Recarrega a página 1×/dia de madrugada (TV ligada direto, vazamento de memória).
   useEffect(() => {
     const t = setInterval(() => {
@@ -142,6 +153,7 @@ export function TvCallPanel({ token, clinicName, topic, initialCalls }: { token:
             </ol>
           </aside>
         </div>
+        <TvTicker items={ticker} />
         {/* Na chamada a mensagem toma a tela inteira; o vídeo fica mudo por baixo. */}
         {flash && current && (
           <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-slate-950/95 px-[4vw] text-center">
@@ -209,6 +221,7 @@ export function TvCallPanel({ token, clinicName, topic, initialCalls }: { token:
           ))}
         </ol>
       </footer>
+      <TvTicker items={ticker} />
     </div>
   );
 }

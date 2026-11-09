@@ -491,6 +491,18 @@ async function main() {
     ],
   });
 
+  // Letreiro da TV: avisos da clínica + notícias de saúde (Agência Brasil).
+  await prisma.tvMediaItem.createMany({
+    data: [
+      ...[
+        "Traga documento com foto e a carteirinha do convênio.",
+        "Chegou? Leia o QR Code da recepção e faça seu check-in pelo celular.",
+        "Vacinação contra a gripe: pergunte na recepção.",
+      ].map((text, i) => ({ clinicId: clinic.id, kind: "TICKER_NOTICE", source: text, title: text.slice(0, 80), position: i })),
+      { clinicId: clinic.id, kind: "TICKER_NEWS", source: "SAUDE", title: "Notícias de saúde (Agência Brasil)", position: 99 },
+    ],
+  });
+
   // ---------- Disparos, régua, NPS ----------
   const campaign = await prisma.broadcastCampaign.create({
     data: {

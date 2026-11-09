@@ -2,6 +2,8 @@
  * Globoplay/Netflix etc. bloqueiam embed (DRM + X-Frame-Options): não há como suportar. */
 
 export type TvMediaKind = "YOUTUBE" | "VIDEO" | "IMAGE" | "SPOTIFY";
+/** Tipos de TvMediaItem que são mídia (os do letreiro — TICKER_* — ficam fora do palco). */
+export const TV_MEDIA_KINDS: TvMediaKind[] = ["YOUTUBE", "VIDEO", "IMAGE", "SPOTIFY"];
 
 const YT_ID = /^[A-Za-z0-9_-]{11}$/;
 const YT_LIST = /^[A-Za-z0-9_-]{2,64}$/;

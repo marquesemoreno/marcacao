@@ -8,7 +8,9 @@ import { createPatientCall, issueTvDisplay, recentCalls, resolveTvDisplay, toTvC
 import { doctorKey, type TvCall } from "@/lib/tv-call";
 import { getBaseUrl } from "@/lib/format";
 import { getSupabaseServerClient, WHATSAPP_MEDIA_BUCKET } from "@/lib/supabase-server";
-import { checkTvUpload, parseSpotifyUrl, parseYoutubeUrl, type TvMediaKind } from "@/lib/tv-media";
+import { checkTvUpload, parseSpotifyUrl, parseYoutubeUrl, TV_MEDIA_KINDS, type TvMediaKind } from "@/lib/tv-media";
+import { unstable_cache } from "next/cache";
+import { buildTickerItems, normalizeNotices, parseRssTitles, TICKER_NEWS_FEED, type TickerItem } from "@/lib/tv-ticker";
 
 /** Recepção/gestão chama um paciente na TV (o status "Em atendimento" é marcado à parte,
  * pelo setAgendaStatus de sempre). */
@@ -115,7 +117,7 @@ async function mediaView(rows: { id: string; kind: string; title: string; source
 
 export async function listTvMedia(): Promise<TvMediaView[]> {
   const { clinicId } = await requireClinicManager();
-  const rows = await prisma.tvMediaItem.findMany({ where: { clinicId }, orderBy: [{ position: "asc" }, { createdAt: "asc" }] });
+  const rows = await prisma.tvMediaItem.findMany({ where: { clinicId, kind: { in: TV_MEDIA_KINDS } }, orderBy: [{ position: "asc" }, { createdAt: "asc" }] });
   return mediaView(rows, 1);
 }
 
@@ -181,7 +183,7 @@ export async function updateTvMedia(id: string, patch: { active?: boolean; move?
   const item = await prisma.tvMediaItem.findFirst({ where: { id, clinicId } });
   if (!item) throw new Error("Item não encontrado.");
   if (patch.move) {
-    const all = await prisma.tvMediaItem.findMany({ where: { clinicId, kind: { not: "SPOTIFY" } }, orderBy: [{ position: "asc" }, { createdAt: "asc" }], select: { id: true } });
+    const all = await prisma.tvMediaItem.findMany({ where: { clinicId, kind: { in: ["YOUTUBE", "VIDEO", "IMAGE"] } }, orderBy: [{ position: "asc" }, { createdAt: "asc" }], select: { id: true } });
     const i = all.findIndex((x) => x.id === id);
     const j = i + patch.move;
     if (i >= 0 && j >= 0 && j < all.length) {
@@ -218,6 +220,61 @@ export async function deleteTvMedia(id: string) {
 export async function getTvMedia(token: string): Promise<TvMediaView[] | null> {
   const tv = await resolveTvDisplay(token);
   if (!tv || tv.kind !== "TV") return null;
-  const rows = await prisma.tvMediaItem.findMany({ where: { clinicId: tv.clinicId, active: true }, orderBy: [{ position: "asc" }, { createdAt: "asc" }] });
+  const rows = await prisma.tvMediaItem.findMany({ where: { clinicId: tv.clinicId, active: true, kind: { in: TV_MEDIA_KINDS } }, orderBy: [{ position: "asc" }, { createdAt: "asc" }] });
   return mediaView(rows, 12);
+}
+
+// ---------- Letreiro (avisos da clínica + notícias de saúde) ----------
+
+const NOTICE_KIND = "TICKER_NOTICE";
+const NEWS_KIND = "TICKER_NEWS";
+
+/** Manchetes de Saúde da Agência Brasil, guardadas 30 min (todas as TVs dividem a mesma leitura). */
+const healthHeadlines = unstable_cache(
+  async () => {
+    try {
+      const res = await fetch(TICKER_NEWS_FEED, { headers: { "user-agent": "ConectaSaude-TV/1.0" }, signal: AbortSignal.timeout(8000), cache: "no-store" });
+      if (!res.ok) return [];
+      return parseRssTitles(await res.text()).slice(0, 20);
+    } catch {
+      return [];
+    }
+  },
+  ["tv-ticker-health-news"],
+  { revalidate: 1800 }
+);
+
+export async function getTickerSettings(): Promise<{ notices: string; news: boolean }> {
+  const { clinicId } = await requireClinicManager();
+  const rows = await prisma.tvMediaItem.findMany({ where: { clinicId, kind: { in: [NOTICE_KIND, NEWS_KIND] } }, orderBy: { position: "asc" } });
+  return {
+    notices: rows.filter((r) => r.kind === NOTICE_KIND).map((r) => r.source).join("\n"),
+    news: rows.some((r) => r.kind === NEWS_KIND && r.active),
+  };
+}
+
+export async function saveTickerSettings(input: { notices: string; news: boolean }) {
+  const { clinicId } = await requireClinicManager();
+  const notices = normalizeNotices(input.notices ?? "");
+  await prisma.$transaction([
+    prisma.tvMediaItem.deleteMany({ where: { clinicId, kind: { in: [NOTICE_KIND, NEWS_KIND] } } }),
+    prisma.tvMediaItem.createMany({
+      data: [
+        ...notices.map((text, i) => ({ clinicId, kind: NOTICE_KIND, source: text, title: text.slice(0, 80), position: i })),
+        ...(input.news ? [{ clinicId, kind: NEWS_KIND, source: "SAUDE", title: "Notícias de saúde (Agência Brasil)", position: 99 }] : []),
+      ],
+    }),
+  ]);
+  revalidatePath("/clinic/tv");
+  return { success: true as const, notices: notices.length };
+}
+
+/** Lado da TV: avisos + manchetes (se ligadas). Vazio = sem letreiro. */
+export async function getTvTicker(token: string): Promise<TickerItem[] | null> {
+  const tv = await resolveTvDisplay(token);
+  if (!tv || tv.kind !== "TV") return null;
+  const rows = await prisma.tvMediaItem.findMany({ where: { clinicId: tv.clinicId, kind: { in: [NOTICE_KIND, NEWS_KIND] } }, orderBy: { position: "asc" } });
+  const notices = rows.filter((r) => r.kind === NOTICE_KIND && r.active).map((r) => r.source);
+  const news = rows.some((r) => r.kind === NEWS_KIND && r.active) ? await healthHeadlines() : [];
+  return buildTickerItems(notices, news);
 }
