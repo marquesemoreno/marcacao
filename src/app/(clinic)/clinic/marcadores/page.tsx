@@ -13,15 +13,16 @@ export default async function MarcadoresPage() {
   const { rows, clinicWhatsapp } = await getMarcadoresReport(today, today);
 
   return (
-    <div className="h-full overflow-y-auto">
-      <div className="space-y-4 p-4 md:p-6 max-w-6xl">
+    // Visual "vidro" (09/11/2026, DESIGN.md §5).
+    <div className="soft-canvas h-full overflow-y-auto">
+      <div className="mx-auto w-full max-w-6xl space-y-5 p-4 sm:p-6 md:p-8">
         <PageHeader
           title="Marcadores"
           subtitle="Parceiros que indicam pacientes. Cada um tem um link de WhatsApp próprio: quem chega por ele entra no relatório."
           actions={
             <Link
               href="/clinic/relatorio?aba=marcadores"
-              className="inline-flex h-9 items-center rounded-full bg-slate-100 px-4 text-sm font-medium text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+              className="inline-flex h-10 items-center rounded-full bg-white/80 ring-1 ring-slate-900/5 shadow-xs dark:bg-white/[0.08] dark:ring-white/10 hover:bg-white dark:hover:bg-white/[0.14] px-4 text-sm font-medium text-slate-700 dark:text-slate-200"
             >
               Ver desempenho
             </Link>
