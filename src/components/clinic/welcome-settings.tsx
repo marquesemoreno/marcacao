@@ -28,7 +28,7 @@ export function WelcomeSettings(props: Props) {
 
   return (
     <>
-      <section className="rounded-2xl bg-white p-4 shadow-xs dark:bg-slate-900">
+      <section className="glass-surface p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             <h2 className="text-sm font-semibold">Saudação automática</h2>
@@ -60,7 +60,7 @@ export function WelcomeSettings(props: Props) {
           maxLength={1000}
           aria-label="Texto da saudação"
           onChange={(e) => setState((s) => ({ ...s, welcomeText: e.target.value }))}
-          className="mt-3 w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 disabled:opacity-70 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+          className="mt-3 w-full rounded-2xl border border-slate-200 bg-white/80 p-3 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 disabled:opacity-70 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-100"
         />
         {props.canEdit && state.welcomeText !== savedText && (
           <div className="mt-2 flex justify-end">
@@ -76,7 +76,7 @@ export function WelcomeSettings(props: Props) {
         )}
       </section>
 
-      <section className="flex flex-wrap items-start justify-between gap-3 rounded-2xl bg-white p-4 shadow-xs dark:bg-slate-900">
+      <section className="flex flex-wrap items-start justify-between gap-3 glass-surface p-5">
         <div className="min-w-0 flex-1">
           <h2 className="text-sm font-semibold">Endereço automático</h2>
           <p className="mt-0.5 text-sm text-slate-600 dark:text-slate-400">
