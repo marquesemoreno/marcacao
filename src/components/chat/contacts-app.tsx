@@ -65,6 +65,7 @@ type ContactRow = {
   lastInteractionAt?: string;
   attendant?: string | null;
   instagramUsername?: string | null;
+  photoUrl?: string | null;
 };
 
 const statusLabels: Record<ContactRow["status"], string> = {

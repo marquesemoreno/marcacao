@@ -2,14 +2,14 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { avatarTone } from "@/lib/avatar-tone";
+import { AvatarBadge } from "@/components/chat/avatar-badge";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { AlertTriangle, CalendarCheck, Clock, Loader2, Megaphone, MessageCircle, RefreshCw, User, UserCheck, X } from "lucide-react";
+import { AlertTriangle, CalendarCheck, Clock, Loader2, Megaphone, MessageCircle, RefreshCw, UserCheck, X } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { displayName, isUsableContactName } from "@/lib/contact-display";
 import { formatPhone } from "@/lib/format";
-import { initialsOf } from "@/lib/agenda-ui";
 import { PROCEDURE_INTEREST_TAG_PREFIX } from "@/lib/conversation-tags";
 import { formatDurationHuman } from "@/lib/sla-calculator";
 import {
@@ -36,6 +36,8 @@ export type PatientListRow = {
   attendant?: string | null;
   /** Já recebeu lembrete da agenda do sistema da clínica (ponte). */
   inClinicSystem?: boolean;
+  /** Foto do perfil (WhatsApp/Instagram) já guardada no contato. */
+  photoUrl?: string | null;
 };
 
 /** O mínimo pra disparo/atribuição — vale pra linha da página e pro "selecionar todos". */
@@ -332,13 +334,15 @@ export function PatientListTable({
                       className="min-w-0 flex-1 rounded-lg px-2.5 pt-2.5 pb-1.5 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
                     >
                       <div className="flex min-w-0 items-center gap-3">
-                        <span
-                          className={`flex size-10 shrink-0 items-center justify-center rounded-full text-xs font-bold tracking-tight shadow-[0_6px_14px_-8px_rgb(15_23_42/0.6)] ring-2 ring-white/80 dark:ring-white/10 ${
+                        <AvatarBadge
+                          name={hasName ? name : ""}
+                          photoUrl={r.photoUrl}
+                          size={40}
+                          className="ring-2 ring-white/80 shadow-[0_6px_14px_-8px_rgb(15_23_42/0.6)] dark:ring-white/10"
+                          fallbackClassName={
                             r.status === "RESOLVED" ? "bg-slate-200 text-slate-500 dark:bg-white/10 dark:text-slate-400" : avatarTone(r.conversationId)
-                          }`}
-                        >
-                          {hasName ? initialsOf(name) : <User className="w-3.5 h-3.5" aria-hidden />}
-                        </span>
+                          }
+                        />
                         <div className="min-w-0 flex-1">
                           <p className="flex min-w-0 items-center gap-1.5 text-sm font-semibold text-slate-900 dark:text-slate-100">
                             <span className="truncate" title={name}>
