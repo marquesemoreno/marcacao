@@ -31,7 +31,7 @@ export function TvTicker({ items }: { items: TickerItem[] }) {
         {row(true)}
       </div>
       {hasNews && (
-        <span className="absolute right-0 top-0 bottom-0 flex items-center bg-gradient-to-l from-slate-900 via-slate-900 to-transparent pl-[3vw] pr-[1.2vw] text-[0.55em] text-slate-400">
+        <span className="absolute right-0 top-0 bottom-0 flex items-center bg-gradient-to-l from-slate-900 via-slate-900 to-transparent pl-[3vw] pr-[1.2vw] text-[0.7em] font-medium text-slate-300">
           Notícias: Agência Brasil
         </span>
       )}
