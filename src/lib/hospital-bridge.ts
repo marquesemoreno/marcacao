@@ -621,3 +621,26 @@ export function fetchBridgeBillingSummary(clinicId: string, inicio: string, fim:
     `/api/faturamento/resumo?inicio=${encodeURIComponent(inicio)}&fim=${encodeURIComponent(fim)}`
   );
 }
+
+/** BI › Faturamento (09/11/2026): peças separadas, quem compõe o total é src/lib/bi/billing.ts. */
+export type BridgeBiBilling = {
+  fonte: string;
+  inicio: string;
+  fim: string;
+  geradoEm: string;
+  ultimaGuia: string | null;
+  convenios: Record<string, string>;
+  /** [AAAA-MM-DD, id do convênio, valor] */
+  guias: [string, string, number][];
+  internacoes: { qtd: number; valor: number; qtdCasada: number; valorCasado: number };
+  recibos: { qtd: number; valor: number; valorComGuia: number };
+  tendencia: { mes: string; qtd: number; valor: number }[];
+  medicos: { medico: string; procedimentos: number; total: number }[];
+  valorComMedico: number;
+  datasInvalidas: number;
+};
+
+export function fetchBridgeBiBilling(clinicId: string, inicio: string, fim: string, tendenciaDesde: string) {
+  const q = new URLSearchParams({ inicio, fim, tendenciaDesde });
+  return fetchOwnerEndpoint<BridgeBiBilling>(clinicId, `/api/bi/faturamento?${q}`);
+}

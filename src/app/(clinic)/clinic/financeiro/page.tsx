@@ -27,7 +27,7 @@ function lastMonths(n: number) {
 export default async function FinanceiroPage({ searchParams }: { searchParams: Promise<{ mes?: string }> }) {
   if (!(await currentUserIsManager())) return <ManagerOnly />;
   const params = await searchParams;
-  const { month, billing, billingPrev, finance, stock } = await getOwnerPanel(params.mes ?? "");
+  const { month, billing, finance, stock } = await getOwnerPanel(params.mes ?? "");
   const staleDays =
     finance.ok && finance.data.ultimaBaixa
       ? Math.floor((Date.now() - new Date(finance.data.ultimaBaixa).getTime()) / 86_400_000)
@@ -57,7 +57,7 @@ export default async function FinanceiroPage({ searchParams }: { searchParams: P
           </button>
         </form>
 
-        {billing.ok && <BillingSection data={billing.data} prev={billingPrev} month={month} />}
+        {billing.ok && <BillingSection data={billing.data} month={month} />}
 
         {!finance.ok ? (
           <section className={card}>
@@ -199,21 +199,11 @@ export default async function FinanceiroPage({ searchParams }: { searchParams: P
   );
 }
 
-function Delta({ now, before }: { now: number; before: number | null }) {
-  if (before === null || before <= 0) return null;
-  const pct = Math.round(((now - before) / before) * 100);
-  if (pct === 0) return <span className="ml-1.5 text-xs text-slate-500">= mês anterior</span>;
-  return (
-    <span className={`ml-1.5 text-xs ${pct > 0 ? "text-emerald-700 dark:text-emerald-400" : "text-rose-700 dark:text-rose-400"}`}>
-      {pct > 0 ? "↑" : "↓"} {Math.abs(pct)}% vs mês anterior
-    </span>
-  );
-}
-
 /** Faturamento do mês (guias ambulatoriais + internações + recibos), por convênio e por médico. */
-function BillingSection({ data, prev, month }: { data: BridgeBillingSummary; prev: BridgeBillingSummary | null; month: string }) {
-  const total = data.ambulatorial.valor + data.internacao.valor;
-  const prevTotal = prev ? prev.ambulatorial.valor + prev.internacao.valor : null;
+function BillingSection({ data, month }: { data: BridgeBillingSummary; month: string }) {
+  // Guias (CPS1) já incluem a internação (84% casam com guia de mesma data e valor em out/26) —
+  // somar as duas contava ~R$ 200 mil em dobro. Hipótese a confirmar com a clínica (ver BI › Faturamento).
+  const total = data.ambulatorial.valor;
   const glosa = data.ambulatorial.glosa + data.internacao.glosa;
   return (
     <>
@@ -221,28 +211,27 @@ function BillingSection({ data, prev, month }: { data: BridgeBillingSummary; pre
         <h2 className="font-semibold">Faturamento — {monthLabel(month)}</h2>
         <p className="mt-3">
           <span className="text-4xl font-semibold tabular-nums">{formatCurrency(total)}</span>
-          <Delta now={total} before={prevTotal} />
         </p>
         <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-3">
           <div>
-            <dt className="text-slate-500">Ambulatorial</dt>
+            <dt className="text-slate-500">Guias (total)</dt>
             <dd className="font-semibold tabular-nums">{formatCurrency(data.ambulatorial.valor)}</dd>
             <dd className="text-xs text-slate-500">{data.ambulatorial.guias} guias</dd>
           </div>
           <div>
-            <dt className="text-slate-500">Internação</dt>
+            <dt className="text-slate-500">Internação (já nas guias)</dt>
             <dd className="font-semibold tabular-nums">{formatCurrency(data.internacao.valor)}</dd>
             <dd className="text-xs text-slate-500">{data.internacao.internacoes} internações</dd>
           </div>
           <div>
-            <dt className="text-slate-500">Recibos particulares</dt>
+            <dt className="text-slate-500">Recibos particulares (pagamento de guias)</dt>
             <dd className="font-semibold tabular-nums">{formatCurrency(data.recibos.valor)}</dd>
             <dd className="text-xs text-slate-500">{data.recibos.quantidade} recibos</dd>
           </div>
         </dl>
         <p className="mt-3 text-xs text-slate-400">
-          {glosa > 0 ? `Glosa lançada no mês: ${formatCurrency(glosa)}.` : "Nenhuma glosa lançada no sistema neste mês."} Ambulatorial + internação pela
-          data do atendimento.
+          {glosa > 0 ? `Glosa lançada no mês: ${formatCurrency(glosa)}.` : "Nenhuma glosa lançada no sistema neste mês."} Total = guias, pela data do atendimento; a internação já está dentro das guias e aparece só como detalhe (a confirmar com a
+          clínica). Análise completa em Relatórios › Faturamento.
         </p>
       </section>
       <div className="grid gap-4 lg:grid-cols-2">

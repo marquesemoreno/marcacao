@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import { ManagerOnly, currentUserCan } from "@/components/clinic/manager-only";
+import { ManagerOnly, currentUserCan, currentUserIsManager } from "@/components/clinic/manager-only";
 import { PeriodFilter } from "@/components/clinic/period-filter";
 import { PageHeader } from "@/components/clinic/page-header";
 import { ReportSelectFilter } from "@/components/clinic/report-filters";
@@ -39,6 +39,8 @@ import { getBudgetConversionReport } from "@/actions/budget-followup";
 import { HoursSavedCard } from "@/components/clinic/hours-saved-card";
 import { getHoursSavedReport } from "@/actions/hours-saved";
 import { WeekForecastSection } from "@/components/clinic/week-forecast-card";
+import { ReportTabs } from "@/components/clinic/bi/report-tabs";
+import { BillingTab } from "@/components/clinic/bi/billing-tab";
 import { ReguaReturnCard } from "@/components/clinic/regua-return-card";
 import { getReguaReturnReport } from "@/actions/regua-return";
 import { SlotRecoveryCard } from "@/components/clinic/slot-recovery-card";
@@ -106,6 +108,8 @@ type RelatorioPageProps = {
     doctor?: string;
     procedure?: string;
     channel?: string;
+    aba?: string;
+    mes?: string;
   }>;
 };
 
@@ -130,6 +134,19 @@ export default async function ClinicReportPage({
 }: RelatorioPageProps) {
   const params = await searchParams;
   if (!(await currentUserCan("relatorios"))) return <ManagerOnly />;
+  const isManager = await currentUserIsManager();
+  if (params.aba === "faturamento") {
+    if (!isManager) return <ManagerOnly />;
+    return (
+      <div className="space-y-6 font-sans flex-1 overflow-y-auto text-slate-900 dark:text-slate-100 p-6 md:p-8 max-w-7xl mx-auto w-full">
+        <PageHeader title="Relatórios" subtitle="Faturamento lido do sistema da clínica (só leitura). Só a gestão vê esta aba." />
+        <ReportTabs active="faturamento" isManager />
+        <Suspense fallback={<p className="text-sm text-slate-500">Lendo o sistema da clínica…</p>}>
+          <BillingTab month={params.mes} />
+        </Suspense>
+      </div>
+    );
+  }
   const period = parsePeriodKey(params.periodo, params.days);
   const labels = periodLabels(period);
   const tags = params.tag ? [params.tag] : undefined;
@@ -329,6 +346,7 @@ export default async function ClinicReportPage({
             />
           </div>
         </div>
+        <ReportTabs active="atendimento" isManager={isManager} />
         {activeFilters.length > 0 && (
           <div className="flex flex-wrap items-center gap-2 text-xs" aria-label="Filtros ativos">
             <span className="font-medium text-slate-600 dark:text-slate-400">Filtrando:</span>
