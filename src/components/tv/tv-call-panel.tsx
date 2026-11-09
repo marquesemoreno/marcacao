@@ -3,7 +3,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Maximize, Volume2 } from "lucide-react";
 import { getSupabaseClient } from "@/lib/supabase-client";
-import { getTvCall, getTvMedia, getTvState, getTvTicker, type TvMediaView } from "@/actions/tv-call";
+import { getTvBackground, getTvCall, getTvMedia, getTvState, getTvTicker, type TvMediaView } from "@/actions/tv-call";
+import { TvBackdrop } from "./tv-backdrop";
+import type { TvBackground } from "@/lib/tv-background";
 import { TvTicker } from "./tv-ticker";
 import type { TickerItem } from "@/lib/tv-ticker";
 import { TvMediaStage } from "./tv-media-stage";
@@ -23,6 +25,7 @@ export function TvCallPanel({ token, clinicName, topic, initialCalls }: { token:
   const [revoked, setRevoked] = useState(false);
   const [media, setMedia] = useState<TvMediaView[]>([]);
   const [ticker, setTicker] = useState<TickerItem[]>([]);
+  const [bg, setBg] = useState<TvBackground>("LISO");
   const seen = useRef(new Set(initialCalls.map((c) => c.id)));
   const queue = useRef<TvCall[]>([]);
   const busy = useRef(false);
@@ -99,9 +102,12 @@ export function TvCallPanel({ token, clinicName, topic, initialCalls }: { token:
     return () => clearInterval(t);
   }, [token]);
 
-  // Letreiro (avisos + notícias de saúde): confere a cada 15 min.
+  // Letreiro (avisos + notícias de saúde) e fundo do painel: confere a cada 15 min.
   useEffect(() => {
-    const load = () => void getTvTicker(token).then((t) => t && setTicker(t)).catch(() => {});
+    const load = () => {
+      void getTvTicker(token).then((t) => t && setTicker(t)).catch(() => {});
+      void getTvBackground(token).then((b) => b && setBg(b)).catch(() => {});
+    };
     load();
     const t = setInterval(load, 15 * 60_000);
     return () => clearInterval(t);
@@ -122,15 +128,18 @@ export function TvCallPanel({ token, clinicName, topic, initialCalls }: { token:
 
   const [current, ...history] = calls;
   const hasMedia = media.length > 0;
+  // Com fundo (arte/paisagem), os cartões viram vidro fosco escuro — a senha continua legível.
+  const card = bg === "LISO" ? "bg-slate-900" : "bg-slate-900/75 backdrop-blur-md";
 
   if (hasMedia) {
     return (
-      <div className="relative flex h-dvh flex-col bg-slate-950 text-white [color-scheme:dark]">
+      <div className="relative isolate flex h-dvh flex-col bg-slate-950 text-white [color-scheme:dark]">
+        <TvBackdrop mode={bg} dim={flash} />
         <Header clinicName={clinicName} soundOn={soundOn} onUnlock={async () => setSoundOn(await unlockAudio())} now={now} />
         <div className="grid min-h-0 flex-1 grid-cols-[7fr_3fr] gap-[1.5vw] px-[2vw] pb-[2vh]">
           <TvMediaStage items={media} ducked={flash} soundOn={soundOn} />
           <aside className="flex min-h-0 flex-col gap-[1.5vh]" aria-live="assertive">
-            <div className={`rounded-[1.2vw] border-4 px-[1.5vw] py-[3vh] text-center ${flash ? "border-emerald-400 bg-emerald-500/15" : "border-slate-800 bg-slate-900"}`}>
+            <div className={`rounded-[1.2vw] border-4 px-[1.5vw] py-[3vh] text-center ${flash ? "border-emerald-400 bg-emerald-500/15" : `border-slate-800 ${card}`}`}>
               <p className="text-[clamp(0.9rem,1.4vw,1.75rem)] uppercase tracking-[0.2em] text-slate-400">{current ? "Chamando" : "Aguarde ser chamado"}</p>
               {current && (
                 <>
@@ -143,7 +152,7 @@ export function TvCallPanel({ token, clinicName, topic, initialCalls }: { token:
             <p className="text-[clamp(0.8rem,1.1vw,1.25rem)] font-semibold uppercase tracking-widest text-slate-500">Últimas chamadas</p>
             <ol className="flex min-h-0 flex-col gap-[1vh] overflow-hidden">
               {history.slice(0, 4).map((c) => (
-                <li key={c.id} className="rounded-xl bg-slate-900 px-[1.2vw] py-[1vh]">
+                <li key={c.id} className={`rounded-xl ${card} px-[1.2vw] py-[1vh]`}>
                   <p className="truncate text-[clamp(1rem,1.8vw,2.25rem)] font-semibold">{c.displayName}</p>
                   <p className="truncate text-[clamp(0.8rem,1.2vw,1.5rem)] text-emerald-400">
                     {c.room ?? "Recepção"} <span className="text-slate-500 tabular-nums">· {fmt.format(new Date(c.calledAt))}</span>
@@ -168,7 +177,8 @@ export function TvCallPanel({ token, clinicName, topic, initialCalls }: { token:
   }
 
   return (
-    <div className="flex min-h-dvh flex-col bg-slate-950 text-white [color-scheme:dark]">
+    <div className="relative isolate flex min-h-dvh flex-col bg-slate-950 text-white [color-scheme:dark]">
+      <TvBackdrop mode={bg} dim={flash} />
       <header className="flex items-center justify-between px-[3vw] py-[2vh]">
         <p className="text-[clamp(1rem,2vw,2rem)] font-semibold text-emerald-400">{clinicName}</p>
         <div className="flex items-center gap-4">
@@ -195,7 +205,7 @@ export function TvCallPanel({ token, clinicName, topic, initialCalls }: { token:
 
       <main className="flex flex-1 flex-col items-center justify-center px-[4vw] text-center" aria-live="assertive">
         {current ? (
-          <div className={`w-full rounded-[2vw] border-4 px-[4vw] py-[5vh] transition-colors duration-500 ${flash ? "border-emerald-400 bg-emerald-500/15" : "border-slate-800 bg-slate-900"}`}>
+          <div className={`w-full rounded-[2vw] border-4 px-[4vw] py-[5vh] transition-colors duration-500 ${flash ? "border-emerald-400 bg-emerald-500/15" : `border-slate-800 ${card}`}`}>
             <p className="text-[clamp(1rem,2.2vw,2.5rem)] font-medium uppercase tracking-[0.2em] text-slate-400">
               {current.attempt > 1 ? `Chamando de novo · ${current.attempt}ª vez` : "Chamando"}
             </p>
@@ -212,7 +222,7 @@ export function TvCallPanel({ token, clinicName, topic, initialCalls }: { token:
         <p className="mb-[1.5vh] text-[clamp(0.9rem,1.4vw,1.5rem)] font-semibold uppercase tracking-widest text-slate-500">Últimas chamadas</p>
         <ol className="grid grid-cols-2 gap-[1.5vw] md:grid-cols-4">
           {history.slice(0, 4).map((c) => (
-            <li key={c.id} className="rounded-xl bg-slate-900 px-[1.5vw] py-[1.5vh]">
+            <li key={c.id} className={`rounded-xl ${card} px-[1.5vw] py-[1.5vh]`}>
               <p className="truncate text-[clamp(1.1rem,2.2vw,2.5rem)] font-semibold">{c.displayName}</p>
               <p className="truncate text-[clamp(0.9rem,1.6vw,1.75rem)] text-emerald-400">
                 {c.room ?? "Recepção"} <span className="text-slate-500 tabular-nums">· {fmt.format(new Date(c.calledAt))}</span>

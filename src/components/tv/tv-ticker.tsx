@@ -24,7 +24,7 @@ export function TvTicker({ items }: { items: TickerItem[] }) {
   );
   const hasNews = items.some((i) => i.source);
   return (
-    <div className="relative flex items-center overflow-hidden border-t border-slate-800 bg-slate-900/80 py-[1.2vh] text-[clamp(1rem,1.8vw,2.1rem)] text-slate-100">
+    <div className="relative flex items-center overflow-hidden border-t border-slate-800 bg-slate-900/80 backdrop-blur-md py-[1.2vh] text-[clamp(1rem,1.8vw,2.1rem)] text-slate-100">
       <style>{`@keyframes tv-ticker{from{transform:translateX(0)}to{transform:translateX(-50%)}}@media (prefers-reduced-motion: reduce){.tv-ticker-track{animation:none!important}}`}</style>
       <div className="tv-ticker-track flex w-max" style={{ animation: `tv-ticker ${tickerDurationSec(chars) * 2}s linear infinite` }}>
         {row(false)}

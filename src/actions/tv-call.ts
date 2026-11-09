@@ -11,6 +11,7 @@ import { getSupabaseServerClient, WHATSAPP_MEDIA_BUCKET } from "@/lib/supabase-s
 import { checkTvUpload, parseSpotifyUrl, parseYoutubeUrl, TV_MEDIA_KINDS, type TvMediaKind } from "@/lib/tv-media";
 import { unstable_cache } from "next/cache";
 import { buildTickerItems, normalizeNotices, parseRssTitles, TICKER_NEWS_FEED, type TickerItem } from "@/lib/tv-ticker";
+import { parseTvBackground, TV_BACKGROUND_KIND, type TvBackground } from "@/lib/tv-background";
 
 /** Recepção/gestão chama um paciente na TV (o status "Em atendimento" é marcado à parte,
  * pelo setAgendaStatus de sempre). */
@@ -277,4 +278,31 @@ export async function getTvTicker(token: string): Promise<TickerItem[] | null> {
   const notices = rows.filter((r) => r.kind === NOTICE_KIND && r.active).map((r) => r.source);
   const news = rows.some((r) => r.kind === NEWS_KIND && r.active) ? await healthHeadlines() : [];
   return buildTickerItems(notices, news);
+}
+
+// ---------- Fundo do painel (Liso / Arte suave / Paisagens) ----------
+
+export async function getTvBackgroundSetting(): Promise<TvBackground> {
+  const { clinicId } = await requireClinicManager();
+  const row = await prisma.tvMediaItem.findFirst({ where: { clinicId, kind: TV_BACKGROUND_KIND } });
+  return parseTvBackground(row?.source);
+}
+
+export async function saveTvBackgroundSetting(value: TvBackground) {
+  const { clinicId } = await requireClinicManager();
+  const bg = parseTvBackground(value);
+  await prisma.$transaction([
+    prisma.tvMediaItem.deleteMany({ where: { clinicId, kind: TV_BACKGROUND_KIND } }),
+    ...(bg === "LISO" ? [] : [prisma.tvMediaItem.create({ data: { clinicId, kind: TV_BACKGROUND_KIND, source: bg, title: "Fundo do painel", position: 0 } })]),
+  ]);
+  revalidatePath("/clinic/tv");
+  return { success: true as const };
+}
+
+/** Lado da TV. */
+export async function getTvBackground(token: string): Promise<TvBackground | null> {
+  const tv = await resolveTvDisplay(token);
+  if (!tv || tv.kind !== "TV") return null;
+  const row = await prisma.tvMediaItem.findFirst({ where: { clinicId: tv.clinicId, kind: TV_BACKGROUND_KIND } });
+  return parseTvBackground(row?.source);
 }
