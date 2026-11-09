@@ -129,7 +129,7 @@ export function ReportSettingsForm({
             marcada com o canal escolhido. Anúncios de clique para WhatsApp do Meta já são reconhecidos automaticamente.
           </p>
           {rules.length > 0 && (
-            <ul className="divide-y divide-slate-100 dark:divide-slate-800 rounded-2xl bg-white dark:bg-slate-900 shadow-xs">
+            <ul className="divide-y divide-slate-100 dark:divide-slate-800 glass-well">
               {rules.map((r) => (
                 <li key={r.id} className="flex items-center justify-between gap-2 px-3 py-1.5 text-xs">
                   <span className="truncate">
