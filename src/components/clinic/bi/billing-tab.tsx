@@ -49,15 +49,16 @@ export async function BillingTab({ month }: { month?: string }) {
 
       <section className={card} aria-label="Faturado no mês">
         <div className="grid gap-5 md:grid-cols-[1.2fr_1fr]">
-          <div>
-            <p className="text-sm text-slate-500">Faturado (guias){v.partial ? ` — até ${br(v.fim)}` : ""}</p>
-            <p className="mt-1 text-4xl font-semibold tabular-nums">{formatCurrency(c.total)}</p>
-            <p className="mt-1 text-xs text-slate-500">
+          <div className="relative overflow-hidden rounded-[1.5rem] bg-blue-600 p-5 text-white shadow-[0_18px_36px_-22px_rgb(37_99_235/0.8)]">
+            <span aria-hidden className="pointer-events-none absolute -right-10 -top-12 size-44 rounded-full bg-white/15 blur-2xl" />
+            <p className="relative text-sm font-medium text-blue-100">Faturado (guias){v.partial ? ` — até ${br(v.fim)}` : ""}</p>
+            <p className="relative mt-2 text-4xl font-semibold tracking-tight tabular-nums">{formatCurrency(c.total)}</p>
+            <p className="relative mt-1.5 text-xs text-blue-100">
               {guias.qtd.toLocaleString("pt-BR")} guias · {v.days} dias úteis{v.partial ? " até agora" : ""}
               {guias.zeradas > 0 && ` · ${guias.zeradas} guias com valor zero`}
             </p>
           </div>
-          <div className="rounded-xl bg-slate-50 p-4 dark:bg-slate-800/60">
+          <div className="report-well p-4">
             <p className="text-sm text-slate-500">Média por dia útil</p>
             <p className="mt-1 text-2xl font-semibold tabular-nums">{cmp?.perDay != null ? formatCurrency(cmp.perDay) : "—"}</p>
             {cmp && cmp.changePct !== null ? (

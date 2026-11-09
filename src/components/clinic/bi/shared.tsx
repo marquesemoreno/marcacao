@@ -1,5 +1,5 @@
 /** Peças comuns das abas de BI do Relatório. */
-export const biCard = "rounded-2xl bg-white dark:bg-slate-900 p-5 shadow-xs";
+export const biCard = "report-surface p-5";
 const MONTHS = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
 /** "202610" ou "2026-10" → "out/26" */
 export const monthLabel = (ym: string) => {

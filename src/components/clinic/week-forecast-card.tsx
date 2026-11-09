@@ -11,7 +11,7 @@ const n1 = (v: number) => v.toLocaleString("pt-BR", { maximumFractionDigits: 1 }
  * pela resposta ao lembrete nas últimas 3 semanas. */
 export function WeekForecastCard({ data }: { data: WeekForecast }) {
   return (
-    <section aria-labelledby="previsao-titulo" className="rounded-2xl bg-white dark:bg-slate-900 p-5 shadow-xs">
+    <section aria-labelledby="previsao-titulo" className="report-surface p-5">
       <h3 id="previsao-titulo" className="font-semibold">Previsão da semana</h3>
       {data.unavailable ? (
         <p className="mt-2 text-sm text-slate-500">Não deu para ler a agenda no computador da clínica agora. Tente mais tarde.</p>
