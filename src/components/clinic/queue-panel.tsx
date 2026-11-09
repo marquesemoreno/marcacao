@@ -11,8 +11,8 @@ import { toTitleCase } from "@/lib/agenda-ui";
 const POLL_MS = 10_000;
 const ROOM_KEY = "senhas.room";
 const SERVICES_KEY = "senhas.services";
-const input = "h-9 rounded-full border border-transparent bg-slate-100 dark:bg-slate-800 px-4 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50";
-const ghost = "inline-flex h-8 items-center gap-1 rounded-full px-3 text-xs font-medium hover:bg-slate-100 disabled:opacity-40 dark:hover:bg-slate-800";
+const input = "h-10 rounded-full border border-transparent bg-white/80 ring-1 ring-slate-900/5 shadow-xs dark:bg-white/[0.08] dark:ring-white/10 px-4 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50";
+const ghost = "inline-flex h-8 items-center gap-1 rounded-full px-3 text-xs font-medium hover:bg-slate-900/5 disabled:opacity-40 dark:hover:bg-white/10";
 
 function waitOrder(list: QueueTicketView[]) {
   const age = (a: QueueTicketView, b: QueueTicketView) => a.createdAt.localeCompare(b.createdAt);
@@ -94,8 +94,19 @@ export function QueuePanel({ initial, compact = false, defaultRoom = "" }: { ini
 
   return (
     <div className="space-y-4">
-      <section className="rounded-2xl bg-white p-4 shadow-xs dark:bg-slate-900">
-        <div className="flex flex-wrap items-end gap-3">
+      <section className="glass-surface relative overflow-hidden p-5">
+        <div aria-hidden className="pointer-events-none absolute -right-16 -top-20 size-56 rounded-full bg-emerald-300/30 blur-3xl dark:bg-emerald-500/15" />
+        <div aria-hidden className="pointer-events-none absolute -bottom-24 left-1/3 size-56 rounded-full bg-sky-300/25 blur-3xl dark:bg-sky-500/10" />
+        {!compact && called[0] && (
+          <div className="relative mb-4 flex flex-wrap items-center gap-x-4 gap-y-1">
+            <span className="text-xs font-medium text-slate-600 dark:text-slate-400">Chamando agora</span>
+            <span className="font-mono text-3xl font-bold tracking-tight text-slate-900 dark:text-white sm:text-4xl">{called[0].code}</span>
+            <span className="text-sm text-slate-600 dark:text-slate-300">
+              {called[0].patientName ? toTitleCase(called[0].patientName) : "Sem agendamento"} · {called[0].room ?? "recepção"}
+            </span>
+          </div>
+        )}
+        <div className="relative flex flex-wrap items-end gap-3">
           <label className="flex flex-col gap-1 text-xs font-medium text-slate-600 dark:text-slate-400">
             Guichê / sala
             <input value={room} onChange={(e) => saveRoom(e.target.value)} placeholder="ex.: Guichê 1" maxLength={40} className={`${input} w-44`} />
@@ -104,7 +115,7 @@ export function QueuePanel({ initial, compact = false, defaultRoom = "" }: { ini
             type="button"
             disabled={pending || waiting.length === 0}
             onClick={() => call()}
-            className="inline-flex h-11 items-center gap-2 rounded-full bg-emerald-700 px-5 text-base font-semibold text-white hover:bg-emerald-800 disabled:bg-slate-300 dark:disabled:bg-slate-700"
+            className="inline-flex h-11 items-center gap-2 rounded-full bg-emerald-600 px-5 text-base font-semibold text-white shadow-[0_10px_20px_-10px_rgb(5_150_105/0.9)] hover:bg-emerald-700 disabled:bg-slate-300 disabled:shadow-none dark:disabled:bg-slate-700"
           >
             {pending ? <Loader2 className="h-5 w-5 animate-spin" aria-hidden /> : <Megaphone className="h-5 w-5" aria-hidden />}
             Chamar próxima{waiting[0] ? ` (${waiting[0].code})` : ""}
@@ -123,7 +134,7 @@ export function QueuePanel({ initial, compact = false, defaultRoom = "" }: { ini
                       type="button"
                       aria-pressed={on}
                       onClick={() => toggleMine(sv.id)}
-                      className={`h-8 rounded-full border px-3 text-xs font-medium ${on ? "border-emerald-600 bg-emerald-50 text-emerald-900 dark:bg-emerald-950/50 dark:text-emerald-200" : "border-slate-200 text-slate-600 dark:border-slate-700 dark:text-slate-300"}`}
+                      className={`h-8 rounded-full border px-3 text-xs font-medium ${on ? "border-transparent bg-slate-900 text-white dark:bg-white dark:text-slate-900" : "border-transparent bg-white/80 ring-1 ring-slate-900/5 shadow-xs dark:bg-white/[0.08] dark:ring-white/10 text-slate-600 dark:text-slate-300"}`}
                     >
                       {sv.name}
                     </button>
@@ -142,10 +153,10 @@ export function QueuePanel({ initial, compact = false, defaultRoom = "" }: { ini
 
       {called.length > 0 && (
         <section aria-labelledby="q-called">
-          <h2 id="q-called" className="mb-2 text-sm font-semibold">Chamadas</h2>
-          <ul className="divide-y divide-slate-100 rounded-2xl bg-white shadow-xs dark:divide-slate-800 dark:bg-slate-900">
+          <h2 id="q-called" className="mb-2 text-base font-semibold tracking-tight">Chamadas</h2>
+          <ul className="glass-surface overflow-hidden divide-y divide-slate-900/[0.05] dark:divide-white/[0.06]">
             {called.slice(0, compact ? 3 : 20).map((t) => (
-              <li key={t.id} className="flex flex-wrap items-center gap-2 px-3 py-2 text-sm">
+              <li key={t.id} className="flex flex-wrap items-center gap-2 px-4 py-2.5 text-sm transition-colors hover:bg-white/50 dark:hover:bg-white/[0.03]">
                 <Code t={t} />
                 <span className="min-w-0 flex-1 truncate">
                   {t.patientName ? toTitleCase(t.patientName) : <span className="text-slate-500">Sem agendamento</span>}
@@ -162,15 +173,15 @@ export function QueuePanel({ initial, compact = false, defaultRoom = "" }: { ini
 
       {!compact && (
         <section aria-labelledby="q-waiting">
-          <h2 id="q-waiting" className="mb-2 text-sm font-semibold">Esperando (ordem de chamada)</h2>
+          <h2 id="q-waiting" className="mb-2 text-base font-semibold tracking-tight">Esperando <span className="text-sm font-normal text-slate-500 dark:text-slate-400">(ordem de chamada)</span></h2>
           {waiting.length === 0 ? (
-            <p className="rounded-2xl border border-dashed border-slate-300 p-4 text-sm text-slate-500 dark:border-slate-700">
+            <p className="glass-surface border border-dashed border-slate-300 p-5 text-sm text-slate-500 dark:border-white/15">
               Ninguém na fila. As senhas aparecem aqui quando o paciente tira no totem.
             </p>
           ) : (
-            <ul className="divide-y divide-slate-100 rounded-2xl bg-white shadow-xs dark:divide-slate-800 dark:bg-slate-900">
+            <ul className="glass-surface overflow-hidden divide-y divide-slate-900/[0.05] dark:divide-white/[0.06]">
               {waiting.map((t) => (
-                <li key={t.id} className="flex flex-wrap items-center gap-2 px-3 py-2 text-sm">
+                <li key={t.id} className="flex flex-wrap items-center gap-2 px-4 py-2.5 text-sm transition-colors hover:bg-white/50 dark:hover:bg-white/[0.03]">
                   <Code t={t} />
                   <span className="min-w-0 flex-1 truncate">
                     {t.patientName ? (
