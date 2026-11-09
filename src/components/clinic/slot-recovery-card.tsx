@@ -11,7 +11,7 @@ export function SlotRecoveryCard({ data }: { data: ReturnType<typeof summarizeSl
     { label: "Encaixadas pela recepção", value: data.bookedManually },
   ];
   return (
-    <section aria-labelledby="vagas-titulo" className="report-surface p-5">
+    <section aria-labelledby="vagas-titulo" className="glass-surface p-5">
       <h3 id="vagas-titulo" className="font-semibold">Vagas recuperadas</h3>
       <p className="mt-3">
         <span className="text-4xl font-semibold tabular-nums">{data.recovered}</span>

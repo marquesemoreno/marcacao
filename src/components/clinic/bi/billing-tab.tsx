@@ -58,7 +58,7 @@ export async function BillingTab({ month }: { month?: string }) {
               {guias.zeradas > 0 && ` · ${guias.zeradas} guias com valor zero`}
             </p>
           </div>
-          <div className="report-well p-4">
+          <div className="glass-well p-4">
             <p className="text-sm text-slate-500">Média por dia útil</p>
             <p className="mt-1 text-2xl font-semibold tabular-nums">{cmp?.perDay != null ? formatCurrency(cmp.perDay) : "—"}</p>
             {cmp && cmp.changePct !== null ? (
