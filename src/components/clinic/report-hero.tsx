@@ -69,23 +69,23 @@ export function HighlightTile({
   const t = TONES[tone];
   return (
     <div
-      className={`relative flex min-h-[9.5rem] flex-col justify-between overflow-hidden rounded-[1.75rem] p-5 shadow-[0_18px_36px_-22px_rgb(15_23_42/0.55)] ${t.tile}`}
+      className={`relative flex min-h-[8.5rem] flex-col justify-between gap-3 overflow-hidden rounded-[1.5rem] p-4 sm:min-h-[9.5rem] sm:rounded-[1.75rem] sm:p-5 shadow-[0_18px_36px_-22px_rgb(15_23_42/0.55)] ${t.tile}`}
     >
       {/* brilho suave no canto, para o cartão não ficar chapado */}
       <span aria-hidden className="pointer-events-none absolute -right-10 -top-12 size-40 rounded-full bg-white/15 blur-2xl" />
       <div className="relative flex items-start justify-between gap-3">
-        <p className="text-[15px] font-semibold leading-snug">{title}</p>
+        <p className="text-sm font-semibold leading-snug sm:text-[15px]">{title}</p>
         <Link
           href={href}
           aria-label={linkLabel}
-          className={`grid size-9 shrink-0 place-items-center rounded-full ring-1 transition-colors focus-visible:outline-offset-2 ${t.btn}`}
+          className={`grid size-8 shrink-0 place-items-center sm:size-9 rounded-full ring-1 transition-colors focus-visible:outline-offset-2 ${t.btn}`}
         >
           <ArrowUpRight className="size-4" aria-hidden />
         </Link>
       </div>
       <div className="relative">
-        <p className="text-[2rem] font-semibold leading-none tracking-tight tabular-nums">{value}</p>
-        <p className={`mt-1.5 text-sm ${t.sub}`}>{sub}</p>
+        <p className="text-[1.375rem] font-semibold leading-none tracking-tight tabular-nums sm:text-[2rem]">{value}</p>
+        <p className={`mt-1.5 text-xs sm:text-sm ${t.sub}`}>{sub}</p>
       </div>
     </div>
   );

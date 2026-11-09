@@ -456,7 +456,7 @@ export default async function ClinicReportPage({
             hint={management.confirmations.totalSent === 0 ? "Nenhum lembrete enviado no período." : `${management.confirmations.totalSent} lembrete(s) enviado(s)`}
           />
         </div>
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
           <HighlightTile
             tone="blue"
             title="Conversas no período"
