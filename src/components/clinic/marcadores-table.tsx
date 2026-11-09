@@ -16,9 +16,21 @@ function formatPhone(p: string): string {
 const pct = (n: number) => `${Math.round(n * 100)}%`;
 const panel = "rounded-2xl bg-white dark:bg-slate-900 shadow-xs";
 
-/** Tabela de marcadores: relatório do período (indicados → agendados → atendidos), link
- * pessoal pra copiar e mandar pro marcador, ativar/desativar e importar lista colada. */
-export function MarcadoresTable({ rows, hasClinicWhatsapp, days }: { rows: MarcadorWithStats[]; hasClinicWhatsapp: boolean; days: number }) {
+/** Tabela de marcadores em dois modos: "cadastro" (página Marcadores: link pessoal pra copiar,
+ * ativar/desativar e importar lista colada) e "relatorio" (Relatórios › Marcadores: indicados →
+ * agendados → atendidos no período, só leitura). */
+export function MarcadoresTable({
+  rows,
+  hasClinicWhatsapp,
+  mode,
+  periodLabel = "",
+}: {
+  rows: MarcadorWithStats[];
+  hasClinicWhatsapp: boolean;
+  mode: "cadastro" | "relatorio";
+  periodLabel?: string;
+}) {
+  const report = mode === "relatorio";
   const router = useRouter();
   const [query, setQuery] = useState("");
   const [copied, setCopied] = useState<string | null>(null);
@@ -80,9 +92,10 @@ export function MarcadoresTable({ rows, hasClinicWhatsapp, days }: { rows: Marca
 
   return (
     <div className="space-y-4">
+      {report && (
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { label: `Pacientes indicados (${days} dias)`, value: totals.referred },
+          { label: `Pacientes indicados (${periodLabel})`, value: totals.referred },
           { label: "Agendaram", value: totals.scheduled, hint: totals.referred ? pct(totals.scheduled / totals.referred) : null },
           { label: "Atendidos", value: totals.attended, hint: totals.scheduled ? `${pct(totals.attended / totals.scheduled)} dos agendados` : null },
           { label: "Marcadores que indicaram", value: `${activeWithReferrals} de ${rows.length}` },
@@ -94,8 +107,9 @@ export function MarcadoresTable({ rows, hasClinicWhatsapp, days }: { rows: Marca
           </div>
         ))}
       </div>
+      )}
 
-      {!hasClinicWhatsapp && (
+      {!report && !hasClinicWhatsapp && (
         <p className="rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 px-3 py-2 text-sm text-amber-900 dark:text-amber-200">
           Cadastre o WhatsApp da clínica em Configurações para gerar os links dos marcadores.
         </p>
@@ -112,6 +126,7 @@ export function MarcadoresTable({ rows, hasClinicWhatsapp, days }: { rows: Marca
             className="h-9 w-full rounded-full border border-transparent bg-slate-100 dark:bg-slate-800 pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
           />
         </div>
+        {!report && (
         <button
           type="button"
           onClick={() => setImportOpen((o) => !o)}
@@ -120,9 +135,10 @@ export function MarcadoresTable({ rows, hasClinicWhatsapp, days }: { rows: Marca
         >
           <Upload className="w-4 h-4" aria-hidden /> Adicionar marcadores
         </button>
+        )}
       </div>
 
-      {importOpen && (
+      {!report && importOpen && (
         <div className={`${panel} p-4 space-y-3`}>
           <div className="flex items-start justify-between gap-2">
             <div>
@@ -156,23 +172,30 @@ export function MarcadoresTable({ rows, hasClinicWhatsapp, days }: { rows: Marca
 
       <div className={`${panel} overflow-x-auto`}>
         <table className="w-full text-sm">
-          <caption className="sr-only">Desempenho dos marcadores nos últimos {days} dias</caption>
+          <caption className="sr-only">{report ? `Desempenho dos marcadores — ${periodLabel}` : "Marcadores cadastrados"}</caption>
           <thead>
             <tr className="border-b border-slate-200 dark:border-slate-800 text-left text-xs font-medium text-slate-600 dark:text-slate-400">
               <th scope="col" className="px-3 py-2">Marcador</th>
-              <th scope="col" className="px-3 py-2 text-right">Indicados</th>
-              <th scope="col" className="px-3 py-2 text-right">Agendaram</th>
-              <th scope="col" className="px-3 py-2 text-right">Atendidos</th>
-              <th scope="col" className="px-3 py-2 text-right" title="Conversas com o próprio marcador no período (ele marcando direto pelo WhatsApp)">Conversas dele</th>
-              <th scope="col" className="px-3 py-2">Link pessoal</th>
-              <th scope="col" className="px-3 py-2"><span className="sr-only">Ativo</span></th>
+              {report ? (
+                <>
+                  <th scope="col" className="px-3 py-2 text-right">Indicados</th>
+                  <th scope="col" className="px-3 py-2 text-right">Agendaram</th>
+                  <th scope="col" className="px-3 py-2 text-right">Atendidos</th>
+                  <th scope="col" className="px-3 py-2 text-right" title="Conversas com o próprio marcador no período (ele marcando direto pelo WhatsApp)">Conversas dele</th>
+                </>
+              ) : (
+                <>
+                  <th scope="col" className="px-3 py-2">Link pessoal</th>
+                  <th scope="col" className="px-3 py-2"><span className="sr-only">Ativo</span></th>
+                </>
+              )}
             </tr>
           </thead>
           <tbody>
             {visible.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-3 py-8 text-center text-slate-500 dark:text-slate-400">
-                  {rows.length === 0 ? "Nenhum marcador cadastrado ainda. Use “Adicionar marcadores”." : "Nenhum marcador encontrado."}
+                <td colSpan={report ? 5 : 3} className="px-3 py-8 text-center text-slate-500 dark:text-slate-400">
+                  {rows.length === 0 ? (report ? "Nenhum marcador cadastrado ainda. Cadastre em Marcadores." : "Nenhum marcador cadastrado ainda. Use “Adicionar marcadores”.") : "Nenhum marcador encontrado."}
                 </td>
               </tr>
             ) : (
@@ -184,6 +207,8 @@ export function MarcadoresTable({ rows, hasClinicWhatsapp, days }: { rows: Marca
                       {formatPhone(r.phone)} · <span className="font-mono">#m-{r.code}</span>
                     </p>
                   </td>
+                  {report ? (
+                    <>
                   <td className="px-3 py-2 text-right tabular-nums font-semibold text-slate-900 dark:text-slate-100">{r.referred}</td>
                   <td className="px-3 py-2 text-right tabular-nums">
                     {r.scheduled}
@@ -191,6 +216,9 @@ export function MarcadoresTable({ rows, hasClinicWhatsapp, days }: { rows: Marca
                   </td>
                   <td className="px-3 py-2 text-right tabular-nums">{r.attended}</td>
                   <td className="px-3 py-2 text-right tabular-nums text-slate-600 dark:text-slate-300">{r.ownConversations}</td>
+                    </>
+                  ) : (
+                    <>
                   <td className="px-3 py-2">
                     {r.link ? (
                       <button
@@ -216,17 +244,21 @@ export function MarcadoresTable({ rows, hasClinicWhatsapp, days }: { rows: Marca
                       {r.active ? "Desativar" : "Reativar"}
                     </button>
                   </td>
+                    </>
+                  )}
                 </tr>
               ))
             )}
           </tbody>
         </table>
       </div>
+      {report && (
       <p className="text-xs leading-relaxed text-slate-500 dark:text-slate-400">
         Conta a partir de quando o paciente chega pelo link do marcador (a mensagem já vem com o código, ex.: #m-lene). “Agendaram” considera
         agendamento no Conecta, lembrete da agenda da clínica, etapa Agendado ou finalização com agendamento; “Atendidos”, quem foi marcado como
         Presente/Atendido na Agenda.
       </p>
+      )}
     </div>
   );
 }

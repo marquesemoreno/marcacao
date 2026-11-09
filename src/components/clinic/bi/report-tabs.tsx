@@ -2,6 +2,7 @@ import Link from "next/link";
 
 const TABS = [
   { key: "atendimento", label: "Atendimento", href: "/clinic/relatorio", managerOnly: false },
+  { key: "marcadores", label: "Marcadores", href: "/clinic/relatorio?aba=marcadores", managerOnly: false },
   { key: "faturamento", label: "Faturamento", href: "/clinic/relatorio?aba=faturamento", managerOnly: true },
   { key: "financeiro", label: "Financeiro", href: "/clinic/relatorio?aba=financeiro", managerOnly: true },
   { key: "estoque", label: "Estoque", href: "/clinic/relatorio?aba=estoque", managerOnly: true },

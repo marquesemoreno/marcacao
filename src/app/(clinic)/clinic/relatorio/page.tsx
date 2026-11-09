@@ -43,6 +43,7 @@ import { ReportTabs } from "@/components/clinic/bi/report-tabs";
 import { BillingTab } from "@/components/clinic/bi/billing-tab";
 import { FinanceTab } from "@/components/clinic/bi/finance-tab";
 import { StockTab } from "@/components/clinic/bi/stock-tab";
+import { MarcadoresTab } from "@/components/clinic/bi/marcadores-tab";
 import { ReguaReturnCard } from "@/components/clinic/regua-return-card";
 import { getReguaReturnReport } from "@/actions/regua-return";
 import { SlotRecoveryCard } from "@/components/clinic/slot-recovery-card";
@@ -138,6 +139,17 @@ export default async function ClinicReportPage({
   if (!(await currentUserCan("relatorios"))) return <ManagerOnly />;
   const isManager = await currentUserIsManager();
   const biTab = params.aba === "faturamento" || params.aba === "financeiro" || params.aba === "estoque" ? params.aba : null;
+  if (params.aba === "marcadores") {
+    return (
+      <div className="space-y-6 font-sans flex-1 overflow-y-auto text-slate-900 dark:text-slate-100 p-6 md:p-8 max-w-7xl mx-auto w-full">
+        <PageHeader title="Relatórios" subtitle="Pacientes indicados por parceiros (marcadores)." />
+        <ReportTabs active="marcadores" isManager={isManager} />
+        <Suspense key={`marcadores-${params.periodo ?? params.days ?? ""}`} fallback={<p className="text-sm text-slate-500">Carregando…</p>}>
+          <MarcadoresTab periodo={params.periodo} days={params.days} />
+        </Suspense>
+      </div>
+    );
+  }
   if (biTab) {
     if (!isManager) return <ManagerOnly />;
     return (
