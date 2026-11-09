@@ -161,10 +161,9 @@ export function PatientPage({ profile, autoSchedule = false }: { profile: Patien
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_22rem]">
-          {/* Coluna direita (no celular vem primeiro): perfil + dados cadastrais */}
-          <aside className="space-y-5 lg:order-2">
-            <section aria-labelledby="ficha-nome" className="glass-surface relative overflow-hidden p-5">
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_22rem] lg:grid-rows-[auto_1fr]">
+          {/* Grade: perfil e dados na coluna da direita; no celular a ordem é perfil → destaques e histórico → dados */}
+            <section aria-labelledby="ficha-nome" className="glass-surface relative overflow-hidden p-5 lg:col-start-2 lg:row-start-1">
               <span
                 aria-hidden
                 className="pointer-events-none absolute inset-0 bg-gradient-to-br from-emerald-100/80 via-white/0 to-sky-100/70 dark:from-emerald-400/10 dark:via-transparent dark:to-sky-400/10"
@@ -204,76 +203,9 @@ export function PatientPage({ profile, autoSchedule = false }: { profile: Patien
               </div>
             </section>
 
-            <section aria-labelledby="ficha-dados" className="glass-surface p-5">
-              <div className="mb-3 flex items-center justify-between gap-2">
-                <h2 id="ficha-dados" className="text-base font-semibold text-slate-900 dark:text-slate-100">
-                  Dados cadastrais
-                </h2>
-                {!editing && (
-                  <button
-                    type="button"
-                    onClick={() => setEditing(true)}
-                    aria-label="Editar dados cadastrais"
-                    className="grid size-9 place-items-center rounded-full bg-white/80 text-slate-700 ring-1 ring-slate-900/5 hover:bg-white dark:bg-white/10 dark:text-slate-200 dark:ring-white/10 dark:hover:bg-white/15"
-                  >
-                    <Pencil className="size-4" aria-hidden />
-                  </button>
-                )}
-              </div>
-              {editing ? (
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    handleSave();
-                  }}
-                  className="space-y-3"
-                >
-                  {FIELDS.map((f) => (
-                    <div key={f.key} className="space-y-1">
-                      <label htmlFor={`pf-${f.key}`} className="text-xs font-medium text-slate-600 dark:text-slate-300">
-                        {f.label}
-                      </label>
-                      {f.key === "notes" ? (
-                        <textarea
-                          id={`pf-${f.key}`}
-                          rows={3}
-                          value={form[f.key]}
-                          onChange={(e) => setForm({ ...form, [f.key]: e.target.value })}
-                          className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950"
-                        />
-                      ) : (
-                        <input
-                          id={`pf-${f.key}`}
-                          type={f.type ?? "text"}
-                          value={form[f.key]}
-                          onChange={(e) => setForm({ ...form, [f.key]: e.target.value })}
-                          className="h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm dark:border-slate-700 dark:bg-slate-950"
-                        />
-                      )}
-                    </div>
-                  ))}
-                  <div className="flex justify-end gap-2 pt-1">
-                    <button type="button" onClick={() => setEditing(false)} className="rounded-full px-4 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-800">
-                      Cancelar
-                    </button>
-                    <button type="submit" disabled={saving} className="rounded-full bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60">
-                      {saving ? "Salvando…" : "Salvar"}
-                    </button>
-                  </div>
-                </form>
-              ) : (
-                <dl className="space-y-3">
-                  <InfoRow icon={Phone} label="Telefone" value={p.contact.phone ? formatPhone(p.contact.phone) : "—"} />
-                  {FIELDS.filter((f) => f.key !== "name").map((f) => (
-                    <InfoRow key={f.key} icon={FIELD_ICON[f.key]} label={f.label} value={valueOf(f.key)} />
-                  ))}
-                </dl>
-              )}
-            </section>
-          </aside>
 
           {/* Coluna principal: destaques + abas */}
-          <div className="min-w-0 space-y-5 lg:order-1">
+          <div className="min-w-0 space-y-5 lg:col-start-1 lg:row-span-2 lg:row-start-1">
             <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
               <HighlightTile
                 tone="blue"
@@ -457,6 +389,73 @@ export function PatientPage({ profile, autoSchedule = false }: { profile: Patien
               </Tabs>
             </section>
           </div>
+
+          <section aria-labelledby="ficha-dados" className="glass-surface self-start p-5 lg:col-start-2 lg:row-start-2">
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <h2 id="ficha-dados" className="text-base font-semibold text-slate-900 dark:text-slate-100">
+                Dados cadastrais
+              </h2>
+              {!editing && (
+                <button
+                  type="button"
+                  onClick={() => setEditing(true)}
+                  aria-label="Editar dados cadastrais"
+                  className="grid size-9 place-items-center rounded-full bg-white/80 text-slate-700 ring-1 ring-slate-900/5 hover:bg-white dark:bg-white/10 dark:text-slate-200 dark:ring-white/10 dark:hover:bg-white/15"
+                >
+                  <Pencil className="size-4" aria-hidden />
+                </button>
+              )}
+            </div>
+            {editing ? (
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  handleSave();
+                }}
+                className="space-y-3"
+              >
+                {FIELDS.map((f) => (
+                  <div key={f.key} className="space-y-1">
+                    <label htmlFor={`pf-${f.key}`} className="text-xs font-medium text-slate-600 dark:text-slate-300">
+                      {f.label}
+                    </label>
+                    {f.key === "notes" ? (
+                      <textarea
+                        id={`pf-${f.key}`}
+                        rows={3}
+                        value={form[f.key]}
+                        onChange={(e) => setForm({ ...form, [f.key]: e.target.value })}
+                        className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950"
+                      />
+                    ) : (
+                      <input
+                        id={`pf-${f.key}`}
+                        type={f.type ?? "text"}
+                        value={form[f.key]}
+                        onChange={(e) => setForm({ ...form, [f.key]: e.target.value })}
+                        className="h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm dark:border-slate-700 dark:bg-slate-950"
+                      />
+                    )}
+                  </div>
+                ))}
+                <div className="flex justify-end gap-2 pt-1">
+                  <button type="button" onClick={() => setEditing(false)} className="rounded-full px-4 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-800">
+                    Cancelar
+                  </button>
+                  <button type="submit" disabled={saving} className="rounded-full bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60">
+                    {saving ? "Salvando…" : "Salvar"}
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <dl className="space-y-3">
+                <InfoRow icon={Phone} label="Telefone" value={p.contact.phone ? formatPhone(p.contact.phone) : "—"} />
+                {FIELDS.filter((f) => f.key !== "name").map((f) => (
+                  <InfoRow key={f.key} icon={FIELD_ICON[f.key]} label={f.label} value={valueOf(f.key)} />
+                ))}
+              </dl>
+            )}
+          </section>
         </div>
       </div>
 
