@@ -103,7 +103,7 @@ Qualquer dúvida, estamos à disposição!`;
 const inputClass =
   "w-full mt-1 h-9 px-3 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500";
 const labelClass = "text-xs font-medium text-slate-600 dark:text-slate-400";
-const panel = "rounded-2xl bg-white dark:bg-slate-900 shadow-xs";
+const panel = "glass-surface";
 
 function brDate(iso: string | null): string {
   if (!iso) return "";
@@ -545,7 +545,9 @@ export function BroadcastManagement() {
   }
 
   return (
-    <div className="p-4 sm:p-6 space-y-6 max-w-4xl mx-auto">
+    // Visual "vidro" (09/11/2026, DESIGN.md §5): fundo em gradiente + cartões translúcidos.
+    <div className="soft-canvas flex-1 min-h-0 overflow-y-auto">
+    <div className="p-4 sm:p-6 md:p-8 space-y-6 max-w-4xl mx-auto">
       <PageHeader
         title="Disparos"
         subtitle={
@@ -557,7 +559,7 @@ export function BroadcastManagement() {
           <div className="flex flex-wrap-reverse justify-end gap-2">
             {channelSetup?.isManager && (
               <Popover open={configOpen} onOpenChange={setConfigOpen}>
-                <PopoverTrigger className={`inline-flex h-9 items-center gap-1.5 px-3 text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg ${FOCUS_RING}`}>
+                <PopoverTrigger className={`inline-flex h-10 items-center gap-1.5 px-3.5 text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-white/70 dark:hover:bg-white/10 rounded-full ${FOCUS_RING}`}>
                   <Settings2 className="w-4 h-4" aria-hidden />
                   Configurar
                 </PopoverTrigger>
@@ -597,7 +599,7 @@ export function BroadcastManagement() {
               type="button"
               onClick={() => setRescheduleModalOpen(true)}
               aria-describedby="disparos-remarcacao-hint"
-              className={`inline-flex h-9 items-center gap-1.5 px-3 text-sm font-medium text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg ${FOCUS_RING}`}
+              className={`inline-flex h-10 items-center gap-1.5 px-4 text-sm font-medium text-slate-700 dark:text-slate-200 bg-white/80 ring-1 ring-slate-900/5 shadow-xs hover:bg-white dark:bg-white/[0.08] dark:ring-white/10 dark:hover:bg-white/[0.14] rounded-full ${FOCUS_RING}`}
             >
               <CalendarClock className="w-4 h-4" aria-hidden />
               Médico desmarcou
@@ -605,7 +607,7 @@ export function BroadcastManagement() {
             <button
               type="button"
               onClick={() => setFormOpen(true)}
-              className={`inline-flex h-9 items-center gap-1.5 px-3 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-full ${FOCUS_RING}`}
+              className={`inline-flex h-10 items-center gap-1.5 px-4 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 shadow-[0_10px_20px_-12px_rgb(5_150_105/0.9)] rounded-full ${FOCUS_RING}`}
             >
               <Plus className="w-4 h-4" aria-hidden />
               Nova campanha
@@ -623,7 +625,7 @@ export function BroadcastManagement() {
       </p>
 
       {health?.tone === "danger" && (
-        <div role="alert" className="rounded-xl border border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-950/40 p-3 text-sm text-red-800 dark:text-red-300">
+        <div role="alert" className="rounded-2xl border border-red-300 dark:border-red-800 bg-red-50/90 dark:bg-red-950/40 p-4 text-sm text-red-800 dark:text-red-300">
           <p className="font-semibold">O número de WhatsApp está desconectado — nenhuma campanha, lembrete ou mensagem do Chat sai agora.</p>
           <p className="mt-0.5">Reconecte o celular da clínica no WhatsApp ou fale com o suporte da Conecta Saúde. Os envios voltam sozinhos quando ele reconectar.</p>
         </div>
@@ -632,7 +634,7 @@ export function BroadcastManagement() {
       {(health || running.length > 0) && (
         <div className="flex flex-wrap items-center justify-between gap-2 -mt-2">
           {health ? (
-            <details className={`group rounded-md border px-2.5 py-1 text-xs ${HEALTH_TONE[health.tone]}`}>
+            <details className={`group rounded-2xl border px-3 py-1.5 text-xs backdrop-blur-xl ${HEALTH_TONE[health.tone]}`}>
               <summary className={`flex items-center gap-1.5 font-medium list-none ${health.reasons.length ? "cursor-pointer" : "pointer-events-none"}`}>
                 <span aria-hidden className={`h-2 w-2 shrink-0 rounded-full ${health.tone === "ok" ? "bg-emerald-500" : health.tone === "warn" ? "bg-amber-500" : "bg-red-500"}`} />
                 {healthLabel(health)}
@@ -656,7 +658,7 @@ export function BroadcastManagement() {
               type="button"
               onClick={pauseAll}
               disabled={pausingAll}
-              className={`inline-flex h-9 items-center gap-1.5 px-3 text-sm font-semibold rounded-xl border border-red-300 dark:border-red-800 text-red-700 dark:text-red-300 bg-white dark:bg-slate-900 hover:bg-red-50 dark:hover:bg-red-950/40 disabled:opacity-60 ${FOCUS_RING}`}
+              className={`inline-flex h-9 items-center gap-1.5 px-4 text-sm font-semibold rounded-full border border-red-300 dark:border-red-800 text-red-700 dark:text-red-300 bg-white/80 dark:bg-white/[0.06] hover:bg-red-50 dark:hover:bg-red-950/40 disabled:opacity-60 ${FOCUS_RING}`}
             >
               {pausingAll ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden /> : <Pause className="w-4 h-4" aria-hidden />}
               Pausar todos os envios
@@ -1154,7 +1156,7 @@ export function BroadcastManagement() {
       </Sheet>
 
       <section className="space-y-3" aria-labelledby="campaigns-title">
-        <h2 id="campaigns-title" className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+        <h2 id="campaigns-title" className="text-base font-semibold tracking-tight text-slate-900 dark:text-slate-100">
           Campanhas
         </h2>
         {loading ? (
@@ -1162,7 +1164,7 @@ export function BroadcastManagement() {
             <Loader2 className="w-4 h-4 animate-spin" aria-hidden /> Carregando…
           </div>
         ) : listError ? (
-          <div role="alert" className="rounded-xl border border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-950/40 p-4 text-sm text-red-800 dark:text-red-300">
+          <div role="alert" className="rounded-[1.75rem] border border-red-300 dark:border-red-800 bg-red-50/90 dark:bg-red-950/40 p-5 text-sm text-red-800 dark:text-red-300">
             Não foi possível carregar as campanhas — as que existem não aparecem aqui.{" "}
             <button type="button" onClick={() => loadCampaigns()} className="font-semibold underline underline-offset-2">
               Tentar de novo
@@ -1463,6 +1465,7 @@ export function BroadcastManagement() {
         </DialogContent>
       </Dialog>
     </div>
+    </div>
   );
 }
 
@@ -1501,11 +1504,11 @@ function CampaignCard({
   // Falha não conta como progresso (não chegou ao paciente).
   const progress = c.total ? Math.round(((c.sent + c.skipped + c.noConsent) / c.total) * 100) : 0;
   const actionBtn =
-    "inline-flex h-8 items-center gap-1.5 px-3 text-xs font-medium rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50";
+    "inline-flex h-8 items-center gap-1.5 px-3 text-xs font-medium rounded-full bg-white/80 ring-1 ring-slate-900/5 shadow-xs hover:bg-white dark:bg-white/[0.08] dark:ring-white/10 dark:hover:bg-white/[0.14] text-slate-700 dark:text-slate-200 disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50";
   return (
     <article
-      className={`rounded-lg border bg-white dark:bg-slate-900 p-4 space-y-3 ${
-        c.status === "RUNNING" ? "border-emerald-300 dark:border-emerald-800 shadow-xs" : "border-slate-200 dark:border-slate-800"
+      className={`glass-surface p-5 space-y-3 ${
+        c.status === "RUNNING" ? "ring-2 ring-emerald-400/60 dark:ring-emerald-700/70" : ""
       }`}
       aria-label={c.name}
     >
@@ -1513,7 +1516,7 @@ function CampaignCard({
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 truncate">{c.name}</h3>
-            <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border ${STATUS_CLASS[c.status]}`}>{STATUS_LABEL[c.status]}</span>
+            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${STATUS_CLASS[c.status]}`}>{STATUS_LABEL[c.status]}</span>
             {c.channel !== "WHATSAPP" && (
               <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border border-sky-300 dark:border-sky-800 bg-sky-50 dark:bg-sky-950/40 text-sky-800 dark:text-sky-300">
                 {c.channel === "SMS" ? "SMS" : "E-mail"}
@@ -1606,7 +1609,7 @@ function CampaignCard({
       </div>
 
       <div>
-        <div className="h-1.5 w-full rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden" role="progressbar" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100} aria-label={`Progresso do envio de ${c.name}`}>
+        <div className="h-2 w-full rounded-full bg-slate-900/[0.06] dark:bg-white/[0.08] overflow-hidden" role="progressbar" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100} aria-label={`Progresso do envio de ${c.name}`}>
           <div className="h-full bg-emerald-500" style={{ width: `${progress}%` }} />
         </div>
         {/* Crítica 02/11: a linha "a · b · c…" de até 8 itens virou células com rótulo. */}
@@ -1669,7 +1672,7 @@ function CampaignCard({
               type="button"
               disabled={busy}
               onClick={onRetry}
-              className="mt-2 inline-flex h-8 items-center gap-1.5 px-3 text-xs font-medium rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-50"
+              className="mt-2 inline-flex h-8 items-center gap-1.5 px-3 text-xs font-medium rounded-full bg-white/80 ring-1 ring-slate-900/5 shadow-xs hover:bg-white dark:bg-white/[0.08] dark:ring-white/10 dark:hover:bg-white/[0.14] text-slate-700 dark:text-slate-200 disabled:opacity-50"
             >
               Devolver falhas à fila e retomar
             </button>
