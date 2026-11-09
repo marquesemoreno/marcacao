@@ -4,6 +4,8 @@ import { prisma } from "@/lib/prisma";
 import type { PlainClinicProcedureItem, PlainAppointment } from "@/lib/serialize";
 import { sendWhatsAppMessage, formatToWhatsAppNumber } from "@/lib/whatsapp";
 import { buildBridgeConfirmationMessage, UROLASER_RETURN_POLICY_NOTICE } from "@/lib/bridge-confirmation";
+import { DEMO_CLINIC_CNPJ } from "@/lib/demo-clinic";
+import { demoBridgeResponse } from "@/lib/bi/demo-bridge";
 
 /**
  * Prefixo que marca um id de procedimento/agendamento como vindo do sistema
@@ -579,7 +581,15 @@ type OwnerResult<T> = { ok: true; data: T } | { ok: false; reason: "unavailable"
 
 async function fetchOwnerEndpoint<T>(clinicId: string, path: string): Promise<OwnerResult<T>> {
   const config = await getBridgeConfig(clinicId);
-  if (!config) return { ok: false, reason: "unavailable" };
+  if (!config) {
+    // Clínica de demonstração (vídeos): números fictícios no formato da ponte.
+    const clinic = await prisma.clinic.findUnique({ where: { id: clinicId }, select: { cnpj: true } });
+    if (clinic?.cnpj === DEMO_CLINIC_CNPJ) {
+      const data = demoBridgeResponse(path, new Date(Date.now() - 3 * 3600_000).toISOString().slice(0, 10));
+      if (data) return { ok: true, data: data as T };
+    }
+    return { ok: false, reason: "unavailable" };
+  }
   try {
     const response = await fetch(`${config.apiUrl}${path}`, {
       headers: { "x-api-token": config.apiToken },

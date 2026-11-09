@@ -173,23 +173,28 @@ fictícios (ver fim). **Nunca gravar com dados da Santa Clara ou da Urolaser.**
 
 ## Antes de gravar — o que falta preparar
 
-**Seed da demo (scripts/seed-demo-clinic.ts, último de 19/10).** Hoje cria clínica, equipe, procedimentos, conversas
-com desfecho, algumas consultas e uma campanha concluída. Falta, para os vídeos 2–6:
+**Seed da demo (scripts/seed-demo-clinic.ts, atualizado 09/11).** Cria tudo que os vídeos usam: agenda de hoje em
+todos os estados (atendido, faltou, em atendimento, aguardando com chegada, confirmado, sem resposta), fichas prévias
+preenchidas, amanhã com lembretes (confirmou, pediu para remarcar, cancelou, sem resposta, número errado) e as conversas
+correspondentes, semana seguinte, 4 marcadores com indicados/agendados/atendidos, consentimento de marketing em ~2/3 dos
+pacientes, um menor com responsável, um aniversariante do dia, régua (desligada), NPS com comentários, orçamentos de 3/8/16
+dias, lista de espera, senhas do dia, chamadas na TV, salas dos médicos, conversa do Instagram (só visual) e campanha concluída.
 
-1. Consultas de **hoje e amanhã** em todos os estados (pendente, confirmado, chegou, em atendimento, atendido, faltou).
-2. Conversas de **lembrete** com respostas "confirmo", "preciso remarcar" e "número errado".
-3. **Marcadores** (3–4 fictícios) com pacientes indicados.
-4. **Ficha prévia** ligada com alguns pacientes já preenchidos; **QR de chegada** e **TV** configurados; **senhas**.
-5. **Consentimento** de marketing em parte dos pacientes; **régua** com prévia; **NPS** com notas.
-6. **Orçamentos** na fila de 3/7/15 dias.
-7. (Opcional) **ponte demo** com faturamento/financeiro/estoque fictícios para o vídeo 6.
+**Faturamento, Financeiro e Estoque na demo** usam o modo demo da ponte (src/lib/bi/demo-bridge.ts): números fictícios,
+sempre os mesmos para o mesmo dia. A linha "Fonte" mostra "DEMONSTRAÇÃO — números fictícios" — deixar aparecer.
 
-Quem roda o seed é você (grava no banco de produção, só na clínica demo — o script apaga e recria só ela pelo CNPJ fixo).
+Comando (você roda; grava no banco só a clínica demo — apaga e recria pelo CNPJ fixo 00.000.000/0001-00):
+
+```bash
+npx tsx --conditions=react-server scripts/seed-demo-clinic.ts
+```
+
+No fim ele imprime os links da TV, do totem e do QR de chegada da demo (novos a cada execução).
 
 **Checklist do dia da gravação**
 - [ ] Rodar o seed na manhã da gravação (datas são relativas a "hoje").
 - [ ] Senha da demo no `.env` local (DEMO_PASSWORD) — não aparece no vídeo.
 - [ ] Crédito da OpenAI ok (Copiloto e sugestões).
-- [ ] Segunda tela/TV com `/tv/<token>` da demo.
+- [ ] Segunda tela/TV com o link de TV que o seed imprimiu.
 - [ ] Celular com a câmera para o QR de chegada (gravar a tela do celular separado).
 - [ ] Navegador limpo, zoom certo, Não perturbe ligado.
