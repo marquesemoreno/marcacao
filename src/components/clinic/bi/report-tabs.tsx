@@ -13,7 +13,7 @@ export function ReportTabs({ active, isManager }: { active: string; isManager: b
   const tabs = TABS.filter((t) => isManager || !t.managerOnly);
   if (tabs.length < 2) return null;
   return (
-    <nav aria-label="Abas do relatório" className="report-surface !rounded-full flex w-fit max-w-full gap-1 overflow-x-auto p-1.5">
+    <nav aria-label="Abas do relatório" className="glass-surface !rounded-full flex w-fit max-w-full gap-1 overflow-x-auto p-1.5">
       {tabs.map((t) => (
         <Link
           key={t.key}

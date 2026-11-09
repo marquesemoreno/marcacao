@@ -8,7 +8,7 @@ export function ReguaReturnCard({ data }: { data: ReturnType<typeof computeRegua
   if (!data.totalSent) return null;
   const rate = Math.round((data.totalScheduled / data.totalSent) * 100);
   return (
-    <section aria-labelledby="regua-titulo" className="report-surface p-5">
+    <section aria-labelledby="regua-titulo" className="glass-surface p-5">
       <h3 id="regua-titulo" className="font-semibold">O que a régua trouxe</h3>
       <p className="mt-3">
         <span className="text-4xl font-semibold tabular-nums">{data.totalScheduled}</span>

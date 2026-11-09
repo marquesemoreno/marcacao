@@ -22,7 +22,7 @@ export function ReportAiSummary({ clinicName, periodLabel, facts }: { clinicName
   }
 
   return (
-    <section aria-labelledby="ia-resumo-titulo" className="report-surface p-5 space-y-3">
+    <section aria-labelledby="ia-resumo-titulo" className="glass-surface p-5 space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 id="ia-resumo-titulo" className="flex items-center gap-2 text-base font-semibold text-slate-900 dark:text-slate-100">
           <Sparkles className="w-4 h-4 text-violet-600 dark:text-violet-400" aria-hidden />

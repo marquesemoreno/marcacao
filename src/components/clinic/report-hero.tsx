@@ -21,7 +21,7 @@ export function KpiPill({
   valueClass?: string;
 }) {
   return (
-    <div className="report-surface flex items-center gap-4 !rounded-[1.5rem] px-4 py-3.5">
+    <div className="glass-surface flex items-center gap-4 !rounded-[1.5rem] px-4 py-3.5">
       <span className="grid size-12 shrink-0 place-items-center rounded-full bg-white text-slate-700 shadow-[0_6px_16px_-8px_rgb(15_23_42/0.35)] ring-1 ring-slate-900/5 dark:bg-white/10 dark:text-slate-100 dark:ring-white/10">
         <Icon className="size-5" aria-hidden strokeWidth={1.75} />
       </span>
@@ -57,16 +57,21 @@ export function HighlightTile({
   value,
   sub,
   href,
+  onOpen,
   linkLabel,
 }: {
   tone: TileTone;
   title: string;
   value: string;
   sub: string;
-  href: string;
+  /** Leva a uma seção/página… */
+  href?: string;
+  /** …ou abre algo na própria tela (ex.: trocar de aba na ficha do paciente). */
+  onOpen?: () => void;
   linkLabel: string;
 }) {
   const t = TONES[tone];
+  const btnClass = `grid size-8 shrink-0 place-items-center rounded-full ring-1 transition-colors focus-visible:outline-offset-2 sm:size-9 ${t.btn}`;
   return (
     <div
       className={`relative flex min-h-[8.5rem] flex-col justify-between gap-3 overflow-hidden rounded-[1.5rem] p-4 sm:min-h-[9.5rem] sm:rounded-[1.75rem] sm:p-5 shadow-[0_18px_36px_-22px_rgb(15_23_42/0.55)] ${t.tile}`}
@@ -75,13 +80,15 @@ export function HighlightTile({
       <span aria-hidden className="pointer-events-none absolute -right-10 -top-12 size-40 rounded-full bg-white/15 blur-2xl" />
       <div className="relative flex items-start justify-between gap-3">
         <p className="text-sm font-semibold leading-snug sm:text-[15px]">{title}</p>
-        <Link
-          href={href}
-          aria-label={linkLabel}
-          className={`grid size-8 shrink-0 place-items-center sm:size-9 rounded-full ring-1 transition-colors focus-visible:outline-offset-2 ${t.btn}`}
-        >
-          <ArrowUpRight className="size-4" aria-hidden />
-        </Link>
+        {href ? (
+          <Link href={href} aria-label={linkLabel} className={btnClass}>
+            <ArrowUpRight className="size-4" aria-hidden />
+          </Link>
+        ) : (
+          <button type="button" onClick={onOpen} aria-label={linkLabel} className={btnClass}>
+            <ArrowUpRight className="size-4" aria-hidden />
+          </button>
+        )}
       </div>
       <div className="relative">
         <p className="text-[1.375rem] font-semibold leading-none tracking-tight tabular-nums sm:text-[2rem]">{value}</p>

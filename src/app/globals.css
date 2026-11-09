@@ -103,27 +103,27 @@
     @apply font-sans;
   }
 }
-/* Piloto de estilo no Relatório (09/11/2026, branch design/relatorio-piloto): fundo em
-   gradiente suave e cartões de vidro bem arredondados. Só vale dentro de .report-canvas. */
+/* Visual "vidro" (09/11/2026, nasceu no piloto do Relatório): fundo em
+   gradiente suave (.soft-canvas) e cartões de vidro bem arredondados (.glass-surface). */
 @layer components {
-  .report-canvas {
+  .soft-canvas {
     background-color: #f3f6fa;
     background-image:
       radial-gradient(56rem 36rem at -8% -10%, rgb(191 219 254 / 0.7), transparent 62%),
       radial-gradient(48rem 34rem at 108% 4%, rgb(167 243 208 / 0.55), transparent 60%),
       radial-gradient(64rem 44rem at 50% 118%, rgb(221 214 254 / 0.5), transparent 62%);
   }
-  .dark .report-canvas {
+  .dark .soft-canvas {
     background-color: #0c0d11;
     background-image:
       radial-gradient(56rem 36rem at -8% -10%, rgb(16 185 129 / 0.14), transparent 62%),
       radial-gradient(48rem 34rem at 108% 4%, rgb(56 189 248 / 0.1), transparent 60%),
       radial-gradient(64rem 44rem at 50% 118%, rgb(99 102 241 / 0.12), transparent 62%);
   }
-  .report-canvas ::selection {
+  .soft-canvas ::selection {
     background: rgb(16 185 129 / 0.25);
   }
-  .report-surface {
+  .glass-surface {
     border-radius: 1.75rem;
     background: rgb(255 255 255 / 0.74);
     -webkit-backdrop-filter: blur(22px) saturate(1.5);
@@ -133,7 +133,7 @@
       0 0 0 1px rgb(255 255 255 / 0.65),
       0 18px 40px -22px rgb(30 41 59 / 0.28);
   }
-  .dark .report-surface {
+  .dark .glass-surface {
     background: rgb(26 27 33 / 0.66);
     box-shadow:
       inset 0 1px 0 rgb(255 255 255 / 0.06),
@@ -141,7 +141,7 @@
       0 18px 44px -20px rgb(0 0 0 / 0.7);
   }
   /* Filtros do topo (Tag, Canal, Período) como pílulas de vidro, legíveis sobre o gradiente. */
-  .report-canvas [data-slot="select-trigger"] {
+  .soft-canvas [data-slot="select-trigger"] {
     height: 2.25rem;
     border-radius: 9999px;
     border-color: transparent;
@@ -151,23 +151,23 @@
     color: rgb(29 29 31);
     box-shadow: 0 0 0 1px rgb(15 23 42 / 0.06), 0 6px 16px -10px rgb(15 23 42 / 0.3);
   }
-  .report-canvas [data-slot="select-trigger"][data-placeholder] {
+  .soft-canvas [data-slot="select-trigger"][data-placeholder] {
     color: rgb(66 66 69);
   }
-  .dark .report-canvas [data-slot="select-trigger"] {
+  .dark .soft-canvas [data-slot="select-trigger"] {
     background: rgb(255 255 255 / 0.08);
     color: rgb(245 245 247);
     box-shadow: 0 0 0 1px rgb(255 255 255 / 0.1);
   }
-  .dark .report-canvas [data-slot="select-trigger"][data-placeholder] {
+  .dark .soft-canvas [data-slot="select-trigger"][data-placeholder] {
     color: rgb(210 210 215);
   }
   /* Painel interno de um cartão de vidro (ex.: "Média por dia útil"). */
-  .report-well {
+  .glass-well {
     border-radius: 1.25rem;
     background: rgb(241 245 249 / 0.7);
   }
-  .dark .report-well {
+  .dark .glass-well {
     background: rgb(255 255 255 / 0.05);
   }
 }

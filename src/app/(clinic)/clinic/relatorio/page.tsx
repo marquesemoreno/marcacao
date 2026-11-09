@@ -102,7 +102,7 @@ const OUTCOME_COLOR: Record<OutcomeGroup, string> = {
 const pctBR = (n: number) => `${n.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%`;
 
 const BASE = "/clinic/relatorio";
-const card = "report-surface";
+const card = "glass-surface";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -123,7 +123,7 @@ type RelatorioPageProps = {
 /** Fundo em gradiente suave do Relatório (piloto de estilo, 09/11/2026). */
 function ReportCanvas({ gap, children }: { gap: string; children: React.ReactNode }) {
   return (
-    <div className="report-canvas flex-1 overflow-y-auto font-sans text-slate-900 dark:text-slate-100">
+    <div className="soft-canvas flex-1 overflow-y-auto font-sans text-slate-900 dark:text-slate-100">
       <div className={`${gap} mx-auto w-full max-w-7xl p-6 md:p-8`}>{children}</div>
     </div>
   );
