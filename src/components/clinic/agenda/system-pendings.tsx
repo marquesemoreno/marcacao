@@ -32,8 +32,8 @@ export function SystemPendings({ items: all, onOpen }: { items: AgendaItem[]; on
   const items = all.filter((i) => !(i.status === "NO_SHOW" && done.includes(i.key)));
   if (items.length === 0) return null;
   return (
-    <details className="group rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50/60 dark:bg-amber-950/30">
-      <summary className="flex cursor-pointer list-none items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold text-amber-900 dark:text-amber-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50">
+    <details className="group rounded-[1.75rem] border border-amber-200 dark:border-amber-800 bg-amber-50/70 dark:bg-amber-950/30 backdrop-blur-xl">
+      <summary className="flex cursor-pointer list-none items-center gap-2 rounded-[1.75rem] px-5 py-2.5 text-sm font-semibold text-amber-900 dark:text-amber-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50">
         <ClipboardList className="h-4 w-4" aria-hidden />
         {items.length} {items.length === 1 ? "ajuste falta" : "ajustes faltam"} no sistema da clínica
         <span className="ml-auto text-xs font-normal group-open:hidden">ver</span>

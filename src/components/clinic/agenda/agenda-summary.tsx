@@ -33,9 +33,9 @@ export function AgendaSummary({
           type="button"
           aria-pressed={lateActive}
           onClick={onToggleLate}
-          className={`inline-flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-xs font-semibold tabular-nums focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50 ${
+          className={`inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-xs font-semibold tabular-nums focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50 ${
             lateActive
-              ? "border-slate-800 bg-slate-800 text-white dark:border-slate-200 dark:bg-slate-200 dark:text-slate-900"
+              ? "border-transparent bg-slate-900 text-white dark:bg-white dark:text-slate-900"
               : "border-amber-400 bg-amber-50 text-amber-900 dark:border-amber-700 dark:bg-amber-950/50 dark:text-amber-200"
           }`}
         >
@@ -57,12 +57,12 @@ export function AgendaSummary({
             aria-pressed={active}
             onClick={() => { if (n > 0 || active) onToggle(g.id); }}
             aria-disabled={n === 0 && !active}
-            className={`inline-flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-xs font-medium tabular-nums transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50 aria-disabled:opacity-45 aria-disabled:cursor-default ${
+            className={`inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-xs font-medium tabular-nums transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50 aria-disabled:opacity-45 aria-disabled:cursor-default ${
               active
-                ? "border-slate-800 bg-slate-800 text-white dark:border-slate-200 dark:bg-slate-200 dark:text-slate-900"
+                ? "border-transparent bg-slate-900 text-white dark:bg-white dark:text-slate-900"
                 : urgent
                   ? "border-violet-300 bg-violet-50 text-violet-800 dark:border-violet-800 dark:bg-violet-950/50 dark:text-violet-300"
-                  : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+                  : "border-transparent bg-white/80 text-slate-700 ring-1 ring-slate-900/5 shadow-xs hover:bg-white dark:bg-white/[0.08] dark:text-slate-300 dark:ring-white/10 dark:hover:bg-white/[0.14]"
             }`}
           >
             <span className={`size-2 rounded-full ${g.dot}`} aria-hidden />

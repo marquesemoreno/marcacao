@@ -28,8 +28,8 @@ export function AgendaMonth({
   for (const i of items) byDay.set(i.date, [...(byDay.get(i.date) ?? []), i]);
 
   return (
-    <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden">
-      <div className="grid grid-cols-7 border-b border-slate-200 dark:border-slate-800">
+    <div className="glass-surface overflow-hidden">
+      <div className="grid grid-cols-7 border-b border-slate-900/[0.07] dark:border-white/[0.07]">
         {WEEKDAYS.map((w) => (
           <div key={w} className="px-2 py-1.5 text-[11px] font-medium text-slate-500 dark:text-slate-400">
             {w}

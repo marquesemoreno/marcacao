@@ -81,7 +81,7 @@ const SHORTCUTS: [string, string][] = [
   ["?", "Mostrar estes atalhos"],
 ];
 
-const panel = "rounded-2xl bg-white dark:bg-slate-900 shadow-xs";
+const panel = "glass-surface";
 
 /** Agenda da recepção (/clinic/agenda). Data e visão ficam no endereço (F5 e link
  * compartilhável). Pensada pro pico da manhã: resumo do dia no topo (também filtra),
@@ -450,7 +450,9 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
   const emptyPeriod = !!current && allItems.length === 0 && failed.length === 0;
 
   return (
-    <div className="flex flex-col lg:flex-row gap-4 lg:gap-6 px-4 lg:px-0">
+    // Visual "vidro" (09/11/2026, DESIGN.md §5): fundo em gradiente + cartões translúcidos.
+    <div className="soft-canvas flex-1 overflow-y-auto">
+    <div className="mx-auto flex w-full max-w-[120rem] flex-col gap-4 p-4 sm:p-6 lg:flex-row lg:gap-6">
       <AgendaSidebar
         date={date}
         onDateChange={setDate}
@@ -517,7 +519,7 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
                 }
               }}
               placeholder="Buscar paciente"
-              className="h-9 w-full rounded-full border border-transparent bg-slate-100 dark:bg-slate-800 pl-8 pr-3 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
+              className="h-10 w-full rounded-full border border-transparent bg-white/80 ring-1 ring-slate-900/5 shadow-xs dark:bg-white/[0.08] dark:ring-white/10 pl-8 pr-3 text-sm placeholder:text-slate-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
             />
           </label>
           {query && current && (
@@ -532,7 +534,7 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
             type="button"
             ref={helpTriggerRef}
             onClick={() => setHelpOpen(true)}
-            className="ml-auto hidden md:inline-flex h-9 items-center gap-1.5 rounded-full px-2.5 text-xs font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
+            className="ml-auto hidden md:inline-flex h-9 items-center gap-1.5 rounded-full px-2.5 text-xs font-medium text-slate-600 dark:text-slate-400 hover:bg-white/70 dark:hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
           >
             <Keyboard className="h-4 w-4" aria-hidden /> Atalhos <kbd className="rounded border border-slate-300 dark:border-slate-600 px-1 font-mono text-[11px]">?</kbd>
           </button>
@@ -607,7 +609,7 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
         {(railWaiting + railInRoom + bookingCount > 0) && (
           <a
             href="#fila-recepcao"
-            className="xl:hidden flex min-h-9 flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border border-sky-200 dark:border-sky-900 bg-sky-50 dark:bg-sky-950/40 px-3 py-1.5 text-sm text-sky-900 dark:text-sky-200 hover:bg-sky-100 dark:hover:bg-sky-950/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
+            className="xl:hidden flex min-h-9 flex-wrap items-center gap-x-3 gap-y-1 rounded-2xl border border-sky-200/80 dark:border-sky-900 bg-sky-50/80 dark:bg-sky-950/40 px-4 py-2 text-sm text-sky-900 dark:text-sky-200 hover:bg-sky-100 dark:hover:bg-sky-950/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
           >
             {railWaiting > 0 && <span className="tabular-nums"><strong>{railWaiting}</strong> aguardando</span>}
             {railInRoom > 0 && <span className="tabular-nums"><strong>{railInRoom}</strong> em atendimento</span>}
@@ -628,7 +630,7 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
         )}
 
         {current && filtersOn && view !== "mes" && visibleItems.length < allItems.length && (
-          <p role="status" className="flex flex-wrap items-center gap-2 rounded-xl bg-slate-100 dark:bg-slate-900 px-3 py-2 text-sm text-slate-700 dark:text-slate-200">
+          <p role="status" className="glass-well flex flex-wrap items-center gap-2 px-4 py-2.5 text-sm text-slate-700 dark:text-slate-200">
             <span className="tabular-nums">
               Mostrando {visibleItems.length} de {allItems.length} {allItems.length === 1 ? "paciente" : "pacientes"} — filtro ativo
               {[
@@ -654,7 +656,7 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
             <button
               type="button"
               onClick={reload}
-              className="mt-4 inline-flex h-9 items-center gap-2 rounded-full bg-slate-100 dark:bg-slate-800 px-4 text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700"
+              className="mt-4 inline-flex h-9 items-center gap-2 rounded-full bg-white/80 ring-1 ring-slate-900/5 shadow-xs hover:bg-white dark:bg-white/[0.08] dark:ring-white/10 dark:hover:bg-white/[0.14] px-4 text-sm font-medium text-slate-700 dark:text-slate-200"
             >
               <RefreshCw className="w-4 h-4" aria-hidden /> Tentar de novo
             </button>
@@ -688,7 +690,7 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
               </div>
             )}
             {view === "semana" && (
-              <div role="group" aria-label="Como ver a semana" className="inline-flex rounded-full bg-slate-100 dark:bg-slate-800 p-0.5">
+              <div role="group" aria-label="Como ver a semana" className="inline-flex glass-surface !rounded-full p-1">
                 {(["carga", "pacientes"] as const).map((m) => (
                   <button
                     key={m}
@@ -696,7 +698,7 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
                     aria-pressed={weekMode === m}
                     onClick={() => setWeekMode(m)}
                     className={`h-8 rounded-full px-3 text-sm font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50 ${
-                      weekMode === m ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm" : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
+                      weekMode === m ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900" : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
                     }`}
                   >
                     {m === "carga" ? "Carga por médico" : "Pacientes"}
@@ -770,7 +772,7 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
             role="dialog"
             aria-modal="true"
             aria-labelledby="atalhos-agenda"
-            className="w-full max-w-sm rounded-xl bg-white dark:bg-slate-900 p-5 shadow-xl"
+            className="w-full max-w-sm rounded-[1.75rem] bg-white dark:bg-slate-900 p-5 shadow-xl"
             onClick={(e) => e.stopPropagation()}
             onKeyDown={(e) => {
               // Só há um botão: Tab fica nele (não sai do diálogo).
@@ -863,6 +865,7 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
         />
       )}
     </div>
+    </div>
   );
 }
 
@@ -871,8 +874,8 @@ function AgendaSkeleton() {
     <div className={`${panel} p-3 space-y-2`} aria-busy="true" aria-label="Carregando agenda">
       {Array.from({ length: 8 }, (_, i) => (
         <div key={i} className="flex gap-3">
-          <div className="h-10 w-10 rounded-md bg-slate-100 dark:bg-slate-800 animate-pulse" />
-          <div className="h-10 flex-1 rounded-md bg-slate-100 dark:bg-slate-800 animate-pulse" style={{ opacity: 1 - i * 0.09 }} />
+          <div className="h-10 w-10 rounded-xl bg-slate-900/5 dark:bg-white/[0.06] animate-pulse" />
+          <div className="h-10 flex-1 rounded-xl bg-slate-900/5 dark:bg-white/[0.06] animate-pulse" style={{ opacity: 1 - i * 0.09 }} />
         </div>
       ))}
     </div>

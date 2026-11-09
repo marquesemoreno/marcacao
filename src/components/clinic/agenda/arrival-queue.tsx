@@ -69,7 +69,7 @@ export function ArrivalQueue({
   const fmt = new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" });
 
   return (
-    <section aria-labelledby="fila-chegada" className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+    <section aria-labelledby="fila-chegada" className="glass-surface overflow-hidden">
       <h2 id="fila-chegada" className="flex items-center gap-2 border-b border-slate-100 dark:border-slate-800 px-4 py-2.5 text-sm font-semibold">
         <UserRound className="h-4 w-4 text-sky-600" aria-hidden />
         Recepção agora
