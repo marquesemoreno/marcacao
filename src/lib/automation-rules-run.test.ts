@@ -74,6 +74,14 @@ describe("runAutomationRules", () => {
     expect(prismaMock.automationRule.update).toHaveBeenCalledWith({ where: { id: "r1" }, data: { lastRunDate: "2026-11-02" } });
   });
 
+  it("pula a clínica demo — nada é criado nem enviado", async () => {
+    prismaMock.automationRule.findMany.mockResolvedValue([{ ...rule, clinic: { ...rule.clinic, cnpj: "00.000.000/0001-00" } }]);
+    const results = await runAutomationRules(now);
+    expect(results).toEqual([]);
+    expect(bridge.fetchBridgeCampaignPatients).not.toHaveBeenCalled();
+    expect(prismaMock.broadcastCampaign.create).not.toHaveBeenCalled();
+  });
+
   it("Retorno usa o intervalo do médico da última consulta (padrão = daysAfter)", async () => {
     prismaMock.automationRule.findMany.mockResolvedValue([{ ...rule, kind: "RETORNO", name: "Retorno", daysAfter: 180, requireNoFuture: true }]);
     prismaMock.returnInterval.findMany.mockResolvedValue([{ kind: "DOCTOR", key: "12", label: "Dr. A", days: 90 }]);

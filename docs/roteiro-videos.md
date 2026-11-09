@@ -130,9 +130,9 @@ Não disparar nada de verdade.
 | 1 (0:00) | Disparos — lista de campanhas com resultado | "Disparos são as mensagens em massa da clínica: campanha de check-up, aviso de feriado, Outubro Rosa." |
 | 2 (0:20) | Nova campanha (2 etapas): público + modelo aprovado pela Meta | "No WhatsApp oficial, toda campanha usa um modelo aprovado pela Meta. Você escolhe o público e o modelo, e o sistema preenche o nome de cada paciente." |
 | 3 (0:50) | Aviso "Sem consentimento" na prévia | "Campanha de marketing só vai para quem autorizou receber. Os outros aparecem como 'sem consentimento' — é a LGPD funcionando sem a clínica precisar lembrar." |
-| 4 (1:10) | Ritmo de envio e saúde do número | "O envio é espaçado e só em horário comercial, e o sistema mostra a saúde do número para a clínica não ser bloqueada." |
+| 4 (1:10) | Ritmo de envio (sem focar no selo do número — na demo ele aparece "Conexão não verificada") | "O envio é espaçado e só em horário comercial, para a clínica não ter o número bloqueado." |
 | 5 (1:30) | Resultado: enviadas, responderam, agendaram | "Depois, você vê quem respondeu e quantos agendaram por causa da campanha." |
-| 6 (1:50) | Régua automática: pós-consulta, retorno, reativação, aniversário (interruptor + prévia) | "E tem a régua automática: agradecimento depois da consulta, lembrete de retorno, convite para quem sumiu há meses e mensagem de aniversário. Liga uma vez e funciona sozinho." |
+| 6 (1:50) | Régua automática (Disparos › Configurar): escolher um modelo, mudar os dias e ver a prévia "Amanhã às 8h: ~N", ligar o interruptor | "E tem a régua automática: agradecimento depois da consulta, lembrete de retorno, convite para quem sumiu há meses e mensagem de aniversário. Liga uma vez e funciona sozinho." |
 | 7 (2:30) | Pesquisa de satisfação (NPS) no relatório | "A pesquisa de satisfação também vai sozinha — e a nota aparece no relatório." |
 | 8 (2:50) | Encerramento | "Paciente que volta é o paciente mais barato que existe." |
 
@@ -140,9 +140,9 @@ Não disparar nada de verdade.
 
 ## Vídeo 6 — Relatórios e BI (3 min)
 
-**Atenção:** a demo não tem sistema de clínica conectado, então Faturamento/Financeiro/Estoque mostram "a ponte precisa
-ser atualizada". Opções: (a) gravar só Atendimento e Marcadores; (b) criar modo demonstração da ponte com números
-fictícios (ver fim). **Nunca gravar com dados da Santa Clara ou da Urolaser.**
+**Atenção:** Faturamento, Financeiro e Estoque usam o modo demo da ponte (números fictícios, ver fim). A previsão da
+semana só aparece com o sistema da clínica conectado, por isso ficou fora deste vídeo. **Nunca gravar com dados da Santa
+Clara ou da Urolaser.**
 
 | Cena | Tela / ação | Fala |
 |------|-------------|------|
@@ -150,9 +150,9 @@ fictícios (ver fim). **Nunca gravar com dados da Santa Clara ou da Urolaser.**
 | 2 (0:25) | Funil + motivos de perda | "Aqui está onde a clínica perde paciente: preço, convênio, horário. Não é achismo, é o que a equipe marcou em cada conversa." |
 | 3 (0:50) | Origem do paciente / campanhas / anúncios | "De onde vem cada paciente — Instagram, Google, indicação — e quanto cada campanha trouxe." |
 | 4 (1:10) | Equipe: tempo de resposta por atendente | "O desempenho da equipe, com tempo de resposta de cada atendente." |
-| 5 (1:25) | Previsão da semana + agenda × confirmações | "E a previsão da semana: quantas consultas provavelmente vão faltar, para a recepção agir antes." |
+| 5 (1:25) | Confirmações (taxa de confirmação dos lembretes) | "E quantos pacientes confirmaram pelo lembrete automático — a recepção sabe com antecedência quem precisa de ligação." |
 | 6 (1:45) | Resumo da IA | "Sem tempo para ler tudo? A IA escreve o resumo do período em poucas linhas." |
-| 7 (2:00) | Aba Faturamento (se houver demo) | "Com o sistema da clínica conectado, o dono vê o faturamento, comparado por dia útil — para um mês curto não parecer queda — com o que entra em cada número explicado." |
+| 7 (2:00) | Aba Faturamento | "Com o sistema da clínica conectado, o dono vê o faturamento, comparado por dia útil — para um mês curto não parecer queda — com o que entra em cada número explicado." |
 | 8 (2:30) | Valores fora do padrão / Financeiro / Estoque | "Ele avisa quando algo está fora do padrão e mostra contas a receber, a pagar e o estoque. Só a gestão vê." |
 | 9 (2:50) | Encerramento | "Decisão com número, não com impressão." |
 
@@ -182,6 +182,9 @@ dias, lista de espera, senhas do dia, chamadas na TV, salas dos médicos, conver
 
 **Faturamento, Financeiro e Estoque na demo** usam o modo demo da ponte (src/lib/bi/demo-bridge.ts): números fictícios,
 sempre os mesmos para o mesmo dia. A linha "Fonte" mostra "DEMONSTRAÇÃO — números fictícios" — deixar aparecer.
+
+**Régua na demo** (src/lib/demo-regua.ts): modelos de exemplo, prévia fictícia e interruptor funcionando. O cron das 8h
+pula a clínica demo, então ligar a régua na gravação não envia nada. Depois de gravar, pode desligar ou só rodar o seed de novo.
 
 Comando (você roda; grava no banco só a clínica demo — apaga e recria pelo CNPJ fixo 00.000.000/0001-00):
 

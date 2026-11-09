@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { DEMO_CLINIC_CNPJ } from "@/lib/demo-clinic";
 import { fetchBridgeCampaignPatients } from "@/lib/hospital-bridge";
 import { buildCampaignAudience, type BridgeCampaignPatient } from "@/lib/campaign-audience";
 import { excludeMissedVisits } from "@/lib/queue-ticket";
@@ -24,10 +25,12 @@ export async function runAutomationRules(now = new Date()): Promise<RunResult[]>
   const today = ruleTargetDate(now, 0);
   const rules = await prisma.automationRule.findMany({
     where: { active: true, OR: [{ lastRunDate: null }, { lastRunDate: { not: today } }] },
-    include: { clinic: { select: { technicalDirectorName: true, technicalDirectorCrm: true, campaignExcludedPatientIds: true } } },
+    include: { clinic: { select: { cnpj: true, technicalDirectorName: true, technicalDirectorCrm: true, campaignExcludedPatientIds: true } } },
   });
   const results: RunResult[] = [];
   for (const rule of rules) {
+    // Clínica demo: a régua liga na tela (modelos de exemplo), mas nunca roda.
+    if (rule.clinic.cnpj === DEMO_CLINIC_CNPJ) continue;
     const base = { ruleId: rule.id, clinicId: rule.clinicId, name: rule.name };
     const result = await runOne(rule, now).catch((e: unknown) => ({ ...base, status: `erro: ${e instanceof Error ? e.message : String(e)}` }));
     await prisma.automationRule.update({ where: { id: rule.id }, data: { lastRunDate: today } });

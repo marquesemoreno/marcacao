@@ -7,6 +7,21 @@ import { checkTemplateParamSources } from "@/lib/broadcast-cloud-template";
 import { getClinicCloudBroadcastSetup } from "@/actions/clinic-broadcast";
 import { revalidatePath } from "next/cache";
 import { ruleAudience } from "@/lib/automation-rules-run";
+import { DEMO_CLINIC_CNPJ } from "@/lib/demo-clinic";
+import { DEMO_CLOUD_TEMPLATES, demoRuleAudienceCount } from "@/lib/demo-regua";
+import type { ClinicCloudTemplate } from "@/actions/clinic-broadcast";
+
+async function isDemoClinic(clinicId: string) {
+  const c = await prisma.clinic.findUnique({ where: { id: clinicId }, select: { cnpj: true } });
+  return c?.cnpj === DEMO_CLINIC_CNPJ;
+}
+
+/** API oficial + modelos para o Sheet da régua. Na clínica demo: modelos de exemplo (o cron pula a demo). */
+export async function getAutomationCloudSetup(): Promise<{ active: boolean; templates: ClinicCloudTemplate[]; error?: string }> {
+  const { clinicId } = await requireClinicPermission("disparos");
+  if (await isDemoClinic(clinicId)) return { active: true, templates: DEMO_CLOUD_TEMPLATES };
+  return getClinicCloudBroadcastSetup();
+}
 
 export type AutomationRuleView = {
   kind: AutomationRuleKind;
@@ -54,6 +69,10 @@ export async function previewAutomationRule(input: { kind: AutomationRuleKind; d
   const step = DEFAULT_RULE_STEPS.find((s) => s.kind === input.kind);
   if (!step) return { ok: false as const, error: "Passo desconhecido." };
   if (input.kind !== "ANIVERSARIO" && validateRuleInput({ daysAfter: input.daysAfter })) return { ok: false as const, error: "Dias inválidos." };
+  if (await isDemoClinic(clinicId)) {
+    const today = new Date(Date.now() - 3 * 3600_000).toISOString().slice(0, 10);
+    return { ok: true as const, count: demoRuleAudienceCount(input.kind, input.daysAfter, today) };
+  }
   const integration = await prisma.hospitalIntegration.findUnique({ where: { clinicId }, select: { active: true } });
   if (!integration?.active) return { ok: false as const, error: "Sem sistema da clínica conectado." };
   const [rule, clinic] = await Promise.all([
@@ -85,7 +104,7 @@ export async function saveAutomationRule(input: {
   const invalid = input.kind === "ANIVERSARIO" ? null : validateRuleInput({ daysAfter: input.daysAfter });
   if (invalid) return { success: false as const, error: invalid };
 
-  const cloud = await getClinicCloudBroadcastSetup();
+  const cloud = await getAutomationCloudSetup();
   let template: { name: string; language: string; bodyText: string; params: string[] } | null = null;
   if (input.cloudTemplateName) {
     const tpl = cloud.templates.find((t) => t.name === input.cloudTemplateName);

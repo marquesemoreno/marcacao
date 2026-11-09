@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { listAutomationRules, previewAutomationRule, saveAutomationRule, type AutomationRuleView } from "@/actions/automation-rules";
+import { getAutomationCloudSetup, listAutomationRules, previewAutomationRule, saveAutomationRule, type AutomationRuleView } from "@/actions/automation-rules";
 import type { ClinicCloudTemplate } from "@/actions/clinic-broadcast";
 import { renderTemplatePreview, templateLabel } from "@/lib/broadcast-cloud-template";
 
@@ -222,7 +222,7 @@ function RuleCard({ rule, cloud, onSaved }: { rule: AutomationRuleView; cloud: {
 export function AutomationRulesSheet({
   open,
   onOpenChange,
-  cloud,
+  cloud: cloudProp,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -230,11 +230,17 @@ export function AutomationRulesSheet({
 }) {
   const [rules, setRules] = useState<AutomationRuleView[] | null>(null);
   const [loadError, setLoadError] = useState(false);
+  // O Sheet busca a própria config (na clínica demo vêm modelos de exemplo); o prop é só o valor inicial.
+  const [cloudSetup, setCloudSetup] = useState(cloudProp);
+  const cloud = cloudSetup ?? cloudProp;
   const load = useCallback(() => {
     setLoadError(false);
     listAutomationRules()
       .then(setRules)
       .catch(() => setLoadError(true));
+    getAutomationCloudSetup()
+      .then(setCloudSetup)
+      .catch(() => {});
   }, []);
   useEffect(() => {
     if (open) load();
