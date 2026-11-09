@@ -10,7 +10,7 @@ export function HoursSavedCard({ data }: { data: HoursSavedSummary }) {
   if (!data.totalMessages) return null;
   const days = data.totalHours / 8;
   return (
-    <section aria-labelledby="horas-titulo" className="rounded-2xl bg-white dark:bg-slate-900 p-5 shadow-xs">
+    <section aria-labelledby="horas-titulo" className="report-surface p-5">
       <h3 id="horas-titulo" className="font-semibold">Horas poupadas pela automação</h3>
       <p className="mt-3">
         <span className="text-4xl font-semibold tabular-nums">{fmtHours(data.totalHours)}</span>

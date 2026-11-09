@@ -55,6 +55,7 @@ import Link from "next/link";
 import { isProcedureAgenda } from "@/lib/doctor-names";
 import { formatDurationHuman, SLA_CRITICAL_MINUTES, SLA_WARNING_MINUTES } from "@/lib/sla-calculator";
 import { ReportDelta } from "@/components/clinic/report-delta";
+import { HighlightTile, KpiPill } from "@/components/clinic/report-hero";
 import {
   UNIDENTIFIED_CHANNEL,
   MIN_ATTENDANT_VOLUME,
@@ -72,6 +73,9 @@ import {
   Wallet,
   X,
   ChevronRight,
+  CalendarCheck,
+  Timer,
+  BellRing,
 } from "lucide-react";
 
 export const metadata = { title: "Relatórios" };
@@ -98,7 +102,7 @@ const OUTCOME_COLOR: Record<OutcomeGroup, string> = {
 const pctBR = (n: number) => `${n.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%`;
 
 const BASE = "/clinic/relatorio";
-const card = "bg-white dark:bg-slate-900 rounded-2xl shadow-xs";
+const card = "report-surface";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -116,11 +120,20 @@ type RelatorioPageProps = {
   }>;
 };
 
+/** Fundo em gradiente suave do Relatório (piloto de estilo, 09/11/2026). */
+function ReportCanvas({ gap, children }: { gap: string; children: React.ReactNode }) {
+  return (
+    <div className="report-canvas flex-1 overflow-y-auto font-sans text-slate-900 dark:text-slate-100">
+      <div className={`${gap} mx-auto w-full max-w-7xl p-6 md:p-8`}>{children}</div>
+    </div>
+  );
+}
+
 /** Título de bloco (Resultado / Equipe e operação / Origem dos pacientes). */
 function BlockHeading({ id, title, hint }: { id: string; title: string; hint: string }) {
   return (
-    <div className="border-b border-slate-200 dark:border-slate-800 pb-2">
-      <h2 id={id} className="text-lg font-semibold text-slate-900 dark:text-slate-100">{title}</h2>
+    <div className="border-b border-slate-900/10 pb-2 dark:border-white/10">
+      <h2 id={id} className="scroll-mt-6 text-lg font-semibold text-slate-900 dark:text-slate-100">{title}</h2>
       <p className="text-xs text-slate-600 dark:text-slate-400">{hint}</p>
     </div>
   );
@@ -141,25 +154,25 @@ export default async function ClinicReportPage({
   const biTab = params.aba === "faturamento" || params.aba === "financeiro" || params.aba === "estoque" ? params.aba : null;
   if (params.aba === "marcadores") {
     return (
-      <div className="space-y-6 font-sans flex-1 overflow-y-auto text-slate-900 dark:text-slate-100 p-6 md:p-8 max-w-7xl mx-auto w-full">
+      <ReportCanvas gap="space-y-6">
         <PageHeader title="Relatórios" subtitle="Pacientes indicados por parceiros (marcadores)." />
         <ReportTabs active="marcadores" isManager={isManager} />
         <Suspense key={`marcadores-${params.periodo ?? params.days ?? ""}`} fallback={<p className="text-sm text-slate-500">Carregando…</p>}>
           <MarcadoresTab periodo={params.periodo} days={params.days} />
         </Suspense>
-      </div>
+      </ReportCanvas>
     );
   }
   if (biTab) {
     if (!isManager) return <ManagerOnly />;
     return (
-      <div className="space-y-6 font-sans flex-1 overflow-y-auto text-slate-900 dark:text-slate-100 p-6 md:p-8 max-w-7xl mx-auto w-full">
+      <ReportCanvas gap="space-y-6">
         <PageHeader title="Relatórios" subtitle="Lido do sistema da clínica (só leitura). Só a gestão vê esta aba." />
         <ReportTabs active={biTab} isManager />
         <Suspense key={`${biTab}-${params.mes ?? ""}`} fallback={<p className="text-sm text-slate-500">Lendo o sistema da clínica…</p>}>
           {biTab === "faturamento" ? <BillingTab month={params.mes} /> : biTab === "financeiro" ? <FinanceTab month={params.mes} /> : <StockTab />}
         </Suspense>
-      </div>
+      </ReportCanvas>
     );
   }
   const period = parsePeriodKey(params.periodo, params.days);
@@ -277,14 +290,14 @@ export default async function ClinicReportPage({
   const csvPeriodLabel = `${labels.title} (${fmtDate(win.since)} a ${fmtDate(windowEnd)})`;
 
   return (
-    <div className="space-y-10 font-sans flex-1 overflow-y-auto text-slate-900 dark:text-slate-100 p-6 md:p-8 max-w-7xl mx-auto w-full">
+    <ReportCanvas gap="space-y-10">
       <div className="space-y-3">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <div className="flex flex-col items-start justify-between gap-3 xl:flex-row xl:items-center">
           <PageHeader
             title="Relatórios"
             subtitle={`${chatReport.totalConversations} conversa(s) · ${labels.title} · ${clinic.tradeName}`}
           />
-          <div className="flex flex-wrap items-center gap-2 shrink-0">
+          <div className="flex min-w-0 flex-wrap items-center gap-2 xl:justify-end">
             <ReportSelectFilter
               basePath={BASE}
               paramKey="tag"
@@ -386,62 +399,97 @@ export default async function ClinicReportPage({
       {/* =========================================================================
           RESUMO DO PERÍODO — as 3 perguntas do gestor, com comparação
          ========================================================================= */}
-      <section aria-labelledby="resumo-titulo" className={`${card} p-5`}>
-        <h2 id="resumo-titulo" className="text-base font-semibold text-slate-900 dark:text-slate-100">
+      <section aria-labelledby="resumo-titulo" className="space-y-4">
+        <h2 id="resumo-titulo" className="sr-only">
           Resumo — {labels.title}
         </h2>
-        <dl className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-5 sm:divide-x divide-slate-200 dark:divide-slate-800">
-          <div className="space-y-1 sm:pr-5">
-            <dt className="text-sm text-slate-600 dark:text-slate-400">Conversão em agendamento</dt>
-            <dd className="text-3xl font-bold tabular-nums text-slate-900 dark:text-slate-100">
-              {chatReport.conversionRate !== null ? pctBR(chatReport.conversionRate) : "—"}
-            </dd>
-            <dd>
-              <ReportDelta current={chatReport.conversionRate} previous={prevChat.conversionRate} unit="pts" better="up" compareLabel={labels.compare} />
-            </dd>
-            <dd className="text-xs text-slate-600 dark:text-slate-400">
-              {outcomes.withOutcome > 0
+        <div className="grid gap-3 md:grid-cols-3">
+          <KpiPill
+            icon={CalendarCheck}
+            value={chatReport.conversionRate !== null ? pctBR(chatReport.conversionRate) : "—"}
+            label="Conversão em agendamento"
+            delta={<ReportDelta variant="chip" current={chatReport.conversionRate} previous={prevChat.conversionRate} unit="pts" better="up" compareLabel={labels.compare} />}
+            hint={
+              outcomes.withOutcome > 0
                 ? `${chatReport.totalAgendados} de ${outcomes.withOutcome} conversa(s) com desfecho`
-                : "Nenhuma conversa com desfecho no período."}
-            </dd>
-          </div>
-          <div className="space-y-1 sm:px-5">
-            <dt className="text-sm text-slate-600 dark:text-slate-400">Respondidas em até {SLA_WARNING_MINUTES} min</dt>
-            <dd className={`text-3xl font-bold tabular-nums ${rs.withinSlaPct === null ? "text-slate-900 dark:text-slate-100" : rs.withinSlaPct >= 80 ? "text-emerald-700 dark:text-emerald-400" : rs.withinSlaPct >= 50 ? "text-amber-700 dark:text-amber-400" : "text-rose-700 dark:text-rose-400"}`}>
-              {rs.withinSlaPct !== null ? pctBR(rs.withinSlaPct) : "—"}
-            </dd>
-            <dd>
-              <ReportDelta current={rs.withinSlaPct} previous={prevRs.withinSlaPct} unit="pts" better="up" compareLabel={labels.compare} />
-            </dd>
-            <dd className="text-xs text-slate-600 dark:text-slate-400">
-              {rs.withinSlaPct === null
+                : "Nenhuma conversa com desfecho no período."
+            }
+          />
+          <KpiPill
+            icon={Timer}
+            value={rs.withinSlaPct !== null ? pctBR(rs.withinSlaPct) : "—"}
+            valueClass={
+              rs.withinSlaPct === null
+                ? ""
+                : rs.withinSlaPct >= 80
+                  ? "text-emerald-700 dark:text-emerald-400"
+                  : rs.withinSlaPct >= 50
+                    ? "text-amber-700 dark:text-amber-400"
+                    : "text-rose-700 dark:text-rose-400"
+            }
+            label={`Respondidas em até ${SLA_WARNING_MINUTES} min`}
+            delta={<ReportDelta variant="chip" current={rs.withinSlaPct} previous={prevRs.withinSlaPct} unit="pts" better="up" compareLabel={labels.compare} />}
+            hint={
+              rs.withinSlaPct === null
                 ? "Nenhuma conversa respondida pela equipe no período."
                 : rs.withinSlaPct >= 80
                   ? "Meta atingida (80% ou mais)."
                   : rs.withinSlaPct >= 50
                     ? "Abaixo da meta de 80%."
-                    : "Bem abaixo da meta de 80%."}
-            </dd>
-          </div>
-          <div className="space-y-1 sm:pl-5">
-            <dt className="text-sm text-slate-600 dark:text-slate-400">Pacientes que confirmaram o lembrete</dt>
-            <dd className="text-3xl font-bold tabular-nums text-slate-900 dark:text-slate-100">
-              {management.confirmations.totalSent > 0 ? pctBR(management.confirmations.confirmedPct) : "—"}
-            </dd>
-            <dd>
+                    : "Bem abaixo da meta de 80%."
+            }
+          />
+          <KpiPill
+            icon={BellRing}
+            value={management.confirmations.totalSent > 0 ? pctBR(management.confirmations.confirmedPct) : "—"}
+            label="Confirmaram o lembrete"
+            delta={
               <ReportDelta
+                variant="chip"
                 current={management.confirmations.totalSent > 0 ? management.confirmations.confirmedPct : null}
                 previous={prevManagement.confirmations.totalSent > 0 ? prevManagement.confirmations.confirmedPct : null}
                 unit="pts"
                 better="up"
                 compareLabel={labels.compare}
               />
-            </dd>
-            {management.confirmations.totalSent === 0 && (
-              <dd className="text-xs text-slate-600 dark:text-slate-400">Nenhum lembrete enviado no período.</dd>
-            )}
-          </div>
-        </dl>
+            }
+            hint={management.confirmations.totalSent === 0 ? "Nenhum lembrete enviado no período." : `${management.confirmations.totalSent} lembrete(s) enviado(s)`}
+          />
+        </div>
+        <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+          <HighlightTile
+            tone="blue"
+            title="Conversas no período"
+            value={chatReport.totalConversations.toLocaleString("pt-BR")}
+            sub={`${chatReport.totalResolved} finalizada(s)`}
+            href="#bloco-funil"
+            linkLabel="Ver funil e evolução"
+          />
+          <HighlightTile
+            tone="teal"
+            title="Agendaram"
+            value={chatReport.totalAgendados.toLocaleString("pt-BR")}
+            sub="conversas que viraram agendamento"
+            href="#bloco-resultado"
+            linkLabel="Ver resultado"
+          />
+          <HighlightTile
+            tone="ink"
+            title="Faturamento estimado"
+            value={management.estimatedRevenue !== null ? formatCurrency(management.estimatedRevenue) : "—"}
+            sub={management.ticket !== null ? `ticket médio de ${formatCurrency(management.ticket)}` : "sem ticket médio cadastrado"}
+            href="#valores-estimados"
+            linkLabel="Ver valores estimados"
+          />
+          <HighlightTile
+            tone="sun"
+            title="Pacientes perdidos"
+            value={outcomes.lostTotal.toLocaleString("pt-BR")}
+            sub={outcomes.topLossReason ? `principal motivo: ${outcomes.topLossReason.label.replace("Perdido — ", "")}` : "nenhum motivo registrado"}
+            href="#bloco-resultado"
+            linkLabel="Ver por que as conversas terminaram"
+          />
+        </div>
       </section>
 
       <ReportAiSummary clinicName={clinic.tradeName} periodLabel={labels.title} facts={insightFacts} />
@@ -637,7 +685,7 @@ export default async function ClinicReportPage({
 
         {/* VALORES ESTIMADOS — marcados como estimativa */}
         <div className="space-y-3">
-          <h3 className="flex items-center gap-2 text-base font-semibold text-slate-900 dark:text-slate-100">
+          <h3 id="valores-estimados" className="flex scroll-mt-6 items-center gap-2 text-base font-semibold text-slate-900 dark:text-slate-100">
             Valores estimados
             <span className="rounded-full border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/40 px-1.5 py-px text-xs font-semibold text-amber-800 dark:text-amber-300">
               Estimativa
@@ -973,6 +1021,6 @@ export default async function ClinicReportPage({
           </div>
         </div>
       </section>
-    </div>
+    </ReportCanvas>
   );
 }

@@ -13,16 +13,16 @@ export function ReportTabs({ active, isManager }: { active: string; isManager: b
   const tabs = TABS.filter((t) => isManager || !t.managerOnly);
   if (tabs.length < 2) return null;
   return (
-    <nav aria-label="Abas do relatório" className="flex gap-1 overflow-x-auto rounded-full bg-slate-100 p-1 dark:bg-slate-800 w-fit max-w-full">
+    <nav aria-label="Abas do relatório" className="report-surface !rounded-full flex w-fit max-w-full gap-1 overflow-x-auto p-1.5">
       {tabs.map((t) => (
         <Link
           key={t.key}
           href={t.href}
           aria-current={t.key === active ? "page" : undefined}
-          className={`whitespace-nowrap rounded-full px-4 py-1.5 text-sm font-medium ${
+          className={`whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium transition-colors ${
             t.key === active
-              ? "bg-white text-slate-900 shadow-xs dark:bg-slate-950 dark:text-slate-100"
-              : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100"
+              ? "bg-slate-900 text-white shadow-sm dark:bg-white dark:text-slate-900"
+              : "text-slate-600 hover:bg-white/70 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white"
           }`}
         >
           {t.label}
