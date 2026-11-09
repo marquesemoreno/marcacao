@@ -60,7 +60,7 @@ export function SecurityPanel() {
   if (!data) return null;
 
   return (
-    <div className="max-w-md space-y-4 rounded-2xl bg-white p-6 shadow-xs dark:bg-slate-900">
+    <div className="glass-surface max-w-md space-y-4 p-6">
       <div className="flex items-center gap-2">
         <ShieldCheck className="size-5 text-emerald-600" />
         <h2 className="text-base font-semibold">Segurança</h2>

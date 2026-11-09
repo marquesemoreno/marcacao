@@ -83,7 +83,7 @@ export function ChangePasswordForm() {
   }
 
   return (
-    <div className="max-w-md bg-white dark:bg-slate-900 rounded-3xl p-6 border border-slate-200/80 dark:border-slate-800 shadow-2xs space-y-4">
+    <div className="glass-surface max-w-md p-6 space-y-4">
       <div className="flex items-center gap-2">
         <KeyRound className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
         <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">Trocar senha</h2>

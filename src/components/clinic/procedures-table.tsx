@@ -149,15 +149,15 @@ export function ProceduresTable({
               className="h-9 pl-9"
             />
           </div>
-          <div className="flex items-center gap-0.5 p-0.5 bg-slate-100 dark:bg-slate-800 rounded-full text-xs font-medium">
+          <div className="flex items-center gap-0.5 p-1 bg-slate-900/5 dark:bg-white/[0.06] rounded-full text-xs font-medium">
             {CATEGORY_FILTERS.map((f) => (
               <button
                 key={f.value}
                 type="button"
                 onClick={() => setCategoryFilter(f.value)}
-                className={`px-2.5 py-1 rounded-md transition-all ${
+                className={`px-3 py-1 rounded-full transition-all ${
                   categoryFilter === f.value
-                    ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 font-semibold shadow-xs"
+                    ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900 font-semibold"
                     : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
                 }`}
               >
@@ -169,7 +169,7 @@ export function ProceduresTable({
         <AddProcedureDialog availableProcedures={availableProcedures} />
       </div>
 
-      <div className="w-full overflow-x-auto rounded-2xl bg-white dark:bg-slate-900 shadow-xs">
+      <div className="w-full overflow-x-auto glass-surface">
         <Table className="w-full">
           <TableHeader>
             <TableRow className="bg-slate-50/70 dark:bg-slate-800/70">
