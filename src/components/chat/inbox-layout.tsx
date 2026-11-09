@@ -2663,9 +2663,9 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
             {onGenerateCopilotSuggestions && (
               <div className="bg-white/80 dark:bg-white/[0.05] rounded-[1.25rem] ring-1 ring-slate-900/5 dark:ring-white/[0.06] p-4 space-y-3">
                 <div className="flex items-center justify-between gap-2">
-                  <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                  <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-1.5 whitespace-nowrap">
                     <Sparkles className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                    Copilot — sugestões de resposta
+                    Copiloto
                   </h4>
                   <button
                     type="button"
