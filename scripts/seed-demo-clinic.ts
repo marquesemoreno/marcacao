@@ -514,7 +514,8 @@ async function main() {
     });
   }
 
-  const base = (process.env.NEXTAUTH_URL || "https://<seu-dominio>").replace(/\/$/, "");
+  // O banco é o de produção, então os links valem no domínio de produção (não no NEXTAUTH_URL local).
+  const base = "https://conectasaudevc.com.br";
   console.log(`Clínica demo criada: ${clinic.tradeName} (${clinic.id})`);
   console.log(`Login: ${MANAGER_EMAIL} — senha em DEMO_PASSWORD no .env (atendentes: ana@, bruno@, carla@${DOMAIN}, mesma senha).`);
   console.log(`TV:          ${base}/tv/${tvRaw}`);
