@@ -231,11 +231,11 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
   const loadingEmpty = isLoading && contacts.length === 0;
 
   return (
-    <div className="flex-1 flex flex-col h-full min-h-0 bg-slate-100/90 dark:bg-slate-950/90 overflow-hidden text-slate-900 dark:text-slate-100" data-od-id="crm-kanban-view">
-      {/* Barra superior */}
-      <div className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-4 sm:px-6 py-3 space-y-2.5 shrink-0">
+    <div className="soft-canvas flex-1 flex flex-col h-full min-h-0 overflow-hidden text-slate-900 dark:text-slate-100" data-od-id="crm-kanban-view">
+      {/* Barra superior — visual "vidro" (09/11/2026, DESIGN.md §5) */}
+      <div className="glass-surface mx-3 mt-3 sm:mx-4 sm:mt-4 px-4 sm:px-5 py-3.5 space-y-2.5 shrink-0">
         <div className="flex flex-wrap items-center gap-3">
-          <h2 className="text-base font-semibold flex items-center gap-2">
+          <h2 className="text-lg font-semibold tracking-tight flex items-center gap-2">
             <KanbanSquare className="w-4 h-4 text-emerald-600 dark:text-emerald-400" aria-hidden />
             CRM
             <span className="text-sm font-normal text-slate-500 dark:text-slate-400 tabular-nums">
@@ -250,7 +250,7 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
               placeholder="Buscar paciente, telefone ou tag…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full h-9 pl-9 pr-3 text-sm bg-slate-100 dark:bg-slate-800 border border-transparent rounded-full focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+              className="w-full h-9 pl-9 pr-3 text-sm bg-white/80 ring-1 ring-slate-900/5 shadow-xs dark:bg-white/[0.08] dark:ring-white/10 border border-transparent rounded-full focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
             />
           </div>
           <div className="relative w-full sm:w-48 flex items-center">
@@ -259,7 +259,7 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
               aria-label="Filtrar por atendente"
               value={selectedAgent}
               onChange={(e) => setSelectedAgent(e.target.value)}
-              className="w-full h-9 pl-9 pr-3 text-sm bg-slate-100 dark:bg-slate-800 border border-transparent rounded-full focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+              className="w-full h-9 pl-9 pr-3 text-sm bg-white/80 ring-1 ring-slate-900/5 shadow-xs dark:bg-white/[0.08] dark:ring-white/10 border border-transparent rounded-full focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
             >
               <option value="todos">Todas as atendentes</option>
               <option value="unassigned">Sem dono</option>
@@ -274,7 +274,7 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
             aria-label="Filtrar por campanha"
             value={campaign}
             onChange={(e) => setCampaign(e.target.value)}
-            className="w-full sm:w-56 h-9 px-3 text-sm bg-slate-100 dark:bg-slate-800 border border-transparent rounded-full focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+            className="w-full sm:w-56 h-9 px-3 text-sm bg-white/80 ring-1 ring-slate-900/5 shadow-xs dark:bg-white/[0.08] dark:ring-white/10 border border-transparent rounded-full focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
           >
             <option value="todas">Todas as campanhas</option>
             {campaignOptions.map((label) => (
@@ -283,7 +283,7 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
               </option>
             ))}
           </select>
-          <div role="radiogroup" aria-label="Agrupar colunas por" className="inline-flex rounded-full bg-slate-100 dark:bg-slate-800 p-0.5">
+          <div role="radiogroup" aria-label="Agrupar colunas por" className="inline-flex rounded-full bg-slate-900/5 dark:bg-white/[0.06] p-1">
             {(['etapa', 'campanha'] as const).map((g) => (
               <button
                 key={g}
@@ -292,7 +292,7 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
                 aria-checked={groupBy === g}
                 onClick={() => setGroupBy(g)}
                 className={`h-8 px-3 rounded-full text-sm font-medium ${
-                  groupBy === g ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
+                  groupBy === g ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
                 }`}
               >
                 {g === 'etapa' ? 'Por etapa' : 'Por campanha'}
@@ -327,8 +327,8 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
               onClick={() => setQuick(f.id)}
               className={`h-8 px-3.5 rounded-full text-sm font-medium border focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50 ${
                 quick === f.id
-                  ? 'bg-slate-900 text-white border-slate-900 dark:bg-slate-100 dark:text-slate-900 dark:border-slate-100'
-                  : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-transparent hover:bg-slate-200 dark:hover:bg-slate-700'
+                  ? 'border-transparent bg-slate-900 text-white dark:bg-white dark:text-slate-900'
+                  : 'border-transparent bg-white/80 ring-1 ring-slate-900/5 shadow-xs dark:bg-white/[0.08] dark:ring-white/10 text-slate-700 dark:text-slate-300 hover:bg-white dark:hover:bg-white/[0.14]'
               }`}
             >
               {f.label}
@@ -350,7 +350,7 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
                   className={`h-7 rounded-full border px-2.5 text-xs font-medium ${
                     on
                       ? 'border-emerald-600 bg-emerald-600 text-white'
-                      : 'border-transparent bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                      : 'border-transparent bg-white/80 ring-1 ring-slate-900/5 shadow-xs dark:bg-white/[0.08] dark:ring-white/10 text-slate-700 dark:text-slate-300 hover:bg-white dark:hover:bg-white/[0.14]'
                   }`}
                 >
                   {tag} <span className="tabular-nums opacity-70">{count}</span>
@@ -375,10 +375,10 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
       {(isLoading || loadError) && (
         <div
           role={loadError ? 'alert' : 'status'}
-          className={`mx-4 sm:mx-6 mt-3 rounded-lg border px-4 py-3 text-sm flex items-center justify-between gap-3 ${
+          className={`mx-3 sm:mx-4 mt-3 rounded-2xl border px-4 py-3 text-sm flex items-center justify-between gap-3 ${
             loadError
               ? 'border-rose-200 dark:border-rose-800 bg-rose-50 dark:bg-rose-950/40 text-rose-800 dark:text-rose-200'
-              : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300'
+              : 'border-transparent bg-white/70 dark:bg-white/[0.06] text-slate-600 dark:text-slate-300'
           }`}
         >
           {loadError ? 'Não foi possível carregar os pacientes do CRM.' : 'Carregando pacientes…'}
@@ -405,9 +405,9 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
                 <section
                   key={col.label}
                   aria-label={`${col.label}: ${col.items.length} paciente${col.items.length === 1 ? '' : 's'}`}
-                  className="flex h-full min-h-0 flex-col rounded-2xl bg-slate-100 dark:bg-slate-900/60"
+                  className="glass-surface flex h-full min-h-0 flex-col overflow-hidden"
                 >
-                  <header className="shrink-0 rounded-t-lg border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 py-2.5">
+                  <header className="shrink-0 border-b border-slate-900/[0.06] dark:border-white/[0.07] px-4 pb-2.5 pt-3.5">
                     <div className="flex items-center gap-2">
                       <h3 className="min-w-0 truncate text-sm font-semibold" title={col.label}>{col.label}</h3>
                       <span className="ml-auto text-xs font-medium text-slate-500 dark:text-slate-400 tabular-nums">{col.items.length}</span>
@@ -422,7 +422,7 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
                       const name = displayName(contact);
                       const st = stageOf(contact);
                       return (
-                        <article key={contact.id} className="rounded-xl bg-white dark:bg-slate-900 p-2.5 shadow-xs">
+                        <article key={contact.id} className="rounded-2xl bg-white/90 dark:bg-white/[0.06] p-2.5 shadow-xs ring-1 ring-slate-900/5 dark:ring-white/[0.06]">
                           <button
                             type="button"
                             onClick={() => setOpenCardId(contact.id)}
@@ -476,8 +476,8 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
                 key={stage.id}
                 aria-label={loadingEmpty ? `${stage.title}: carregando` : `${stage.title}: ${cards.length} paciente${cards.length === 1 ? '' : 's'}`}
                 aria-busy={loadingEmpty}
-                className={`flex h-full min-h-0 flex-col rounded-lg border bg-slate-50/90 dark:bg-slate-900/60 ${
-                  dragOverStage === stage.id ? 'border-emerald-400 ring-2 ring-emerald-400/40' : 'border-slate-200 dark:border-slate-800'
+                className={`glass-surface flex h-full min-h-0 flex-col overflow-hidden border ${
+                  dragOverStage === stage.id ? 'border-emerald-400 ring-2 ring-emerald-400/40' : 'border-transparent'
                 }`}
                 onDragOver={(e) => {
                   if (!draggingRef.current) return;
@@ -492,7 +492,7 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
                   if (id) moveTo(id, stage.id);
                 }}
               >
-                <header className="shrink-0 rounded-t-lg border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 py-2.5">
+                <header className="shrink-0 border-b border-slate-900/[0.06] dark:border-white/[0.07] px-4 pb-2.5 pt-3.5">
                   <div className="flex items-center gap-2">
                     <span className={`size-2 rounded-full ${stage.accent}`} aria-hidden />
                     <Icon className="w-4 h-4 text-slate-500 dark:text-slate-400" aria-hidden />
@@ -513,11 +513,11 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
                   {loadingEmpty ? (
                     <div aria-hidden className="space-y-2">
                       {[0, 1, 2].map((i) => (
-                        <div key={i} className="h-16 animate-pulse rounded-xl bg-white dark:bg-slate-800/60" />
+                        <div key={i} className="h-16 animate-pulse rounded-2xl bg-white/70 dark:bg-white/[0.06]" />
                       ))}
                     </div>
                   ) : cards.length === 0 ? (
-                    <p className="rounded-xl border border-dashed border-slate-300 dark:border-slate-700 py-6 text-center text-sm text-slate-500 dark:text-slate-400">
+                    <p className="rounded-2xl border border-dashed border-slate-300 dark:border-white/15 py-6 text-center text-sm text-slate-500 dark:text-slate-400">
                       Nenhum paciente aqui
                     </p>
                   ) : (
@@ -539,10 +539,10 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
                             draggingRef.current = null;
                             setDragOverStage(null);
                           }}
-                          className={`group rounded-xl border bg-white dark:bg-slate-900 p-2.5 shadow-xs hover:shadow-md transition-shadow ${
+                          className={`group rounded-2xl border bg-white/90 dark:bg-white/[0.06] p-2.5 shadow-xs hover:shadow-md transition-shadow ${
                             alert === 'sem_retorno'
                               ? 'border-amber-300 dark:border-amber-700 bg-amber-50/60 dark:bg-amber-950/20'
-                              : 'border-transparent'
+                              : 'border-slate-900/5 dark:border-white/[0.06]'
                           }`}
                         >
                           <button
@@ -648,7 +648,7 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
                     <button
                       type="button"
                       onClick={() => onAddToStage(stage.id as FunnelStage)}
-                      className="w-full rounded-xl border border-dashed border-slate-300 dark:border-slate-700 py-1.5 text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-900"
+                      className="w-full rounded-full border border-dashed border-slate-300 dark:border-white/15 py-1.5 text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-white/80 dark:hover:bg-white/[0.08]"
                     >
                       + Adicionar
                     </button>
