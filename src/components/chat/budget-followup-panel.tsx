@@ -55,7 +55,7 @@ export function BudgetFollowupPanel({ onOpenChat }: { onOpenChat: (conversationI
   }
 
   return (
-    <div className="shrink-0 border-b border-violet-200 dark:border-violet-900/60 bg-violet-50/80 dark:bg-violet-950/30 px-4 sm:px-6">
+    <div className="shrink-0 mx-3 mt-3 sm:mx-4 rounded-[1.75rem] border border-violet-200/80 dark:border-violet-900/60 bg-violet-50/75 dark:bg-violet-950/30 backdrop-blur-xl px-4 sm:px-5">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
