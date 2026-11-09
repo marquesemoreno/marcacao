@@ -342,8 +342,8 @@ const ContactListItem = React.memo(function ContactListItem({
     c.queueState === 'URGENCIA_CLINICA'
       ? 'bg-rose-50 dark:bg-rose-950/30 hover:bg-rose-100/70 dark:hover:bg-rose-950/50'
       : isSelected
-      ? 'bg-slate-200/70 dark:bg-slate-800'
-      : 'hover:bg-slate-100 dark:hover:bg-slate-800/50';
+      ? 'bg-white shadow-xs ring-1 ring-slate-900/5 dark:bg-white/[0.08] dark:ring-white/10'
+      : 'hover:bg-white/60 dark:hover:bg-white/[0.04]';
   // A espera é o número mais forte da linha: no lugar do horário, na cor da faixa do SLA.
   const waitClass =
     c.sla.variant === 'critical'
@@ -360,7 +360,7 @@ const ContactListItem = React.memo(function ContactListItem({
     <div
       onClick={() => onSelect(c.id)}
       aria-current={isSelected ? 'true' : undefined}
-      className={`group mx-1.5 my-0.5 rounded-xl px-2.5 py-2.5 transition-colors cursor-pointer relative flex gap-3 items-start ${rowColorClasses}`}
+      className={`group mx-2 my-0.5 rounded-2xl px-2.5 py-2.5 transition-colors cursor-pointer relative flex gap-3 items-start ${rowColorClasses}`}
       data-od-id={`contact-card-${c.id}`}
     >
       <button
@@ -371,7 +371,7 @@ const ContactListItem = React.memo(function ContactListItem({
         }}
         aria-label={`Abrir conversa com ${displayName(c)}${c.unreadCount > 0 ? `, ${c.unreadCount} não lida(s)` : ''}`}
         aria-current={isSelected ? 'true' : undefined}
-        className="absolute inset-0 z-0 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-500"
+        className="absolute inset-0 z-0 rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-500"
       />
       <Popover open={isCardMenuOpen} onOpenChange={(open) => { setIsCardMenuOpen(open); if (!open) setIsMuteSubmenuOpen(false); }}>
         <PopoverTrigger
@@ -1406,12 +1406,14 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
           </span>
         </div>
       )}
-    <div className="flex flex-1 min-h-0 w-full overflow-hidden bg-slate-50 dark:bg-slate-950 font-sans antialiased text-slate-800 dark:text-slate-100 relative">
+    {/* Visual "vidro" (09/11/2026, DESIGN.md §5): fila, conversa e paciente como painéis
+        flutuantes sobre o gradiente. Os balões continuam sólidos (leitura do dia inteiro). */}
+    <div className="soft-canvas flex flex-1 min-h-0 w-full overflow-hidden font-sans antialiased text-slate-800 dark:text-slate-100 relative md:gap-3 md:p-3">
       {/* =========================================================================
           COLUNA 1: FILA DE ATENDIMENTO (320px em Desktop)
          ========================================================================= */}
       <aside
-        className={`w-full md:w-80 md:min-w-[320px] md:max-w-[320px] bg-slate-100/70 dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 shadow-sm flex-col h-full shrink-0 z-20 select-none ${
+        className={`w-full md:w-80 md:min-w-[320px] md:max-w-[320px] bg-white/70 dark:bg-[rgb(26_27_33/0.66)] md:glass-surface overflow-hidden flex-col h-full shrink-0 z-20 select-none ${
           // Some enquanto agenda — só conversa + painel de agendamento na tela; volta ao
           // normal assim que fecha. Precisa vir antes do mobileView, senão "queue" (o
           // padrão fora do mobile) sempre ganhava e escondia esse hide.
@@ -1420,7 +1422,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
         data-od-id="inbox-queue-column"
       >
         {/* Header & Busca */}
-        <div className="p-3.5 sm:p-4 border-b border-slate-100 dark:border-slate-800 space-y-3 bg-white dark:bg-slate-900">
+        <div className="p-3.5 sm:p-4 border-b border-slate-900/[0.06] dark:border-white/[0.07] space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-2">
             <h2 className="font-bold text-slate-900 dark:text-slate-100 text-base tracking-tight flex items-center gap-2 whitespace-nowrap">
               Fila de Atendimento
@@ -1481,7 +1483,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
               placeholder="Buscar paciente, telefone ou mensagem…"
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 focus:bg-white dark:focus:bg-slate-900 transition-all text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500"
+              className="w-full pl-9 pr-3 py-2 text-xs bg-white/80 ring-1 ring-slate-900/5 shadow-xs dark:bg-white/[0.08] dark:ring-white/10 border border-transparent rounded-full focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 focus:bg-white dark:focus:bg-white/[0.12] transition-all text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500"
             />
           </div>
 
@@ -1526,7 +1528,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
           {/* min-w-0 + rolagem: as abas nunca passam da largura da fila (antes "Não
               Atribuídas" e os ícones invadiam a coluna da conversa). */}
           <div className="flex min-w-0 items-center gap-1.5">
-          <div ref={tabsScrollRef} className="flex-1 min-w-0 flex items-center gap-0.5 p-0.5 bg-slate-100 dark:bg-slate-800/90 rounded-lg text-xs font-medium overflow-x-auto [scrollbar-width:none]">
+          <div ref={tabsScrollRef} className="flex-1 min-w-0 flex items-center gap-0.5 p-1 bg-slate-900/5 dark:bg-white/[0.06] rounded-full text-xs font-medium overflow-x-auto [scrollbar-width:none]">
             {ALL_INBOX_TABS.filter((tab) => visibleTabIds.includes(tab.id)).map((tab) => {
               // C3: um único estilo de aba ativa. O alerta de espera sem responsável virou só
               // a cor do contador (vermelho passado o limiar) — antes a aba inteira ficava
@@ -1544,9 +1546,9 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                   onClick={() => onFilterTabChange(tab.id)}
                   aria-pressed={isActive}
                   title={isUnassignedAlert ? `Há paciente esperando há ${unassignedWaitMinutes} min sem responsável` : undefined}
-                  className={`shrink-0 whitespace-nowrap flex-1 py-1.5 px-2 rounded-md text-xs transition-all whitespace-nowrap text-center inline-flex items-center justify-center gap-1 ${
+                  className={`shrink-0 whitespace-nowrap flex-1 py-1.5 px-2.5 rounded-full text-xs transition-all whitespace-nowrap text-center inline-flex items-center justify-center gap-1 ${
                     isActive
-                      ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 font-semibold shadow-sm'
+                      ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 font-semibold shadow-sm'
                       : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
                   }`}
                 >
@@ -1777,7 +1779,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
           COLUNA 2: JANELA DE CHAT CENTRAL
          ========================================================================= */}
       <main
-        className={`flex-1 flex flex-col h-full bg-[#F8FAFC] dark:bg-slate-950 min-w-0 relative ${
+        className={`flex-1 flex flex-col h-full bg-white/50 dark:bg-[rgb(26_27_33/0.5)] md:glass-surface overflow-hidden min-w-0 relative ${
           mobileView === 'chat' ? 'flex' : 'hidden md:flex'
         }`}
         data-od-id="inbox-chat-column"
@@ -1802,7 +1804,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
             {contacts.length === 0 && isLoadingContacts ? (
               <p className="text-sm font-medium text-slate-500 dark:text-slate-400" role="status">Carregando conversas…</p>
             ) : contacts.length === 0 ? (
-              <div className="max-w-md space-y-1.5 bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+              <div className="max-w-md space-y-1.5 bg-white/80 dark:bg-white/[0.05] p-6 rounded-[1.75rem] ring-1 ring-slate-900/5 dark:ring-white/[0.06] shadow-sm">
                 <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
                   Nenhuma conversa aberta nesta caixa de entrada
                 </h3>
@@ -1828,7 +1830,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
         ) : (
           <>
             {/* Header da Conversa */}
-            <header className="h-16 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-3 sm:px-5 flex items-center justify-between shrink-0 shadow-xs z-10">
+            <header className="h-16 bg-white/70 dark:bg-white/[0.03] backdrop-blur-xl border-b border-slate-900/[0.06] dark:border-white/[0.07] px-3 sm:px-5 flex items-center justify-between shrink-0 z-10">
               <div className="flex items-center gap-2.5 min-w-0">
                 <button
                   onClick={() => setMobileView('queue')}
@@ -2170,7 +2172,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
             <div
               ref={messagesContainerRef}
               onScroll={handleMessagesScroll}
-              className="flex-1 overflow-y-auto overflow-x-hidden min-w-0 p-3 sm:p-6 space-y-3 bg-slate-100 dark:bg-slate-950/60"
+              className="flex-1 overflow-y-auto overflow-x-hidden min-w-0 p-3 sm:p-6 space-y-3 bg-slate-100/70 dark:bg-black/25"
               data-od-id="chat-messages-area"
             >
               {displayedMessages.length === 0 && isLoadingMessages && !showOnlyStarred ? (
@@ -2231,7 +2233,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
             </div>
 
             {/* Barra de Envio Inferior: toggle integrado no topo do input */}
-            <footer className="p-2.5 sm:p-3.5 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 shrink-0">
+            <footer className="p-2.5 sm:p-3.5 bg-white/70 dark:bg-white/[0.03] backdrop-blur-xl border-t border-slate-900/[0.06] dark:border-white/[0.07] shrink-0">
               {whatsappBlocked ? (
                 <p id="composer-notice" className="mb-2 flex items-center gap-1.5 text-xs font-medium text-rose-700 dark:text-rose-400">
                   <AlertTriangle className="w-3.5 h-3.5 shrink-0" aria-hidden />
@@ -2301,7 +2303,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                 >
                   {/* Toggle de Modo: integrado no topo do card do input */}
                   <div className="flex items-center justify-between px-2 py-1.5">
-                    <div className="inline-flex p-0.5 bg-slate-100 dark:bg-slate-800 rounded-full text-xs font-medium">
+                    <div className="inline-flex p-0.5 bg-slate-900/5 dark:bg-white/[0.06] rounded-full text-xs font-medium">
                       <button
                         type="button"
                         onClick={() => setComposerMode('whatsapp')}
@@ -2623,7 +2625,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
          ========================================================================= */}
       {selectedContact && (
         <aside
-          className={`w-full lg:w-[320px] lg:min-w-[320px] lg:max-w-[320px] bg-slate-100 dark:bg-slate-950 border-l border-slate-200 dark:border-slate-800 shadow-sm flex-col h-full shrink-0 overflow-y-auto ${
+          className={`w-full lg:w-[320px] lg:min-w-[320px] lg:max-w-[320px] bg-slate-50/80 dark:bg-[rgb(26_27_33/0.66)] md:glass-surface flex-col h-full shrink-0 overflow-y-auto ${
             mobileView === 'crm'
               ? 'flex absolute inset-0 z-40 bg-slate-50 dark:bg-slate-900 animate-in slide-in-from-right duration-200'
               // Esconde enquanto o painel de agendamento está aberto — os dois disputam a
@@ -2659,7 +2661,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
           <div className="p-4 space-y-4">
             {/* Card 0: Copilot de sugestões de resposta */}
             {onGenerateCopilotSuggestions && (
-              <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 space-y-3">
+              <div className="bg-white/80 dark:bg-white/[0.05] rounded-[1.25rem] ring-1 ring-slate-900/5 dark:ring-white/[0.06] p-4 space-y-3">
                 <div className="flex items-center justify-between gap-2">
                   <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
                     <Sparkles className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
@@ -2722,7 +2724,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
             )}
 
             {/* Card 1: Perfil do Contato */}
-            <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 space-y-3">
+            <div className="bg-white/80 dark:bg-white/[0.05] rounded-[1.25rem] ring-1 ring-slate-900/5 dark:ring-white/[0.06] p-4 space-y-3">
               <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-700/60 pb-3">
                 <div className="flex items-center gap-3 min-w-0">
                   <AvatarBadge name={displayName(selectedContact)} photoUrl={selectedContact.avatar} size={44} className="ring-2 ring-white dark:ring-slate-900 shadow-sm shrink-0" />
@@ -2882,7 +2884,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
               const past = selectedContact.consultationHistory.filter((c) => !c.isUpcoming);
 
               return (
-                <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 space-y-3">
+                <div className="bg-white/80 dark:bg-white/[0.05] rounded-[1.25rem] ring-1 ring-slate-900/5 dark:ring-white/[0.06] p-4 space-y-3">
                   {upcoming.length > 0 && (
                     <div className="space-y-1.5">
                       <label className="text-xs font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
@@ -2904,7 +2906,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
             })()}
 
             {/* Card 2: Tags & Observações */}
-            <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 space-y-2">
+            <div className="bg-white/80 dark:bg-white/[0.05] rounded-[1.25rem] ring-1 ring-slate-900/5 dark:ring-white/[0.06] p-4 space-y-2">
               <div className="flex items-center justify-between">
                 <label className="text-sm font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
                   <Tag className="w-3.5 h-3.5 text-slate-400" /> Tags do Paciente
@@ -2970,7 +2972,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
             {/* Card 3: Transferir Atendimento — combobox pesquisável em vez da lista
                 aberta de botões (que, com muitos atendentes, empurrava o resto do
                 CRM pra fora da tela) + confirmação em modal rápido. */}
-            <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 space-y-2">
+            <div className="bg-white/80 dark:bg-white/[0.05] rounded-[1.25rem] ring-1 ring-slate-900/5 dark:ring-white/[0.06] p-4 space-y-2">
               <label className="text-sm font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
                 <UserPlus className="w-3.5 h-3.5 text-slate-400" /> Transferir Atendimento Para
               </label>
@@ -3025,7 +3027,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
 
 
             {/* Card 4: Etapa do Atendimento (seleção única — só a etapa atual fica em destaque) */}
-            <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 space-y-2.5">
+            <div className="bg-white/80 dark:bg-white/[0.05] rounded-[1.25rem] ring-1 ring-slate-900/5 dark:ring-white/[0.06] p-4 space-y-2.5">
               <label className="text-sm font-semibold text-slate-700 dark:text-slate-200">
                 Etapa do Atendimento
               </label>
