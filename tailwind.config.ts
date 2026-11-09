@@ -6,6 +6,8 @@ const config: Config = {
     "./src/pages/**/*.{js,ts,jsx,tsx,mdx}",
     "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
     "./src/app/**/*.{js,ts,jsx,tsx,mdx}",
+    // Paletas por extenso em src/lib (ex.: avatar-tone.ts).
+    "./src/lib/**/*.{ts,tsx}",
   ],
   theme: {
     extend: {
