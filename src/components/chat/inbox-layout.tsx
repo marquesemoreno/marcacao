@@ -1713,7 +1713,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                 <div
                   role="heading"
                   aria-level={3}
-                  className="sticky top-0 z-[5] flex items-center justify-between bg-slate-100/95 dark:bg-slate-900/95 backdrop-blur-sm px-4 py-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300"
+                  className="sticky top-0 z-[5] flex items-center justify-between bg-white/60 dark:bg-[rgb(26_27_33/0.7)] backdrop-blur-xl px-4 py-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300"
                 >
                   <span title={group === 'esquecidas' ? 'Pacientes que escreveram há mais de 48 h e ainda esperam resposta — ficam depois de quem escreveu nas últimas 48 h, para não esconder quem acabou de chegar.' : undefined}>
                     {QUEUE_GROUP_LABEL[group]}
@@ -2635,7 +2635,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                 ? 'hidden'
                 : isCrmPanelOverlay
                   // P3: notebook (< 1366px) — gaveta por cima da conversa, não espreme o chat.
-                  ? 'hidden lg:flex lg:absolute lg:inset-y-0 lg:right-0 lg:z-30 lg:shadow-2xl animate-in slide-in-from-right duration-200'
+                  ? 'hidden lg:flex lg:absolute lg:inset-y-3 lg:right-3 lg:!h-auto lg:z-30 lg:shadow-2xl animate-in slide-in-from-right duration-200'
                   : 'hidden lg:flex'
           }`}
           data-od-id="inbox-crm-column"
