@@ -151,7 +151,9 @@ async function main() {
   });
 
   const hash = await bcrypt.hash(password, 10);
-  const manager = await prisma.user.create({ data: { name: "Gestão Demo", email: MANAGER_EMAIL, passwordHash: hash, role: "CLINIC", clinicId: clinic.id, isAttendant: false } });
+  const manager = await prisma.user.create({ data: { name: "Gestão Demo", email: MANAGER_EMAIL, passwordHash: hash, role: "CLINIC", clinicId: clinic.id, isAttendant: false, isManager: true, clinicRole: "GESTAO" } });
+  // Login de médico (vídeo 3): vê a ficha prévia só dos pacientes dele de hoje e chama na TV.
+  await prisma.user.create({ data: { name: DOCTORS[0], email: `livia@${DOMAIN}`, passwordHash: hash, role: "CLINIC", clinicId: clinic.id, isAttendant: false, clinicRole: "MEDICO", doctorName: DOCTORS[0] } });
   const attendants = await Promise.all(
     ["Ana Souza", "Bruno Lima", "Carla Mendes"].map((name) =>
       prisma.user.create({
@@ -324,20 +326,26 @@ async function main() {
 
   // ---------- Agenda ----------
   const today = dateOf(0);
-  // Hoje: todos os estados. Chegadas relativas a agora (rode o seed na manhã da gravação).
+  // Hoje: todos os estados, com horários em volta de AGORA (rodar a qualquer hora do dia dá uma
+  // agenda coerente: atendidos antes, chegou/em atendimento perto de agora, confirmados depois).
+  const slotBase = Math.floor((now.getHours() * 60 + now.getMinutes()) / 30) * 30;
+  const at = (off: number) => {
+    const m = Math.min(Math.max(slotBase + off, 6 * 60), 22 * 60);
+    return `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+  };
   const TODAY: { time: string; p: number; doc: number; proc: number; status: "PENDING" | "CONFIRMED"; reminder: string | null; mark?: string; arrivedMinAgo?: number; ficha?: boolean }[] = [
-    { time: "07:30", p: 0, doc: 0, proc: 0, status: "CONFIRMED", reminder: "CONFIRMED", mark: "COMPLETED", ficha: true },
-    { time: "08:00", p: 1, doc: 1, proc: 1, status: "CONFIRMED", reminder: "CONFIRMED", mark: "COMPLETED" },
-    { time: "08:30", p: 2, doc: 2, proc: 4, status: "CONFIRMED", reminder: "SENT", mark: "NO_SHOW" },
-    { time: "09:00", p: 3, doc: 0, proc: 0, status: "CONFIRMED", reminder: "CONFIRMED", mark: "IN_ROOM", arrivedMinAgo: 35, ficha: true },
-    { time: "09:30", p: 4, doc: 1, proc: 3, status: "CONFIRMED", reminder: "CONFIRMED", mark: "IN_SERVICE", arrivedMinAgo: 22, ficha: true },
-    { time: "10:00", p: 5, doc: 2, proc: 4, status: "CONFIRMED", reminder: "CONFIRMED", mark: "IN_SERVICE", arrivedMinAgo: 9, ficha: true },
-    { time: "10:30", p: 6, doc: 0, proc: 2, status: "CONFIRMED", reminder: "CONFIRMED" },
-    { time: "11:00", p: 7, doc: 1, proc: 0, status: "CONFIRMED", reminder: "CONFIRMED", ficha: true },
-    { time: "14:00", p: 8, doc: 2, proc: 4, status: "PENDING", reminder: "SENT" },
-    { time: "15:00", p: 9, doc: 0, proc: 1, status: "CONFIRMED", reminder: "CONFIRMED" },
-    { time: "16:00", p: 10, doc: 1, proc: 3, status: "PENDING", reminder: null },
-    { time: "16:30", p: 11, doc: 2, proc: 2, status: "CONFIRMED", reminder: "CONFIRMED" },
+    { time: at(-180), p: 0, doc: 0, proc: 0, status: "CONFIRMED", reminder: "CONFIRMED", mark: "COMPLETED", ficha: true },
+    { time: at(-150), p: 1, doc: 1, proc: 1, status: "CONFIRMED", reminder: "CONFIRMED", mark: "COMPLETED" },
+    { time: at(-120), p: 2, doc: 2, proc: 4, status: "CONFIRMED", reminder: "SENT", mark: "NO_SHOW" },
+    { time: at(-30), p: 3, doc: 0, proc: 0, status: "CONFIRMED", reminder: "CONFIRMED", mark: "IN_ROOM", arrivedMinAgo: 35, ficha: true },
+    { time: at(0), p: 4, doc: 1, proc: 3, status: "CONFIRMED", reminder: "CONFIRMED", mark: "IN_SERVICE", arrivedMinAgo: 22, ficha: true },
+    { time: at(30), p: 5, doc: 2, proc: 4, status: "CONFIRMED", reminder: "CONFIRMED", mark: "IN_SERVICE", arrivedMinAgo: 9, ficha: true },
+    { time: at(60), p: 6, doc: 0, proc: 2, status: "CONFIRMED", reminder: "CONFIRMED" },
+    { time: at(90), p: 7, doc: 1, proc: 0, status: "CONFIRMED", reminder: "CONFIRMED", ficha: true },
+    { time: at(120), p: 8, doc: 2, proc: 4, status: "PENDING", reminder: "SENT" },
+    { time: at(150), p: 9, doc: 0, proc: 1, status: "CONFIRMED", reminder: "CONFIRMED" },
+    { time: at(180), p: 10, doc: 1, proc: 3, status: "PENDING", reminder: null },
+    { time: at(210), p: 11, doc: 2, proc: 2, status: "CONFIRMED", reminder: "CONFIRMED" },
   ];
   const template = await prisma.formTemplate.create({
     data: { clinicId: clinic.id, kind: "ANAMNESE", name: "Ficha prévia", version: 1, body: DEFAULT_ANAMNESE_TEMPLATE as unknown as Prisma.InputJsonValue, active: true },
@@ -461,14 +469,13 @@ async function main() {
     });
     return code;
   };
-  const byTime = (t: string) => todayAppts.find((a) => a.time === t)!;
-  const c1 = await ticket({ svc: 0, status: "DONE", appt: byTime("07:30"), minAgo: 120, calledMinAgo: 100 });
-  const c2 = await ticket({ svc: 1, status: "DONE", appt: byTime("08:00"), minAgo: 90, calledMinAgo: 70 });
-  const c3 = await ticket({ svc: 0, status: "CALLED", appt: byTime("09:00"), minAgo: 35, calledMinAgo: 6 });
-  await ticket({ svc: 0, status: "WAITING", appt: byTime("09:30"), minAgo: 22 });
-  await ticket({ svc: 0, status: "WAITING", appt: byTime("10:00"), minAgo: 9 });
+  const c1 = await ticket({ svc: 0, status: "DONE", appt: todayAppts[0], minAgo: 120, calledMinAgo: 100 });
+  const c2 = await ticket({ svc: 1, status: "DONE", appt: todayAppts[1], minAgo: 90, calledMinAgo: 70 });
+  const c3 = await ticket({ svc: 0, status: "CALLED", appt: todayAppts[3], minAgo: 35, calledMinAgo: 6 });
+  await ticket({ svc: 0, status: "WAITING", appt: todayAppts[4], minAgo: 22 });
+  await ticket({ svc: 0, status: "WAITING", appt: todayAppts[5], minAgo: 9 });
   await ticket({ svc: 2, type: "P", status: "WAITING", minAgo: 5, name: "Sr. Otávio Brandão" });
-  for (const [code, appt, minAgo] of [[c1, byTime("07:30"), 100], [c2, byTime("08:00"), 70], [c3, byTime("09:00"), 6]] as const) {
+  for (const [code, appt, minAgo] of [[c1, todayAppts[0], 100], [c2, todayAppts[1], 70], [c3, todayAppts[3], 6]] as const) {
     await prisma.patientCall.create({
       data: { clinicId: clinic.id, source: "LOCAL", externalId: appt.id, displayName: code, spokenName: PATIENTS[appt.p], doctor: DOCTORS[appt.doc], room: ROOMS[appt.doc], ticketCode: code, calledByUserId: attendants[0].id, createdAt: new Date(now.getTime() - minutes(minAgo)) },
     });
@@ -518,6 +525,7 @@ async function main() {
   const base = "https://conectasaudevc.com.br";
   console.log(`Clínica demo criada: ${clinic.tradeName} (${clinic.id})`);
   console.log(`Login: ${MANAGER_EMAIL} — senha em DEMO_PASSWORD no .env (atendentes: ana@, bruno@, carla@${DOMAIN}, mesma senha).`);
+  console.log(`Médico: livia@${DOMAIN} (mesma senha) — vê a ficha prévia dos pacientes dela de hoje.`);
   console.log(`TV:          ${base}/tv/${tvRaw}`);
   console.log(`Totem:       ${base}/totem/${totemRaw}`);
   console.log(`QR chegada:  ${base}/chegada/${qrRaw}`);
