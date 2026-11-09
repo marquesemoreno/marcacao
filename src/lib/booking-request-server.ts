@@ -1,16 +1,10 @@
 import "server-only";
-import OpenAI from "openai";
+import type OpenAI from "openai";
+import { aiChat, isAiConfigured } from "@/lib/ai-gateway";
+import { privacyForConversation } from "@/lib/ai-privacy-context";
 import { prisma } from "@/lib/prisma";
 import { BOOKING_EXTRACTION_PROMPT, bookingRequestAction, parseBookingExtraction } from "@/lib/booking-request";
 import { notifyAgenda } from "@/lib/realtime-server";
-
-let client: OpenAI | null = null;
-function openai(): OpenAI | null {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) return null;
-  if (!client) client = new OpenAI({ apiKey });
-  return client;
-}
 
 /** Depois que o Jev disse "Quer agendar": a IA lê as últimas mensagens do paciente e cria
  * (ou atualiza) o pedido de marcação da recepção. Nunca lança; sem OpenAI não faz nada. */
@@ -23,8 +17,7 @@ export type SavedBookingRequest = {
 
 export async function upsertBookingRequestFromConversation(conversationId: string): Promise<SavedBookingRequest | null> {
   try {
-    const ai = openai();
-    if (!ai) return null;
+    if (!isAiConfigured()) return null;
     const conversation = await prisma.conversation.findUnique({
       where: { id: conversationId },
       select: { clinicId: true, contact: { select: { phone: true, name: true } } },
@@ -37,7 +30,8 @@ export async function upsertBookingRequestFromConversation(conversationId: strin
       select: { content: true },
     });
     if (recent.length === 0) return null;
-    const completion = await ai.chat.completions.create({
+    const privacy = await privacyForConversation(conversationId);
+    const completion = await aiChat({ ...privacy, feature: "pedido-marcacao" }, {
       model: process.env.OPENAI_MODEL || "gpt-4o-mini",
       messages: [
         { role: "system", content: BOOKING_EXTRACTION_PROMPT },

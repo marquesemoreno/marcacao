@@ -52,7 +52,7 @@ export async function GET(request: Request) {
       pinned: true,
       tags: true,
       lastMessageAt: true,
-      contact: { select: { phone: true } },
+      contact: { select: { phone: true, name: true } },
       clinic: { select: { hospitalIntegration: { select: { remindersPausedUntil: true } } } },
       // Nota interna não conta — o que importa é a conversa com o paciente.
       messages: {
@@ -81,7 +81,7 @@ export async function GET(request: Request) {
         const mensagens = [...c.messages]
           .reverse()
           .map((m) => ({ de: m.direction === "INBOUND" ? "paciente" : "clínica", texto: (m.content || "[mídia]").slice(0, 400) }));
-        endings.set(c.id, endingFromJevAnswer(await askJevChoice({ mensagens }, CONVERSATION_ENDING_QUESTION)));
+        endings.set(c.id, endingFromJevAnswer(await askJevChoice({ mensagens }, CONVERSATION_ENDING_QUESTION, { clinicId: c.clinicId, knownNames: [c.contact.name], feature: "atendente-encerramento" })));
       })
     );
   }

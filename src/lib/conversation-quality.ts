@@ -1,5 +1,7 @@
 import "server-only";
-import OpenAI from "openai";
+import type OpenAI from "openai";
+import { aiChat, isAiConfigured } from "@/lib/ai-gateway";
+import { privacyForConversation } from "@/lib/ai-privacy-context";
 import { prisma } from "@/lib/prisma";
 import { computeResponseTimingsFromMessages, type ResponseTimings } from "@/lib/response-timings";
 
@@ -20,19 +22,11 @@ export async function computeResponseTimings(conversationId: string): Promise<Re
   return computeResponseTimingsFromMessages(messages, conversation?.resolvedAt ?? null);
 }
 
-let client: OpenAI | null = null;
-function getOpenAiClient(): OpenAI | null {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) return null;
-  if (!client) client = new OpenAI({ apiKey });
-  return client;
-}
-
 type SentimentAnalysis = { sentiment: "POSITIVO" | "NEUTRO" | "NEGATIVO"; summary: string; complianceNotes: string } | null;
 
 async function analyzeSentiment(conversationId: string): Promise<SentimentAnalysis> {
-  const openai = getOpenAiClient();
-  if (!openai) return null;
+  if (!isAiConfigured()) return null;
+  const privacy = { ...(await privacyForConversation(conversationId)), feature: "qualidade" as const };
 
   // Mesmo padrão de ai-copilot.ts: orderBy desc + take + reverse() (nunca orderBy asc +
   // take, que pega as mensagens mais ANTIGAS em conversa longa — bug já corrigido antes).
@@ -61,7 +55,7 @@ Responda em JSON, exatamente neste formato:
   ];
 
   try {
-    const completion = await openai.chat.completions.create({
+    const completion = await aiChat(privacy, {
       model: process.env.OPENAI_MODEL || "gpt-4o-mini",
       messages: conversationMessages,
       response_format: { type: "json_object" },

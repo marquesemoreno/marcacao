@@ -1,7 +1,9 @@
 "use server";
 import "server-only";
 
-import OpenAI from "openai";
+import type OpenAI from "openai";
+import { aiChat, isAiConfigured } from "@/lib/ai-gateway";
+import { privacyForClinic } from "@/lib/ai-privacy-context";
 import { requireClinicSession } from "@/lib/session";
 import { updateAppointmentStatus } from "@/actions/clinic";
 import { createClinicBroadcastCampaign } from "@/actions/clinic-broadcast";
@@ -30,14 +32,6 @@ Regras obrigatórias:
 2. Depois de chamar cancelAppointment ou createCampaignDraft, explique o que foi encontrado e deixe claro que está aguardando a confirmação da recepcionista — nunca diga que "já cancelou" ou "já enviou".
 3. Seja objetivo e direto (poucas frases).`;
 
-let client: OpenAI | null = null;
-function getOpenAiClient(): OpenAI | null {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) return null;
-  if (!client) client = new OpenAI({ apiKey });
-  return client;
-}
-
 /** Igual a generateAiReply (ai-attendant.ts): nunca deixa uma falha da OpenAI (rate
  * limit, modelo indisponível, chave inválida) ou de uma tool virar erro 500 pro
  * client — o Next redige exceções não tratadas em produção (só um digest sem
@@ -45,8 +39,7 @@ function getOpenAiClient(): OpenAI | null {
  * "algo deu errado" sem explicação nenhuma. Captura e devolve mensagem amigável. */
 export async function runCopilotCommand(history: CopilotChatMessage[]): Promise<CopilotTurnResult> {
   const { clinicId } = await requireClinicSession();
-  const openai = getOpenAiClient();
-  if (!openai) {
+  if (!isAiConfigured()) {
     return { message: "O assistente de IA não está configurado neste ambiente (falta OPENAI_API_KEY)." };
   }
 
@@ -56,7 +49,8 @@ export async function runCopilotCommand(history: CopilotChatMessage[]): Promise<
       ...history.slice(-20).map((m) => ({ role: m.role, content: m.content })),
     ];
 
-    const first = await openai.chat.completions.create({
+    const privacy = await privacyForClinic(clinicId);
+    const first = await aiChat({ ...privacy, feature: "copiloto-recepcao" }, {
       model: process.env.OPENAI_MODEL || "gpt-4o-mini",
       messages: conversationMessages,
       tools: ASSISTANT_TOOL_DEFINITIONS,
@@ -80,7 +74,12 @@ export async function runCopilotCommand(history: CopilotChatMessage[]): Promise<
     );
     const pendingAction = executed.find((e) => e.result.pendingAction)?.result.pendingAction;
 
-    const second = await openai.chat.completions.create({
+    // Nomes de pacientes que as ferramentas devolveram também viram token para o modelo
+    // (e voltam com o nome real na resposta mostrada à recepcionista).
+    const patientNames = executed.flatMap(({ result }) =>
+      result.pendingAction?.kind === "cancelAppointment" ? result.pendingAction.candidates.map((c) => c.patientName) : [],
+    );
+    const second = await aiChat({ ...privacy, knownNames: patientNames, feature: "copiloto-recepcao" }, {
       model: process.env.OPENAI_MODEL || "gpt-4o-mini",
       messages: [
         ...conversationMessages,

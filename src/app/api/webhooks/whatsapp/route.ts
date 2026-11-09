@@ -38,6 +38,7 @@ import { isKnownMspLeadPhone } from "@/lib/msp-lead-outreach";
 import { isKnownPartnerLeadPhone } from "@/lib/ai-lead-outreach";
 import { resolveStatusFromReply, isRescheduleReply, isWrongNumberReply, wasSentConfirmationPrompt } from "@/lib/appointment-reply";
 import { classifyAppointmentReply } from "@/lib/appointment-reply-ai";
+import { privacyForConversation } from "@/lib/ai-privacy-context";
 import { buildBridgeConfirmationFollowUp } from "@/lib/bridge-confirmation";
 import { addressReply, renderWelcome, shouldSendAddressReply, shouldSendWelcome } from "@/lib/welcome-message";
 import { extractBridgeNumeroFromNotes, confirmBridgeAppointment, verifyBridgeAppointmentPersisted } from "@/lib/hospital-bridge";
@@ -1198,7 +1199,11 @@ async function processWhatsappWebhook(body: Prisma.InputJsonValue, forcedClinicI
   // "Executiva": a ação decidida aqui é executada de verdade (confirma/cancela o
   // agendamento), sem revisão humana antes — ver aviso de auditoria abaixo.
   if (isConfirmationContext && !newStatus && !rescheduleRequested) {
-    const aiAction = await classifyAppointmentReply(incoming.text, lastOutbound?.content);
+    const aiAction = await classifyAppointmentReply(
+      incoming.text,
+      lastOutbound?.content,
+      conversation ? await privacyForConversation(conversation.id) : {},
+    );
     if (aiAction === "CONFIRMED") {
       newStatus = aiAction;
       classifiedByAi = true;

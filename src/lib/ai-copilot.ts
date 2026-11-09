@@ -1,18 +1,12 @@
 import "server-only";
-import OpenAI from "openai";
+import type OpenAI from "openai";
+import { aiChat, isAiConfigured } from "@/lib/ai-gateway";
+import { privacyForConversation } from "@/lib/ai-privacy-context";
 import { prisma } from "@/lib/prisma";
 import { buildClinicKnowledgeContext } from "@/lib/clinic-knowledge";
 
 const DEFAULT_INSTRUCTIONS =
   "Responda dúvidas gerais sobre agendamento, horários e procedimentos com cordialidade e objetividade.";
-
-let client: OpenAI | null = null;
-function getOpenAiClient(): OpenAI | null {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) return null;
-  if (!client) client = new OpenAI({ apiKey });
-  return client;
-}
 
 /**
  * Sugestões de resposta pro atendente revisar e decidir se usa — bem diferente
@@ -31,8 +25,8 @@ export async function generateReplySuggestions(
   clinicName: string,
   quotedMessageContent?: string
 ): Promise<string[]> {
-  const openai = getOpenAiClient();
-  if (!openai) return [];
+  if (!isAiConfigured()) return [];
+  const privacy = { ...(await privacyForConversation(conversationId)), clinicId, feature: "copiloto" as const };
 
   // `orderBy: desc` + `take: 20` + reverse — ver mesma correção e nota em ai-attendant.ts
   // (generateAiReply): com `orderBy: asc`, `take: 20` pegava as 20 mensagens mais ANTIGAS
@@ -78,7 +72,7 @@ Responda em JSON, exatamente neste formato: {"suggestions": ["sugestão 1", "sug
   ];
 
   try {
-    const completion = await openai.chat.completions.create({
+    const completion = await aiChat(privacy, {
       model: process.env.OPENAI_MODEL || "gpt-4o-mini",
       messages: conversationMessages,
       response_format: { type: "json_object" },

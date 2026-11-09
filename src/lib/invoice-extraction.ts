@@ -1,18 +1,11 @@
 import "server-only";
-import OpenAI from "openai";
+import type OpenAI from "openai";
+import { aiChat, isAiConfigured, type AiCallContext } from "@/lib/ai-gateway";
 import { isValidCpf } from "@/lib/cpf";
 import { formatCpf, formatCurrency } from "@/lib/format";
 import type { InvoiceData } from "@/lib/chat-messages";
 
 export type { InvoiceData };
-
-let client: OpenAI | null = null;
-function getOpenAiClient(): OpenAI | null {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) return null;
-  if (!client) client = new OpenAI({ apiKey });
-  return client;
-}
 
 const EXTRACT_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
   type: "function",
@@ -45,12 +38,14 @@ function parseBrazilianCurrency(raw: string): number | null {
  * classifyAppointmentReply (appointment-reply-ai.ts): campos fixos, tool_choice forçado,
  * mais confiável que pedir JSON livre pra um schema com vários campos opcionais.
  * `null` sem OPENAI_API_KEY ou em qualquer falha — nunca lança. */
-export async function extractInvoiceData(text: string): Promise<InvoiceData | null> {
-  const openai = getOpenAiClient();
-  if (!openai) return null;
+export async function extractInvoiceData(
+  text: string,
+  privacy: Omit<AiCallContext, "feature"> = {},
+): Promise<InvoiceData | null> {
+  if (!isAiConfigured()) return null;
 
   try {
-    const completion = await openai.chat.completions.create({
+    const completion = await aiChat({ ...privacy, feature: "nota-fiscal" }, {
       model: process.env.OPENAI_MODEL || "gpt-4o-mini",
       messages: [
         {

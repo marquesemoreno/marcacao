@@ -1,6 +1,6 @@
 "use server";
 
-import OpenAI from "openai";
+import { aiChat, isAiConfigured } from "@/lib/ai-gateway";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireClinicManager, requireClinicSession } from "@/lib/session";
@@ -76,10 +76,6 @@ export async function setProcessPublished(id: string, published: boolean) {
   revalidatePath(PATH);
 }
 
-function openai(): OpenAI | null {
-  return process.env.OPENAI_API_KEY ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) : null;
-}
-
 /** Dúvida: a IA responde só pelo texto do processo. Fica registrada para a gestão ver o que a
  * equipe pergunta; sem resposta no texto, vai como dúvida em aberto. */
 export async function askProcess(id: string, question: string): Promise<{ answered: boolean; text: string }> {
@@ -88,10 +84,9 @@ export async function askProcess(id: string, question: string): Promise<{ answer
   const q = question.trim().slice(0, 500);
   if (q.length < 5) throw new Error("Escreva a dúvida.");
   let result: ReturnType<typeof interpretProcessAnswer> = { answered: false };
-  const ai = openai();
-  if (ai) {
+  if (isAiConfigured()) {
     try {
-      const completion = await ai.chat.completions.create({
+      const completion = await aiChat({ feature: "processos", clinicId }, {
         model: process.env.OPENAI_MODEL || "gpt-4o-mini",
         messages: [
           { role: "system", content: processQuestionPrompt(p.title, p.body) },

@@ -26,6 +26,7 @@ import { assignmentSeenAtFor } from "@/lib/conversation-assignment";
 import { getAiAttendantConfig } from "@/lib/ai-attendant";
 import { analyzeConversationQuality } from "@/lib/conversation-quality";
 import { extractInvoiceData, type InvoiceData } from "@/lib/invoice-extraction";
+import { privacyForConversation } from "@/lib/ai-privacy-context";
 import { processDocumentMessage } from "@/lib/documents/document-processor";
 import { validateExtractedDocument, type DocumentReviewData } from "@/lib/documents/document-validator";
 import { mentionsInvoiceRequest } from "@/lib/chat-messages";
@@ -1072,7 +1073,7 @@ export async function extractMessageInvoiceDataAdmin(messageId: string) {
     return { success: true as const, data: message.extractedInvoiceData as InvoiceData };
   }
 
-  const data = await extractInvoiceData(message.content);
+  const data = await extractInvoiceData(message.content, await privacyForConversation(message.conversationId));
   if (!data) {
     return { success: false as const, error: "Não foi possível extrair dados dessa mensagem. Tente de novo." };
   }
