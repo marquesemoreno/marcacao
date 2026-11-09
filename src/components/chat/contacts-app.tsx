@@ -330,7 +330,9 @@ export function ContactsApp({ scope, basePath }: { scope: Scope; basePath: strin
   }
 
   return (
-    <div className="flex-1 space-y-5 overflow-y-auto p-4 sm:p-6 font-sans text-slate-900 dark:text-slate-100">
+    // Visual "vidro" (09/11/2026, DESIGN.md §5): fundo em gradiente + cartões translúcidos.
+    <div className="soft-canvas flex-1 overflow-y-auto font-sans text-slate-900 dark:text-slate-100">
+    <div className="mx-auto w-full max-w-7xl space-y-5 p-4 sm:p-6 md:p-8">
       <PageHeader
         title="Pacientes"
         subtitle={
@@ -347,14 +349,14 @@ export function ContactsApp({ scope, basePath }: { scope: Scope; basePath: strin
           {scope === "admin" && (
             <button
               onClick={() => setIsImportModalOpen(true)}
-              className="flex items-center gap-1.5 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 px-3.5 py-2 text-xs font-medium text-slate-700 dark:text-slate-300 transition-all shadow-xs"
+              className="flex h-10 items-center gap-1.5 rounded-full bg-white/80 ring-1 ring-slate-900/5 shadow-xs dark:bg-white/[0.08] dark:ring-white/10 hover:bg-white dark:hover:bg-white/[0.14] px-4 text-sm font-medium text-slate-700 dark:text-slate-300 transition-all"
             >
               <Upload className="size-4" aria-hidden /> Importar contatos
             </button>
           )}
           <button
             onClick={() => setIsModalOpen(true)}
-            className="flex items-center gap-1.5 rounded-full bg-emerald-600 hover:bg-emerald-700 px-3.5 py-2 text-xs font-medium text-white transition-all shadow-xs"
+            className="flex h-10 items-center gap-1.5 rounded-full bg-emerald-600 hover:bg-emerald-700 px-4 text-sm font-semibold text-white transition-all shadow-[0_10px_20px_-12px_rgb(5_150_105/0.9)]"
           >
             <UserPlus className="size-4" aria-hidden /> Novo paciente
           </button>
@@ -370,7 +372,7 @@ export function ContactsApp({ scope, basePath }: { scope: Scope; basePath: strin
             onChange={(event) => setSearch(event.target.value)}
             aria-label="Buscar pacientes"
             placeholder="Buscar por nome, telefone, CPF ou convênio…"
-            className="w-full rounded-full border border-transparent bg-slate-100 dark:bg-slate-800 py-2.5 pl-9 pr-3 text-sm outline-none transition-all focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+            className="w-full h-10 rounded-full border border-transparent bg-white/80 ring-1 ring-slate-900/5 shadow-xs dark:bg-white/[0.08] dark:ring-white/10 pl-9 pr-3 text-sm placeholder:text-slate-500 outline-none transition-all focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
           />
         </div>
         {scope === "clinic" && (
@@ -379,7 +381,7 @@ export function ContactsApp({ scope, basePath }: { scope: Scope; basePath: strin
               aria-label="Ordenar"
               value={sort}
               onChange={(e) => updateParams({ ordem: e.target.value === "espera" ? null : e.target.value, page: null })}
-              className="h-9 rounded-full border border-transparent bg-slate-100 dark:bg-slate-800 px-3 text-sm text-slate-700 dark:text-slate-300"
+              className="h-9 rounded-full border border-transparent bg-white/80 ring-1 ring-slate-900/5 shadow-xs dark:bg-white/[0.08] dark:ring-white/10 px-3 text-sm text-slate-700 dark:text-slate-300"
             >
               {PATIENT_SORTS.map((s) => (
                 <option key={s.id} value={s.id}>
@@ -391,7 +393,7 @@ export function ContactsApp({ scope, basePath }: { scope: Scope; basePath: strin
               aria-label="Filtrar por etapa"
               value={stageFilter}
               onChange={(e) => updateParams({ etapa: e.target.value, page: null })}
-              className="h-9 rounded-full border border-transparent bg-slate-100 dark:bg-slate-800 px-3 text-sm text-slate-700 dark:text-slate-300"
+              className="h-9 rounded-full border border-transparent bg-white/80 ring-1 ring-slate-900/5 shadow-xs dark:bg-white/[0.08] dark:ring-white/10 px-3 text-sm text-slate-700 dark:text-slate-300"
             >
               <option value="">Todas as etapas</option>
               <option value="NOVOS">Novo</option>
@@ -404,7 +406,7 @@ export function ContactsApp({ scope, basePath }: { scope: Scope; basePath: strin
               aria-label="Filtrar por atendente"
               value={ownerFilter}
               onChange={(e) => updateParams({ atendente: e.target.value, page: null })}
-              className="h-9 rounded-full border border-transparent bg-slate-100 dark:bg-slate-800 px-3 text-sm text-slate-700 dark:text-slate-300"
+              className="h-9 rounded-full border border-transparent bg-white/80 ring-1 ring-slate-900/5 shadow-xs dark:bg-white/[0.08] dark:ring-white/10 px-3 text-sm text-slate-700 dark:text-slate-300"
             >
               <option value="">Todas as atendentes</option>
               <option value="sem_dono">Sem dono</option>
@@ -418,7 +420,7 @@ export function ContactsApp({ scope, basePath }: { scope: Scope; basePath: strin
               <button
                 type="button"
                 onClick={() => updateParams({ motivo: "", page: null })}
-                className="inline-flex h-9 items-center gap-1.5 rounded-full bg-slate-100 dark:bg-slate-800 px-3 text-xs font-medium text-slate-700 dark:text-slate-200"
+                className="inline-flex h-9 items-center gap-1.5 rounded-full bg-white/80 ring-1 ring-slate-900/5 shadow-xs dark:bg-white/[0.08] dark:ring-white/10 hover:bg-white dark:hover:bg-white/[0.14] px-3 text-xs font-medium text-slate-700 dark:text-slate-200"
                 aria-label={`Remover filtro de motivo: ${outcomeLabel(reasonFilter)}`}
               >
                 Motivo: {outcomeLabel(reasonFilter)}
@@ -430,7 +432,7 @@ export function ContactsApp({ scope, basePath }: { scope: Scope; basePath: strin
               aria-label="Filtrar por convênio"
               value={convenioFilter}
               onChange={(e) => updateParams({ convenio: e.target.value, page: null })}
-              className="h-9 rounded-full border border-transparent bg-slate-100 dark:bg-slate-800 px-3 text-xs text-slate-700 dark:text-slate-300"
+              className="h-9 rounded-full border border-transparent bg-white/80 ring-1 ring-slate-900/5 shadow-xs dark:bg-white/[0.08] dark:ring-white/10 px-3 text-xs text-slate-700 dark:text-slate-300"
             >
               <option value="">Todos os convênios</option>
               {convenios.map((c) => (
@@ -442,7 +444,7 @@ export function ContactsApp({ scope, basePath }: { scope: Scope; basePath: strin
               aria-label="Filtrar por médico da última consulta"
               value={doctorFilter}
               onChange={(e) => updateParams({ doctor: e.target.value, page: null })}
-              className="h-9 rounded-full border border-transparent bg-slate-100 dark:bg-slate-800 px-3 text-xs text-slate-700 dark:text-slate-300"
+              className="h-9 rounded-full border border-transparent bg-white/80 ring-1 ring-slate-900/5 shadow-xs dark:bg-white/[0.08] dark:ring-white/10 px-3 text-xs text-slate-700 dark:text-slate-300"
             >
               <option value="">Todos os médicos</option>
               <optgroup label="Médicos">
@@ -488,14 +490,14 @@ export function ContactsApp({ scope, basePath }: { scope: Scope; basePath: strin
       {/* Celular: um card por paciente (a tabela de 7 colunas exigia rolar na horizontal). */}
       <ul className="lg:hidden space-y-2" aria-label="Contatos">
         {isLoading ? (
-          <li className="rounded-2xl bg-white dark:bg-slate-900 shadow-xs p-6 text-center text-sm text-slate-400">Carregando contatos...</li>
+          <li className="glass-surface p-6 text-center text-sm text-slate-400">Carregando contatos...</li>
         ) : filteredContacts.length === 0 ? (
-          <li className="rounded-2xl bg-white dark:bg-slate-900 shadow-xs p-6 text-center text-sm text-slate-400 italic">
+          <li className="glass-surface p-6 text-center text-sm text-slate-400 italic">
             {search || convenioFilter || doctorFilter ? "Nenhum contato encontrado para esse filtro." : "Nenhum contato cadastrado ainda."}
           </li>
         ) : (
           filteredContacts.map((contact) => (
-            <li key={contact.conversationId} className="rounded-2xl bg-white dark:bg-slate-900 shadow-xs p-3 space-y-2">
+            <li key={contact.conversationId} className="glass-surface !rounded-[1.25rem] p-3 space-y-2">
               <div className="flex items-start justify-between gap-2">
                 <button type="button" onClick={() => handleOpenSheet(contact)} aria-label={`Ver ficha de ${displayName(contact)}`} className="flex min-w-0 items-center gap-2.5 text-left">
                   <AvatarBadge name={displayName(contact)} size={36} />
@@ -545,10 +547,10 @@ export function ContactsApp({ scope, basePath }: { scope: Scope; basePath: strin
           ))
         )}
       </ul>
-      <div className="hidden lg:block overflow-hidden rounded-2xl bg-white dark:bg-slate-900 shadow-xs">
+      <div className="hidden lg:block overflow-hidden glass-surface">
         <Table>
           <TableHeader>
-            <TableRow className="bg-slate-50/70 dark:bg-slate-800/40">
+            <TableRow className="bg-slate-900/[0.03] dark:bg-white/[0.04]">
               <TableHead>Paciente</TableHead>
               <TableHead>Telefone</TableHead>
               <TableHead>CPF / Convênio</TableHead>
@@ -663,7 +665,7 @@ export function ContactsApp({ scope, basePath }: { scope: Scope; basePath: strin
               type="button"
               disabled={page <= 1 || isLoading}
               onClick={() => updateParams({ page: page - 1 })}
-              className="rounded-full bg-slate-100 dark:bg-slate-800 px-3 py-1.5 hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed"
+              className="rounded-full bg-white/80 ring-1 ring-slate-900/5 shadow-xs dark:bg-white/[0.08] dark:ring-white/10 hover:bg-white dark:hover:bg-white/[0.14] px-3 py-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
             >
               Anterior
             </button>
@@ -672,7 +674,7 @@ export function ContactsApp({ scope, basePath }: { scope: Scope; basePath: strin
               type="button"
               disabled={page >= pageCount || isLoading}
               onClick={() => updateParams({ page: page + 1 })}
-              className="rounded-full bg-slate-100 dark:bg-slate-800 px-3 py-1.5 hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed"
+              className="rounded-full bg-white/80 ring-1 ring-slate-900/5 shadow-xs dark:bg-white/[0.08] dark:ring-white/10 hover:bg-white dark:hover:bg-white/[0.14] px-3 py-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
             >
               Próxima
             </button>
@@ -826,6 +828,7 @@ export function ContactsApp({ scope, basePath }: { scope: Scope; basePath: strin
           </div>
         </div>
       )}
+    </div>
     </div>
   );
 }

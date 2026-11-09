@@ -190,7 +190,7 @@ export function PatientListTable({
   return (
     <div className="space-y-2">
       {selected.size > 0 && (
-        <div className="sticky top-0 z-10 flex flex-wrap items-center gap-2 rounded-xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/60 px-3 py-2 text-sm">
+        <div className="sticky top-0 z-10 flex flex-wrap items-center gap-2 rounded-2xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50/90 dark:bg-emerald-950/70 backdrop-blur-xl px-4 py-2.5 text-sm">
           <span className="font-semibold text-emerald-900 dark:text-emerald-200">
             {plural(selected.size, "selecionado", "selecionados")}
             {withoutPhone > 0 && <span className="font-normal"> · {plural(withoutPhone, "sem telefone (fica fora do disparo)", "sem telefone (ficam fora do disparo)")}</span>}
@@ -255,7 +255,7 @@ export function PatientListTable({
       {/* Mesmo layout das marcações da Agenda: cartão com iniciais, nome em Nome Próprio, subtítulo,
           selos de situação/etapa e um botão de ação. */}
       {loadError ? (
-        <div role="alert" className="rounded-2xl bg-white dark:bg-slate-900 shadow-xs py-10 px-4 text-center">
+        <div role="alert" className="glass-surface py-10 px-4 text-center">
           <p className="flex items-center justify-center gap-2 text-sm font-semibold text-slate-800 dark:text-slate-100">
             <AlertTriangle className="w-4 h-4 text-amber-600" aria-hidden /> Não foi possível carregar os pacientes.
           </p>
@@ -263,26 +263,26 @@ export function PatientListTable({
           <button
             type="button"
             onClick={onRetry}
-            className="mt-3 inline-flex h-9 items-center gap-2 rounded-full bg-slate-100 dark:bg-slate-800 px-3 text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700"
+            className="mt-3 inline-flex h-9 items-center gap-2 rounded-full bg-white/80 ring-1 ring-slate-900/5 shadow-xs dark:bg-white/[0.08] dark:ring-white/10 hover:bg-white dark:hover:bg-white/[0.14] px-4 text-sm font-medium text-slate-700 dark:text-slate-200"
           >
             <RefreshCw className="w-4 h-4" aria-hidden /> Tentar de novo
           </button>
         </div>
       ) : isLoading ? (
-        <div role="status" className="rounded-2xl bg-white dark:bg-slate-900 shadow-xs py-10 text-center text-sm text-slate-500">
+        <div role="status" className="glass-surface py-10 text-center text-sm text-slate-500">
           <span className="inline-flex items-center gap-2">
             <Loader2 className="w-4 h-4 animate-spin" aria-hidden /> Carregando pacientes…
           </span>
         </div>
       ) : rows.length === 0 ? (
-        <div className="rounded-2xl bg-white dark:bg-slate-900 shadow-xs py-10 px-4 text-center text-sm text-slate-500">{emptyMessage}</div>
+        <div className="glass-surface py-10 px-4 text-center text-sm text-slate-500">{emptyMessage}</div>
       ) : (
         <>
           <label className="flex w-fit items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
             <input type="checkbox" aria-label="Selecionar todos desta página" checked={pageAllSelected} onChange={togglePage} className="size-4 accent-emerald-600" />
             Selecionar todos desta página
           </label>
-          <ul className="grid gap-2 xl:grid-cols-2" aria-label="Pacientes">
+          <ul className="grid gap-3 xl:grid-cols-2" aria-label="Pacientes">
             {rows.map((r) => {
               const hasName = isUsableContactName(r.name);
               const name = displayName(r);
@@ -295,16 +295,16 @@ export function PatientListTable({
               const isSelected = selected.has(r.conversationId);
               const tone =
                 r.status === "RESOLVED"
-                  ? "border-transparent bg-slate-50 dark:bg-slate-900/60"
+                  ? "border-white/60 bg-white/55 dark:border-white/[0.05] dark:bg-white/[0.03]"
                   : waitingMin !== null
-                    ? "border-dashed border-amber-300 dark:border-amber-700 bg-white dark:bg-slate-900"
-                    : "border-transparent bg-emerald-50/70 dark:bg-emerald-950/25";
+                    ? "border-dashed border-amber-300 dark:border-amber-700 bg-white/85 dark:bg-[rgb(26_27_33/0.66)]"
+                    : "border-white/60 bg-emerald-50/75 dark:border-white/[0.05] dark:bg-emerald-950/30";
               const badge = "inline-flex h-6 items-center gap-1 rounded-full border px-2 text-xs font-semibold";
               return (
                 <li
                   key={r.conversationId}
                   data-state={isSelected ? "selected" : undefined}
-                  className={`relative rounded-xl border ${tone} shadow-xs transition-shadow hover:shadow-md ${isSelected ? "ring-2 ring-emerald-500/40" : ""}`}
+                  className={`relative rounded-[1.25rem] border ${tone} backdrop-blur-xl shadow-[0_1px_2px_rgb(15_23_42/0.04),0_12px_28px_-18px_rgb(15_23_42/0.25)] transition-shadow hover:shadow-md ${isSelected ? "ring-2 ring-emerald-500/40" : ""}`}
                 >
                   <div className="flex items-start">
                     <input
