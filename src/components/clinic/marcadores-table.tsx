@@ -1,6 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { AvatarBadge } from "@/components/chat/avatar-badge";
+import { avatarTone } from "@/lib/avatar-tone";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Check, Copy, Loader2, Search, Upload, X } from "lucide-react";
@@ -14,7 +16,7 @@ function formatPhone(p: string): string {
 }
 
 const pct = (n: number) => `${Math.round(n * 100)}%`;
-const panel = "rounded-2xl bg-white dark:bg-slate-900 shadow-xs";
+const panel = "glass-surface";
 
 /** Tabela de marcadores em dois modos: "cadastro" (página Marcadores: link pessoal pra copiar,
  * ativar/desativar e importar lista colada) e "relatorio" (Relatórios › Marcadores: indicados →
@@ -110,7 +112,7 @@ export function MarcadoresTable({
       )}
 
       {!report && !hasClinicWhatsapp && (
-        <p className="rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 px-3 py-2 text-sm text-amber-900 dark:text-amber-200">
+        <p className="rounded-2xl border border-amber-200 dark:border-amber-800 bg-amber-50/85 dark:bg-amber-950/40 backdrop-blur-xl px-4 py-2.5 text-sm text-amber-900 dark:text-amber-200">
           Cadastre o WhatsApp da clínica em Configurações para gerar os links dos marcadores.
         </p>
       )}
@@ -123,7 +125,7 @@ export function MarcadoresTable({
             onChange={(e) => setQuery(e.target.value)}
             aria-label="Buscar marcador"
             placeholder="Buscar por nome ou telefone…"
-            className="h-9 w-full rounded-full border border-transparent bg-slate-100 dark:bg-slate-800 pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+            className="h-10 w-full rounded-full border border-transparent bg-white/80 ring-1 ring-slate-900/5 shadow-xs dark:bg-white/[0.08] dark:ring-white/10 pl-9 pr-3 text-sm placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
           />
         </div>
         {!report && (
@@ -131,7 +133,7 @@ export function MarcadoresTable({
           type="button"
           onClick={() => setImportOpen((o) => !o)}
           aria-expanded={importOpen}
-          className="inline-flex h-9 items-center gap-2 rounded-full bg-slate-100 dark:bg-slate-800 px-4 text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700"
+          className="inline-flex h-10 items-center gap-2 rounded-full bg-white/80 ring-1 ring-slate-900/5 shadow-xs dark:bg-white/[0.08] dark:ring-white/10 hover:bg-white dark:hover:bg-white/[0.14] px-4 text-sm font-medium text-slate-700 dark:text-slate-200"
         >
           <Upload className="w-4 h-4" aria-hidden /> Adicionar marcadores
         </button>
@@ -139,7 +141,7 @@ export function MarcadoresTable({
       </div>
 
       {!report && importOpen && (
-        <div className={`${panel} p-4 space-y-3`}>
+        <div className={`${panel} p-5 space-y-3`}>
           <div className="flex items-start justify-between gap-2">
             <div>
               <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-100">Colar lista de marcadores</h2>
@@ -155,7 +157,7 @@ export function MarcadoresTable({
             rows={6}
             aria-label="Lista de marcadores"
             placeholder={"Lene – 77 98831-4115\nMais Saúde; (77) 99821-3969"}
-            className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 p-3 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+            className="w-full rounded-2xl border border-slate-200 dark:border-white/10 bg-white/90 dark:bg-white/[0.04] p-3 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
           />
           <div className="flex justify-end">
             <button
@@ -174,8 +176,8 @@ export function MarcadoresTable({
         <table className="w-full text-sm">
           <caption className="sr-only">{report ? `Desempenho dos marcadores — ${periodLabel}` : "Marcadores cadastrados"}</caption>
           <thead>
-            <tr className="border-b border-slate-200 dark:border-slate-800 text-left text-xs font-medium text-slate-600 dark:text-slate-400">
-              <th scope="col" className="px-3 py-2">Marcador</th>
+            <tr className="border-b border-slate-900/[0.07] dark:border-white/[0.07] text-left text-xs font-medium text-slate-600 dark:text-slate-400">
+              <th scope="col" className="px-4 py-3">Marcador</th>
               {report ? (
                 <>
                   <th scope="col" className="px-3 py-2 text-right">Indicados</th>
@@ -200,12 +202,22 @@ export function MarcadoresTable({
               </tr>
             ) : (
               visible.map((r) => (
-                <tr key={r.id} className={`border-b border-slate-100 dark:border-slate-800/60 last:border-0 ${r.active ? "" : "opacity-55"}`}>
-                  <td className="px-3 py-2">
-                    <p className="font-medium text-slate-900 dark:text-slate-100">{r.name}</p>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 tabular-nums">
-                      {formatPhone(r.phone)} · <span className="font-mono">#m-{r.code}</span>
-                    </p>
+                <tr key={r.id} className={`border-b border-slate-900/[0.05] dark:border-white/[0.05] last:border-0 transition-colors hover:bg-white/50 dark:hover:bg-white/[0.03] ${r.active ? "" : "opacity-55"}`}>
+                  <td className="px-4 py-2.5">
+                    <div className="flex items-center gap-3">
+                      <AvatarBadge
+                        name={r.name}
+                        size={36}
+                        className="ring-2 ring-white/80 dark:ring-white/10"
+                        fallbackClassName={r.active ? avatarTone(r.id) : "bg-slate-200 text-slate-500 dark:bg-white/10 dark:text-slate-400"}
+                      />
+                      <div className="min-w-0">
+                        <p className="font-medium text-slate-900 dark:text-slate-100">{r.name}</p>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 tabular-nums">
+                          {formatPhone(r.phone)} · <span className="font-mono">#m-{r.code}</span>
+                        </p>
+                      </div>
+                    </div>
                   </td>
                   {report ? (
                     <>
@@ -224,7 +236,7 @@ export function MarcadoresTable({
                       <button
                         type="button"
                         onClick={() => copyLink(r)}
-                        className="inline-flex h-8 items-center gap-1.5 rounded-full bg-slate-100 dark:bg-slate-800 px-3 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
+                        className="inline-flex h-8 items-center gap-1.5 rounded-full bg-white/80 ring-1 ring-slate-900/5 shadow-xs dark:bg-white/[0.08] dark:ring-white/10 hover:bg-white dark:hover:bg-white/[0.14] px-3 text-xs font-medium text-slate-700 dark:text-slate-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
                         aria-label={`Copiar link de ${r.name}`}
                       >
                         {copied === r.id ? <Check className="w-3.5 h-3.5 text-emerald-600" aria-hidden /> : <Copy className="w-3.5 h-3.5" aria-hidden />}
