@@ -21,8 +21,13 @@ const GROUPS: { id: AiActionGroup | "todas"; label: string }[] = [
 
 const TONE_ICON = {
   positive: <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" aria-hidden />,
-  neutral: <MessageSquareText className="w-4 h-4 text-slate-500 dark:text-slate-400" aria-hidden />,
+  neutral: <MessageSquareText className="w-4 h-4 text-sky-600 dark:text-sky-400" aria-hidden />,
   attention: <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400" aria-hidden />,
+} as const;
+const TONE_BADGE = {
+  positive: "bg-emerald-100 dark:bg-emerald-400/15",
+  neutral: "bg-sky-100 dark:bg-sky-400/15",
+  attention: "bg-amber-100 dark:bg-amber-400/15",
 } as const;
 
 function whenLabel(iso: string) {
@@ -53,13 +58,14 @@ export default async function AiActionsPage({ searchParams }: { searchParams: Pr
   const chip = (active: boolean) =>
     `inline-flex h-8 items-center rounded-full px-3.5 text-sm font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50 ${
       active
-        ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900"
-        : "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700"
+        ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900"
+        : "bg-white/80 ring-1 ring-slate-900/5 shadow-xs dark:bg-white/[0.08] dark:ring-white/10 hover:bg-white dark:hover:bg-white/[0.14] text-slate-700 dark:text-slate-200"
     }`;
 
   return (
-    <div className="h-full overflow-y-auto">
-      <div className="space-y-4 p-4 md:p-6 max-w-4xl">
+    // Visual "vidro" (09/11/2026, DESIGN.md §5).
+    <div className="soft-canvas h-full overflow-y-auto">
+      <div className="mx-auto w-full max-w-4xl space-y-4 p-4 sm:p-6 md:p-8">
         <PageHeader
           title="Ações da IA"
           subtitle="O que a IA decidiu ou respondeu sozinha, com a mensagem do paciente que motivou. Abra a conversa para conferir ou corrigir."
@@ -69,13 +75,14 @@ export default async function AiActionsPage({ searchParams }: { searchParams: Pr
         <ClosingMessageSetting enabled={closing.enabled} text={closing.text} canEdit={closing.canEdit} />
         <UrgencyTagToggle enabled={urgency.enabled} canToggle={urgency.canToggle} />
 
+        <h2 className="pt-4 text-base font-semibold tracking-tight text-slate-900 dark:text-slate-100">O que a IA fez</h2>
         <div className="flex flex-wrap items-center gap-2">
           {GROUPS.map((g) => (
             <Link key={g.id} href={href({ grupo: g.id })} className={chip((group ?? "todas") === g.id)} aria-current={(group ?? "todas") === g.id ? "true" : undefined}>
               {g.label}
             </Link>
           ))}
-          <span className="mx-1 h-5 w-px bg-slate-200 dark:bg-slate-700" aria-hidden />
+          <span className="mx-1 h-5 w-px bg-slate-900/10 dark:bg-white/10" aria-hidden />
           {[7, 30, 90].map((d) => (
             <Link key={d} href={href({ days: d })} className={chip(days === d)} aria-current={days === d ? "true" : undefined}>
               {d} dias
@@ -92,26 +99,26 @@ export default async function AiActionsPage({ searchParams }: { searchParams: Pr
             defaultValue={query}
             aria-label="Buscar paciente"
             placeholder="Buscar paciente…"
-            className="h-9 w-full max-w-xs rounded-full border border-transparent bg-slate-100 dark:bg-slate-800 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+            className="h-10 w-full max-w-xs rounded-full border border-transparent bg-white/80 ring-1 ring-slate-900/5 shadow-xs dark:bg-white/[0.08] dark:ring-white/10 px-4 text-sm placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
           />
-          <button type="submit" className="h-9 rounded-full px-4 text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800">
+          <button type="submit" className="h-10 rounded-full px-4 text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-white/70 dark:hover:bg-white/10">
             Buscar
           </button>
         </form>
 
         {rows.length === 0 ? (
-          <p className="rounded-2xl border border-dashed border-slate-300 dark:border-slate-700 p-6 text-sm text-slate-600 dark:text-slate-400">
+          <p className="glass-surface border border-dashed border-slate-300 dark:border-white/15 p-6 text-sm text-slate-600 dark:text-slate-400">
             Nenhuma ação da IA neste período. Quando ela confirmar, cancelar ou responder sozinha, aparece aqui.
           </p>
         ) : (
-          <ul className="divide-y divide-slate-100 dark:divide-slate-800 rounded-2xl bg-white dark:bg-slate-900 shadow-xs">
+          <ul className="glass-surface overflow-hidden divide-y divide-slate-900/[0.05] dark:divide-white/[0.06]">
             {rows.map((r) => (
               <li key={r.id}>
                 <Link
                   href={`/clinic/pacientes/${r.conversationId}`}
-                  className="flex items-start gap-3 px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-800/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-500/50"
+                  className="flex items-start gap-3 px-5 py-3.5 transition-colors hover:bg-white/60 dark:hover:bg-white/[0.04] focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-500/50"
                 >
-                  <span className="mt-0.5">{TONE_ICON[r.tone]}</span>
+                  <span className={`grid size-8 shrink-0 place-items-center rounded-full ${TONE_BADGE[r.tone]}`}>{TONE_ICON[r.tone]}</span>
                   <span className="min-w-0 flex-1">
                     <span className="block text-sm font-medium text-slate-900 dark:text-slate-100">
                       {r.label} <span className="font-normal text-slate-500 dark:text-slate-400">· {r.patientName}</span>

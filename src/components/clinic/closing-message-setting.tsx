@@ -25,7 +25,7 @@ export function ClosingMessageSetting({ enabled: initialEnabled, text: initialTe
     });
 
   return (
-    <section className="rounded-2xl bg-white p-4 shadow-xs dark:bg-slate-900">
+    <section className="glass-surface p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <h2 className="text-sm font-semibold">Despedida ao finalizar</h2>
@@ -53,7 +53,7 @@ export function ClosingMessageSetting({ enabled: initialEnabled, text: initialTe
         onChange={(e) => setText(e.target.value)}
         maxLength={1000}
         aria-label="Texto da despedida"
-        className="mt-3 w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 disabled:opacity-70 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+        className="mt-3 w-full rounded-2xl border border-slate-200 bg-white/80 p-3 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 disabled:opacity-70 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-100"
       />
       {canEdit && text !== saved && (
         <div className="mt-2 flex justify-end">

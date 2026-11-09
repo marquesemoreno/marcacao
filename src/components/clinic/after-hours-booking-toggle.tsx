@@ -34,7 +34,7 @@ export function AfterHoursBookingToggle({
     });
 
   return (
-    <section className="space-y-3 rounded-2xl bg-white p-4 shadow-xs dark:bg-slate-900">
+    <section className="space-y-3 glass-surface p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <h2 className="text-sm font-semibold">Pedido de marcação pela IA</h2>
