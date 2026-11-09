@@ -1,5 +1,6 @@
 import "server-only";
-import OpenAI from "openai";
+import type OpenAI from "openai";
+import { aiChat, isAiConfigured } from "@/lib/ai-gateway";
 import { prisma } from "@/lib/prisma";
 import { sendWhatsAppMessage, formatToWhatsAppNumber } from "@/lib/whatsapp";
 import { getTivdcClinicId } from "@/lib/tivdc";
@@ -18,22 +19,13 @@ export async function isKnownPartnerLeadPhone(contactPhone: string): Promise<boo
   return leads.some((lead) => formatToWhatsAppNumber(lead.phone) === contactPhone);
 }
 
-let client: OpenAI | null = null;
-function getOpenAiClient(): OpenAI | null {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) return null;
-  if (!client) client = new OpenAI({ apiKey });
-  return client;
-}
-
 /** Rascunho de primeiro contato pro lead de parceria — mesmo tom que um admin
  * mandaria na mão pelo botão "Chamar no WhatsApp" (ver admin/leads/page.tsx),
  * só que personalizado com os dados do cadastro. Sempre com saída fácil
  * ("responda sair") — contato não solicitado precisa disso (mesmo espírito do
  * opt-out já usado em disparo em massa, ver isBroadcastOptOutReply). */
 async function generateOutreachMessage(lead: PartnerLead): Promise<string | null> {
-  const openai = getOpenAiClient();
-  if (!openai) return null;
+  if (!isAiConfigured()) return null;
 
   const prompt = `Escreva uma mensagem curta de WhatsApp (3-5 frases) pra um primeiro contato comercial com uma clínica/profissional interessado em virar parceiro credenciado da Conecta Saúde (marketplace de agendamento de consultas e exames).
 
@@ -52,7 +44,7 @@ Regras:
 - Não invente número, preço ou prazo. Não use markdown além de *negrito* pontual (formatação nativa do WhatsApp).`;
 
   try {
-    const completion = await openai.chat.completions.create({
+    const completion = await aiChat({ feature: "prospeccao", knownNames: [lead.contactName], preserveTerms: [lead.clinicName, "Conecta Saúde"] }, {
       model: process.env.OPENAI_MODEL || "gpt-4o-mini",
       messages: [{ role: "user", content: prompt }],
       max_tokens: 300,

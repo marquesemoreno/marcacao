@@ -1,5 +1,7 @@
 import "server-only";
-import OpenAI from "openai";
+import type OpenAI from "openai";
+import { aiChat, isAiConfigured } from "@/lib/ai-gateway";
+import { privacyForConversation } from "@/lib/ai-privacy-context";
 import { prisma } from "@/lib/prisma";
 import { getAiToolDefinitions, executeAiTool } from "@/lib/ai-tools";
 import { buildClinicKnowledgeContext } from "@/lib/clinic-knowledge";
@@ -73,14 +75,6 @@ export async function getAiAttendantConfig(clinicId: string) {
   return config;
 }
 
-let client: OpenAI | null = null;
-function getOpenAiClient(): OpenAI | null {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) return null;
-  if (!client) client = new OpenAI({ apiKey });
-  return client;
-}
-
 /** Gera a resposta da IA a partir só do histórico DESSA conversa (data minimization —
  * nunca manda CPF, nunca manda outras conversas do mesmo contato). Retorna `null` se a
  * IA não está configurada (sem API key) ou se a chamada falhar — chamador deve tratar
@@ -96,8 +90,8 @@ export async function generateAiReply(
   instructions: string,
   clinicId: string
 ): Promise<string | null> {
-  const openai = getOpenAiClient();
-  if (!openai) return null;
+  if (!isAiConfigured()) return null;
+  const privacy = { ...(await privacyForConversation(conversationId)), clinicId, feature: "atendente" as const };
 
   // `orderBy: desc` + `take: 20` + reverse — pega as 20 mensagens MAIS RECENTES. Bug real
   // encontrado testando: com `orderBy: asc` (como estava antes), `take: 20` pegava as 20
@@ -126,7 +120,7 @@ export async function generateAiReply(
   ];
 
   try {
-    const first = await openai.chat.completions.create({
+    const first = await aiChat(privacy, {
       model: process.env.OPENAI_MODEL || "gpt-4o-mini",
       messages: conversationMessages,
       tools: await getAiToolDefinitions(clinicId),
@@ -152,7 +146,7 @@ export async function generateAiReply(
       }))
     );
 
-    const second = await openai.chat.completions.create({
+    const second = await aiChat(privacy, {
       model: process.env.OPENAI_MODEL || "gpt-4o-mini",
       messages: [
         ...conversationMessages,

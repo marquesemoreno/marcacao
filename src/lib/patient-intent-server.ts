@@ -1,6 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import { askJevChoice } from "@/lib/jev";
+import { privacyForConversation } from "@/lib/ai-privacy-context";
 import { intentFromJevAnswer, PATIENT_INTENT_MIN_CONFIDENCE, PATIENT_INTENT_QUESTION } from "@/lib/patient-intent";
 
 /** Classifica a intenção atual do paciente (últimas 3 mensagens de texto recebidas) e
@@ -16,7 +17,7 @@ export async function classifyAndStorePatientIntent(conversationId: string): Pro
     });
     if (recent.length === 0) return;
     const mensagens = recent.reverse().map((m) => m.content.slice(0, 500));
-    const result = intentFromJevAnswer(await askJevChoice({ mensagens }, PATIENT_INTENT_QUESTION));
+    const result = intentFromJevAnswer(await askJevChoice({ mensagens }, PATIENT_INTENT_QUESTION, await privacyForConversation(conversationId)));
     if (!result) return;
     await prisma.conversation.update({
       where: { id: conversationId },

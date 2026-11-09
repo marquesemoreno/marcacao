@@ -3,8 +3,10 @@
  * paciente; o que gera texto continua na OpenAI. Chave em JEVAI_API_KEY (só servidor). */
 
 import type { AppointmentReplyAction } from "./appointment-reply-ai";
+import { aiJev, type AiCallContext } from "./ai-gateway";
 
-const JEV_URL = "https://api.typesafe.ai/v1/systemone";
+/** Contexto opcional para a barreira LGPD (clínica, nomes conhecidos do paciente). */
+export type JevPrivacy = Omit<AiCallContext, "feature">;
 
 /** Abaixo disso a ação NÃO é executada (vira UNCLEAR → recepção). A resposta ao
  * lembrete confirma/cancela consulta de verdade, então o corte é alto. Testado com
@@ -35,25 +37,21 @@ const REPLY_QUESTION = {
 
 /** Classifica a resposta ao lembrete. `null` = Jev indisponível (sem chave, erro,
  * timeout) — o chamador usa o fallback. Nunca lança. */
-export async function classifyReplyWithJev(resposta: string, lembrete?: string | null): Promise<AppointmentReplyAction | null> {
-  const apiKey = process.env.JEVAI_API_KEY;
-  if (!apiKey) return null;
+export async function classifyReplyWithJev(
+  resposta: string,
+  lembrete?: string | null,
+  privacy: JevPrivacy = {},
+): Promise<AppointmentReplyAction | null> {
   try {
-    const res = await fetch(JEV_URL, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
+    const json = await aiJev(
+      { feature: "lembrete", ...privacy },
+      {
         model: "jev-latest",
         state: { lembrete: lembrete ?? "Lembrete de consulta pedindo confirmação.", resposta },
         questions: { acao: REPLY_QUESTION },
-      }),
-      signal: AbortSignal.timeout(5000),
-    });
-    if (!res.ok) {
-      console.error("Jev respondeu", res.status);
-      return null;
-    }
-    const json = (await res.json()) as { answers?: Record<string, JevChoiceAnswer> };
+      },
+    );
+    if (!json) return null;
     return actionFromJevAnswer(json.answers?.acao);
   } catch (error) {
     console.error("Falha ao classificar resposta via Jev:", error);
@@ -63,22 +61,17 @@ export async function classifyReplyWithJev(resposta: string, lembrete?: string |
 
 /** Pergunta de escolha genérica ao Jev. `undefined` = indisponível (sem chave, erro,
  * timeout). Nunca lança. */
-export async function askJevChoice(state: unknown, question: object): Promise<JevChoiceAnswer | undefined> {
-  const apiKey = process.env.JEVAI_API_KEY;
-  if (!apiKey) return undefined;
+export async function askJevChoice(
+  state: unknown,
+  question: object,
+  privacy: JevPrivacy & { feature?: AiCallContext["feature"] } = {},
+): Promise<JevChoiceAnswer | undefined> {
   try {
-    const res = await fetch(JEV_URL, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ model: "jev-latest", state, questions: { q: question } }),
-      signal: AbortSignal.timeout(5000),
-    });
-    if (!res.ok) {
-      console.error("Jev respondeu", res.status);
-      return undefined;
-    }
-    const json = (await res.json()) as { answers?: Record<string, JevChoiceAnswer> };
-    return json.answers?.q;
+    const json = await aiJev(
+      { feature: "intencao", ...privacy },
+      { model: "jev-latest", state, questions: { q: question } },
+    );
+    return json?.answers?.q;
   } catch (error) {
     console.error("Falha ao consultar o Jev:", error);
     return undefined;

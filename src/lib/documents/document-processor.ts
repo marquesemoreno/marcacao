@@ -1,7 +1,7 @@
 import "server-only";
-import OpenAI from "openai";
+import type OpenAI from "openai";
+import { aiChat, isAiConfigured, type AiCallContext } from "@/lib/ai-gateway";
 import { z } from "zod";
-import { sanitizePromptForAI } from "@/lib/security/lgpd-sanitizer";
 
 /**
  * Leitura e extração estruturada de documentos médicos (pedido de exame, receita,
@@ -38,14 +38,6 @@ export interface DocumentProcessingResult {
   extracted: ExtractedDocument;
 }
 
-let client: OpenAI | null = null;
-function getOpenAiClient(): OpenAI | null {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) return null;
-  if (!client) client = new OpenAI({ apiKey });
-  return client;
-}
-
 const EXTRACT_DOCUMENT_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
   type: "function",
   function: {
@@ -75,9 +67,9 @@ const EXTRACT_DOCUMENT_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
 
 /** Chamada 1 — transcrição literal via visão, sem interpretar nada ainda
  * (interpretação acontece só na Chamada 2, sobre o texto já mascarado). */
-async function readDocumentTextFromImage(openai: OpenAI, buffer: Buffer, mimeType: string): Promise<string> {
+async function readDocumentTextFromImage(ctx: AiCallContext, buffer: Buffer, mimeType: string): Promise<string> {
   const base64 = buffer.toString("base64");
-  const completion = await openai.chat.completions.create({
+  const completion = await aiChat(ctx, {
     model: process.env.OPENAI_MODEL || "gpt-4o-mini",
     messages: [
       {
@@ -99,10 +91,10 @@ async function readDocumentTextFromImage(openai: OpenAI, buffer: Buffer, mimeTyp
 
 /** Chamada 2 — extração estruturada (forced tool-call, mesmo padrão de
  * invoice-extraction.ts) sobre o texto JÁ MASCARADO pelo Vault. */
-async function extractStructuredFields(openai: OpenAI, sanitizedText: string): Promise<ExtractedDocument> {
-  if (!sanitizedText.trim()) return FALLBACK_EXTRACTED_DOCUMENT;
+async function extractStructuredFields(ctx: AiCallContext, ocrText: string): Promise<ExtractedDocument> {
+  if (!ocrText.trim()) return FALLBACK_EXTRACTED_DOCUMENT;
 
-  const completion = await openai.chat.completions.create({
+  const completion = await aiChat(ctx, {
     model: process.env.OPENAI_MODEL || "gpt-4o-mini",
     messages: [
       {
@@ -110,7 +102,7 @@ async function extractStructuredFields(openai: OpenAI, sanitizedText: string): P
         content:
           "Extraia os campos estruturados deste texto transcrito de um documento médico. Use a ferramenta. Nunca invente um exame ou dado que não está explicitamente no texto — omita o campo em vez de adivinhar. Trechos como {{PATIENT_NAME_1}} ou {{PATIENT_CPF_1}} são identificadores internos do sistema, ignore-os (não são o convênio nem o médico).",
       },
-      { role: "user", content: sanitizedText },
+      { role: "user", content: ocrText },
     ],
     tools: [EXTRACT_DOCUMENT_TOOL],
     tool_choice: { type: "function", function: { name: "extrairDadosDocumentoMedico" } },
@@ -138,14 +130,16 @@ export async function processDocumentMessage(params: {
   buffer: Buffer;
   mimeType: string;
   knownPatientNames?: string[];
+  clinicId?: string | null;
 }): Promise<DocumentProcessingResult | null> {
-  const openai = getOpenAiClient();
-  if (!openai) return null;
+  if (!isAiConfigured()) return null;
 
   try {
-    const rawOcrText = await readDocumentTextFromImage(openai, params.buffer, params.mimeType);
-    const { sanitizedText } = sanitizePromptForAI(rawOcrText, params.knownPatientNames);
-    const extracted = await extractStructuredFields(openai, sanitizedText);
+    // A imagem não dá para mascarar (fica registrada como não mascarável no gateway); o
+    // texto transcrito é mascarado pelo gateway antes da extração.
+    const ctx: AiCallContext = { feature: "documento", clinicId: params.clinicId, knownNames: params.knownPatientNames };
+    const rawOcrText = await readDocumentTextFromImage(ctx, params.buffer, params.mimeType);
+    const extracted = await extractStructuredFields(ctx, rawOcrText);
     return { rawOcrText, extracted };
   } catch (error) {
     console.error("Falha ao processar documento médico:", error);

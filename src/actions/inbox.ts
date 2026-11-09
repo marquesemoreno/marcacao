@@ -33,6 +33,7 @@ import { assignmentSeenAtFor, assignOnReply } from "@/lib/conversation-assignmen
 import { getAiAttendantConfig } from "@/lib/ai-attendant";
 import { analyzeConversationQuality } from "@/lib/conversation-quality";
 import { extractInvoiceData, type InvoiceData } from "@/lib/invoice-extraction";
+import { privacyForConversation } from "@/lib/ai-privacy-context";
 import { processDocumentMessage } from "@/lib/documents/document-processor";
 import { validateExtractedDocument, type DocumentReviewData } from "@/lib/documents/document-validator";
 
@@ -1169,7 +1170,7 @@ export async function transcribeMessageAudio(messageId: string) {
     return { success: false as const, error: "Não consegui baixar o áudio pra transcrever." };
   }
 
-  const transcription = await transcribeAudio(buffer, message.mimeType || "audio/ogg");
+  const transcription = await transcribeAudio(buffer, message.mimeType || "audio/ogg", clinicId);
   if (!transcription) {
     return { success: false as const, error: "Não foi possível transcrever esse áudio. Tente de novo." };
   }
@@ -1197,7 +1198,7 @@ export async function extractMessageInvoiceData(messageId: string) {
     return { success: true as const, data: message.extractedInvoiceData as InvoiceData };
   }
 
-  const data = await extractInvoiceData(message.content);
+  const data = await extractInvoiceData(message.content, await privacyForConversation(message.conversationId));
   if (!data) {
     return { success: false as const, error: "Não foi possível extrair dados dessa mensagem. Tente de novo." };
   }
@@ -1243,6 +1244,7 @@ export async function processMessageDocument(messageId: string) {
       buffer,
       mimeType: message.mimeType,
       knownPatientNames: [message.conversation.contact.name],
+      clinicId,
     });
     if (!processed) {
       return { success: false as const, error: "Não foi possível ler o documento. Tente de novo." };

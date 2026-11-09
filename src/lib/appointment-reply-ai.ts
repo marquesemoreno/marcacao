@@ -1,16 +1,9 @@
 import "server-only";
-import OpenAI from "openai";
+import type OpenAI from "openai";
+import { aiChat, isAiConfigured, type AiCallContext } from "@/lib/ai-gateway";
 import { classifyReplyWithJev } from "./jev";
 
 export type AppointmentReplyAction = "CONFIRMED" | "CANCELLED" | "RESCHEDULE" | "UNCLEAR";
-
-let client: OpenAI | null = null;
-function getOpenAiClient(): OpenAI | null {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) return null;
-  if (!client) client = new OpenAI({ apiKey });
-  return client;
-}
 
 const CLASSIFY_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
   type: "function",
@@ -56,15 +49,18 @@ const VALID_ACTIONS: AppointmentReplyAction[] = ["CONFIRMED", "CANCELLED", "RESC
  * abaixo de JEV_MIN_CONFIDENCE vira UNCLEAR (recepção). OpenAI só se o Jev estiver
  * indisponível. `lembrete` = texto do pedido de confirmação que o paciente respondeu.
  */
-export async function classifyAppointmentReply(text: string, lembrete?: string | null): Promise<AppointmentReplyAction> {
-  const jevAction = await classifyReplyWithJev(text, lembrete);
+export async function classifyAppointmentReply(
+  text: string,
+  lembrete?: string | null,
+  privacy: Omit<AiCallContext, "feature"> = {},
+): Promise<AppointmentReplyAction> {
+  const jevAction = await classifyReplyWithJev(text, lembrete, privacy);
   if (jevAction) return jevAction;
 
-  const openai = getOpenAiClient();
-  if (!openai) return "UNCLEAR";
+  if (!isAiConfigured()) return "UNCLEAR";
 
   try {
-    const completion = await openai.chat.completions.create({
+    const completion = await aiChat({ ...privacy, feature: "lembrete" }, {
       model: process.env.OPENAI_MODEL || "gpt-4o-mini",
       messages: [
         {

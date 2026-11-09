@@ -1,6 +1,6 @@
 "use server";
 
-import OpenAI from "openai";
+import { aiChat, isAiConfigured } from "@/lib/ai-gateway";
 import { unstable_cache } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireClinicPermission } from "@/lib/session";
@@ -96,11 +96,9 @@ export async function getClinicReportInsights(period: PeriodKey = "30") {
  * tela mostra os fatos em lista. */
 export async function generateReportSummary(input: { clinicName: string; periodLabel: string; facts: string[] }): Promise<{ text: string | null }> {
   await requireClinicPermission("relatorios");
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey || input.facts.length === 0) return { text: null };
+  if (!isAiConfigured() || input.facts.length === 0) return { text: null };
   try {
-    const openai = new OpenAI({ apiKey });
-    const r = await openai.chat.completions.create({
+    const r = await aiChat({ feature: "resumo-relatorio", preserveTerms: [input.clinicName] }, {
       model: process.env.OPENAI_MODEL || "gpt-4o-mini",
       temperature: 0.3,
       max_tokens: 350,
