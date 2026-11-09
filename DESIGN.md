@@ -101,6 +101,14 @@ superfície (tipografia, cores de status, botões, formulários em gaveta/diálo
   `md:gap-3 md:p-3`); no celular ocupam a tela inteira sem vidro. Cabeçalho e caixa de
   mensagem `bg-white/70 dark:bg-white/[0.03] backdrop-blur-xl`; conversa selecionada vira
   cartão claro. **Balões continuam sólidos** (leitura do dia inteiro) — não aplicar vidro.
+- **Painel do paciente (Chat)**: cartões internos `bg-white/80 dark:bg-white/[0.05]
+  rounded-[1.25rem] ring-1` com título `text-sm font-semibold` curto e numa linha só
+  (painel tem 320px — ex.: "Copiloto", não "Copilot — sugestões de resposta"). Dentro
+  deles: itens em poço suave `rounded-2xl bg-slate-900/[0.04] dark:bg-white/[0.04]`
+  (sugestões do Copiloto, consultas do Histórico), selos de status/tags em `rounded-full`,
+  campos de edição `rounded-xl` (ou `rounded-full` em linha única) com borda leve e foco
+  verde, botões e seletor de atendente em pílula, etapas do atendimento em pílula (ativa
+  verde cheio). Aviso de confirmação em âmbar `rounded-2xl`.
 - **Não migrar** gavetas (Sheet) e diálogos de formulário: continuam sólidos, com bordas
   nos campos, para leitura e foco.
 - **Celular**: sempre conferir `scrollWidth == innerWidth`; abas longas rolam na horizontal
