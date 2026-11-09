@@ -188,12 +188,12 @@ export function PatientPage({ profile, autoSchedule = false }: { profile: Patien
                 </div>
 
                 {/* Ações rápidas: conversa em destaque (é a principal), as outras em vidro */}
-                <div className="mt-5 flex flex-wrap justify-center gap-3">
+                <div className="mt-5 flex flex-wrap justify-center gap-2">
                   <QuickAction label="Conversa" href={`/clinic/inbox?c=${p.conversationId}`} icon={MessageCircle} primary />
                   {p.contact.phone && <QuickAction label="Agendar" onClick={() => setScheduling(true)} icon={CalendarPlus} />}
                   {p.contact.phone && (
                     <QuickAction
-                      label="Copiar tel."
+                      label="Copiar"
                       onClick={() => navigator.clipboard.writeText(p.contact.phone!).then(() => toast.success("Telefone copiado."))}
                       icon={Copy}
                     />
@@ -311,7 +311,7 @@ export function PatientPage({ profile, autoSchedule = false }: { profile: Patien
 
             <section id="ficha-abas" aria-label="Histórico do paciente" className="glass-surface scroll-mt-6 p-4 sm:p-5">
               <Tabs value={tab} onValueChange={(v) => setTab(String(v))} className="gap-4">
-                <div className="overflow-x-auto">
+                <div className="-mx-1 overflow-x-auto overflow-y-hidden px-1 py-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                   <TabsList className="!h-auto w-max gap-1 !rounded-full bg-slate-900/5 !p-1 dark:bg-white/5 [&>*]:whitespace-nowrap">
                     {[
                       ["timeline", `Linha do tempo (${p.timeline.length})`],
@@ -322,7 +322,7 @@ export function PatientPage({ profile, autoSchedule = false }: { profile: Patien
                       <TabsTrigger
                         key={v}
                         value={v}
-                        className="!rounded-full !border-0 !px-4 !py-1.5 data-[active]:!bg-slate-900 data-[active]:!text-white data-[active]:!shadow-sm dark:data-[active]:!bg-white dark:data-[active]:!text-slate-900"
+                        className="!rounded-full !border-0 !px-4 !py-1.5 after:!hidden data-[active]:!bg-slate-900 data-[active]:!text-white data-[active]:!shadow-sm dark:data-[active]:!bg-white dark:data-[active]:!text-slate-900"
                       >
                         {l}
                       </TabsTrigger>
@@ -573,7 +573,7 @@ function QuickAction({
       <span className="text-[11px] font-medium text-slate-600 dark:text-slate-300">{label}</span>
     </>
   );
-  const cls = "group flex w-14 flex-col items-center gap-1.5 rounded-xl focus-visible:outline-offset-4";
+  const cls = "group flex w-[3.25rem] flex-col items-center gap-1.5 rounded-xl focus-visible:outline-offset-4";
   return href ? (
     <Link href={href} className={cls}>
       {inner}
