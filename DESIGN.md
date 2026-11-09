@@ -44,9 +44,11 @@ superfícies limpas, cantos arredondados, quase nenhuma borda, cinzas neutros.
 - **Modais**: grid de 2 colunas no desktop (`md:grid-cols-2 gap-4`), sem scroll interno
   desnecessário.
 
-## 5. Visual "vidro" (09/11/2026) — Relatório e Ficha do paciente
-Nasceu no piloto do Relatório e foi aplicado à ficha do paciente. É a direção para as
-próximas telas redesenhadas; as demais seguem as seções 1–4 até serem migradas.
+## 5. Visual "vidro" (09/11/2026) — todas as telas da clínica
+Nasceu no piloto do Relatório e foi aplicado, em 09/11, a todas as telas da clínica:
+Relatório, Ficha, Agenda, CRM, Disparos, Pacientes, Marcadores, Configurações, IA, Senhas e
+Chat. É o padrão para telas novas. As seções 1–4 continuam valendo para o que não for
+superfície (tipografia, cores de status, botões, formulários em gaveta/diálogo).
 
 - **Fundo da tela**: envolver a página em `.soft-canvas` (globals.css) — claro #f3f6fa com
   manchas suaves azul/menta/lilás; escuro #0c0d11 com brilhos esmeralda/céu/índigo.
@@ -73,3 +75,35 @@ próximas telas redesenhadas; as demais seguem as seções 1–4 até serem migr
   direita; no celular a ordem é perfil → destaques e histórico → dados cadastrais (usar
   `lg:col-start/row-start` em vez de `order` para manter a ordem do DOM certa no celular).
 - Lembrete Tailwind 3: importante é `!classe` (prefixo), não `classe!`.
+
+### 5.1 Padrões repetidos nas telas migradas
+- **Pílula de filtro/botão** (PILL): `bg-white/80 ring-1 ring-slate-900/5 shadow-xs
+  dark:bg-white/[0.08] dark:ring-white/10` (+ hover `bg-white` / `white/[0.14]`).
+- **Ativo** (aba, chip, segmento): `bg-slate-900 text-white dark:bg-white dark:text-slate-900`.
+- **Trilho de abas** (RAIL): `glass-surface !rounded-full p-1`; dentro de um cartão use
+  `bg-slate-900/5 dark:bg-white/[0.06] rounded-full p-1`.
+- **Linhas divisórias** (LINE): `border-slate-900/[0.07] dark:border-white/[0.07]`; listas
+  `divide-slate-900/[0.05] dark:divide-white/[0.06]`.
+- **Listas**: `<ul className="glass-surface overflow-hidden divide-y …">`, linhas com hover
+  `bg-white/60 dark:bg-white/[0.04]`. Vazio: `glass-surface border border-dashed`.
+- **Card do shadcn** dentro de `.soft-canvas` vira vidro sozinho (regra
+  `.soft-canvas [data-slot="card"]` em globals.css, `--card-spacing: 1.25rem`) — não precisa
+  trocar classes em Configurações/admin. `ui/card.tsx` usa sintaxe Tailwind 3
+  (`px-[var(--card-spacing)]`).
+- **Cor por item** (lista de pessoas): `avatarTone(nome)` em src/lib/avatar-tone.ts (8
+  gradientes, hash estável) e `AvatarBadge fallbackClassName`; foto do WhatsApp quando já
+  guardada no contato. Etapa do funil com as cores do CRM (Novo âmbar, Em atendimento céu,
+  Orçamento violeta, Agendado esmeralda, Finalizado cinza). `tailwind.config.ts` varre
+  `src/lib` por causa disso.
+- **Painel de destaque** (Senhas "Chamando agora", perfil da Ficha): `glass-surface relative
+  overflow-hidden` com 1–2 manchas `blur-3xl` (esmeralda/céu, 15–30%) atrás do conteúdo.
+- **Chat**: fila, conversa e painel do paciente são painéis flutuantes (`md:glass-surface`,
+  `md:gap-3 md:p-3`); no celular ocupam a tela inteira sem vidro. Cabeçalho e caixa de
+  mensagem `bg-white/70 dark:bg-white/[0.03] backdrop-blur-xl`; conversa selecionada vira
+  cartão claro. **Balões continuam sólidos** (leitura do dia inteiro) — não aplicar vidro.
+- **Não migrar** gavetas (Sheet) e diálogos de formulário: continuam sólidos, com bordas
+  nos campos, para leitura e foco.
+- **Celular**: sempre conferir `scrollWidth == innerWidth`; abas longas rolam na horizontal
+  (`!flex-nowrap` + itens `!flex-none`), textos secundários de botão somem com
+  `max-sm:sr-only`.
+- **Testar** pela prévia Vercel (push para um branch `design/*`), claro, escuro e celular.
