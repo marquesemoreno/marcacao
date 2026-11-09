@@ -38,11 +38,11 @@ export function renderConsultationRow(consultation: ConsultationRecord) {
   return (
     <div
       key={consultation.id}
-      className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800/60 text-xs"
+      className="px-3 py-2.5 rounded-2xl bg-slate-900/[0.04] dark:bg-white/[0.04] text-xs"
     >
       <div className="flex items-center justify-between gap-2">
         <span className="font-semibold text-slate-800 dark:text-slate-200 truncate">{consultation.specialty}</span>
-        <span className={`shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded-md ${badge.classes}`}>{badge.label}</span>
+        <span className={`shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded-full ${badge.classes}`}>{badge.label}</span>
       </div>
       <div className="flex items-center justify-between gap-2 mt-0.5 text-slate-500 dark:text-slate-400">
         <span className="truncate">{consultation.date} · {consultation.doctor}</span>

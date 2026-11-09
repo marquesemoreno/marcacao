@@ -2652,7 +2652,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
               }}
               aria-label="Fechar painel"
               title="Fechar painel"
-              className="size-11 -mr-2.5 flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-full transition-colors"
+              className="size-11 -mr-2.5 flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-900/5 dark:hover:bg-white/10 rounded-full transition-colors"
             >
               <X className="w-5 h-5" />
             </button>
@@ -2689,7 +2689,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                     {copilotSuggestions.map((suggestion, index) => (
                       <div
                         key={index}
-                        className="rounded-xl bg-slate-100 dark:bg-slate-800/60 p-2.5 space-y-2"
+                        className="rounded-2xl bg-slate-900/[0.04] dark:bg-white/[0.04] p-3 space-y-2"
                       >
                         <p className="text-[11.5px] text-slate-700 dark:text-slate-200 leading-relaxed whitespace-pre-wrap">
                           {suggestion}
@@ -2701,7 +2701,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                               setInputText(suggestion);
                               toast.success("Sugestão inserida na resposta!");
                             }}
-                            className="flex-1 px-2 py-1 text-xs font-semibold rounded-full bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                            className="flex-1 px-2 py-1 text-xs font-semibold rounded-full bg-white/80 ring-1 ring-slate-900/5 shadow-xs dark:bg-white/[0.08] dark:ring-white/10 text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-white/[0.14] transition-colors"
                           >
                             Inserir no chat
                           </button>
@@ -2725,11 +2725,11 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
 
             {/* Card 1: Perfil do Contato */}
             <div className="bg-white/80 dark:bg-white/[0.05] rounded-[1.25rem] ring-1 ring-slate-900/5 dark:ring-white/[0.06] p-4 space-y-3">
-              <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-700/60 pb-3">
+              <div className="flex items-center justify-between border-b border-slate-900/[0.07] dark:border-white/[0.07] pb-3">
                 <div className="flex items-center gap-3 min-w-0">
-                  <AvatarBadge name={displayName(selectedContact)} photoUrl={selectedContact.avatar} size={44} className="ring-2 ring-white dark:ring-slate-900 shadow-sm shrink-0" />
+                  <AvatarBadge name={displayName(selectedContact)} photoUrl={selectedContact.avatar} size={44} className="ring-2 ring-white/80 dark:ring-white/10 shadow-sm shrink-0" />
                   <div className="min-w-0">
-                    <h4 className="font-bold text-slate-900 dark:text-slate-100 text-xs truncate">
+                    <h4 className="font-semibold tracking-tight text-slate-900 dark:text-slate-100 text-sm truncate">
                       {displayName(selectedContact)}
                     </h4>
                     {selectedContact.channel === 'instagram' && !selectedContact.phone ? (
@@ -2752,7 +2752,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                           navigator.clipboard.writeText(selectedContact.phone);
                           toast.success("Telefone copiado!");
                         }}
-                        className="p-1.5 -m-1 text-slate-400 hover:text-emerald-700 dark:hover:text-emerald-400 rounded"
+                        className="p-1.5 -m-1 text-slate-400 hover:text-emerald-700 dark:hover:text-emerald-400 rounded-full"
                         title="Copiar telefone"
                       >
                         <Copy className="w-3 h-3" />
@@ -2776,7 +2776,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                     }
                     setIsEditingPatient(!isEditingPatient);
                   }}
-                  className="p-2.5 -m-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 shrink-0"
+                  className="p-2.5 -m-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded-full hover:bg-slate-900/5 dark:hover:bg-white/10 shrink-0"
                   title="Editar cadastro do paciente"
                 >
                   <Edit2 className="w-3.5 h-3.5" />
@@ -2791,7 +2791,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                       type="text"
                       value={editPatientName}
                       onChange={(e) => setEditPatientName(e.target.value)}
-                      className="w-full px-2 py-1 text-xs border rounded-lg bg-white dark:bg-slate-900 dark:border-slate-700 text-slate-900 dark:text-slate-100"
+                      className="w-full px-3 py-1.5 text-xs rounded-xl border border-slate-200 dark:border-white/10 bg-white/90 dark:bg-white/[0.04] text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
                     />
                   </div>
                   <div>
@@ -2800,7 +2800,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                       type="text"
                       value={editPatientCpf}
                       onChange={(e) => setEditPatientCpf(e.target.value)}
-                      className="w-full px-2 py-1 text-xs border rounded-lg bg-white dark:bg-slate-900 dark:border-slate-700 text-slate-900 dark:text-slate-100"
+                      className="w-full px-3 py-1.5 text-xs rounded-xl border border-slate-200 dark:border-white/10 bg-white/90 dark:bg-white/[0.04] text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
                     />
                   </div>
                   <div>
@@ -2810,7 +2810,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                       value={editPatientPhone}
                       onChange={(e) => setEditPatientPhone(e.target.value)}
                       placeholder="Ex: 77999998888"
-                      className="w-full px-2 py-1 text-xs border rounded-lg bg-white dark:bg-slate-900 dark:border-slate-700 text-slate-900 dark:text-slate-100"
+                      className="w-full px-3 py-1.5 text-xs rounded-xl border border-slate-200 dark:border-white/10 bg-white/90 dark:bg-white/[0.04] text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
                     />
                   </div>
                   {onUpdateContactGlpiEntity && (
@@ -2820,7 +2820,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                         value={editPatientGlpiEntityId ?? ""}
                         onChange={(e) => setEditPatientGlpiEntityId(e.target.value ? Number(e.target.value) : null)}
                         disabled={isLoadingGlpiEntities}
-                        className="w-full px-2 py-1 text-xs border rounded-lg bg-white dark:bg-slate-900 dark:border-slate-700 text-slate-900 dark:text-slate-100 disabled:opacity-50"
+                        className="w-full px-3 py-1.5 text-xs rounded-xl border border-slate-200 dark:border-white/10 bg-white/90 dark:bg-white/[0.04] text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 disabled:opacity-50"
                       >
                         <option value="">
                           {isLoadingGlpiEntities ? "Carregando…" : "Nenhuma (chamado cai na raiz)"}
@@ -2836,13 +2836,13 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                   <button
                     onClick={handleSavePatientEdits}
                     disabled={isSavingPatientEdits || !editPatientName.trim()}
-                    className="w-full py-1.5 bg-emerald-600 text-white font-semibold text-xs rounded-lg mt-1 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full py-2 bg-emerald-600 text-white font-semibold text-xs rounded-full mt-1 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {isSavingPatientEdits ? "Salvando..." : "Salvar Alterações"}
                   </button>
                 </div>
               ) : (
-                <div className="space-y-1.5 text-xs text-slate-600 dark:text-slate-300">
+                <div className="space-y-2 text-xs text-slate-600 dark:text-slate-300">
                   {selectedContact.cpf && (
                     <div className="flex justify-between">
                       <span className="text-slate-500 dark:text-slate-400 font-medium">CPF:</span>
@@ -2856,7 +2856,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                         value={selectedContact.acquisitionChannel ?? ""}
                         onChange={(e) => onChangeAcquisition(selectedContact.id, e.target.value || null)}
                         title={selectedContact.acquisitionDetail ? `Detectado: ${selectedContact.acquisitionDetail}` : undefined}
-                        className="max-w-[150px] truncate rounded-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-1.5 py-0.5 text-xs font-semibold text-slate-800 dark:text-slate-200"
+                        className="max-w-[150px] truncate rounded-full border-0 bg-white/80 ring-1 ring-slate-900/5 shadow-xs dark:bg-white/[0.08] dark:ring-white/10 px-2 py-0.5 text-xs font-semibold text-slate-800 dark:text-slate-200"
                       >
                         <option value="">Não identificado</option>
                         {[...new Set([...ACQUISITION_CHANNELS, ...(selectedContact.acquisitionChannel ? [selectedContact.acquisitionChannel] : [])])].map((ch) => (
@@ -2887,7 +2887,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                 <div className="bg-white/80 dark:bg-white/[0.05] rounded-[1.25rem] ring-1 ring-slate-900/5 dark:ring-white/[0.06] p-4 space-y-3">
                   {upcoming.length > 0 && (
                     <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
+                      <label className="text-sm font-semibold text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5">
                         <Calendar className="w-3.5 h-3.5" /> Próximos Agendamentos
                       </label>
                       <div className="space-y-1.5">{upcoming.map(renderConsultationRow)}</div>
@@ -2928,7 +2928,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                 {selectedContact.tags.map((tag) => (
                   <span
                     key={tag}
-                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-semibold border ${tagClasses(tag)}`}
+                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold border ${tagClasses(tag)}`}
                   >
                     {tag}
                     <button onClick={() => onRemoveTag(tag)} aria-label={`Remover tag ${tag}`} className="p-1 -m-1 hover:text-slate-900 dark:hover:text-white">
@@ -2956,12 +2956,12 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                     placeholder="Nova tag..."
                     value={newTagInput}
                     onChange={(e) => setNewTagInput(e.target.value)}
-                    className="flex-1 px-2.5 py-1 text-xs border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100"
+                    className="flex-1 px-3 py-1.5 text-xs rounded-full border border-slate-200 dark:border-white/10 bg-white/90 dark:bg-white/[0.04] text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
                   />
                   <button
                     onClick={handleAddTag}
                     aria-label="Confirmar nova tag"
-                    className="p-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700"
+                    className="p-2 bg-emerald-600 text-white rounded-full hover:bg-emerald-700"
                   >
                     <Check className="w-4 h-4" />
                   </button>
@@ -2984,7 +2984,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                     render={
                       <button
                         type="button"
-                        className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-between text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700"
+                        className="w-full px-3.5 py-2 rounded-full bg-white/80 ring-1 ring-slate-900/5 shadow-xs dark:bg-white/[0.08] dark:ring-white/10 flex items-center justify-between text-xs text-slate-700 dark:text-slate-200 hover:bg-white dark:hover:bg-white/[0.14]"
                       />
                     }
                   >
@@ -3042,10 +3042,10 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                       role="radio"
                       aria-checked={isActive}
                       onClick={() => (needsConfirm ? setPendingFunnelStage(stage.id) : onUpdateFunnelStage(stage.id))}
-                      className={`flex items-center justify-center gap-1.5 rounded-lg border px-2.5 py-2 text-xs transition-colors ${
+                      className={`flex items-center justify-center gap-1.5 rounded-full border px-2.5 py-2 text-xs transition-colors ${
                         isActive
                           ? 'bg-emerald-600 border-emerald-600 text-white font-bold shadow-2xs'
-                          : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 font-medium hover:border-emerald-300 dark:hover:border-emerald-700 hover:text-emerald-700 dark:hover:text-emerald-400'
+                          : 'border-transparent bg-white/80 ring-1 ring-slate-900/5 shadow-xs dark:bg-white/[0.08] dark:ring-white/10 text-slate-600 dark:text-slate-300 font-medium hover:text-emerald-700 dark:hover:text-emerald-400'
                       }`}
                     >
                       {isActive && <Check className="w-3.5 h-3.5 shrink-0" />}
@@ -3055,7 +3055,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                 })}
               </div>
               {pendingFunnelStage && (
-                <div className="rounded-lg border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/40 p-2 space-y-1.5">
+                <div className="rounded-2xl border border-amber-300/70 dark:border-amber-700/60 bg-amber-50/90 dark:bg-amber-950/40 p-3 space-y-2">
                   <p className="text-xs font-medium text-amber-800 dark:text-amber-300">
                     Pular direto para &quot;{FUNNEL_STEPS.find((s) => s.id === pendingFunnelStage)?.label}&quot;?
                   </p>
@@ -3066,14 +3066,14 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                         await onUpdateFunnelStage(pendingFunnelStage);
                         setPendingFunnelStage(null);
                       }}
-                      className="flex-1 px-2 py-1.5 rounded-md bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700"
+                      className="flex-1 px-2 py-1.5 rounded-full bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700"
                     >
                       Confirmar
                     </button>
                     <button
                       type="button"
                       onClick={() => setPendingFunnelStage(null)}
-                      className="flex-1 px-2 py-1.5 rounded-full bg-slate-100 dark:bg-slate-800 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700"
+                      className="flex-1 px-2 py-1.5 rounded-full bg-white/80 ring-1 ring-slate-900/5 shadow-xs dark:bg-white/[0.08] dark:ring-white/10 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-white/[0.14]"
                     >
                       Cancelar
                     </button>
