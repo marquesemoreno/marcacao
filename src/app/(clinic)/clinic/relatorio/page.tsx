@@ -292,12 +292,12 @@ export default async function ClinicReportPage({
   return (
     <ReportCanvas gap="space-y-10">
       <div className="space-y-3">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <div className="flex flex-col items-start justify-between gap-3 xl:flex-row xl:items-center">
           <PageHeader
             title="Relatórios"
             subtitle={`${chatReport.totalConversations} conversa(s) · ${labels.title} · ${clinic.tradeName}`}
           />
-          <div className="flex flex-wrap items-center gap-2 shrink-0">
+          <div className="flex min-w-0 flex-wrap items-center gap-2 xl:justify-end">
             <ReportSelectFilter
               basePath={BASE}
               paramKey="tag"
