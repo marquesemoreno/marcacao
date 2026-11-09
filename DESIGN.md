@@ -43,3 +43,33 @@ superfícies limpas, cantos arredondados, quase nenhuma borda, cinzas neutros.
   `rounded-br-md` / `rounded-bl-md`.
 - **Modais**: grid de 2 colunas no desktop (`md:grid-cols-2 gap-4`), sem scroll interno
   desnecessário.
+
+## 5. Visual "vidro" (09/11/2026) — Relatório e Ficha do paciente
+Nasceu no piloto do Relatório e foi aplicado à ficha do paciente. É a direção para as
+próximas telas redesenhadas; as demais seguem as seções 1–4 até serem migradas.
+
+- **Fundo da tela**: envolver a página em `.soft-canvas` (globals.css) — claro #f3f6fa com
+  manchas suaves azul/menta/lilás; escuro #0c0d11 com brilhos esmeralda/céu/índigo.
+  Dentro dele, os `Select` viram pílulas de vidro automaticamente.
+- **Cartão de vidro**: `.glass-surface p-5` (raio 1.75rem, branco 74% + blur 22px, sombra
+  suave; escuro rgb(26 27 33/.66)). Substitui `rounded-2xl bg-white shadow-xs` nessas telas.
+  Pílula de vidro: `glass-surface !rounded-full`.
+- **Painel interno**: `.glass-well` (raio 1.25rem, slate claro 70% / branco 5% no escuro)
+  para linhas de lista ou blocos dentro de um cartão de vidro.
+- **KPI em pílula** (`KpiPill`, src/components/clinic/report-hero.tsx): selo redondo com
+  ícone + valor + rótulo + variação (`ReportDelta variant="chip"`).
+- **Cartão de destaque** (`HighlightTile`, mesmo arquivo): tons `blue | teal | ink | sun`,
+  título, valor grande (`text-[1.375rem] sm:text-[2rem]`), linha de apoio e botão redondo
+  com seta no canto (`href` vira Link; `onOpen` vira botão — ex.: abrir uma aba).
+  No celular ficam em `grid-cols-2`; no desktop até 4 por linha.
+- **Abas em pílula**: trilho sem barra de rolagem visível
+  (`overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden`); ativa
+  `bg-slate-900 text-white dark:bg-white dark:text-slate-900`, demais sem fundo.
+- **Ações rápidas** (`QuickAction`, patient-page.tsx): círculo `size-11` com o nome embaixo
+  (`text-[11px]`), todas numa linha; a principal (Conversa) em verde cheio.
+- **Pílula de contexto** (`ContextPill`) e **linha de dado** (`InfoRow`: ícone redondo
+  `size-8`, rótulo `text-xs` em cima, valor embaixo; vazio = "—" em cinza claro).
+- **Layout da ficha**: desktop `lg:grid-cols-[minmax(0,1fr)_22rem]` com perfil e dados à
+  direita; no celular a ordem é perfil → destaques e histórico → dados cadastrais (usar
+  `lg:col-start/row-start` em vez de `order` para manter a ordem do DOM certa no celular).
+- Lembrete Tailwind 3: importante é `!classe` (prefixo), não `classe!`.
