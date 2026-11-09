@@ -31,9 +31,9 @@ async function totemOf(token: string, kind: "TOTEM" | "QR"): Promise<string | nu
 export async function getTotemInfo(token: string, kind: "TOTEM" | "QR" = "TOTEM"): Promise<{ clinicName: string; needsLocation: boolean; services: QueueServiceView[] } | null> {
   const clinicId = await totemOf(token, kind);
   if (!clinicId) return null;
-  const clinic = await prisma.clinic.findUnique({ where: { id: clinicId }, select: { name: true, arrivalLat: true, arrivalLng: true } });
+  const clinic = await prisma.clinic.findUnique({ where: { id: clinicId }, select: { name: true, tradeName: true, arrivalLat: true, arrivalLng: true } });
   return {
-    clinicName: clinic?.name ?? "",
+    clinicName: clinic?.tradeName || clinic?.name || "",
     needsLocation: kind === "QR" && clinic?.arrivalLat != null && clinic?.arrivalLng != null,
     services: await listQueueServices(clinicId, true),
   };

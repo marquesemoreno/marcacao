@@ -282,7 +282,7 @@ export async function followQueueTicket(raw: string): Promise<TicketFollow | nul
   if (!t || t.day !== todayInBahia()) return null;
   const [waiting, clinic, sameDoctor] = await Promise.all([
     t.status === "WAITING" ? waitingToday(t.clinicId, t.day, t.serviceId) : Promise.resolve([]),
-    prisma.clinic.findUnique({ where: { id: t.clinicId }, select: { name: true } }),
+    prisma.clinic.findUnique({ where: { id: t.clinicId }, select: { name: true, tradeName: true } }),
     t.status === "WAITING" && t.doctor
       ? prisma.queueTicket.findMany({ where: { clinicId: t.clinicId, day: t.day, status: "WAITING", doctor: { not: null } }, select: { doctor: true, appointmentTime: true, status: true } })
       : Promise.resolve([]),
@@ -290,7 +290,7 @@ export async function followQueueTicket(raw: string): Promise<TicketFollow | nul
   const nowBR = new Date(Date.now() - 3 * 3600_000);
   return {
     code: t.code,
-    clinicName: clinic?.name ?? "",
+    clinicName: clinic?.tradeName || clinic?.name || "",
     status: t.status as TicketStatus,
     ahead: t.status === "WAITING" ? ticketsAhead(waiting, t.id) : 0,
     room: t.room,

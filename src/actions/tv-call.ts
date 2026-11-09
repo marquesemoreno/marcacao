@@ -83,8 +83,8 @@ export async function getDoctorRooms(): Promise<{ doctor: string; room: string }
 export async function getTvState(token: string): Promise<{ clinicName: string; topic: string | null; calls: TvCall[] } | null> {
   const tv = await resolveTvDisplay(token);
   if (!tv || tv.kind !== "TV") return null;
-  const clinic = await prisma.clinic.findUnique({ where: { id: tv.clinicId }, select: { name: true } });
-  return { clinicName: clinic?.name ?? "", topic: tvTopicFor(tv.clinicId), calls: await recentCalls(tv.clinicId) };
+  const clinic = await prisma.clinic.findUnique({ where: { id: tv.clinicId }, select: { name: true, tradeName: true } });
+  return { clinicName: clinic?.tradeName || clinic?.name || "", topic: tvTopicFor(tv.clinicId), calls: await recentCalls(tv.clinicId) };
 }
 
 export async function getTvCall(token: string, id: string): Promise<TvCall | null> {
