@@ -15,7 +15,7 @@ import type { Procedure } from "@prisma/client";
  * (BusinessHoursForm), Preços (agora ProceduresTable em vez dos cards empilhados) e
  * Parâmetros/Links (ReportSettingsForm + TrackedLinksCard). */
 // Aba ativa bem visível também no modo escuro (o padrão do shadcn é quase invisível no trilho cinza).
-const trig = "!rounded-full !border-0 px-3 after:!hidden aria-selected:!bg-slate-900 aria-selected:!text-white dark:aria-selected:!bg-white dark:aria-selected:!text-slate-900";
+const trig = "!flex-none shrink-0 !rounded-full !border-0 px-3 after:!hidden aria-selected:!bg-slate-900 aria-selected:!text-white dark:aria-selected:!bg-white dark:aria-selected:!text-slate-900";
 
 export function PrecosPageTabs({
   businessHours,
@@ -43,7 +43,7 @@ export function PrecosPageTabs({
   return (
     <Tabs defaultValue="horarios" className="gap-4 min-w-0">
       {/* Fixa no topo do contêiner de rolagem da página (lista de procedimentos é longa). */}
-      <TabsList className="glass-surface sticky top-0 z-10 !h-auto w-full sm:w-fit flex-wrap justify-start !rounded-full p-1">
+      <TabsList className="glass-surface sticky top-0 z-10 !h-auto max-w-full w-fit !flex-nowrap justify-start overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden !rounded-full p-1">
         <TabsTrigger value="horarios" className={trig}>Horários de Atendimento</TabsTrigger>
         <TabsTrigger value="precos" className={trig}>Procedimentos e Preços</TabsTrigger>
         <TabsTrigger value="parametros" className={trig}>Parâmetros, Links e Campanhas</TabsTrigger>
