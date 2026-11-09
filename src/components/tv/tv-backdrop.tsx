@@ -11,7 +11,10 @@ export function TvBackdrop({ mode, dim }: { mode: TvBackground; dim: boolean }) 
     <div aria-hidden className="pointer-events-none fixed inset-0 -z-10 overflow-hidden bg-slate-950">
       <style>{KEYFRAMES}</style>
       {mode === "ARTE" ? <SoftArt /> : <Landscapes />}
-      <div className={`absolute inset-0 bg-gradient-to-b from-slate-950/80 via-slate-950/55 to-slate-950/85 transition-opacity duration-700`} />
+      {/* Véu: a arte já é escura e desfocada, a foto precisa de mais. */}
+      <div
+        className={`absolute inset-0 bg-gradient-to-b ${mode === "ARTE" ? "from-slate-950/50 via-slate-950/10 to-slate-950/60" : "from-slate-950/80 via-slate-950/55 to-slate-950/85"}`}
+      />
       <div className={`absolute inset-0 bg-slate-950 transition-opacity duration-700 ${dim ? "opacity-60" : "opacity-0"}`} />
     </div>
   );
@@ -28,7 +31,7 @@ const KEYFRAMES = `
 
 /** Gradiente vivo bem lento nas cores da marca (verde, azul-petróleo, azul). */
 function SoftArt() {
-  const blob = "tvbg-anim absolute rounded-full blur-[10vw] opacity-60";
+  const blob = "tvbg-anim absolute rounded-full blur-[8vw] opacity-90";
   return (
     <>
       <div className={`${blob} -left-[15vw] -top-[20vh] h-[80vh] w-[60vw] bg-emerald-600`} style={{ animation: "tvbg-drift-a 90s ease-in-out infinite" }} />
