@@ -208,7 +208,7 @@ export function MarcadoresTable({
                       <AvatarBadge
                         name={r.name}
                         size={36}
-                        className="ring-2 ring-white/80 dark:ring-white/10"
+                        className="max-sm:!hidden ring-2 ring-white/80 dark:ring-white/10"
                         fallbackClassName={r.active ? avatarTone(r.id) : "bg-slate-200 text-slate-500 dark:bg-white/10 dark:text-slate-400"}
                       />
                       <div className="min-w-0">
@@ -240,7 +240,7 @@ export function MarcadoresTable({
                         aria-label={`Copiar link de ${r.name}`}
                       >
                         {copied === r.id ? <Check className="w-3.5 h-3.5 text-emerald-600" aria-hidden /> : <Copy className="w-3.5 h-3.5" aria-hidden />}
-                        {copied === r.id ? "Copiado" : "Copiar link"}
+                        <span className="max-sm:sr-only">{copied === r.id ? "Copiado" : "Copiar link"}</span>
                       </button>
                     ) : (
                       <span className="text-xs text-slate-400">—</span>
