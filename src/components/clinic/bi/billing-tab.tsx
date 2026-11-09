@@ -2,18 +2,11 @@ import { AlertTriangle, Info } from "lucide-react";
 import { getBiBilling } from "@/actions/bi/billing";
 import { formatCurrency } from "@/lib/format";
 
-const card = "rounded-2xl bg-white dark:bg-slate-900 p-5 shadow-xs";
-const MONTHS = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
-const monthLabel = (ym: string) => `${MONTHS[Number(ym.slice(5, 7)) - 1]}/${ym.slice(2, 4)}`;
-const br = (ymd: string | null) => (ymd ? ymd.split("-").reverse().join("/") : "—");
+import { BridgeProblem, MonthPicker, biCard as card, brDate as br, monthLabel } from "./shared";
+
 const pct = (n: number) => `${n.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%`;
 const compact = (n: number) =>
   n >= 1000 ? `R$ ${(n / 1000).toLocaleString("pt-BR", { maximumFractionDigits: n >= 100_000 ? 0 : 1 })} mil` : formatCurrency(n);
-
-function lastMonths(n: number) {
-  const now = new Date(Date.now() - 3 * 3600_000);
-  return Array.from({ length: n }, (_, i) => new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1)).toISOString().slice(0, 7));
-}
 
 /** Selo das regras que ainda dependem de confirmação da clínica. */
 function ToConfirm() {
@@ -28,18 +21,7 @@ function ToConfirm() {
  * convênios (com valores atípicos sinalizados) e médicos com a cobertura da atribuição. */
 export async function BillingTab({ month }: { month?: string }) {
   const v = await getBiBilling(month ?? "");
-  if (!v.ok) {
-    return (
-      <section className={card}>
-        <h2 className="font-semibold">Faturamento</h2>
-        <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
-          {v.reason === "unavailable"
-            ? "O sistema da clínica ainda não está conectado a esta análise (a ponte precisa ser atualizada)."
-            : "Não consegui falar com o sistema da clínica agora. Tente de novo em instantes."}
-        </p>
-      </section>
-    );
-  }
+  if (!v.ok) return <BridgeProblem title="Faturamento" reason={v.reason} />;
 
   const { composition: c, comparison: cmp, guias } = v;
   const lidoEm = new Date(v.geradoEm).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", dateStyle: "short", timeStyle: "short" });
@@ -62,26 +44,7 @@ export async function BillingTab({ month }: { month?: string }) {
             Fonte: {v.fonte} · última guia lançada em {br(v.ultimaGuia)} · lido em {lidoEm} (atualiza a cada 3 h)
           </p>
         </div>
-        <form action="/clinic/relatorio" className="flex items-end gap-2">
-          <input type="hidden" name="aba" value="faturamento" />
-          <label className="text-xs font-medium text-slate-600 dark:text-slate-400">
-            Mês
-            <select
-              name="mes"
-              defaultValue={v.month}
-              className="mt-1 block h-9 w-36 rounded-md border border-slate-200 bg-white px-2 text-sm dark:border-slate-700 dark:bg-slate-950"
-            >
-              {lastMonths(13).map((m) => (
-                <option key={m} value={m}>
-                  {monthLabel(m)}
-                </option>
-              ))}
-            </select>
-          </label>
-          <button type="submit" className="h-9 rounded-md bg-slate-900 px-4 text-sm font-semibold text-white dark:bg-slate-100 dark:text-slate-900">
-            Ver
-          </button>
-        </form>
+        <MonthPicker aba="faturamento" month={v.month} />
       </div>
 
       <section className={card} aria-label="Faturado no mês">

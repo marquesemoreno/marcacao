@@ -605,23 +605,6 @@ export function fetchBridgeStockSummary(clinicId: string) {
   return fetchOwnerEndpoint<BridgeStockSummary>(clinicId, "/api/estoque/resumo");
 }
 
-export type BridgeBillingSummary = {
-  inicio: string;
-  fim: string;
-  ambulatorial: { guias: number; valor: number; glosa: number };
-  internacao: { internacoes: number; valor: number; glosa: number };
-  recibos: { quantidade: number; valor: number };
-  porConvenio: { convenio: string; quantidade: number; total: number }[];
-  porMedico: { medico: string; procedimentos: number; total: number }[];
-};
-
-export function fetchBridgeBillingSummary(clinicId: string, inicio: string, fim: string) {
-  return fetchOwnerEndpoint<BridgeBillingSummary>(
-    clinicId,
-    `/api/faturamento/resumo?inicio=${encodeURIComponent(inicio)}&fim=${encodeURIComponent(fim)}`
-  );
-}
-
 /** BI › Faturamento (09/11/2026): peças separadas, quem compõe o total é src/lib/bi/billing.ts. */
 export type BridgeBiBilling = {
   fonte: string;

@@ -41,6 +41,8 @@ import { getHoursSavedReport } from "@/actions/hours-saved";
 import { WeekForecastSection } from "@/components/clinic/week-forecast-card";
 import { ReportTabs } from "@/components/clinic/bi/report-tabs";
 import { BillingTab } from "@/components/clinic/bi/billing-tab";
+import { FinanceTab } from "@/components/clinic/bi/finance-tab";
+import { StockTab } from "@/components/clinic/bi/stock-tab";
 import { ReguaReturnCard } from "@/components/clinic/regua-return-card";
 import { getReguaReturnReport } from "@/actions/regua-return";
 import { SlotRecoveryCard } from "@/components/clinic/slot-recovery-card";
@@ -135,14 +137,15 @@ export default async function ClinicReportPage({
   const params = await searchParams;
   if (!(await currentUserCan("relatorios"))) return <ManagerOnly />;
   const isManager = await currentUserIsManager();
-  if (params.aba === "faturamento") {
+  const biTab = params.aba === "faturamento" || params.aba === "financeiro" || params.aba === "estoque" ? params.aba : null;
+  if (biTab) {
     if (!isManager) return <ManagerOnly />;
     return (
       <div className="space-y-6 font-sans flex-1 overflow-y-auto text-slate-900 dark:text-slate-100 p-6 md:p-8 max-w-7xl mx-auto w-full">
-        <PageHeader title="Relatórios" subtitle="Faturamento lido do sistema da clínica (só leitura). Só a gestão vê esta aba." />
-        <ReportTabs active="faturamento" isManager />
-        <Suspense fallback={<p className="text-sm text-slate-500">Lendo o sistema da clínica…</p>}>
-          <BillingTab month={params.mes} />
+        <PageHeader title="Relatórios" subtitle="Lido do sistema da clínica (só leitura). Só a gestão vê esta aba." />
+        <ReportTabs active={biTab} isManager />
+        <Suspense key={`${biTab}-${params.mes ?? ""}`} fallback={<p className="text-sm text-slate-500">Lendo o sistema da clínica…</p>}>
+          {biTab === "faturamento" ? <BillingTab month={params.mes} /> : biTab === "financeiro" ? <FinanceTab month={params.mes} /> : <StockTab />}
         </Suspense>
       </div>
     );
