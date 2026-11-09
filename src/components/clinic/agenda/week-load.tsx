@@ -32,15 +32,15 @@ export function WeekLoadTable({
   };
 
   if (load.rows.length === 0) {
-    return <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-8 text-center text-sm text-slate-500 dark:text-slate-400">Nenhum paciente nesta semana.</div>;
+    return <div className="glass-surface p-8 text-center text-sm text-slate-500 dark:text-slate-400">Nenhum paciente nesta semana.</div>;
   }
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+    <div className="overflow-x-auto glass-surface">
       <table className="w-full min-w-[640px] border-collapse text-sm">
         <caption className="sr-only">Pacientes por médico e dia. Clique numa célula para abrir o dia daquele médico.</caption>
         <thead>
-          <tr className="border-b border-slate-200 dark:border-slate-800">
+          <tr className="border-b border-slate-900/[0.07] dark:border-white/[0.07]">
             <th scope="col" className="px-3 py-2 text-left text-xs font-semibold text-slate-600 dark:text-slate-400">Médico</th>
             {days.map((d) => (
               <th

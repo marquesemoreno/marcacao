@@ -60,7 +60,7 @@ export function BookingRequests({ refreshKey, onCount }: { refreshKey: number; o
 
   if (items.length === 0) return null;
   return (
-    <section aria-labelledby="pedidos-titulo" className="rounded-2xl border border-violet-200 dark:border-violet-900 bg-white dark:bg-slate-900">
+    <section aria-labelledby="pedidos-titulo" className="glass-surface overflow-hidden ring-1 ring-violet-300/60 dark:ring-violet-800/60">
       <h2 id="pedidos-titulo" className="flex items-center gap-2 px-4 pt-3 text-sm font-semibold">
         <CalendarPlus className="h-4 w-4 text-violet-700 dark:text-violet-400" aria-hidden />
         Pedidos de marcação

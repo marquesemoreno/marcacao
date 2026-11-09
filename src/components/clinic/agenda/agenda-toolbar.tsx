@@ -48,7 +48,7 @@ export function AgendaToolbar({
   /** Recebendo avisos em tempo real (Realtime conectado). */
   live?: boolean;
 }) {
-  const navBtn = `inline-flex items-center justify-center h-9 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 ${focusRing}`;
+  const navBtn = `inline-flex items-center justify-center h-10 rounded-full bg-white/80 ring-1 ring-slate-900/5 shadow-xs hover:bg-white dark:bg-white/[0.08] dark:ring-white/10 dark:hover:bg-white/[0.14] text-slate-700 dark:text-slate-200 ${focusRing}`;
   return (
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div className="flex items-center gap-2 min-w-0">
@@ -61,7 +61,7 @@ export function AgendaToolbar({
         <button type="button" onClick={onNext} className={`${navBtn} w-9 shrink-0`} aria-label="Próximo período" title="Próximo (→)">
           <ChevronRight className="w-4 h-4" />
         </button>
-        <h1 className="ml-1 truncate text-lg md:text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100 first-letter:uppercase" aria-live="polite">
+        <h1 className="ml-1 truncate text-lg md:text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100 first-letter:uppercase" aria-live="polite">
           {shortLabel ? (
             <>
               <span className="sm:hidden">{shortLabel}</span>
@@ -74,7 +74,7 @@ export function AgendaToolbar({
         <button
           type="button"
           onClick={onRefresh}
-          className={`ml-1 inline-flex size-9 shrink-0 items-center justify-center rounded-full text-slate-600 dark:text-slate-400 hover:text-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 dark:hover:text-slate-200 ${focusRing}`}
+          className={`ml-1 inline-flex size-9 shrink-0 items-center justify-center rounded-full text-slate-600 dark:text-slate-400 hover:text-slate-800 hover:bg-white/70 dark:hover:bg-white/10 dark:hover:text-slate-200 ${focusRing}`}
           aria-label={loading ? "Carregando agenda" : "Atualizar agenda"}
           title="Atualizar"
         >
@@ -102,7 +102,7 @@ export function AgendaToolbar({
           <span className="hidden xl:inline">Senhas</span>
         </button>
       )}
-      <div role="group" aria-label="Visão da agenda" className="inline-flex max-w-full overflow-x-auto rounded-full bg-slate-100 dark:bg-slate-800 p-0.5">
+      <div role="group" aria-label="Visão da agenda" className="inline-flex max-w-full overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden glass-surface !rounded-full p-1">
         {AGENDA_VIEWS.map((v) => (
           <button
             key={v.id}
@@ -112,7 +112,7 @@ export function AgendaToolbar({
             title={`${v.label} (${v.key})`}
             className={`shrink-0 px-2.5 sm:px-3 h-8 text-sm font-medium rounded-full ${focusRing} ${
               view === v.id
-                ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm"
+                ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900"
                 : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
             }`}
           >

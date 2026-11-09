@@ -57,7 +57,7 @@ export function AgendaSidebar({
           onClick={() => setMobileOpen((o) => !o)}
           aria-expanded={mobileOpen}
           aria-controls="agenda-filters"
-          className="lg:hidden inline-flex h-10 items-center gap-1.5 rounded-full bg-slate-100 dark:bg-slate-800 px-4 text-sm font-medium text-slate-700 dark:text-slate-200"
+          className="lg:hidden inline-flex h-10 items-center gap-1.5 rounded-full bg-white/80 ring-1 ring-slate-900/5 shadow-xs hover:bg-white dark:bg-white/[0.08] dark:ring-white/10 dark:hover:bg-white/[0.14] px-4 text-sm font-medium text-slate-700 dark:text-slate-200"
         >
           <SlidersHorizontal className="w-4 h-4" aria-hidden />
           Data e médico{filterCount ? ` (${filterCount})` : ""}
@@ -66,7 +66,7 @@ export function AgendaSidebar({
       </div>
 
       <div id="agenda-filters" className={`${mobileOpen ? "block" : "hidden"} lg:block space-y-3`}>
-        <div className="rounded-2xl bg-white dark:bg-slate-900 shadow-xs p-2 flex justify-center [&_.group\/calendar]:bg-transparent">
+        <div className="glass-surface p-2 flex justify-center [&_.group\/calendar]:bg-transparent">
           <Calendar
             mode="single"
             locale={ptBR}
@@ -78,7 +78,7 @@ export function AgendaSidebar({
           />
         </div>
 
-        <section className="rounded-2xl bg-white dark:bg-slate-900 shadow-xs p-3">
+        <section className="glass-surface p-4">
           <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-100 mb-2">Médico</h2>
           {loading ? (
             <div className="space-y-2 py-1" aria-busy="true" aria-label="Carregando médicos">
@@ -91,14 +91,14 @@ export function AgendaSidebar({
           ) : (
             <ul className="space-y-0.5 max-h-64 overflow-y-auto">
               <li>
-                <label className="flex h-8 items-center gap-2 rounded-md px-1 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800">
+                <label className="flex h-8 items-center gap-2 rounded-md px-1 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-900/[0.04] dark:hover:bg-white/[0.06]">
                   <input type="checkbox" checked={allDoctors} onChange={onAllDoctors} className="size-4 accent-emerald-600" />
                   Todos
                 </label>
               </li>
               {doctors.map((d) => (
                 <li key={d}>
-                  <label className="flex h-8 items-center gap-2 rounded-md px-1 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800">
+                  <label className="flex h-8 items-center gap-2 rounded-md px-1 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-900/[0.04] dark:hover:bg-white/[0.06]">
                     <input
                       type="checkbox"
                       checked={!allDoctors && selectedDoctors.includes(d)}

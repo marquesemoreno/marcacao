@@ -95,15 +95,15 @@ export function AgendaGrid({
   const segments = collapseEmptyRows(rows, occupied, nowRow != null ? new Set([nowRow]) : new Set(), openedGaps);
 
   return (
-    <div ref={scrollRef} className="relative h-[70dvh] min-h-[14rem] overflow-auto rounded-2xl bg-white dark:bg-slate-900 shadow-xs">
+    <div ref={scrollRef} className="relative h-[70dvh] min-h-[14rem] overflow-auto glass-surface !bg-[#f9fafc]/90 dark:!bg-[#1b1c22]/90">
       <div className="grid min-w-fit" style={template}>
         {/* Cabeçalho */}
-        <div className="sticky top-0 left-0 z-30 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800" />
+        <div className="sticky top-0 left-0 z-30 bg-[#f9fafc] dark:bg-[#1b1c22] border-b border-slate-900/[0.07] dark:border-white/[0.07]" />
         {columns.map((col) => (
           <div
             key={col.id}
-            className={`sticky top-0 z-20 flex items-start justify-between gap-2 border-b border-l border-slate-200 dark:border-slate-800 px-3 py-2 ${
-              col.highlight ? "bg-emerald-50 dark:bg-emerald-950" : "bg-white dark:bg-slate-900"
+            className={`sticky top-0 z-20 flex items-start justify-between gap-2 border-b border-l border-slate-900/[0.07] dark:border-white/[0.07] px-3 py-2 ${
+              col.highlight ? "bg-emerald-50 dark:bg-emerald-950" : "bg-[#f9fafc] dark:bg-[#1b1c22]"
             }`}
           >
             <div className="min-w-0">
@@ -126,11 +126,11 @@ export function AgendaGrid({
 
         {hasUnscheduled && (
           <>
-            <div className="sticky left-0 z-10 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 pr-2 py-2 text-xs leading-tight text-slate-500 dark:text-slate-400 text-right">
+            <div className="sticky left-0 z-10 bg-[#f9fafc] dark:bg-[#1b1c22] border-b border-slate-900/[0.07] dark:border-white/[0.07] pr-2 py-2 text-xs leading-tight text-slate-500 dark:text-slate-400 text-right">
               Sem horário
             </div>
             {byCell.map((c, i) => (
-              <div key={columns[i].id} className="border-b border-l border-slate-200 dark:border-slate-800 p-1 space-y-1 bg-slate-50/70 dark:bg-slate-950/40">
+              <div key={columns[i].id} className="border-b border-l border-slate-900/[0.07] dark:border-white/[0.07] p-1 space-y-1 bg-slate-50/70 dark:bg-slate-950/40">
                 {c.unscheduled.map((item) => (
                   <AppointmentCard key={item.key} item={item} compact={compact} nowTime={nowTime} onOpen={onOpen} onSetStatus={onSetStatus} onReschedule={onReschedule} />
                 ))}
@@ -146,8 +146,8 @@ export function AgendaGrid({
             return (
               <div key={`gap-${seg.from}`} className="contents">
                 {/* Sem rótulo de hora aqui: o intervalo já está na faixa (crítica 7ª). */}
-                <div className="sticky left-0 z-10 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800" />
-                <div style={{ gridColumn: "2 / -1" }} className="border-t border-l border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/40">
+                <div className="sticky left-0 z-10 bg-[#f9fafc] dark:bg-[#1b1c22] border-t border-slate-900/[0.07] dark:border-white/[0.07]" />
+                <div style={{ gridColumn: "2 / -1" }} className="border-t border-l border-slate-900/[0.07] dark:border-white/[0.07] bg-slate-50/70 dark:bg-slate-950/40">
                   <button
                     type="button"
                     onClick={() => setOpenedGaps((prev) => new Set(prev).add(seg.from))}
@@ -173,13 +173,13 @@ export function AgendaGrid({
           const line = isNow
             ? "border-emerald-500 dark:border-emerald-400"
             : isHour
-              ? "border-slate-200 dark:border-slate-800"
+              ? "border-slate-900/[0.07] dark:border-white/[0.07]"
               : "border-slate-100 dark:border-slate-800/50";
           return (
             <div key={row} className="contents">
               <div
                 ref={isNow ? nowRef : undefined}
-                className={`sticky left-0 z-10 bg-white dark:bg-slate-900 border-t ${line} pr-2 text-right text-xs tabular-nums ${
+                className={`sticky left-0 z-10 bg-[#f9fafc] dark:bg-[#1b1c22] border-t ${line} pr-2 text-right text-xs tabular-nums ${
                   isNow ? "font-semibold text-emerald-700 dark:text-emerald-400" : "text-slate-600 dark:text-slate-400"
                 }`}
               >
