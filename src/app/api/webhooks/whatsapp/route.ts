@@ -502,6 +502,28 @@ async function handleDeviceOutbound(
 // do plano, que pode cortar no meio e perder a gravação.
 export const maxDuration = 120;
 
+/** Uma linha por mensagem recebida, pra dar pra ver no log da Vercel se a instância está
+ * entregando, se veio com o token e o que a rota fez. Só instância, tipo do evento, token e
+ * resultado — nada de telefone, nome ou texto. Só messages.upsert, pra não encher o log
+ * com os avisos de entrega/leitura. */
+async function logArrival(body: unknown, token: string, response: Response) {
+  const rec = body as { event?: unknown; instance?: unknown };
+  const kind = typeof rec.event === "string" ? rec.event.toLowerCase().replace(/_/g, ".") : "";
+  if (kind !== "messages.upsert") return;
+  const parsed = (await response.clone().json().catch(() => null)) as { status?: unknown; reason?: unknown } | null;
+  const result = typeof parsed?.status === "string" ? parsed.status : typeof parsed?.reason === "string" ? parsed.reason : null;
+  console.log(
+    JSON.stringify({
+      event: "wa_webhook",
+      instance: typeof rec.instance === "string" ? rec.instance.slice(0, 80) : null,
+      kind,
+      token,
+      http: response.status,
+      result: result ? result.slice(0, 60) : null,
+    })
+  );
+}
+
 export async function POST(request: Request) {
   const requiredSecret = process.env.WHATSAPP_WEBHOOK_SECRET;
   if (!requiredSecret) {
@@ -534,7 +556,9 @@ export async function POST(request: Request) {
   const internal = isInternalSecretAuthorized(request.headers.get("x-internal-secret"), process.env.CRON_SECRET);
   const forcedClinicId = internal ? request.headers.get("x-cloud-clinic-id") ?? undefined : undefined;
   try {
-    return await processWhatsappWebhook(body, forcedClinicId);
+    const response = await processWhatsappWebhook(body, forcedClinicId);
+    await logArrival(body, verdict, response);
+    return response;
   } catch (error) {
     // Proteção geral: erro inesperado (banco fora, bug) vira 500 pra quem mandou tentar de
     // novo — a Evolution, ou a rota da API oficial, que então grava a mensagem direto. O

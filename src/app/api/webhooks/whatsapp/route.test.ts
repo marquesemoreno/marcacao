@@ -56,6 +56,25 @@ describe("POST /api/webhooks/whatsapp (Evolution)", () => {
     expect(prismaMock.message.create).not.toHaveBeenCalled();
   });
 
+  it("registra a chegada de mensagem só com instância, token e resultado (nada do paciente)", async () => {
+    prismaMock.message.findUnique.mockResolvedValue({ id: "msg1" });
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    await POST(evolutionRequest(upsertBody));
+    const line = log.mock.calls.map((c) => c.join(" ")).find((l) => l.includes("wa_webhook"));
+    expect(line).toBeDefined();
+    expect(JSON.parse(line!)).toEqual({
+      event: "wa_webhook",
+      instance: "clinica-teste",
+      kind: "messages.upsert",
+      token: "open",
+      http: 200,
+      result: "duplicate",
+    });
+    expect(line).not.toContain("5577988887777");
+    expect(line).not.toContain("Maria");
+    log.mockRestore();
+  });
+
   describe("segredo do webhook", () => {
     beforeEach(() => {
       process.env.WHATSAPP_WEBHOOK_SECRET = "s3gredo";
