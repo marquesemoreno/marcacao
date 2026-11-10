@@ -202,8 +202,15 @@ export async function getEvolutionConnectionState(config: EvolutionInstanceConfi
   );
 }
 
+/** Reinicia a instância sem desconectar o número. Na Evolution v2 a rota é POST; a v1 usava
+ * PUT, e mandar PUT pra v2 devolve 404 (o botão "Reiniciar" do admin falhava assim). */
 export async function restartEvolutionInstance(config: EvolutionInstanceConfig) {
-  return evolutionFetch<unknown>(config, `/instance/restart/${config.instanceName}`, { method: "PUT" });
+  const path = `/instance/restart/${config.instanceName}`;
+  const result = await evolutionFetch<unknown>(config, path, { method: "POST" });
+  if (!result.success && result.error.startsWith("HTTP 404")) {
+    return evolutionFetch<unknown>(config, path, { method: "PUT" });
+  }
+  return result;
 }
 
 export async function logoutEvolutionInstance(config: EvolutionInstanceConfig) {
