@@ -20,7 +20,8 @@ export const CLINIC_ROLE_LABEL: Record<ClinicRole, string> = {
 export type ClinicPermission = "atendimento" | "ficha.ver" | "disparos" | "relatorios" | "config" | "chamar";
 
 const MATRIX: Record<ClinicRole, ClinicPermission[]> = {
-  RECEPCAO: ["atendimento", "ficha.ver", "chamar"],
+  // Disparos liberado para a recepção em 10/11/2026 (avisar pacientes de agenda marcada errada / remarcação).
+  RECEPCAO: ["atendimento", "ficha.ver", "disparos", "chamar"],
   MARKETING: ["atendimento", "disparos", "relatorios"],
   GESTAO: ["atendimento", "ficha.ver", "disparos", "relatorios", "config", "chamar"],
   MEDICO: ["chamar"],

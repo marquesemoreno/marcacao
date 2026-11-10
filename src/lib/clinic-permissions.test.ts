@@ -2,10 +2,10 @@ import { describe, expect, it } from "vitest";
 import { can, parseClinicRole, CLINIC_ROLE_LABEL } from "./clinic-permissions";
 
 describe("can", () => {
-  it("recepção: atende e vê ficha, mas não dispara nem vê relatório", () => {
+  it("recepção: atende, vê ficha e dispara (pedido 10/11, avisos de agenda), mas não vê relatório", () => {
     expect(can("RECEPCAO", "atendimento")).toBe(true);
     expect(can("RECEPCAO", "ficha.ver")).toBe(true);
-    expect(can("RECEPCAO", "disparos")).toBe(false);
+    expect(can("RECEPCAO", "disparos")).toBe(true);
     expect(can("RECEPCAO", "relatorios")).toBe(false);
     expect(can("RECEPCAO", "config")).toBe(false);
   });

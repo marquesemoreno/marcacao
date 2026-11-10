@@ -602,7 +602,7 @@ export function BroadcastManagement() {
               className={`inline-flex h-10 items-center gap-1.5 px-4 text-sm font-medium text-slate-700 dark:text-slate-200 bg-white/80 ring-1 ring-slate-900/5 shadow-xs hover:bg-white dark:bg-white/[0.08] dark:ring-white/10 dark:hover:bg-white/[0.14] rounded-full ${FOCUS_RING}`}
             >
               <CalendarClock className="w-4 h-4" aria-hidden />
-              Médico desmarcou
+              Remarcar
             </button>
             <button
               type="button"
@@ -618,7 +618,7 @@ export function BroadcastManagement() {
 
       {/* Dica para quem está começando; some depois que a clínica já tem algumas campanhas. */}
       <p id="disparos-remarcacao-hint" className={campaigns.length >= 3 ? "sr-only" : "-mt-4 text-xs text-slate-500 dark:text-slate-400"}>
-        <strong className="font-medium text-slate-600 dark:text-slate-300">Médico desmarcou</strong> avisa de uma vez os pacientes agendados com ele no dia.{" "}
+        <strong className="font-medium text-slate-600 dark:text-slate-300">Remarcar</strong> avisa de uma vez os pacientes agendados com ele no dia.{" "}
         {channelSetup?.isManager
           ? "Mensagens automáticas de pós-consulta, retorno e aniversário ficam em Configurar › Régua automática."
           : "Mensagens automáticas de pós-consulta e aniversário são ligadas pela gestão."}
