@@ -96,6 +96,7 @@ export function ClinicNav({
     const badgeText = count > 99 ? "99+" : String(count);
     const link = (
       <Link
+        prefetch={false}
         key={item.href}
         href={item.href}
         aria-current={isActive ? "page" : undefined}

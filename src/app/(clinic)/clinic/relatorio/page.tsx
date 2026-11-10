@@ -62,7 +62,7 @@ import {
   topConverter,
   type OutcomeGroup,
 } from "@/lib/report-metrics";
-import { parsePeriodKey, periodLabels, periodWindow } from "@/lib/report-period";
+import { parsePeriodKey, periodLabels, periodWindow, type PeriodKey } from "@/lib/report-period";
 import { formatCurrency, appointmentStatusLabels } from "@/lib/format";
 import {
   CheckCircle2,
@@ -145,6 +145,27 @@ function NotFiltered({ show }: { show: boolean }) {
   return <p className="text-xs text-amber-800 dark:text-amber-300">Esta seção não muda com os filtros de tag e canal.</p>;
 }
 
+/** Cartões secundários do bloco "Funil e evolução": saem do `Promise.all` da página (que, com uma
+ * conexão só, virava fila) e carregam em streaming, sem segurar o resto do relatório. */
+async function FunnelExtras({ period }: { period: PeriodKey }) {
+  const [nps, budgetConversion, hoursSaved, reguaReturn, slotRecovery] = await Promise.all([
+    getClinicNpsReport(period),
+    getBudgetConversionReport(period).catch(() => null),
+    getHoursSavedReport(period).catch(() => null),
+    getReguaReturnReport(period).catch(() => null),
+    getSlotRecoveryReport(period).catch(() => null),
+  ]);
+  return (
+    <>
+      {hoursSaved && <HoursSavedCard data={hoursSaved} />}
+      {reguaReturn && <ReguaReturnCard data={reguaReturn} />}
+      {slotRecovery && <SlotRecoveryCard data={slotRecovery} />}
+      {budgetConversion && <BudgetConversionCard data={budgetConversion} />}
+      <NpsCard nps={nps} />
+    </>
+  );
+}
+
 export default async function ClinicReportPage({
   searchParams,
 }: RelatorioPageProps) {
@@ -194,11 +215,6 @@ export default async function ClinicReportPage({
     prevManagement,
     campaignBreakdown,
     insights,
-    nps,
-    budgetConversion,
-    hoursSaved,
-    reguaReturn,
-    slotRecovery,
   ] = await Promise.all([
     getClinicChatReport(period, tags, params.channel),
     isExclusive
@@ -215,11 +231,6 @@ export default async function ClinicReportPage({
     getClinicManagementReport(period, params.channel, true),
     getClinicCampaignBreakdown(period),
     getClinicReportInsights(period),
-    getClinicNpsReport(period),
-    getBudgetConversionReport(period).catch(() => null),
-    getHoursSavedReport(period).catch(() => null),
-    getReguaReturnReport(period).catch(() => null),
-    getSlotRecoveryReport(period).catch(() => null),
   ]);
   const rs = chatReport.responseStats;
   const prevRs = prevChat.responseStats;
@@ -508,11 +519,9 @@ export default async function ClinicReportPage({
         <Suspense fallback={null}>
           <WeekForecastSection />
         </Suspense>
-        {hoursSaved && <HoursSavedCard data={hoursSaved} />}
-        {reguaReturn && <ReguaReturnCard data={reguaReturn} />}
-        {slotRecovery && <SlotRecoveryCard data={slotRecovery} />}
-        {budgetConversion && <BudgetConversionCard data={budgetConversion} />}
-        <NpsCard nps={nps} />
+        <Suspense key={`extras-${period}`} fallback={<p className="text-sm text-slate-500">Carregando…</p>}>
+          <FunnelExtras period={period} />
+        </Suspense>
       </section>
 
       {insights.agenda && (
