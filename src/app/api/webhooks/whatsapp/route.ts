@@ -6,7 +6,7 @@ import { handleSlotOfferReply, startSlotOfferForItem } from "@/lib/slot-offer-se
 import { classifyAndStorePatientIntent } from "@/lib/patient-intent-server";
 import type { AppointmentStatus, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { isWebhookTokenAuthorized } from "@/lib/request-auth";
+import { isInternalSecretAuthorized, isWebhookTokenAuthorized } from "@/lib/request-auth";
 import { logAiAction } from "@/lib/ai-action-log-server";
 import { extractPatientData } from "@/lib/patient-data-extraction";
 import { sendAppointmentConfirmation, sendWhatsAppMessage, formatToWhatsAppNumber, getEvolutionConfig, toggleNinthDigit } from "@/lib/whatsapp";
@@ -497,6 +497,11 @@ async function handleDeviceOutbound(
   return "saved";
 }
 
+// Explícito: a mensagem recebida roda dentro do pedido (download de mídia, transcrição, IA,
+// várias consultas) e o trabalho de after() conta no mesmo tempo. Sem isso vale o padrão
+// do plano, que pode cortar no meio e perder a gravação.
+export const maxDuration = 120;
+
 export async function POST(request: Request) {
   const requiredSecret = process.env.WHATSAPP_WEBHOOK_SECRET;
   if (!requiredSecret) {
@@ -512,9 +517,32 @@ export async function POST(request: Request) {
   }
   // Encaminhamento interno da API oficial (webhooks/whatsapp-cloud): a clínica vem no
   // cabeçalho, aceito só com o segredo interno (CRON_SECRET).
-  const internal = process.env.CRON_SECRET && request.headers.get("x-internal-secret") === process.env.CRON_SECRET;
+  const internal = isInternalSecretAuthorized(request.headers.get("x-internal-secret"), process.env.CRON_SECRET);
   const forcedClinicId = internal ? request.headers.get("x-cloud-clinic-id") ?? undefined : undefined;
-  return processWhatsappWebhook(body, forcedClinicId);
+  try {
+    return await processWhatsappWebhook(body, forcedClinicId);
+  } catch (error) {
+    // Proteção geral: erro inesperado (banco fora, bug) vira 500 pra quem mandou tentar de
+    // novo — a Evolution, ou a rota da API oficial, que então grava a mensagem direto. O
+    // reenvio é seguro: mensagem já gravada é pulada pela checagem de whatsappKeyId.
+    // Só a 1ª linha e o código do erro: erro de validação do Prisma traz os argumentos da
+    // consulta (nome, telefone, texto) nas linhas seguintes. O corpo vai inteiro no log
+    // (como nos outros registros de whatsapp.inbound) pra dar pra reprocessar.
+    const code = (error as { code?: unknown })?.code;
+    const summary = (error instanceof Error ? error.message : String(error)).split("\n")[0].slice(0, 300);
+    console.error("Falha ao processar webhook do WhatsApp:", typeof code === "string" ? `${code} ${summary}` : summary);
+    await prisma.webhookLog
+      .create({
+        data: {
+          event: "whatsapp.inbound",
+          payload: { kind: "processing_error", error: summary, code: typeof code === "string" ? code : null, body },
+          status: "FAILED",
+          responseCode: 500,
+        },
+      })
+      .catch(() => {});
+    return NextResponse.json({ ok: false, error: "processing_failed" }, { status: 500 });
+  }
 }
 
 /** Processamento do evento no formato da Evolution — também usado pela API oficial
@@ -657,6 +685,13 @@ async function processWhatsappWebhook(body: Prisma.InputJsonValue, forcedClinicI
   if (!incoming) {
     await logInbound(body, "IGNORED");
     return NextResponse.json({ ignored: true, reason: "non_message_event" }, { status: 200 });
+  }
+
+  // Reenvio (Evolution tentando de novo, ou a API oficial depois de um 500) de mensagem que
+  // já está gravada: não grava de novo (estouraria a chave única de whatsappKeyId) nem roda
+  // a automação outra vez (responderia o paciente em dobro).
+  if (incoming.keyId && (await prisma.message.findUnique({ where: { whatsappKeyId: incoming.keyId }, select: { id: true } }))) {
+    return NextResponse.json({ ok: true, status: "duplicate" }, { status: 200 });
   }
 
   // =========================================================================

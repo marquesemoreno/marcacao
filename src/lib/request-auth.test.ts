@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { isCronAuthorized, isWebhookTokenAuthorized } from "./request-auth";
+import { isCronAuthorized, isInternalSecretAuthorized, isWebhookTokenAuthorized } from "./request-auth";
 
 describe("isCronAuthorized", () => {
   it("aceita o Bearer certo", () => {
@@ -30,5 +30,20 @@ describe("isWebhookTokenAuthorized", () => {
     expect(isWebhookTokenAuthorized("abd", "abc")).toBe(false);
     expect(isWebhookTokenAuthorized(null, "abc")).toBe(false);
     expect(isWebhookTokenAuthorized("abcd", "abc")).toBe(false);
+  });
+});
+
+describe("isInternalSecretAuthorized", () => {
+  it("aceita só o mesmo segredo", () => {
+    expect(isInternalSecretAuthorized("s3cret", "s3cret")).toBe(true);
+    expect(isInternalSecretAuthorized("s3creT", "s3cret")).toBe(false);
+    expect(isInternalSecretAuthorized("s3cre", "s3cret")).toBe(false);
+    expect(isInternalSecretAuthorized(null, "s3cret")).toBe(false);
+  });
+
+  it("sem segredo configurado recusa tudo (encaminhamento interno fica desligado)", () => {
+    expect(isInternalSecretAuthorized("", undefined)).toBe(false);
+    expect(isInternalSecretAuthorized("", "")).toBe(false);
+    expect(isInternalSecretAuthorized("undefined", undefined)).toBe(false);
   });
 });

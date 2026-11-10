@@ -6,13 +6,20 @@ Auditoria só de leitura e medição: nada foi alterado no código nem no banco.
 
 **Ressalva sobre as medições:** o navegador embutido estava em segundo plano e atrasou os temporizadores. Os tempos de cada pedido de rede são confiáveis; os tempos de "página pronta" não são, e não foram usados como prova.
 
-**Status (10/11):** Prioridade 1 feita em parte no commit `7fd69ef`; Prioridades 2 e 3 não iniciadas. Cada prioridade deve ser feita em sessão própria (ver "Como executar" no fim).
+**Status (10/11):** Prioridade 1 feita em parte no commit `7fd69ef`; Prioridade 2 feita, menos o segredo obrigatório (ver "Andamento da Prioridade 2"); Prioridade 3 não iniciada. Cada prioridade deve ser feita em sessão própria (ver "Como executar" no fim).
 
 ### Andamento da Prioridade 1 (commit `7fd69ef`)
 
 - **Feito:** `prefetch={false}` no menu da clínica e do admin; `loading.tsx` e `error.tsx` em `/clinic` e `/admin`, com componente `Skeleton`; 5 cartões secundários do Relatório saíram do `Promise.all` e carregam em `Suspense`.
 - **Não feito, por decisão:** juntar as actions do CRM (a ordem atual veio de propósito no `2c92608`); fotos em lote (não reduziria as chamadas à Evolution).
 - **Pendente:** partir o resto do Relatório, que pede refatoração própria.
+
+### Andamento da Prioridade 2 (10/11, com TDD)
+
+- **Feito:** a API oficial devolve 500 quando algum evento não é gravado, e a Meta reenvia. O webhook da Evolution pula a mensagem cujo `whatsappKeyId` já está gravado (responde `duplicate` sem rodar a automação de novo) e tem try/catch geral: erro vira 500 e um `WebhookLog` FAILED com o corpo inteiro e só a 1ª linha do erro. `maxDuration` explícito (Evolution 120 s, API oficial 60 s). `x-internal-secret` comparado em tempo constante (`isInternalSecretAuthorized`).
+- **Testes:** `src/app/api/webhooks/whatsapp-cloud/route.test.ts`, `src/app/api/webhooks/whatsapp/route.test.ts` e `src/lib/request-auth.test.ts`.
+- **Pendente (passo do usuário):** tornar o `WHATSAPP_WEBHOOK_SECRET` obrigatório. Antes, configurar o mesmo valor na Vercel e no webhook de cada instância da Evolution (cabeçalho `x-webhook-token`) e confirmar que as mensagens chegam. Só depois a trava é ligada no código (`isWebhookTokenAuthorized`).
+- **Risco que continua:** se a automação passar de 25 s antes de gravar (download de mídia lento), a API oficial grava direto pelo caminho reserva. A automação então para na chave única (500), e a mensagem fica sem resposta automática. Resolve de vez com a fila de webhooks (seção 3).
 
 ### Medição depois do `7fd69ef` (10/11, clínica demo, produção)
 

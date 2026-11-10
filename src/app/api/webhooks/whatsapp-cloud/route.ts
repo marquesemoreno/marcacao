@@ -16,6 +16,10 @@ import { parseCloudWebhook, toEvolutionPayload, type CloudEvent } from "@/lib/wh
  * e status. Automação do webhook da Evolution (IA, respostas a lembrete, tags…) entra
  * na entrega 3. */
 
+// Explícito: o encaminhamento pra automação espera até 25 s e, se falhar, ainda grava
+// direto — cabe com folga em 60 s.
+export const maxDuration = 60;
+
 export async function GET(request: Request) {
   const params = new URL(request.url).searchParams;
   const expected = process.env.WHATSAPP_CLOUD_VERIFY_TOKEN;
@@ -145,6 +149,7 @@ export async function POST(request: Request) {
   // Evolution continua ligada no mesmo número e cada mensagem apareceria duas vezes.
   const clinicByPhone = new Map(accounts.filter((a) => a.active).map((a) => [a.phoneNumberId, a.clinicId]));
   const touched = new Set<string>();
+  let failed = 0;
   for (const event of events) {
     const clinicId = clinicByPhone.get(event.phoneNumberId);
     if (!clinicId) continue;
@@ -159,14 +164,26 @@ export async function POST(request: Request) {
       await handle(event, clinicId);
       touched.add(clinicId);
     } catch (error) {
-      console.error("Falha ao gravar evento da API oficial do WhatsApp:", error);
+      failed++;
+      console.error("Falha ao gravar evento da API oficial do WhatsApp:", error instanceof Error ? error.message : error);
     }
   }
   for (const clinicId of touched) notifyInboxRealtime(clinicId).catch(() => {});
 
   await prisma.webhookLog
-    .create({ data: { event: "whatsapp_cloud.inbound", payload: body as Prisma.InputJsonValue, status: events.length ? "SUCCESS" : "IGNORED", responseCode: null } })
+    .create({
+      data: {
+        event: "whatsapp_cloud.inbound",
+        payload: body as Prisma.InputJsonValue,
+        status: failed ? "FAILED" : events.length ? "SUCCESS" : "IGNORED",
+        responseCode: failed ? 500 : null,
+      },
+    })
     .catch(() => {});
-  // A Meta reenvia se não receber 200 rápido — sempre 200 depois de validar a assinatura.
+  // A Meta reenvia o lote enquanto não receber 200. Se algum evento não foi gravado
+  // (banco fora, por exemplo), 500 faz ela tentar de novo em vez de a mensagem do paciente
+  // se perder; o que já foi gravado é pulado no reenvio (checagem por whatsappKeyId aqui e
+  // no webhook da Evolution).
+  if (failed) return NextResponse.json({ ok: false, events: events.length, failed }, { status: 500 });
   return NextResponse.json({ ok: true, events: events.length });
 }

@@ -21,3 +21,11 @@ export function isWebhookTokenAuthorized(provided: string | null, required: stri
   if (!required) return true;
   return !!provided && safeEqual(provided, required);
 }
+
+/** Segredo do encaminhamento interno (header `x-internal-secret`, hoje o CRON_SECRET) —
+ * usado pela API oficial ao repassar a mensagem pro webhook da Evolution com a clínica no
+ * cabeçalho. Sem segredo configurado recusa tudo; comparação em tempo constante. */
+export function isInternalSecretAuthorized(provided: string | null, secret: string | undefined): boolean {
+  if (!secret) return false;
+  return !!provided && safeEqual(provided, secret);
+}
