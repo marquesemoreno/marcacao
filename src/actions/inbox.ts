@@ -1331,6 +1331,20 @@ export async function getPendingCount() {
   return Number(result[0]?.count ?? 0);
 }
 
+/** Contadores da fila do Chat numa chamada só (antes eram 5 server actions por
+ * atualização, executadas em fila pelo Next.js — a lista e as mensagens esperavam). */
+export async function getInboxStats() {
+  await requireClinicSession();
+  const [capacity, unassignedWaitMinutes, unassignedCount, pendingCount, unseenAssignments] = await Promise.all([
+    getAttendantCapacity(),
+    getOldestUnassignedWaitMinutes(),
+    getUnassignedCount(),
+    getPendingCount(),
+    getUnseenAssignmentNotifications(),
+  ]);
+  return { capacity, unassignedWaitMinutes, unassignedCount, pendingCount, unseenAssignments };
+}
+
 /** Conversas atribuídas a mim (transferência ou atribuição manual do admin) que eu
  * ainda não abri — busca independente da aba selecionada, pra tocar som/notificar
  * mesmo se o atendente estiver em "Não Atribuídas" ou numa conversa diferente

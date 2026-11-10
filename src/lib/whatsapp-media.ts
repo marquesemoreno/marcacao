@@ -142,14 +142,41 @@ export async function downloadWhatsAppMedia(path: string): Promise<Buffer | null
   return Buffer.from(await data.arrayBuffer());
 }
 
-/** Gera as URLs assinadas para uma lista de mensagens em paralelo (evita N chamadas sequenciais). */
+/** URLs assinadas já geradas nesta instância do servidor (valem 1 h; reaproveitadas por
+ * 50 min). Cada atualização do Chat pedia uma URL nova por mídia, uma chamada ao Storage
+ * por arquivo — agora é uma chamada só, e só para o que não está no cache. */
+const signedUrlCache = new Map<string, { url: string; expiresAt: number }>();
+const SIGNED_URL_TTL_SEC = 60 * 60;
+const SIGNED_URL_REUSE_MS = 50 * 60_000;
+
+/** Gera as URLs assinadas de uma lista de mensagens numa chamada só ao Storage. */
 export async function attachSignedUrls<T extends { mediaPath: string | null }>(
   messages: T[]
 ): Promise<(T & { mediaUrl: string | null })[]> {
-  return Promise.all(
-    messages.map(async (message) => ({
-      ...message,
-      mediaUrl: message.mediaPath ? await getSignedMediaUrl(message.mediaPath) : null,
-    }))
-  );
+  const now = Date.now();
+  const missing = [
+    ...new Set(
+      messages
+        .map((m) => m.mediaPath)
+        .filter((p): p is string => !!p && !((signedUrlCache.get(p)?.expiresAt ?? 0) > now))
+    ),
+  ];
+  if (missing.length > 0) {
+    const supabase = getSupabaseServerClient();
+    if (supabase) {
+      const { data } = await supabase.storage.from(WHATSAPP_MEDIA_BUCKET).createSignedUrls(missing, SIGNED_URL_TTL_SEC);
+      for (const item of data ?? []) {
+        if (item.path && item.signedUrl && !item.error) {
+          signedUrlCache.set(item.path, { url: item.signedUrl, expiresAt: now + SIGNED_URL_REUSE_MS });
+        }
+      }
+      if (signedUrlCache.size > 5000) {
+        for (const [k, v] of signedUrlCache) if (v.expiresAt <= now) signedUrlCache.delete(k);
+      }
+    }
+  }
+  return messages.map((message) => ({
+    ...message,
+    mediaUrl: message.mediaPath ? (signedUrlCache.get(message.mediaPath)?.url ?? null) : null,
+  }));
 }

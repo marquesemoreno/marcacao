@@ -11,6 +11,10 @@ import { CopilotLauncher } from "@/components/clinic/copilot/copilot-launcher";
 import { getClinicInfo } from "@/actions/clinic";
 import { getClinicRole, isLive } from "@/lib/session";
 import { redirect } from "next/navigation";
+import { cache } from "react";
+
+/** Uma consulta da clínica por requisição (título da página + layout usavam duas). */
+const loadClinicInfo = cache(() => getClinicInfo());
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -19,7 +23,7 @@ export const revalidate = 0;
  * só o próprio nome em `metadata.title`). Antes todas herdavam o título do site dos
  * pacientes ("Consultas e Exames Perto de Você"). */
 export async function generateMetadata(): Promise<Metadata> {
-  const clinic = await getClinicInfo().catch(() => null);
+  const clinic = await loadClinicInfo().catch(() => null);
   if (!clinic) return { title: "Conecta Saúde" };
   return { title: { template: `%s · ${clinic.tradeName} · Conecta Saúde`, default: `${clinic.tradeName} · Conecta Saúde` } };
 }
@@ -31,7 +35,7 @@ export default async function ClinicLayout({
 }>) {
   const session = await getServerSession(authOptions);
   if (session && !(await isLive(session))) redirect("/sair");
-  const clinic = await getClinicInfo();
+  const clinic = await loadClinicInfo();
   const isExclusive = Boolean(clinic.whatsappInstance);
   const role = session?.user.id ? await getClinicRole(session.user.id) : "RECEPCAO";
 

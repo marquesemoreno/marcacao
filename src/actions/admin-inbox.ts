@@ -1373,6 +1373,19 @@ export async function transferConversationAdmin(conversationId: string, targetUs
   return { success: true };
 }
 
+/** Contadores da fila do Chat (admin) numa chamada só — ver getInboxStats em inbox.ts. */
+export async function getInboxStatsAdmin() {
+  await requireAdminSession();
+  const [capacity, unassignedWaitMinutes, unassignedCount, pendingCount, unseenAssignments] = await Promise.all([
+    getAttendantCapacityAdmin(),
+    getOldestUnassignedWaitMinutesAdmin(),
+    getUnassignedCountAdmin(),
+    getPendingCountAdmin(),
+    getUnseenAssignmentNotificationsAdmin(),
+  ]);
+  return { capacity, unassignedWaitMinutes, unassignedCount, pendingCount, unseenAssignments };
+}
+
 /** Conversas atribuídas a mim (transferência de outro atendente, ou atribuição
  * manual feita por outro admin) que eu ainda não abri — ver a versão pro lado
  * clínica em getUnseenAssignmentNotifications (actions/inbox.ts). */

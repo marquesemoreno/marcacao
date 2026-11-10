@@ -9,6 +9,9 @@ export async function register() {
     environment: process.env.VERCEL_ENV ?? "development",
     tracesSampleRate: 0,
     sendDefaultPii: false,
+    // Sessão vencida/encerrada numa aba aberta: o servidor recusa certo e a tela leva ao
+    // login (ver /api/auth/alive). Não é defeito — não vira alerta (MARCACAO-8).
+    ignoreErrors: [/^Não autorizado$/],
   });
 }
 

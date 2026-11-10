@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -20,7 +19,7 @@ import {
   Smartphone,
   type LucideIcon, ClipboardList, MonitorPlay, Ticket } from "lucide-react";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
-import { getMyUnreadCount } from "@/actions/clinic-shell";
+import { useUnreadCount } from "@/lib/use-unread-count";
 import { can, type ClinicPermission, type ClinicRole } from "@/lib/clinic-permissions";
 
 type NavItem = { href: string; label: string; icon: LucideIcon; badge?: "unread"; onlyFull?: boolean; perm?: ClinicPermission };
@@ -65,7 +64,6 @@ const NAV_GROUPS: NavGroup[] = [
   },
 ];
 
-const UNREAD_POLL_MS = 60_000;
 
 export function ClinicNav({
   exclusiveWhatsapp = false,
@@ -82,18 +80,7 @@ export function ClinicNav({
 }) {
   const pathname = usePathname();
   const isHorizontal = orientation === "horizontal";
-  const [unread, setUnread] = useState(0);
-
-  useEffect(() => {
-    let cancelled = false;
-    const load = () => getMyUnreadCount().then((n) => !cancelled && setUnread(n)).catch(() => {});
-    load();
-    const timer = setInterval(load, UNREAD_POLL_MS);
-    return () => {
-      cancelled = true;
-      clearInterval(timer);
-    };
-  }, [pathname]);
+  const unread = useUnreadCount();
 
   const groups = NAV_GROUPS.map((g) => ({ ...g, items: g.items.filter((i) => !(exclusiveWhatsapp && i.onlyFull) && !(i.perm && !can(role, i.perm))) })).filter(
     (g) => g.items.length > 0

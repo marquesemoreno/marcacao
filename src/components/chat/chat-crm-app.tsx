@@ -1,5 +1,6 @@
 "use client";
 
+import { checkSessionAfterError } from "@/lib/session-guard-client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -24,7 +25,6 @@ import {
   getConversationOwners,
   restoreConversationOwners,
   transferConversation,
-  getAttendantCapacity,
   getWhatsappChannelStatus,
   resolveConversation,
   reopenConversation,
@@ -39,9 +39,6 @@ import {
   listClinicConveniosForAppointment,
   getClinicDoctorAgenda,
   listClinicPatientsForAppointment,
-  getOldestUnassignedWaitMinutes,
-  getUnassignedCount,
-  getPendingCount,
   suggestIaReply,
   markConversationRead,
   markConversationUnread,
@@ -58,6 +55,7 @@ import {
   forwardMessage,
   resendMessage,
   getUnseenAssignmentNotifications,
+  getInboxStats,
   markAssignmentSeen,
   editMessage,
   transcribeMessageAudio,
@@ -86,7 +84,6 @@ import {
   getConversationOwnersAdmin,
   restoreConversationOwnersAdmin,
   transferConversationAdmin,
-  getAttendantCapacityAdmin,
   resolveConversationAdmin,
   reopenConversationAdmin,
   listCannedResponsesAdmin,
@@ -100,9 +97,6 @@ import {
   listClinicConveniosForAppointmentAdmin,
   getClinicDoctorAgendaAdmin,
   listClinicPatientsForAppointmentAdmin,
-  getOldestUnassignedWaitMinutesAdmin,
-  getUnassignedCountAdmin,
-  getPendingCountAdmin,
   suggestIaReplyAdmin,
   listClinicsForReassignment,
   updateConversationClinicAdmin,
@@ -120,6 +114,7 @@ import {
   forwardMessageAdmin,
   resendMessageAdmin,
   getUnseenAssignmentNotificationsAdmin,
+  getInboxStatsAdmin,
   markAssignmentSeenAdmin,
   getOutboundFromDeviceStatsAdmin,
   editMessageAdmin,
@@ -356,47 +351,40 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
   const refreshContacts = useCallback(async () => {
     const clinicIdArg = scope === "admin" && clinicFilter ? clinicFilter : undefined;
 
-    const capacityFn = scope === "admin" ? getAttendantCapacityAdmin : getAttendantCapacity;
-    capacityFn().then(setAttendantCapacity).catch(() => {});
-
-    // Só existe no admin — quantas respostas foram mandadas hoje direto pelo celular
-    // conectado (fora do painel), ver getOutboundFromDeviceStatsAdmin.
-    if (scope === "admin") {
-      getOutboundFromDeviceStatsAdmin(clinicIdArg).then(setOutboundFromDeviceStats).catch(() => {});
-    }
-    // Busca independente da aba selecionada — precisa saber se tem paciente esperando há
-    // muito tempo em "Não Atribuídas" mesmo quando o atendente está vendo "Minhas".
-    const waitFn = scope === "admin" ? getOldestUnassignedWaitMinutesAdmin : getOldestUnassignedWaitMinutes;
-    waitFn().then(setUnassignedWaitMinutes).catch(() => {});
-    (scope === "admin" ? getUnassignedCountAdmin : getUnassignedCount)().then(setUnassignedCount).catch(() => {});
-
-    // Idem — badge ambiente da aba "Pendentes" (ver getPendingCount em actions/inbox.ts).
-    const pendingFn = scope === "admin" ? getPendingCountAdmin : getPendingCount;
-    pendingFn().then(setPendingCount).catch(() => {});
-
-    // Idem — independente da aba, pra avisar (som + notificação de desktop) assim que
-    // alguém transfere/atribui uma conversa a mim, mesmo que eu esteja em "Não
-    // Atribuídas" ou olhando outra conversa quando isso acontecer.
-    actions
-      .getUnseenAssignmentNotifications()
-      .then((pending) => {
-        for (const item of pending) {
-          if (notifiedAssignmentIdsRef.current.has(item.conversationId)) continue;
-          notifiedAssignmentIdsRef.current.add(item.conversationId);
-          if (isFirstLoadRef.current) continue; // não notifica atribuições que já existiam antes de abrir a tela
-          playNotificationSound();
-          showDesktopNotification(`🔄 Você recebeu uma conversa: ${item.contactName}`, {
-            body: "Transferida ou atribuída a você — clique pra abrir.",
-            onClick: () => setSelectedContactId(item.conversationId),
-          });
-        }
-        // Limpa da memória quem não está mais pendente (já foi vista, ex: aberta em outra aba)
-        const stillPending = new Set(pending.map((p) => p.conversationId));
-        for (const id of notifiedAssignmentIdsRef.current) {
-          if (!stillPending.has(id)) notifiedAssignmentIdsRef.current.delete(id);
-        }
-      })
-      .catch(() => {});
+    // Contadores da fila (carga, sem dono, espera, pendentes, atribuições novas) numa
+    // chamada só, disparada DEPOIS da lista: o Next.js executa server actions em fila, e
+    // antes eram 5 chamadas na frente da lista e das mensagens. Ver getInboxStats.
+    const loadStats = () => {
+      (scope === "admin" ? getInboxStatsAdmin : getInboxStats)()
+        .then((stats) => {
+          setAttendantCapacity(stats.capacity);
+          setUnassignedWaitMinutes(stats.unassignedWaitMinutes);
+          setUnassignedCount(stats.unassignedCount);
+          setPendingCount(stats.pendingCount);
+          const pending = stats.unseenAssignments;
+          for (const item of pending) {
+            if (notifiedAssignmentIdsRef.current.has(item.conversationId)) continue;
+            notifiedAssignmentIdsRef.current.add(item.conversationId);
+            if (isFirstLoadRef.current) continue; // não notifica atribuições que já existiam antes de abrir a tela
+            playNotificationSound();
+            showDesktopNotification(`🔄 Você recebeu uma conversa: ${item.contactName}`, {
+              body: "Transferida ou atribuída a você — clique pra abrir.",
+              onClick: () => setSelectedContactId(item.conversationId),
+            });
+          }
+          // Limpa da memória quem não está mais pendente (já foi vista, ex: aberta em outra aba)
+          const stillPending = new Set(pending.map((p) => p.conversationId));
+          for (const id of notifiedAssignmentIdsRef.current) {
+            if (!stillPending.has(id)) notifiedAssignmentIdsRef.current.delete(id);
+          }
+        })
+        .catch(() => {});
+      // Só existe no admin — quantas respostas foram mandadas hoje direto pelo celular
+      // conectado (fora do painel), ver getOutboundFromDeviceStatsAdmin.
+      if (scope === "admin") {
+        getOutboundFromDeviceStatsAdmin(clinicIdArg).then(setOutboundFromDeviceStats).catch(() => {});
+      }
+    };
 
     // D1: falha na carga não pode virar "0 pacientes" silencioso — antes uma exceção aqui
     // deixava o quadro do CRM zerado sem aviso nenhum.
@@ -413,7 +401,9 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
         });
         forceFinalizedRef.current = false;
         // As ativas (poucas) aparecem logo; as finalizadas chegam em segundo plano.
-        const active = await actions.listChatContacts("todas", searchQuery || undefined, clinicIdArg);
+        const activePromise = actions.listChatContacts("todas", searchQuery || undefined, clinicIdArg);
+        loadStats();
+        const active = await activePromise;
         // Só depois das ativas: a consulta pesada não disputa conexão com a que o usuário está esperando.
         const finalizedPromise = reloadFinalized ? actions.listChatContacts("finalizadas", searchQuery || undefined, clinicIdArg) : null;
         const activeIds = new Set(active.map((c) => c.id));
@@ -433,10 +423,15 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
             forceFinalizedRef.current = true; // tenta de novo na próxima atualização
           });
       } else {
-        result = await actions.listChatContacts(filterTab, searchQuery || undefined, clinicIdArg, agentFilter || undefined);
+        const listPromise = actions.listChatContacts(filterTab, searchQuery || undefined, clinicIdArg, agentFilter || undefined);
+        loadStats();
+        result = await listPromise;
       }
     } catch (error) {
       console.error("Falha ao carregar conversas:", error);
+      // Sessão caiu (vencida, senha trocada, encerrada em outro aparelho)? Vai pro login
+      // em vez de deixar a tela parada tentando de novo (MARCACAO-8).
+      void checkSessionAfterError();
       setContactsLoadError(true);
       setIsLoadingContacts(false);
       return;
