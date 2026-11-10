@@ -8,6 +8,7 @@ import { requireClinicManager, requireClinicSession } from "@/lib/session";
 import { startOfUTCDay, addUTCDays } from "@/lib/date";
 import { periodWindow, type PeriodKey } from "@/lib/report-period";
 import { computeCampaignReport } from "@/lib/crm-campaigns";
+import { computeOutcomes as computeLeadOutcomes } from "@/lib/lead-outcomes-server";
 import { computeCampaignStats, phoneKey, type CampaignStats } from "@/lib/campaign-report";
 import { NON_PATIENT_TAG, RESCHEDULE_PENDING_TAG as CAMPAIGN_RESCHEDULE_TAG } from "@/lib/conversation-tags";
 import {
@@ -783,12 +784,17 @@ export async function getClinicCampaignBreakdown(period: PeriodKey = "30") {
     prisma.conversation.findMany({
       where: { clinicId, createdAt: { gte: since, ...(until ? { lt: until } : {}) }, AND: [NOT_ADMINISTRATIVE] },
       select: {
+        id: true,
+        createdAt: true,
+        updatedAt: true,
+        resolvedAt: true,
         acquisitionChannel: true,
         acquisitionDetail: true,
         status: true,
         resolutionReason: true,
         funnelStage: true,
-        stageChanges: { where: { toStage: { in: ["ORCAMENTO", "AGENDADO"] } }, select: { toStage: true } },
+        contact: { select: { phone: true } },
+        stageChanges: { where: { toStage: { in: ["ORCAMENTO", "AGENDADO"] } }, select: { toStage: true, createdAt: true } },
       },
     }),
     prisma.clinic.findUniqueOrThrow({ where: { id: clinicId }, select: { defaultTicket: true } }),
@@ -797,9 +803,29 @@ export async function getClinicCampaignBreakdown(period: PeriodKey = "30") {
   const spendByLabel = Object.fromEntries(spends.map((s) => [s.campaign, Number(s.amount)]));
   const ticket = clinic.defaultTicket !== null ? Number(clinic.defaultTicket) : null;
   // Etapas alcançadas: a atual + as que passou (a conversa pode ter voltado de etapa).
-  const withStages = conversations.map(({ funnelStage, stageChanges, ...c }) => ({
-    ...c,
-    stagesReached: [funnelStage as string, ...stageChanges.map((s) => s.toStage as string)],
+  // Agendou/compareceu também pela agenda (Conecta, lembrete da ponte, chegada marcada),
+  // casando o telefone — a recepção nem sempre move o card no CRM.
+  const outcomes = await computeLeadOutcomes(
+    clinicId,
+    conversations.map((c) => ({
+      id: c.id,
+      createdAt: c.createdAt,
+      updatedAt: c.updatedAt,
+      funnelStage: c.funnelStage,
+      resolutionReason: c.resolutionReason,
+      resolvedAt: c.resolvedAt,
+      phone: c.contact.phone,
+      scheduledStageAt: c.stageChanges.filter((s) => s.toStage === "AGENDADO").map((s) => s.createdAt),
+    }))
+  );
+  const withStages = conversations.map((c) => ({
+    acquisitionChannel: c.acquisitionChannel,
+    acquisitionDetail: c.acquisitionDetail,
+    status: c.status,
+    resolutionReason: c.resolutionReason,
+    stagesReached: [c.funnelStage as string, ...c.stageChanges.map((s) => s.toStage as string)],
+    scheduledInAgenda: !!outcomes.get(c.id)?.scheduledAt,
+    attended: !!outcomes.get(c.id)?.attendedAt,
   }));
   return { month, rows: computeCampaignReport(withStages, ticket, spendByLabel) };
 }

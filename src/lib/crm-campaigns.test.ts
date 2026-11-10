@@ -54,6 +54,7 @@ describe("computeCampaignReport", () => {
       channel: "Google Ads",
       leads: 4,
       scheduled: 1,
+      attended: 0,
       conversionRate: 50,
       revenue: 250,
       spend: 400,
@@ -80,5 +81,22 @@ describe("funil por anúncio", () => {
       {}
     );
     expect(rows[0]).toMatchObject({ leads: 5, budget: 2, scheduled: 3, revenue: 300 });
+  });
+});
+
+describe("agendou/compareceu pela agenda (telefone)", () => {
+  it("agendamento visto na agenda conta mesmo sem etapa no CRM; comparecimento em coluna própria", () => {
+    const base = { acquisitionChannel: "Site da Clínica", acquisitionDetail: "home", status: "OPEN", resolutionReason: null };
+    const rows = computeCampaignReport(
+      [
+        { ...base },
+        { ...base, scheduledInAgenda: true },
+        { ...base, scheduledInAgenda: true, attended: true },
+        { ...base, stagesReached: ["AGENDADO"] },
+      ],
+      null,
+      {}
+    );
+    expect(rows[0]).toMatchObject({ leads: 4, scheduled: 3, attended: 1 });
   });
 });

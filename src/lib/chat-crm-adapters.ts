@@ -1,4 +1,5 @@
 import { autoCloseHint } from "@/lib/conversation-auto-close";
+import { stripTrackingCodes } from "./ad-tracking";
 import type {
   Contact as PrismaContact,
   ContactClinicProfile,
@@ -232,7 +233,7 @@ export function toChatContact(conversation: ConversationWithRelations, viewerUse
     lastMessage: previewMessage
       ? previewMessage.type === "INTERNAL_NOTE"
         ? `🔒 Nota: ${previewMessage.content}`
-        : previewMessage.content ||
+        : (previewMessage.direction === "INBOUND" ? stripTrackingCodes(previewMessage.content) : previewMessage.content) ||
           (previewMessage.type === "ATTACHMENT"
             ? previewMessage.mimeType?.startsWith("image/")
               ? "📷 Imagem"
@@ -315,7 +316,9 @@ export function toChatMessage(
     // Mantém o conteúdo original visível (não troca por um placeholder) — só marca
     // `deleted` pra tela aplicar o estilo (vermelho/tachado), avisando que o remetente
     // apagou sem esconder o que a atendente já tinha visto.
-    text: message.content,
+    // Código de origem/ref: do site (#site-home, ref:abc123) fica gravado e alimenta a
+    // origem do lead, mas não aparece no balão (ver src/lib/ad-tracking.ts).
+    text: message.type === "TEXT" && message.direction === "INBOUND" ? stripTrackingCodes(message.content) : message.content,
     deleted: Boolean(message.deletedAt),
     mediaDownloadFailed:
       message.type === "TEXT" && message.direction === "INBOUND" && isMediaDownloadFailedNotice(message.content),

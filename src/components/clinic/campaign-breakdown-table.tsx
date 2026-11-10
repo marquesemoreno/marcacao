@@ -40,6 +40,7 @@ export function CampaignBreakdownTable({ rows, month }: { rows: CampaignReportRo
             <th className="px-3 text-right font-medium">Leads</th>
             <th className="px-3 text-right font-medium">Orçamento</th>
             <th className="px-3 text-right font-medium">Agendaram</th>
+            <th className="px-3 text-right font-medium">Compareceram</th>
             <th className="px-3 text-right font-medium">Conversão</th>
             <th className="px-3 text-right font-medium">Receita estimada</th>
             {month && (
@@ -59,6 +60,7 @@ export function CampaignBreakdownTable({ rows, month }: { rows: CampaignReportRo
               <td className="px-3 text-right tabular-nums">{r.leads}</td>
               <td className="px-3 text-right tabular-nums">{r.budget}</td>
               <td className="px-3 text-right tabular-nums">{r.scheduled}</td>
+              <td className="px-3 text-right tabular-nums">{r.attended}</td>
               <td className="px-3 text-right tabular-nums">{r.conversionRate !== null ? pctBR(r.conversionRate) : "—"}</td>
               <td className="px-3 text-right tabular-nums">{r.revenue !== null ? formatCurrency(r.revenue) : "—"}</td>
               {month && (

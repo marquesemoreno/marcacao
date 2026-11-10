@@ -35,7 +35,12 @@ export async function GET(request: Request) {
   // Histórico de login: 6 meses. Links de "esqueci a senha": apagados 1 dia depois de vencer.
   const loginEvents = await prisma.loginEvent.deleteMany({ where: { createdAt: { lt: new Date(Date.now() - 180 * 86_400_000) } } });
   const resetTokens = await prisma.passwordResetToken.deleteMany({ where: { expiresAt: { lt: new Date(Date.now() - 86_400_000) } } });
+  // Cliques de anúncio (gclid/fbclid do site): 90 dias, com ou sem conversa — passou da
+  // janela de importação do Google Ads. As conversões caem junto (cascade); a origem da
+  // conversa (canal/campanha) fica.
+  const adClicks = await prisma.adClick.deleteMany({ where: { createdAt: { lt: new Date(Date.now() - 90 * 86_400_000) } } });
   return NextResponse.json({
+    adClicks: adClicks.count,
     webhookLogs,
     loginFailures: loginFailures.count,
     formResponses: formResponses.count,
