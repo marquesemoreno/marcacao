@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { isCronAuthorized, isInternalSecretAuthorized, isWebhookTokenAuthorized } from "./request-auth";
+import {
+  isCronAuthorized,
+  isInternalSecretAuthorized,
+  isWebhookEnforced,
+  isWebhookTokenAuthorized,
+  webhookTokenVerdict,
+} from "./request-auth";
 
 describe("isCronAuthorized", () => {
   it("aceita o Bearer certo", () => {
@@ -30,6 +36,39 @@ describe("isWebhookTokenAuthorized", () => {
     expect(isWebhookTokenAuthorized("abd", "abc")).toBe(false);
     expect(isWebhookTokenAuthorized(null, "abc")).toBe(false);
     expect(isWebhookTokenAuthorized("abcd", "abc")).toBe(false);
+  });
+});
+
+describe("webhookTokenVerdict", () => {
+  it("sem segredo configurado o webhook segue aberto", () => {
+    expect(webhookTokenVerdict(null, undefined, false)).toBe("open");
+    expect(webhookTokenVerdict("qualquer", "", true)).toBe("open");
+  });
+
+  it("token certo é válido, com ou sem a trava", () => {
+    expect(webhookTokenVerdict("abc", "abc", false)).toBe("valid");
+    expect(webhookTokenVerdict("abc", "abc", true)).toBe("valid");
+  });
+
+  it("preparo (trava desligada): token ausente ou errado é aceito, mas marcado", () => {
+    expect(webhookTokenVerdict(null, "abc", false)).toBe("unverified");
+    expect(webhookTokenVerdict("abd", "abc", false)).toBe("unverified");
+  });
+
+  it("trava ligada: token ausente ou errado é recusado", () => {
+    expect(webhookTokenVerdict(null, "abc", true)).toBe("rejected");
+    expect(webhookTokenVerdict("abcd", "abc", true)).toBe("rejected");
+  });
+});
+
+describe("isWebhookEnforced", () => {
+  it("só liga com 1 ou true", () => {
+    expect(isWebhookEnforced("1")).toBe(true);
+    expect(isWebhookEnforced("true")).toBe(true);
+    expect(isWebhookEnforced(" TRUE ")).toBe(true);
+    expect(isWebhookEnforced(undefined)).toBe(false);
+    expect(isWebhookEnforced("")).toBe(false);
+    expect(isWebhookEnforced("0")).toBe(false);
   });
 });
 

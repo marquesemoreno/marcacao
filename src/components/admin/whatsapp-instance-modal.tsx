@@ -2,7 +2,7 @@
 
 import { useCallback, useRef, useState } from "react";
 import type { WhatsappInstanceStatus } from "@prisma/client";
-import { QrCode, RefreshCw, Power, Loader2, CheckCircle2, XCircle, Circle } from "lucide-react";
+import { QrCode, RefreshCw, Power, Loader2, CheckCircle2, XCircle, Circle, ShieldCheck } from "lucide-react";
 import { WhatsAppIcon } from "@/components/icons/whatsapp-icon";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "sonner";
@@ -13,6 +13,7 @@ import {
   testConnection,
   restartInstance,
   disconnectInstance,
+  reapplyWebhook,
 } from "@/actions/admin-whatsapp-instance";
 
 type Status = WhatsappInstanceStatus;
@@ -174,6 +175,24 @@ export function WhatsappInstanceModal({ clinicId, clinicName }: { clinicId: stri
       }
     } catch {
       toast.error("Erro ao reiniciar instância.");
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function handleReapplyWebhook() {
+    setActionLoading("webhook");
+    try {
+      const result = await reapplyWebhook(clinicId);
+      if (!result.success) {
+        toast.error(result.error);
+      } else if (result.withToken) {
+        toast.success("Webhook reaplicado com o token de segurança.");
+      } else {
+        toast.warning("Webhook reaplicado, mas sem token: WHATSAPP_WEBHOOK_SECRET não está configurado.");
+      }
+    } catch {
+      toast.error("Erro ao reaplicar o webhook.");
     } finally {
       setActionLoading(null);
     }
@@ -365,6 +384,20 @@ export function WhatsappInstanceModal({ clinicId, clinicName }: { clinicId: stri
                       <Power className="w-3.5 h-3.5" />
                     )}
                     Desconectar
+                  </button>
+                  <button
+                    type="button"
+                    disabled={actionLoading !== null}
+                    onClick={handleReapplyWebhook}
+                    title="Registra de novo o webhook na Evolution, com o token de segurança. Não derruba a conexão."
+                    className="col-span-2 inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-bold text-sky-700 dark:text-sky-300 bg-sky-50 dark:bg-sky-950/60 hover:bg-sky-100 dark:hover:bg-sky-900 border border-sky-200 dark:border-sky-800 disabled:opacity-50 rounded-xl transition-all"
+                  >
+                    {actionLoading === "webhook" ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <ShieldCheck className="w-3.5 h-3.5" />
+                    )}
+                    Reaplicar webhook
                   </button>
                 </div>
               </div>

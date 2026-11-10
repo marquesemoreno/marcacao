@@ -122,6 +122,18 @@ export async function restartInstance(clinicId: string) {
   return { success: true as const };
 }
 
+/** Registra de novo o webhook da instância na Evolution, sem mexer na conexão. Serve pra
+ * aplicar o cabeçalho x-webhook-token depois que WHATSAPP_WEBHOOK_SECRET foi criado. */
+export async function reapplyWebhook(clinicId: string) {
+  await requireAdminSession();
+  const config = await getInstanceConfigOrThrow(clinicId);
+  const result = await setEvolutionWebhook(config);
+  if (!result.success) {
+    return { success: false as const, error: result.error };
+  }
+  return { success: true as const, withToken: !!process.env.WHATSAPP_WEBHOOK_SECRET };
+}
+
 export async function disconnectInstance(clinicId: string) {
   await requireAdminSession();
   const config = await getInstanceConfigOrThrow(clinicId);

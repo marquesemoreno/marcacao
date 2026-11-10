@@ -90,6 +90,9 @@ function getWebhookBaseUrl(): string {
  * webhook de outra clínica por aqui apagava silenciosamente o "apagar para todos" dela. */
 export async function setEvolutionWebhook(config: EvolutionInstanceConfig) {
   const webhookUrl = `${getWebhookBaseUrl()}/api/webhooks/whatsapp`;
+  // O cabeçalho só existe via API (a tela da Evolution não tem o campo). Sem mandar aqui,
+  // recriar o webhook apagaria o token e, com a trava ligada, a clínica pararia de receber.
+  const secret = process.env.WHATSAPP_WEBHOOK_SECRET;
   return evolutionFetch<unknown>(config, `/webhook/set/${config.instanceName}`, {
     method: "POST",
     body: JSON.stringify({
@@ -98,6 +101,7 @@ export async function setEvolutionWebhook(config: EvolutionInstanceConfig) {
         enabled: true,
         webhookByEvents: false,
         events: ["MESSAGES_UPSERT", "MESSAGES_UPDATE", "MESSAGES_SET", "MESSAGES_DELETE"],
+        ...(secret ? { headers: { "x-webhook-token": secret } } : {}),
       },
     }),
   });

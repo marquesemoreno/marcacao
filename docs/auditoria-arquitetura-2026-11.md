@@ -18,7 +18,10 @@ Auditoria só de leitura e medição: nada foi alterado no código nem no banco.
 
 - **Feito:** a API oficial devolve 500 quando algum evento não é gravado, e a Meta reenvia. O webhook da Evolution pula a mensagem cujo `whatsappKeyId` já está gravado (responde `duplicate` sem rodar a automação de novo) e tem try/catch geral: erro vira 500 e um `WebhookLog` FAILED com o corpo inteiro e só a 1ª linha do erro. `maxDuration` explícito (Evolution 120 s, API oficial 60 s). `x-internal-secret` comparado em tempo constante (`isInternalSecretAuthorized`).
 - **Testes:** `src/app/api/webhooks/whatsapp-cloud/route.test.ts`, `src/app/api/webhooks/whatsapp/route.test.ts` e `src/lib/request-auth.test.ts`.
-- **Pendente (passo do usuário):** tornar o `WHATSAPP_WEBHOOK_SECRET` obrigatório. Antes, configurar o mesmo valor na Vercel e no webhook de cada instância da Evolution (cabeçalho `x-webhook-token`) e confirmar que as mensagens chegam. Só depois a trava é ligada no código (`isWebhookTokenAuthorized`).
+- **Segredo do webhook, em duas etapas (10/11):** a tela da Evolution não tem campo de cabeçalho, então o sistema passou a enviá-lo ao registrar o webhook.
+  1. Preparo: criar `WHATSAPP_WEBHOOK_SECRET` na Vercel, redeploy, e em `/admin/clinicas` → Instância WhatsApp → "Reaplicar webhook" em cada clínica. Mensagem sem o token ainda é aceita e gera aviso no log da Vercel com o nome da instância.
+  2. Trava: quando o aviso parar de aparecer, criar `WHATSAPP_WEBHOOK_ENFORCE=1` na Vercel e redeploy. Para desfazer, apagar essa variável.
+  - **Pendente:** a instância global (TIVDC, configurada por variável de ambiente) não tem botão de reaplicar; precisa disso antes da trava se ainda recebe mensagens.
 - **Risco que continua:** se a automação passar de 25 s antes de gravar (download de mídia lento), a API oficial grava direto pelo caminho reserva. A automação então para na chave única (500), e a mensagem fica sem resposta automática. Resolve de vez com a fila de webhooks (seção 3).
 
 ### Medição depois do `7fd69ef` (10/11, clínica demo, produção)

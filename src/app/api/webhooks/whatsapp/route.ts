@@ -6,7 +6,7 @@ import { handleSlotOfferReply, startSlotOfferForItem } from "@/lib/slot-offer-se
 import { classifyAndStorePatientIntent } from "@/lib/patient-intent-server";
 import type { AppointmentStatus, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { isInternalSecretAuthorized, isWebhookTokenAuthorized } from "@/lib/request-auth";
+import { isInternalSecretAuthorized, isWebhookEnforced, webhookTokenVerdict } from "@/lib/request-auth";
 import { logAiAction } from "@/lib/ai-action-log-server";
 import { extractPatientData } from "@/lib/patient-data-extraction";
 import { sendAppointmentConfirmation, sendWhatsAppMessage, formatToWhatsAppNumber, getEvolutionConfig, toggleNinthDigit } from "@/lib/whatsapp";
@@ -507,13 +507,27 @@ export async function POST(request: Request) {
   if (!requiredSecret) {
     console.warn("WHATSAPP_WEBHOOK_SECRET não configurado: webhook da Evolution aceita qualquer remetente.");
   }
-  if (!isWebhookTokenAuthorized(request.headers.get("x-webhook-token"), requiredSecret)) {
+  const verdict = webhookTokenVerdict(
+    request.headers.get("x-webhook-token"),
+    requiredSecret,
+    isWebhookEnforced(process.env.WHATSAPP_WEBHOOK_ENFORCE)
+  );
+  if (verdict === "rejected") {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
   const body = await request.json().catch(() => null);
   if (!body) {
     return NextResponse.json({ error: "invalid body" }, { status: 400 });
+  }
+  if (verdict === "unverified") {
+    // Etapa de preparo: aceita, mas avisa qual instância ainda manda sem o token — só o
+    // nome da instância, nada da mensagem. Enquanto este aviso aparecer, não ligar a trava.
+    const instance = (body as { instance?: unknown }).instance;
+    console.warn(
+      "Webhook do WhatsApp sem x-webhook-token válido. Instância:",
+      typeof instance === "string" ? instance.slice(0, 80) : "(desconhecida)"
+    );
   }
   // Encaminhamento interno da API oficial (webhooks/whatsapp-cloud): a clínica vem no
   // cabeçalho, aceito só com o segredo interno (CRON_SECRET).
