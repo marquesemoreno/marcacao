@@ -666,6 +666,7 @@ model Conversation {
   triages      MessageTriage[]
   qualityAudit ConversationQualityAudit?
   stageChanges ConversationStageChange[]
+  adClick      AdClick?
 
   @@index([clinicId, status])
   @@index([contactId])
@@ -1734,4 +1735,49 @@ model PasswordResetToken {
 
   @@index([userId])
   @@map("password_reset_tokens")
+}
+
+/// Clique pago que chegou ao site da clínica (gclid/fbclid), enviado pelo track.js do site
+/// com consentimento de cookies (ver src/lib/ad-tracking.ts e /api/track/click). Liga-se à
+/// conversa quando a 1ª mensagem traz "ref:<token>". Sem IP, sem página, sem referrer.
+/// Apagado 90 dias após o clique (cron data-retention) — com ou sem conversa.
+model AdClick {
+  id             String    @id @default(cuid())
+  token          String    @unique
+  gclid          String?
+  gbraid         String?
+  wbraid         String?
+  fbclid         String?
+  utmSource      String?   @map("utm_source")
+  utmMedium      String?   @map("utm_medium")
+  utmCampaign    String?   @map("utm_campaign")
+  utmContent     String?   @map("utm_content")
+  utmTerm        String?   @map("utm_term")
+  conversationId String?   @unique @map("conversation_id")
+  matchedAt      DateTime? @map("matched_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  conversation Conversation?  @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+  conversions  AdConversion[]
+
+  @@index([createdAt])
+  @@map("ad_clicks")
+}
+
+/// Conversão de um clique pago: SCHEDULED (agendou) ou ATTENDED (compareceu). Gravada pelo
+/// cron ad-conversions; a Meta recebe pela Conversions API (metaSentAt) e o Google Ads busca
+/// a planilha /api/conversions/google-ads. Só evento + identificador de clique.
+model AdConversion {
+  id         String    @id @default(cuid())
+  adClickId  String    @map("ad_click_id")
+  kind       String
+  occurredAt DateTime  @map("occurred_at")
+  metaSentAt DateTime? @map("meta_sent_at")
+  metaError  String?   @map("meta_error")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  adClick AdClick @relation(fields: [adClickId], references: [id], onDelete: Cascade)
+
+  @@unique([adClickId, kind])
+  @@map("ad_conversions")
 }

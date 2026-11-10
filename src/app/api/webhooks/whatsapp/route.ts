@@ -11,6 +11,7 @@ import { logAiAction } from "@/lib/ai-action-log-server";
 import { extractPatientData } from "@/lib/patient-data-extraction";
 import { sendAppointmentConfirmation, sendWhatsAppMessage, formatToWhatsAppNumber, getEvolutionConfig, toggleNinthDigit } from "@/lib/whatsapp";
 import { detectAcquisition } from "@/lib/acquisition";
+import { extractClickRef } from "@/lib/ad-tracking";
 import { fetchMediaBase64, uploadWhatsAppMedia, formatDuration } from "@/lib/whatsapp-media";
 import { formatFileSize } from "@/lib/format";
 import { notifyInboxRealtime } from "@/lib/supabase-server";
@@ -891,6 +892,33 @@ async function processWhatsappWebhook(body: Prisma.InputJsonValue, forcedClinicI
         });
       } catch (error) {
         console.error("Falha ao detectar canal de aquisição:", error);
+      }
+    }
+
+    // Clique pago do site ("ref:<token>", ver src/lib/ad-tracking.ts e /api/track/click):
+    // liga a conversa ao gclid/fbclid para exportar a conversão depois. Qualquer mensagem
+    // serve (paciente com conversa aberta também clica no anúncio). Nunca bloqueia.
+    const clickRef = extractClickRef(incoming.text);
+    if (clickRef) {
+      try {
+        const click = await prisma.adClick.findFirst({
+          where: { token: clickRef, conversationId: null, createdAt: { gte: new Date(Date.now() - 90 * 86_400_000) } },
+          select: { id: true, utmCampaign: true },
+        });
+        const alreadyLinked = click
+          ? await prisma.adClick.findUnique({ where: { conversationId: conversation.id }, select: { id: true } })
+          : null;
+        if (click && !alreadyLinked) {
+          await prisma.adClick.update({ where: { id: click.id }, data: { conversationId: conversation.id, matchedAt: new Date() } });
+          if (click.utmCampaign) {
+            await prisma.conversation.updateMany({
+              where: { id: conversation.id, acquisitionDetail: null },
+              data: { acquisitionDetail: click.utmCampaign.replace(/[-_+]+/g, " ").trim().toLowerCase() },
+            });
+          }
+        }
+      } catch (error) {
+        console.error("Falha ao ligar clique de anúncio à conversa:", error instanceof Error ? error.message : error);
       }
     }
 

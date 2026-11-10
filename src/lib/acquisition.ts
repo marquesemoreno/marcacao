@@ -55,7 +55,13 @@ const CAMPAIGN_CODE_CHANNELS: Record<string, string> = {
   gmn: "Google Meu Negócio",
   ig: "Instagram Orgânico",
   fb: "Facebook Orgânico",
+  // Anúncio do Meta levando ao site (alternativa discreta à URL utm_… no texto).
+  igads: "Instagram Ads",
+  fbads: "Facebook Ads",
 };
+
+/** Mesmo padrão usado para tirar o código da exibição (ver stripTrackingCodes). */
+export const CAMPAIGN_CODE_PATTERN = /#(site|gads|gmn|igads|fbads|ig|fb)-([\w-]+)/i;
 
 /** "vasectomia-outubro" / "check_up" → "vasectomia outubro" / "check up". */
 function humanizeCampaign(raw: string): string {
@@ -63,9 +69,10 @@ function humanizeCampaign(raw: string): string {
 }
 
 function campaignFromCode(text: string): { channel: string; detail: string } | null {
-  const m = /#(site|gads|gmn|ig|fb)-([\w-]+)/i.exec(text);
+  const m = CAMPAIGN_CODE_PATTERN.exec(text);
   if (!m) return null;
-  return { channel: CAMPAIGN_CODE_CHANNELS[m[1].toLowerCase()], detail: humanizeCampaign(m[2]) };
+  const detail = humanizeCampaign(m[2].replace(/-+$/, ""));
+  return { channel: CAMPAIGN_CODE_CHANNELS[m[1].toLowerCase()], detail: detail || null } as { channel: string; detail: string };
 }
 
 function channelFromKeyword(text: string): string | null {

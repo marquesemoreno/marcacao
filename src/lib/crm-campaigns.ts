@@ -40,6 +40,8 @@ export type CampaignReportRow = {
   /** Receberam valor (etapa Orçamento do CRM em algum momento). */
   budget: number;
   scheduled: number;
+  /** Chegaram/foram atendidos (marcação na Agenda ou agendamento concluído). */
+  attended: number;
   conversionRate: number | null;
   revenue: number | null;
   spend: number | null;
@@ -52,15 +54,26 @@ export type CampaignReportRow = {
  * resto do relatório). Receita = agendaram × ticket médio (estimativa). Investimento vem do
  * que a clínica informou pro mês (spendByLabel); sem ele, custo e retorno ficam null. */
 export function computeCampaignReport(
-  conversations: (WithAcquisition & { status: string; resolutionReason: string | null; stagesReached?: string[] })[],
+  conversations: (WithAcquisition & {
+    status: string;
+    resolutionReason: string | null;
+    stagesReached?: string[];
+    /** Agendou segundo a agenda (Conecta, lembrete da ponte, chegada) — ver lead-outcomes-server. */
+    scheduledInAgenda?: boolean;
+    attended?: boolean;
+  })[],
   ticket: number | null,
   spendByLabel: Record<string, number>
 ): CampaignReportRow[] {
   return groupByCampaign(conversations).map(({ label, channel, items }) => {
     const leads = items.length;
     const isScheduled = (c: (typeof items)[number]) =>
-      c.resolutionReason === "AGENDAMENTO_CONCLUIDO" || (c.stagesReached ?? []).includes("AGENDADO");
+      c.resolutionReason === "AGENDAMENTO_CONCLUIDO" ||
+      (c.stagesReached ?? []).includes("AGENDADO") ||
+      !!c.scheduledInAgenda ||
+      !!c.attended;
     const scheduled = items.filter(isScheduled).length;
+    const attended = items.filter((c) => c.attended).length;
     const budget = items.filter((c) => (c.stagesReached ?? []).includes("ORCAMENTO")).length;
     // Base da conversão: com desfecho ou já agendada (etapa) — nunca passa de 100%.
     const withOutcome = items.filter((c) => hasOutcome(c) || isScheduled(c)).length;
@@ -72,6 +85,7 @@ export function computeCampaignReport(
       leads,
       budget,
       scheduled,
+      attended,
       conversionRate: withOutcome > 0 ? round1((scheduled / withOutcome) * 100) : null,
       revenue,
       spend,

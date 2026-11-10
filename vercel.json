@@ -48,6 +48,10 @@
       "schedule": "*/5 * * * *"
     },
     {
+      "path": "/api/cron/ad-conversions",
+      "schedule": "50 * * * *"
+    },
+    {
       "path": "/api/cron/booking-assist",
       "schedule": "*/5 * * * *"
     }
