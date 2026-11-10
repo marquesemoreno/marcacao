@@ -8,6 +8,7 @@ import { updateClinicCommission, toggleClinicActive, toggleClinicMarketplaceList
 import { CreateClinicModal } from "./create-clinic-modal";
 import { ViewProceduresModal } from "./view-procedures-modal";
 import { WhatsappInstanceModal } from "./whatsapp-instance-modal";
+import { GlobalWebhookButton } from "./global-webhook-button";
 import { HospitalIntegrationModal } from "./hospital-integration-modal";
 import { InstagramAccountModal } from "./instagram-account-modal";
 import { AiAttendantModal } from "./ai-attendant-modal";
@@ -147,7 +148,10 @@ export function ClinicsManagement({ clinics: initialClinics }: { clinics: Clinic
           </p>
         </div>
 
-        <CreateClinicModal />
+        <div className="flex flex-wrap items-center gap-2">
+          <GlobalWebhookButton />
+          <CreateClinicModal />
+        </div>
       </div>
 
       {/* =========================================================================

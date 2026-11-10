@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import type { WhatsappInstanceStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireAdminSession } from "@/lib/session";
+import { getEvolutionConfig } from "@/lib/whatsapp";
 import {
   createEvolutionInstance,
   setEvolutionWebhook,
@@ -132,6 +133,20 @@ export async function reapplyWebhook(clinicId: string) {
     return { success: false as const, error: result.error };
   }
   return { success: true as const, withToken: !!process.env.WHATSAPP_WEBHOOK_SECRET };
+}
+
+/** O mesmo, pra instância global (variáveis de ambiente), que não tem cadastro por clínica. */
+export async function reapplyGlobalWebhook() {
+  await requireAdminSession();
+  const { apiUrl, apiKey, instanceName } = await getEvolutionConfig();
+  if (!apiKey) {
+    return { success: false as const, error: "A instância global não tem API Key configurada." };
+  }
+  const result = await setEvolutionWebhook({ apiUrl, apiKey, instanceName });
+  if (!result.success) {
+    return { success: false as const, error: result.error };
+  }
+  return { success: true as const, withToken: !!process.env.WHATSAPP_WEBHOOK_SECRET, instanceName };
 }
 
 export async function disconnectInstance(clinicId: string) {
