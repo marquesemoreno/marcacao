@@ -45,3 +45,8 @@ export function dueDateToInstant(dueDate: string | null): Date | null {
 export function instantToDueDate(dueAt: Date | null): string {
   return dueAt ? brtDay(dueAt) : "";
 }
+
+/** Último instante de hoje em Brasília: tudo com prazo até aqui está "para hoje ou atrasado". */
+export function endOfBrtDay(now: Date): Date {
+  return new Date(new Date(`${brtDay(now)}T00:00:00-03:00`).getTime() + 86_400_000 - 1);
+}

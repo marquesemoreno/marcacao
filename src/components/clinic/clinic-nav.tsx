@@ -19,10 +19,10 @@ import {
   Smartphone,
   type LucideIcon, ClipboardList, ListTodo, MonitorPlay, Ticket } from "lucide-react";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
-import { useUnreadCount } from "@/lib/use-unread-count";
+import { useTaskCount, useUnreadCount } from "@/lib/use-unread-count";
 import { can, type ClinicPermission, type ClinicRole } from "@/lib/clinic-permissions";
 
-type NavItem = { href: string; label: string; icon: LucideIcon; badge?: "unread"; onlyFull?: boolean; perm?: ClinicPermission };
+type NavItem = { href: string; label: string; icon: LucideIcon; badge?: "unread" | "tasks"; onlyFull?: boolean; perm?: ClinicPermission };
 type NavGroup = { label: string; items: NavItem[] };
 
 /** N3 — menu agrupado. Itens `onlyFull` não aparecem pra clínicas com WhatsApp exclusivo
@@ -35,7 +35,7 @@ const NAV_GROUPS: NavGroup[] = [
       { href: "/clinic/inbox", label: "Chat", icon: MessageCircle, badge: "unread" },
       { href: "/clinic/crm", label: "CRM", icon: KanbanSquare },
       { href: "/clinic/agenda", label: "Agenda", icon: CalendarDays },
-      { href: "/clinic/tarefas", label: "Tarefas", icon: ListTodo },
+      { href: "/clinic/tarefas", label: "Tarefas", icon: ListTodo, badge: "tasks" },
       { href: "/clinic/senhas", label: "Senhas", icon: Ticket, perm: "chamar" },
       { href: "/clinic/agendamentos", label: "Agendamentos", icon: CalendarCheck, onlyFull: true },
     ],
@@ -82,6 +82,7 @@ export function ClinicNav({
   const pathname = usePathname();
   const isHorizontal = orientation === "horizontal";
   const unread = useUnreadCount();
+  const dueTasks = useTaskCount();
 
   const groups = NAV_GROUPS.map((g) => ({ ...g, items: g.items.filter((i) => !(exclusiveWhatsapp && i.onlyFull) && !(i.perm && !can(role, i.perm))) })).filter(
     (g) => g.items.length > 0
@@ -93,7 +94,8 @@ export function ClinicNav({
       (item.href === "/clinic/contatos" && pathname?.startsWith("/clinic/pacientes")) ||
       (item.href === "/clinic/precos" && pathname?.startsWith("/clinic/perfil"));
     const Icon = item.icon;
-    const count = item.badge === "unread" ? unread : 0;
+    const count = item.badge === "unread" ? unread : item.badge === "tasks" ? dueTasks : 0;
+    const countLabel = item.badge === "tasks" ? "para hoje ou atrasadas" : "aguardando resposta";
     const badgeText = count > 99 ? "99+" : String(count);
     const link = (
       <Link
@@ -103,7 +105,7 @@ export function ClinicNav({
         aria-current={isActive ? "page" : undefined}
         // Recolhido o link é só um ícone: sem aria-label ele fica sem nome pro leitor de tela
         // (a dica que aparece ao passar o mouse não conta como nome).
-        aria-label={count > 0 ? `${item.label} (${count} aguardando resposta)` : collapsed ? item.label : undefined}
+        aria-label={count > 0 ? `${item.label} (${count} ${countLabel})` : collapsed ? item.label : undefined}
         className={`group relative flex shrink-0 items-center gap-2.5 rounded-lg text-sm font-semibold transition-colors duration-150 ${
           collapsed ? "justify-center px-2 py-2" : isHorizontal ? "min-h-11 px-3.5 py-2 whitespace-nowrap" : "px-3 py-2.5"
         } ${isActive ? "bg-emerald-600 text-white shadow-sm shadow-emerald-950/40" : "text-slate-300 hover:bg-slate-800/80 hover:text-white"}`}
@@ -126,7 +128,7 @@ export function ClinicNav({
         <TooltipTrigger render={link} />
         <TooltipContent side="right">
           {item.label}
-          {count > 0 ? ` · ${count} aguardando resposta` : ""}
+          {count > 0 ? ` · ${count} ${countLabel}` : ""}
         </TooltipContent>
       </Tooltip>
     );

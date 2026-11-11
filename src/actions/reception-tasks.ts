@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireClinicSession } from "@/lib/session";
 import { displayName } from "@/lib/contact-display";
-import { dueDateToInstant, validateTaskInput } from "@/lib/reception-tasks";
+import { dueDateToInstant, endOfBrtDay, validateTaskInput } from "@/lib/reception-tasks";
 
 export type TaskView = {
   id: string;
@@ -124,4 +124,28 @@ export async function deleteTask(id: string) {
   if (count === 0) return { success: false as const, error: "Tarefa não encontrada." };
   revalidatePath("/clinic/tarefas");
   return { success: true as const };
+}
+
+export async function updateTask(id: string, input: { text: string; dueDate: string | null; assignedUserId: string | null }) {
+  const { clinicId } = await requireClinicSession();
+  const invalid = validateTaskInput(input);
+  if (invalid) return { success: false as const, error: invalid };
+  if (input.assignedUserId && !(await prisma.user.findFirst({ where: { id: input.assignedUserId, clinicId, clinicRole: { not: "MEDICO" } }, select: { id: true } }))) {
+    return { success: false as const, error: "Responsável não encontrado na clínica." };
+  }
+  const { count } = await prisma.receptionTask.updateMany({
+    where: { id, clinicId },
+    data: { text: input.text.trim(), dueAt: dueDateToInstant(input.dueDate), assignedUserId: input.assignedUserId },
+  });
+  if (count === 0) return { success: false as const, error: "Tarefa não encontrada." };
+  revalidatePath("/clinic/tarefas");
+  return { success: true as const };
+}
+
+/** Contador do menu: tarefas abertas, minhas ou sem responsável, atrasadas ou para hoje. */
+export async function getMyDueTaskCount(now = new Date()): Promise<number> {
+  const { clinicId, userId } = await requireClinicSession();
+  return prisma.receptionTask.count({
+    where: { clinicId, doneAt: null, dueAt: { lte: endOfBrtDay(now) }, OR: [{ assignedUserId: userId }, { assignedUserId: null }] },
+  });
 }

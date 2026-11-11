@@ -2,11 +2,12 @@
 
 import { useCallback, useEffect, useId, useMemo, useState } from "react";
 import Link from "next/link";
-import { Bot, Check, Loader2, MessageCircle, Plus, RotateCcw, Trash2, X } from "lucide-react";
+import { Bot, Check, Loader2, MessageCircle, Pencil, Plus, RotateCcw, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/clinic/page-header";
-import { createTask, deleteTask, getTaskPatient, listTaskAssignees, listTasks, setTaskDone, type TaskView } from "@/actions/reception-tasks";
-import { TASK_TEXT_MAX, groupTasks, validateTaskInput, type TaskBucket } from "@/lib/reception-tasks";
+import { createTask, deleteTask, getTaskPatient, listTaskAssignees, listTasks, setTaskDone, updateTask, type TaskView } from "@/actions/reception-tasks";
+import { TASK_TEXT_MAX, groupTasks, instantToDueDate, validateTaskInput, type TaskBucket } from "@/lib/reception-tasks";
+import { refreshMenuCounts } from "@/lib/use-unread-count";
 
 const field =
   "h-10 w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500";
@@ -20,11 +21,22 @@ const dueFmt = new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digi
 
 type Assignees = { me: string; users: { id: string; name: string }[] };
 
-function NewTaskForm({ assignees, patient, onDone }: { assignees: Assignees; patient: { conversationId: string; name: string } | null; onDone: (saved: boolean) => void }) {
+/** Criar (sem `editing`) ou editar uma tarefa. */
+function TaskForm({
+  assignees,
+  patient,
+  editing,
+  onDone,
+}: {
+  assignees: Assignees;
+  patient: { conversationId: string; name: string } | null;
+  editing?: TaskView;
+  onDone: (saved: boolean) => void;
+}) {
   const uid = useId();
-  const [text, setText] = useState("");
-  const [dueDate, setDueDate] = useState("");
-  const [assignedUserId, setAssignedUserId] = useState(assignees.me);
+  const [text, setText] = useState(editing?.text ?? "");
+  const [dueDate, setDueDate] = useState(editing ? instantToDueDate(editing.dueAt ? new Date(editing.dueAt) : null) : "");
+  const [assignedUserId, setAssignedUserId] = useState(editing ? (editing.assignedUserId ?? "") : assignees.me);
   const [saving, setSaving] = useState(false);
   const [tried, setTried] = useState(false);
   const error = validateTaskInput({ text, dueDate: dueDate || null });
@@ -34,20 +46,22 @@ function NewTaskForm({ assignees, patient, onDone }: { assignees: Assignees; pat
     if (error) return;
     setSaving(true);
     try {
-      const r = await createTask({ text, dueDate: dueDate || null, assignedUserId: assignedUserId || null, conversationId: patient?.conversationId ?? null });
+      const values = { text, dueDate: dueDate || null, assignedUserId: assignedUserId || null };
+      const r = editing ? await updateTask(editing.id, values) : await createTask({ ...values, conversationId: patient?.conversationId ?? null });
       if (r.success) {
-        toast.success("Tarefa criada.");
+        toast.success(editing ? "Tarefa atualizada." : "Tarefa criada.");
+        refreshMenuCounts();
         onDone(true);
       } else toast.error(r.error);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Não foi possível criar a tarefa.");
+      toast.error(e instanceof Error ? e.message : "Não foi possível salvar a tarefa.");
     } finally {
       setSaving(false);
     }
   }
 
   return (
-    <section className="glass-surface space-y-4 p-4 sm:p-5" aria-label="Nova tarefa">
+    <section className={editing ? "space-y-4 py-3" : "glass-surface space-y-4 p-4 sm:p-5"} aria-label={editing ? "Editar tarefa" : "Nova tarefa"}>
       {patient && (
         <p className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 dark:bg-emerald-900/40 px-3 py-1 text-sm font-medium text-emerald-800 dark:text-emerald-200">
           <MessageCircle className="h-4 w-4" aria-hidden /> Paciente: {patient.name}
@@ -101,16 +115,17 @@ function NewTaskForm({ assignees, patient, onDone }: { assignees: Assignees; pat
         </button>
         <button type="button" onClick={save} disabled={saving} className={primaryBtn}>
           {saving && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}
-          Criar tarefa
+          {editing ? "Salvar" : "Criar tarefa"}
         </button>
       </div>
     </section>
   );
 }
 
-function TaskRow({ task, bucket, onChanged }: { task: TaskView; bucket: TaskBucket; onChanged: () => void }) {
+function TaskRow({ task, bucket, assignees, onChanged }: { task: TaskView; bucket: TaskBucket; assignees: Assignees | null; onChanged: () => void }) {
   const [busy, setBusy] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [editing, setEditing] = useState(false);
 
   async function run(action: () => Promise<{ success: boolean; error?: string }>, ok: string) {
     setBusy(true);
@@ -118,6 +133,7 @@ function TaskRow({ task, bucket, onChanged }: { task: TaskView; bucket: TaskBuck
       const r = await action();
       if (r.success) {
         toast.success(ok);
+        refreshMenuCounts();
         onChanged();
       } else toast.error(r.error ?? "Não foi possível salvar.");
     } catch {
@@ -129,6 +145,21 @@ function TaskRow({ task, bucket, onChanged }: { task: TaskView; bucket: TaskBuck
   }
 
   const due = task.dueAt ? dueFmt.format(new Date(task.dueAt)) : null;
+  if (editing && assignees) {
+    return (
+      <li>
+        <TaskForm
+          assignees={assignees}
+          patient={null}
+          editing={task}
+          onDone={(saved) => {
+            setEditing(false);
+            if (saved) onChanged();
+          }}
+        />
+      </li>
+    );
+  }
   return (
     <li className="flex items-start gap-3 py-3">
       <button
@@ -175,6 +206,18 @@ function TaskRow({ task, bucket, onChanged }: { task: TaskView; bucket: TaskBuck
           </button>
         </div>
       ) : (
+        <div className="flex shrink-0">
+          {!task.done && assignees && (
+            <button
+              type="button"
+              onClick={() => setEditing(true)}
+              disabled={busy}
+              aria-label={`Editar: ${task.text}`}
+              className="flex size-11 sm:size-8 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-white"
+            >
+              <Pencil className="h-4 w-4" aria-hidden />
+            </button>
+          )}
         <button
           type="button"
           onClick={() => setConfirmDelete(true)}
@@ -184,6 +227,7 @@ function TaskRow({ task, bucket, onChanged }: { task: TaskView; bucket: TaskBuck
         >
           <Trash2 className="h-4 w-4" aria-hidden />
         </button>
+        </div>
       )}
     </li>
   );
@@ -251,7 +295,7 @@ export function TasksApp({ conversationId }: { conversationId: string | null }) 
         />
 
         {formOpen && assignees && (
-          <NewTaskForm
+          <TaskForm
             assignees={assignees}
             patient={patient}
             onDone={(saved) => {
@@ -324,7 +368,7 @@ export function TasksApp({ conversationId }: { conversationId: string | null }) 
                 </h2>
                 <ul className="divide-y divide-slate-200/70 dark:divide-white/10">
                   {groups[bucket].map((t) => (
-                    <TaskRow key={t.id} task={byId.get(t.id)!} bucket={bucket} onChanged={load} />
+                    <TaskRow key={t.id} task={byId.get(t.id)!} bucket={bucket} assignees={assignees} onChanged={load} />
                   ))}
                 </ul>
               </section>

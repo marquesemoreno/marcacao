@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const db = vi.hoisted(() => ({
-  receptionTask: { findMany: vi.fn(), create: vi.fn(), updateMany: vi.fn(), deleteMany: vi.fn() },
+  receptionTask: { findMany: vi.fn(), create: vi.fn(), updateMany: vi.fn(), deleteMany: vi.fn(), count: vi.fn() },
   user: { findMany: vi.fn(), findFirst: vi.fn() },
   conversation: { findMany: vi.fn(), findFirst: vi.fn() },
 }));
@@ -11,7 +11,7 @@ vi.mock("@/lib/prisma", () => ({ prisma: db }));
 vi.mock("@/lib/session", () => ({ requireClinicSession }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 
-import { createTask, deleteTask, getTaskPatient, listTasks, setTaskDone } from "./reception-tasks";
+import { createTask, deleteTask, getMyDueTaskCount, getTaskPatient, listTasks, setTaskDone, updateTask } from "./reception-tasks";
 
 beforeEach(() => {
   for (const model of Object.values(db)) for (const fn of Object.values(model)) fn.mockReset();
@@ -136,5 +136,47 @@ describe("responsáveis", () => {
     const r = await createTask({ text: "Ligar", dueDate: null, assignedUserId: "medico", conversationId: null });
     expect(db.user.findFirst.mock.calls[0][0].where).toEqual({ id: "medico", clinicId: "clinic-a", clinicRole: { not: "MEDICO" } });
     expect(r.success).toBe(false);
+  });
+});
+
+describe("updateTask", () => {
+  it("edita texto, prazo e responsável só dentro da clínica", async () => {
+    db.user.findFirst.mockResolvedValue({ id: "u2" });
+    db.receptionTask.updateMany.mockResolvedValue({ count: 1 });
+    const r = await updateTask("t1", { text: " Ligar amanhã ", dueDate: "2026-11-20", assignedUserId: "u2" });
+    expect(r).toEqual({ success: true });
+    expect(db.receptionTask.updateMany).toHaveBeenCalledWith({
+      where: { id: "t1", clinicId: "clinic-a" },
+      data: { text: "Ligar amanhã", dueAt: new Date("2026-11-21T02:59:00Z"), assignedUserId: "u2" },
+    });
+  });
+
+  it("tirar o prazo e o responsável grava vazio", async () => {
+    db.receptionTask.updateMany.mockResolvedValue({ count: 1 });
+    await updateTask("t1", { text: "Ligar", dueDate: null, assignedUserId: null });
+    expect(db.receptionTask.updateMany.mock.calls[0][0].data).toEqual({ text: "Ligar", dueAt: null, assignedUserId: null });
+  });
+
+  it("tarefa de outra clínica, texto vazio ou responsável de fora: não grava", async () => {
+    db.receptionTask.updateMany.mockResolvedValue({ count: 0 });
+    expect((await updateTask("de-outra", { text: "Ligar", dueDate: null, assignedUserId: null })).success).toBe(false);
+    db.receptionTask.updateMany.mockClear();
+    expect((await updateTask("t1", { text: " ", dueDate: null, assignedUserId: null })).success).toBe(false);
+    db.user.findFirst.mockResolvedValue(null);
+    expect((await updateTask("t1", { text: "Ligar", dueDate: null, assignedUserId: "de-fora" })).success).toBe(false);
+    expect(db.receptionTask.updateMany).not.toHaveBeenCalled();
+  });
+});
+
+describe("getMyDueTaskCount", () => {
+  it("conta as abertas minhas ou sem responsável, atrasadas ou para hoje, da clínica", async () => {
+    db.receptionTask.count.mockResolvedValue(3);
+    expect(await getMyDueTaskCount(new Date("2026-11-11T15:00:00Z"))).toBe(3);
+    expect(db.receptionTask.count.mock.calls[0][0].where).toEqual({
+      clinicId: "clinic-a",
+      doneAt: null,
+      dueAt: { lte: new Date("2026-11-12T02:59:59.999Z") },
+      OR: [{ assignedUserId: "u1" }, { assignedUserId: null }],
+    });
   });
 });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dueDateToInstant, groupTasks, taskBucket, validateTaskInput } from "./reception-tasks";
+import { dueDateToInstant, endOfBrtDay, groupTasks, taskBucket, validateTaskInput } from "./reception-tasks";
 
 // 11/11/2026 12:00 em Brasília
 const now = new Date("2026-11-11T15:00:00Z");
@@ -54,5 +54,20 @@ describe("dueDateToInstant", () => {
   it("o prazo vale até o fim do dia em Brasília", () => {
     expect(dueDateToInstant("2026-11-20")).toEqual(new Date("2026-11-21T02:59:00Z"));
     expect(dueDateToInstant(null)).toBeNull();
+  });
+});
+
+describe("endOfBrtDay", () => {
+  it("devolve o último instante de hoje em Brasília", () => {
+    // 11/11 12:00 em Brasília → fim do dia = 12/11 02:59:59.999Z
+    expect(endOfBrtDay(new Date("2026-11-11T15:00:00Z"))).toEqual(new Date("2026-11-12T02:59:59.999Z"));
+    // 01:00Z ainda é dia 10 em Brasília
+    expect(endOfBrtDay(new Date("2026-11-11T01:00:00Z"))).toEqual(new Date("2026-11-11T02:59:59.999Z"));
+  });
+
+  it("o prazo de hoje (23:59) entra na conta; o de amanhã não", () => {
+    const end = endOfBrtDay(new Date("2026-11-11T15:00:00Z"));
+    expect(dueDateToInstant("2026-11-11")!.getTime()).toBeLessThanOrEqual(end.getTime());
+    expect(dueDateToInstant("2026-11-12")!.getTime()).toBeGreaterThan(end.getTime());
   });
 });
