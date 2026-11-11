@@ -102,7 +102,7 @@ export function ClinicNav({
         aria-current={isActive ? "page" : undefined}
         aria-label={count > 0 ? `${item.label} (${count} aguardando resposta)` : undefined}
         className={`group relative flex shrink-0 items-center gap-2.5 rounded-lg text-sm font-semibold transition-colors duration-150 ${
-          collapsed ? "justify-center px-2 py-2.5" : isHorizontal ? "px-3 py-2 whitespace-nowrap" : "px-3 py-2.5"
+          collapsed ? "justify-center px-2 py-2.5" : isHorizontal ? "min-h-11 px-3.5 py-2 whitespace-nowrap" : "px-3 py-2.5"
         } ${isActive ? "bg-emerald-600 text-white shadow-sm shadow-emerald-950/40" : "text-slate-300 hover:bg-slate-800/80 hover:text-white"}`}
       >
         <Icon className={`h-4 w-4 shrink-0 ${isActive ? "text-white" : "text-slate-400 group-hover:text-slate-200"}`} />

@@ -39,6 +39,8 @@ import {
   KanbanSquare,
   Clock,
   AlertTriangle,
+  SlidersHorizontal,
+  ChevronDown,
 } from 'lucide-react';
 
 interface CRMKanbanProps {
@@ -133,6 +135,9 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
   onLoadMoreFinalized,
 }) => {
   const [search, setSearch] = useState('');
+  // Celular: seletores e tags ficam recolhidos atrás de "Filtros" pra os cartões aparecerem
+  // já na primeira tela. No desktop tudo continua visível.
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [selectedAgent, setSelectedAgent] = useState<string>('todos');
   const [quick, setQuick] = useState<CrmQuickFilter>('ativos');
   // Agrupar por etapa (padrão) ou por campanha de origem (pedido de 19/10, ref. Kommo).
@@ -234,6 +239,7 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
   const openIndex = openCard ? openColumn.findIndex((c) => c.id === openCard.id) : -1;
   const hasActiveFilter = search.trim() !== '' || selectedAgent !== 'todos' || quick !== 'ativos' || campaign !== 'todas' || selectedTags.length > 0;
   const finalizedCount = contacts.filter((c) => c.isResolved).length;
+  const hiddenFilterCount = (selectedAgent !== 'todos' ? 1 : 0) + (campaign !== 'todas' ? 1 : 0) + (groupBy === 'campanha' ? 1 : 0) + selectedTags.length;
   // Primeira carga: não mostra "0 pacientes" nem colunas vazias como se fosse o resultado.
   const loadingEmpty = isLoading && contacts.length === 0;
 
@@ -242,31 +248,43 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
       {/* Barra superior — visual "vidro" (09/11/2026, DESIGN.md §5) */}
       <div className="glass-surface mx-3 mt-3 sm:mx-4 sm:mt-4 px-4 sm:px-5 py-3.5 space-y-2.5 shrink-0">
         <div className="flex flex-wrap items-center gap-3">
-          <h2 className="text-lg font-semibold tracking-tight flex items-center gap-2">
+          <h2 className="w-full sm:w-auto text-lg font-semibold tracking-tight flex items-center gap-2">
             <KanbanSquare className="w-4 h-4 text-emerald-600 dark:text-emerald-400" aria-hidden />
             CRM
             <span className="text-sm font-normal text-slate-500 dark:text-slate-400 tabular-nums">
               {loadingEmpty ? 'carregando…' : `${filtered.length} paciente${filtered.length === 1 ? '' : 's'}`}
             </span>
           </h2>
-          <div className="relative w-full sm:w-60">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" aria-hidden />
+          <div className="relative min-w-0 flex-1 sm:flex-none sm:w-60">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3.5 sm:top-2.5" aria-hidden />
             <input
               type="text"
               aria-label="Buscar no CRM"
               placeholder="Buscar paciente, telefone ou tag…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full h-9 pl-9 pr-3 text-sm bg-white/80 ring-1 ring-slate-900/5 shadow-xs dark:bg-white/[0.08] dark:ring-white/10 border border-transparent rounded-full focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+              className="w-full h-11 sm:h-9 pl-9 pr-3 text-base sm:text-sm bg-white/80 ring-1 ring-slate-900/5 shadow-xs dark:bg-white/[0.08] dark:ring-white/10 border border-transparent rounded-full focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
             />
           </div>
+          <button
+            type="button"
+            aria-expanded={filtersOpen}
+            aria-controls="crm-filtros"
+            onClick={() => setFiltersOpen((v) => !v)}
+            className="sm:hidden inline-flex h-11 shrink-0 items-center gap-1.5 rounded-full bg-slate-900/5 dark:bg-white/[0.08] px-4 text-sm font-medium text-slate-700 dark:text-slate-200"
+          >
+            <SlidersHorizontal className="size-4" aria-hidden />
+            Filtros{hiddenFilterCount > 0 ? ` (${hiddenFilterCount})` : ''}
+            <ChevronDown className={`size-4 transition-transform ${filtersOpen ? 'rotate-180' : ''}`} aria-hidden />
+          </button>
+          <div id="crm-filtros" className={`${filtersOpen ? 'flex' : 'hidden'} w-full flex-wrap items-center gap-3 sm:contents`}>
           <div className="relative w-full sm:w-48 flex items-center">
             <UserCheck className="w-4 h-4 text-slate-400 absolute left-3 pointer-events-none" aria-hidden />
             <select
               aria-label="Filtrar por atendente"
               value={selectedAgent}
               onChange={(e) => setSelectedAgent(e.target.value)}
-              className="w-full h-9 pl-9 pr-3 text-sm bg-white/80 ring-1 ring-slate-900/5 shadow-xs dark:bg-white/[0.08] dark:ring-white/10 border border-transparent rounded-full focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+              className="w-full h-11 sm:h-9 pl-9 pr-3 text-base sm:text-sm bg-white/80 ring-1 ring-slate-900/5 shadow-xs dark:bg-white/[0.08] dark:ring-white/10 border border-transparent rounded-full focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
             >
               <option value="todos">Todas as atendentes</option>
               <option value="unassigned">Sem dono</option>
@@ -281,7 +299,7 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
             aria-label="Filtrar por campanha"
             value={campaign}
             onChange={(e) => setCampaign(e.target.value)}
-            className="w-full sm:w-56 h-9 px-3 text-sm bg-white/80 ring-1 ring-slate-900/5 shadow-xs dark:bg-white/[0.08] dark:ring-white/10 border border-transparent rounded-full focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+            className="w-full sm:w-56 h-11 sm:h-9 px-3 text-base sm:text-sm bg-white/80 ring-1 ring-slate-900/5 shadow-xs dark:bg-white/[0.08] dark:ring-white/10 border border-transparent rounded-full focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
           >
             <option value="todas">Todas as campanhas</option>
             {campaignOptions.map((label) => (
@@ -298,7 +316,7 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
                 role="radio"
                 aria-checked={groupBy === g}
                 onClick={() => setGroupBy(g)}
-                className={`h-8 px-3 rounded-full text-sm font-medium ${
+                className={`h-10 sm:h-8 px-3 rounded-full text-sm font-medium ${
                   groupBy === g ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
                 }`}
               >
@@ -322,8 +340,13 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
               Limpar filtros
             </button>
           )}
+          </div>
         </div>
-        <div role="radiogroup" aria-label="Filtro rápido" className="flex flex-wrap gap-1.5">
+        <div
+          role="radiogroup"
+          aria-label="Filtro rápido"
+          className="-mx-4 flex gap-1.5 overflow-x-auto px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0"
+        >
           {QUICK_FILTERS.map((f) => (
             <button
               key={f.id}
@@ -332,7 +355,7 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
               aria-checked={quick === f.id}
               title={f.hint}
               onClick={() => setQuick(f.id)}
-              className={`h-8 px-3.5 rounded-full text-sm font-medium border focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50 ${
+              className={`h-10 sm:h-8 shrink-0 whitespace-nowrap px-3.5 rounded-full text-sm font-medium border focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50 ${
                 quick === f.id
                   ? 'border-transparent bg-slate-900 text-white dark:bg-white dark:text-slate-900'
                   : 'border-transparent bg-white/80 ring-1 ring-slate-900/5 shadow-xs dark:bg-white/[0.08] dark:ring-white/10 text-slate-700 dark:text-slate-300 hover:bg-white dark:hover:bg-white/[0.14]'
@@ -344,7 +367,7 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
           ))}
         </div>
         {(tagChips.length > 0 || nonPatientCount > 0) && (
-          <div className="flex flex-wrap items-center gap-1.5" aria-label="Filtrar por tag">
+          <div className={`${filtersOpen ? 'flex' : 'hidden'} sm:flex flex-wrap items-center gap-1.5`} aria-label="Filtrar por tag">
             <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Tags:</span>
             {(showAllTags ? tagChips : tagChips.slice(0, 10)).map(({ tag, count }) => {
               const on = selectedTags.includes(tag);
@@ -354,7 +377,7 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
                   type="button"
                   aria-pressed={on}
                   onClick={() => setSelectedTags((prev) => (on ? prev.filter((t) => t !== tag) : [...prev, tag]))}
-                  className={`h-7 rounded-full border px-2.5 text-xs font-medium ${
+                  className={`h-9 sm:h-7 rounded-full border px-2.5 text-xs font-medium ${
                     on
                       ? 'border-emerald-600 bg-emerald-600 text-white'
                       : 'border-transparent bg-white/80 ring-1 ring-slate-900/5 shadow-xs dark:bg-white/[0.08] dark:ring-white/10 text-slate-700 dark:text-slate-300 hover:bg-white dark:hover:bg-white/[0.14]'
@@ -400,8 +423,8 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
       {topSlot}
 
       {groupBy === 'campanha' && (
-        <div className="flex-1 min-h-0 overflow-x-auto overflow-y-hidden p-3 sm:p-4">
-          <div className="grid h-full min-h-0 grid-flow-col auto-cols-[minmax(260px,1fr)] gap-3">
+        <div className="flex-1 min-h-0 overflow-x-auto overflow-y-hidden p-3 sm:p-4 snap-x snap-mandatory scroll-pl-3 sm:snap-none">
+          <div className="grid h-full min-h-0 grid-flow-col auto-cols-[82vw] sm:auto-cols-[minmax(260px,1fr)] gap-3 [&>section]:snap-start">
             {campaignColumns.length === 0 && (
               <p className="text-sm text-slate-500 dark:text-slate-400">Nenhum paciente com esses filtros.</p>
             )}
@@ -474,8 +497,8 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
       )}
 
       {/* Quadro: só ele rola na horizontal; cada coluna rola por dentro na vertical. */}
-      <div className={`flex-1 min-h-0 overflow-x-auto overflow-y-hidden p-3 sm:p-4 ${groupBy === 'campanha' ? 'hidden' : ''}`}>
-        <div className="grid h-full min-h-0 grid-flow-col auto-cols-[minmax(260px,1fr)] gap-3">
+      <div className={`flex-1 min-h-0 overflow-x-auto overflow-y-hidden p-3 sm:p-4 snap-x snap-mandatory scroll-pl-3 sm:snap-none ${groupBy === 'campanha' ? 'hidden' : ''}`}>
+        <div className="grid h-full min-h-0 grid-flow-col auto-cols-[82vw] sm:auto-cols-[minmax(260px,1fr)] gap-3 [&>section]:snap-start">
           {columns.map(({ stage, cards, value }) => {
             const Icon = STAGE_ICONS[stage.id];
             return (

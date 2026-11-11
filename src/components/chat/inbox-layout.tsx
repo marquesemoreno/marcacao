@@ -1440,7 +1440,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                 <button
                   type="button"
                   onClick={() => setIsNewContactModalOpen(true)}
-                  className="flex items-center justify-center w-8 h-8 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white transition-colors"
+                  className="flex items-center justify-center size-11 sm:size-8 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white transition-colors"
                   title="Cadastrar novo contato e iniciar conversa"
                   aria-label="Cadastrar novo contato e iniciar conversa"
                 >
@@ -1483,14 +1483,14 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
 
           {/* Barra de Busca */}
           <div className="relative">
-            <Search className="w-4 h-4 text-slate-400 dark:text-slate-500 absolute left-3 top-2.5" />
+            <Search className="w-4 h-4 text-slate-400 dark:text-slate-500 absolute left-3 top-3.5 sm:top-2.5" />
             <input
               type="text"
               aria-label="Buscar conversas"
               placeholder="Buscar paciente, telefone ou mensagem…"
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 text-xs bg-white/80 ring-1 ring-slate-900/5 shadow-xs dark:bg-white/[0.08] dark:ring-white/10 border border-transparent rounded-full focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 focus:bg-white dark:focus:bg-white/[0.12] transition-all text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500"
+              className="w-full pl-9 pr-3 py-2.5 text-base sm:py-2 sm:text-xs bg-white/80 ring-1 ring-slate-900/5 shadow-xs dark:bg-white/[0.08] dark:ring-white/10 border border-transparent rounded-full focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 focus:bg-white dark:focus:bg-white/[0.12] transition-all text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500"
             />
           </div>
 
@@ -1681,7 +1681,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
         </div>
 
         {/* Lista de Conversas */}
-        <div className="flex-1 overflow-y-auto py-1">
+        <div className="flex-1 overflow-y-auto pt-1 pb-20 sm:pb-1">
           {filteredContacts.length === 0 && isLoadingContacts ? (
             <div aria-busy="true" aria-label="Carregando conversas">
               {Array.from({ length: 7 }).map((_, i) => (
