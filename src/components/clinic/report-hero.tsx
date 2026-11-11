@@ -38,7 +38,7 @@ export function KpiPill({
 }
 
 const TONES = {
-  blue: { tile: "bg-blue-600 text-white", sub: "text-blue-100", btn: "bg-white/15 hover:bg-white/25 text-white ring-white/25" },
+  blue: { tile: "bg-blue-600 text-white", sub: "text-blue-50", btn: "bg-white/15 hover:bg-white/25 text-white ring-white/25" },
   teal: { tile: "bg-teal-700 text-white", sub: "text-teal-100", btn: "bg-white/15 hover:bg-white/25 text-white ring-white/25" },
   ink: {
     tile: "bg-slate-950 text-white ring-1 ring-white/10 dark:bg-[#1f2128]",

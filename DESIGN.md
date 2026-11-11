@@ -24,6 +24,10 @@ superfícies limpas, cantos arredondados, quase nenhuma borda, cinzas neutros.
   exceção é o rótulo das ações rápidas da ficha (§5).
   Acento suave: `bg-emerald-50 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300`.
 - Texto: principal `text-slate-900`, secundário `text-slate-500`.
+  O `slate-500` muda com o tema (variável `--slate-500` em `globals.css`, 11/11/2026): `#707075`
+  no claro (4,9:1 sobre branco) e `#86868b` no escuro. Em superfície sempre escura (menu
+  lateral, TV) usar `text-slate-400`, que não muda. `text-slate-400` sobre fundo claro é só
+  para ícone e placeholder, nunca para texto que precisa ser lido.
 
 ## 3. Tipografia
 - Fonte Inter (fallback -apple-system), `letter-spacing: -0.011em` no body.

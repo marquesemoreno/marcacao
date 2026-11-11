@@ -726,7 +726,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry, 
               </div>
             )}
 
-            <div className="flex items-center justify-end gap-1 text-xs text-slate-400 mt-1">
+            <div className="flex items-center justify-end gap-1 text-xs text-slate-600 dark:text-slate-400 mt-1">
               {isAgent && message.senderName && <span className="truncate max-w-[10rem]" title="Quem enviou (só a equipe vê)">{message.senderName === "Enviada pelo celular" ? "pelo celular" : message.senderName.split(" ")[0]} ·</span>}
               <span>{message.timestamp}</span>
               {isAgent && <MessageStatusTicks status={message.deliveryStatus} />}
@@ -838,7 +838,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry, 
               {contactPhone && <p className="text-xs opacity-80 font-mono">{contactPhone}</p>}
             </div>
           </div>
-          <div className="flex items-center justify-end gap-1 text-xs text-slate-400 mt-1.5">
+          <div className="flex items-center justify-end gap-1 text-xs text-slate-600 dark:text-slate-400 mt-1.5">
             <span>{message.timestamp}</span>
             {isAgent && <MessageStatusTicks status={message.deliveryStatus} />}
           </div>

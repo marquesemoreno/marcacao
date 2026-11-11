@@ -33,7 +33,9 @@ const config: Config = {
           200: "#e8e8ed",
           300: "#d2d2d7",
           400: "#aeaeb2",
-          500: "#86868b",
+          // Cinza do texto secundário: muda com o tema (globals.css). No claro o #86868b da Apple
+          // dá só 3,6:1 sobre branco; #707075 dá 4,9:1 (e 4,5:1 sobre o fundo da página).
+          500: "rgb(var(--slate-500) / <alpha-value>)",
           600: "#6e6e73",
           700: "#48484a",
           800: "#2c2c2e",
