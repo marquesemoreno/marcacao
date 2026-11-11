@@ -27,7 +27,10 @@ superfícies limpas, cantos arredondados, quase nenhuma borda, cinzas neutros.
   O `slate-500` muda com o tema (variável `--slate-500` em `globals.css`, 11/11/2026): `#707075`
   no claro (4,9:1 sobre branco) e `#86868b` no escuro. Em superfície sempre escura (menu
   lateral, TV) usar `text-slate-400`, que não muda. `text-slate-400` sobre fundo claro é só
-  para ícone e placeholder, nunca para texto que precisa ser lido.
+  para ícone, nunca para texto que precisa ser lido.
+- Texto de exemplo dos campos (placeholder): cor única por tema, variável `--placeholder` em
+  `globals.css` (`#707075` no claro, `#aeaeb2` no escuro). Não pôr `placeholder:text-slate-*`
+  no campo. `--muted-foreground` no claro é `oklch(0.5 0 0)` (abas inativas acima de 5:1).
 
 ## 3. Tipografia
 - Fonte Inter (fallback -apple-system), `letter-spacing: -0.011em` no body.

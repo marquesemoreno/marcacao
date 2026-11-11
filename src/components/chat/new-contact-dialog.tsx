@@ -17,7 +17,7 @@ export type NewContactInput = { name: string; phone: string; clinicId?: string; 
 type ExistingContact = { name: string; conversationId: string | null } | null;
 
 const inputClass =
-  "w-full mt-1 h-10 px-3 text-sm rounded-lg border bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/30";
+  "w-full mt-1 h-10 px-3 text-sm rounded-lg border bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/30";
 const labelClass = "text-sm font-medium text-slate-700 dark:text-slate-200";
 
 /** Modal "Novo Contato" (F2) — único pra Contatos e Inbox (antes eram dois diferentes).

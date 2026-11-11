@@ -317,7 +317,7 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
 
   const labelClass = "block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5";
   const inputClass = (hasError: boolean) =>
-    `w-full h-10 text-sm rounded-lg border bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 px-3 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 transition-colors disabled:opacity-60 disabled:cursor-not-allowed ${
+    `w-full h-10 text-sm rounded-lg border bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 px-3 focus:outline-none focus:ring-2 transition-colors disabled:opacity-60 disabled:cursor-not-allowed ${
       hasError
         ? 'border-red-400 focus:ring-red-200 dark:focus:ring-red-900/40'
         : 'border-slate-200 dark:border-slate-700 focus:ring-emerald-500/20 focus:border-emerald-400'

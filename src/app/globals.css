@@ -23,6 +23,8 @@
   :root {
     /* Texto secundário (slate-500): mais fechado no tema claro pra passar de 4,5:1. */
     --slate-500: 112 112 117;
+    /* Texto de exemplo dos campos: o padrão do Tailwind (#9ca3af) dá 2,5:1 sobre branco. */
+    --placeholder: 112 112 117;
     --background: oklch(1 0 0);
     --foreground: oklch(0.145 0 0);
     --card: oklch(1 0 0);
@@ -34,7 +36,8 @@
     --secondary: oklch(0.97 0 0);
     --secondary-foreground: oklch(0.205 0 0);
     --muted: oklch(0.97 0 0);
-    --muted-foreground: oklch(0.556 0 0);
+    /* 0.556 dava 4,2:1 sobre o cinza das abas inativas; 0.5 dá mais de 5:1. */
+    --muted-foreground: oklch(0.5 0 0);
     --accent: oklch(0.97 0 0);
     --accent-foreground: oklch(0.205 0 0);
     --destructive: oklch(0.577 0.245 27.325);
@@ -59,6 +62,7 @@
   }
   .dark {
     --slate-500: 134 134 139;
+    --placeholder: 174 174 178;
     --background: oklch(0.145 0 0);
     --foreground: oklch(0.985 0 0);
     --card: oklch(0.205 0 0);
@@ -104,6 +108,13 @@
   }
   html {
     @apply font-sans;
+  }
+  /* Uma cor só para o texto de exemplo de todos os campos, por tema. Não usar
+     placeholder:text-slate-400 nos campos: no tema claro dá 2,2:1. */
+  input::placeholder,
+  textarea::placeholder {
+    color: rgb(var(--placeholder));
+    opacity: 1;
   }
 }
 /* Visual "vidro" (09/11/2026, nasceu no piloto do Relatório): fundo em

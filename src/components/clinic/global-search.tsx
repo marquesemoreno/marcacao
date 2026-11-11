@@ -99,7 +99,7 @@ export function GlobalSearch() {
             }}
             placeholder="Buscar paciente, telefone, CPF ou texto da conversa…"
             aria-label="Buscar paciente, telefone ou conversa"
-            className="flex-1 h-12 bg-transparent text-base text-slate-900 dark:text-slate-100 placeholder:text-slate-400 outline-none"
+            className="flex-1 h-12 bg-transparent text-base text-slate-900 dark:text-slate-100 outline-none"
           />
           {loading && <Loader2 className="w-4 h-4 animate-spin text-slate-400" />}
         </div>

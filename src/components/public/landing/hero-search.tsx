@@ -146,7 +146,7 @@ export function HeroSearch() {
                       ? "Ex: Clínico Geral, Cardiologista, Oftalmo..."
                       : "Ex: Ultrassom, Hemograma, Ressonância..."
                   }
-                  className="w-full bg-transparent text-sm font-semibold text-slate-900 placeholder:text-slate-400 outline-none"
+                  className="w-full bg-transparent text-sm font-semibold text-slate-900 outline-none"
                   aria-label="Especialidade ou exame"
                 />
               </div>
