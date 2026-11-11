@@ -94,7 +94,7 @@ function StepFields({ uid, step, onChange, cloud, legend }: { uid: string; step:
     <>
       <fieldset>
         <legend className={labelClass}>{legend}</legend>
-        <div className="mt-1 grid gap-2 sm:grid-cols-3">
+        <div className="mt-1 grid gap-2">
           {ACTION_OPTIONS.map(([value, title, help]) => (
             <label
               key={value}
