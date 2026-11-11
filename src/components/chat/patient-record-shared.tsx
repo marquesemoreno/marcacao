@@ -42,7 +42,7 @@ export function renderConsultationRow(consultation: ConsultationRecord) {
     >
       <div className="flex items-center justify-between gap-2">
         <span className="font-semibold text-slate-800 dark:text-slate-200 truncate">{consultation.specialty}</span>
-        <span className={`shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded-full ${badge.classes}`}>{badge.label}</span>
+        <span className={`shrink-0 text-xs font-bold px-1.5 py-0.5 rounded-full ${badge.classes}`}>{badge.label}</span>
       </div>
       <div className="flex items-center justify-between gap-2 mt-0.5 text-slate-500 dark:text-slate-400">
         <span className="truncate">{consultation.date} · {consultation.doctor}</span>
@@ -52,7 +52,7 @@ export function renderConsultationRow(consultation: ConsultationRecord) {
       </div>
       {consultation.preparationInstructions && (
         <details className="mt-1">
-          <summary className="cursor-pointer text-[10px] font-semibold text-sky-700 dark:text-sky-400">
+          <summary className="cursor-pointer text-xs font-semibold text-sky-700 dark:text-sky-400">
             Ver preparo do exame
           </summary>
           <p className="mt-1 text-slate-600 dark:text-slate-300 whitespace-pre-wrap">

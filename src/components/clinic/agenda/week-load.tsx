@@ -51,7 +51,7 @@ export function WeekLoadTable({
                 <button type="button" onClick={() => onOpenDay(d, null)} className="rounded px-1 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50">
                   {dayLabel(d)}
                 </button>
-                {holidays.has(d) && <span className="block text-[11px] font-medium text-amber-700 dark:text-amber-400">Feriado</span>}
+                {holidays.has(d) && <span className="block text-xs font-medium text-amber-700 dark:text-amber-400">Feriado</span>}
               </th>
             ))}
           </tr>
@@ -76,7 +76,7 @@ export function WeekLoadTable({
                       >
                         <span className={c.total ? "text-base font-semibold" : ""}>{c.total || "–"}</span>
                         {(c.aguardando > 0 || c.remarcar > 0) && (
-                          <span className="text-[11px] leading-tight">
+                          <span className="text-xs leading-tight">
                             {c.aguardando > 0 && <span className="text-amber-800 dark:text-amber-300">{c.aguardando} aguard.</span>}
                             {c.aguardando > 0 && c.remarcar > 0 && " · "}
                             {c.remarcar > 0 && <span className="font-semibold text-violet-800 dark:text-violet-300">{c.remarcar} remarcar</span>}

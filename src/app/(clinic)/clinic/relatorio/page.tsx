@@ -133,7 +133,7 @@ function ReportCanvas({ gap, children }: { gap: string; children: React.ReactNod
 function BlockHeading({ id, title, hint }: { id: string; title: string; hint: string }) {
   return (
     <div className="border-b border-slate-900/10 pb-2 dark:border-white/10">
-      <h2 id={id} className="scroll-mt-6 text-lg font-semibold text-slate-900 dark:text-slate-100">{title}</h2>
+      <h2 id={id} className="scroll-mt-20 text-lg font-semibold text-slate-900 dark:text-slate-100">{title}</h2>
       <p className="text-xs text-slate-600 dark:text-slate-400">{hint}</p>
     </div>
   );
@@ -504,6 +504,29 @@ export default async function ClinicReportPage({
       </section>
 
       <ReportAiSummary clinicName={clinic.tradeName} periodLabel={labels.title} facts={insightFacts} />
+
+      {/* Índice da página: o relatório tem ~5.400 px de altura, e sem isso só rolando se chega
+          na Equipe ou na Origem. Fica preso no topo enquanto a pessoa rola. */}
+      <nav
+        aria-label="Seções do relatório"
+        className="glass-surface !rounded-full sticky top-2 z-10 -mx-1 flex gap-1 overflow-x-auto p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
+        {[
+          { href: "#bloco-funil", label: "Funil e evolução" },
+          ...(insights.agenda ? [{ href: "#bloco-agenda", label: "Agenda" }] : []),
+          { href: "#bloco-resultado", label: "Resultado" },
+          { href: "#bloco-equipe", label: "Equipe" },
+          { href: "#bloco-origem", label: "Origem" },
+        ].map((item) => (
+          <a
+            key={item.href}
+            href={item.href}
+            className="inline-flex h-10 shrink-0 items-center whitespace-nowrap rounded-full px-4 text-sm font-medium text-slate-700 hover:bg-slate-900/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50 dark:text-slate-200 dark:hover:bg-white/[0.08] sm:h-9"
+          >
+            {item.label}
+          </a>
+        ))}
+      </nav>
 
       {/* =========================================================================
           FUNIL, TENDÊNCIA E PACIENTES

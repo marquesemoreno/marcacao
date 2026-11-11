@@ -66,12 +66,12 @@ export function WeeklyTrendCard({ weeks }: { weeks: ReturnType<typeof computeWee
         <div className="flex items-end gap-2 h-40" role="img" aria-label="Conversas e agendamentos por semana">
           {weeks.map((w) => (
             <div key={w.label} className="flex-1 min-w-0 flex flex-col items-center gap-1 h-full justify-end">
-              <span className="text-[11px] tabular-nums text-slate-600 dark:text-slate-400">{w.conversations}</span>
+              <span className="text-xs tabular-nums text-slate-600 dark:text-slate-400">{w.conversations}</span>
               <div className="w-full max-w-10 flex flex-col justify-end rounded-t bg-sky-200 dark:bg-sky-900" style={{ height: `${(w.conversations / max) * 100}%` }}>
                 <div className="w-full rounded-t bg-emerald-500" style={{ height: w.conversations ? `${(w.scheduled / w.conversations) * 100}%` : 0 }} />
               </div>
-              <span className="text-[11px] text-slate-500 dark:text-slate-400">{w.label}</span>
-              <span className="text-[11px] font-medium tabular-nums text-emerald-700 dark:text-emerald-400">{w.rate !== null ? pctBR(w.rate) : "—"}</span>
+              <span className="text-xs text-slate-500 dark:text-slate-400">{w.label}</span>
+              <span className="text-xs font-medium tabular-nums text-emerald-700 dark:text-emerald-400">{w.rate !== null ? pctBR(w.rate) : "—"}</span>
             </div>
           ))}
         </div>

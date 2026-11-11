@@ -76,8 +76,8 @@ export function TvSettings({ initial, doctors }: { initial: Settings; doctors: s
           {settings.displays.map((d) => (
             <li key={d.id} className="flex items-center gap-3 text-sm">
               <span className="font-medium">{d.name}</span>
-              {d.kind === "QR" && <span className="rounded bg-violet-100 px-1.5 py-0.5 text-[11px] font-semibold text-violet-900 dark:bg-violet-950 dark:text-violet-200">QR</span>}
-              {d.kind === "TOTEM" && <span className="rounded bg-sky-100 px-1.5 py-0.5 text-[11px] font-semibold text-sky-900 dark:bg-sky-950 dark:text-sky-200">Totem</span>}
+              {d.kind === "QR" && <span className="rounded bg-violet-100 px-1.5 py-0.5 text-xs font-semibold text-violet-900 dark:bg-violet-950 dark:text-violet-200">QR</span>}
+              {d.kind === "TOTEM" && <span className="rounded bg-sky-100 px-1.5 py-0.5 text-xs font-semibold text-sky-900 dark:bg-sky-950 dark:text-sky-200">Totem</span>}
               <span className="text-xs text-slate-500">{d.lastSeenAt ? `visto ${fmt.format(new Date(d.lastSeenAt))}` : "ainda não abriu"}</span>
               <button
                 type="button"

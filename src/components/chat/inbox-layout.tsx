@@ -2711,7 +2711,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                         key={index}
                         className="rounded-2xl bg-slate-900/[0.04] dark:bg-white/[0.04] p-3 space-y-2"
                       >
-                        <p className="text-[11.5px] text-slate-700 dark:text-slate-200 leading-relaxed whitespace-pre-wrap">
+                        <p className="text-xs text-slate-700 dark:text-slate-200 leading-relaxed whitespace-pre-wrap">
                           {suggestion}
                         </p>
                         <div className="flex items-center gap-1.5">

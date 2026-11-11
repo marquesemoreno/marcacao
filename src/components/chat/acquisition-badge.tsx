@@ -14,7 +14,7 @@ export function AcquisitionBadge({ channel, detail }: { channel: string; detail?
       : "bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300";
   return (
     <span
-      className={`inline-flex shrink-0 items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-medium ${tone}`}
+      className={`inline-flex shrink-0 items-center gap-1 rounded-md border px-1.5 py-0.5 text-xs font-medium ${tone}`}
       title={detail ? `Origem: ${channel} — ${detail}` : `Origem: ${channel}`}
     >
       <Icon className="w-2.5 h-2.5" />

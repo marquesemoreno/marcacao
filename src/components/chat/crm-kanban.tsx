@@ -479,7 +479,7 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
                                 type="button"
                                 onClick={() => onOpenContactChat(contact.id)}
                                 aria-label={`Abrir conversa com ${name}`}
-                                className="inline-flex h-7 items-center gap-1 rounded-md px-2 text-xs font-medium text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/50"
+                                className="inline-flex h-10 sm:h-7 items-center gap-1 rounded-md px-2 text-xs font-medium text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/50"
                               >
                                 <MessageCircle className="w-3.5 h-3.5" aria-hidden /> Chat
                               </button>
@@ -644,7 +644,7 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
                                 onClick={() => moveDirection(contact.id, -1)}
                                 aria-label={`Voltar ${name} para ${STAGE_TITLE[STAGE_ORDER[Math.max(0, stageIdx - 1)]]}`}
                                 title="Voltar etapa"
-                                className="inline-flex size-7 items-center justify-center rounded-md text-slate-500 hover:text-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 dark:hover:text-slate-200 disabled:opacity-30"
+                                className="inline-flex size-10 sm:size-7 items-center justify-center rounded-md text-slate-500 hover:text-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 dark:hover:text-slate-200 disabled:opacity-30"
                               >
                                 <ArrowLeft className="w-3.5 h-3.5" aria-hidden />
                               </button>
@@ -654,7 +654,7 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
                                 onClick={() => moveDirection(contact.id, 1)}
                                 aria-label={`Avançar ${name} para ${STAGE_TITLE[STAGE_ORDER[Math.min(STAGE_ORDER.length - 1, stageIdx + 1)]]}`}
                                 title="Avançar etapa"
-                                className="inline-flex size-7 items-center justify-center rounded-md text-slate-500 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/50 dark:hover:text-emerald-400 disabled:opacity-30"
+                                className="inline-flex size-10 sm:size-7 items-center justify-center rounded-md text-slate-500 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/50 dark:hover:text-emerald-400 disabled:opacity-30"
                               >
                                 <ArrowRight className="w-3.5 h-3.5" aria-hidden />
                               </button>
@@ -664,7 +664,7 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
                                 type="button"
                                 onClick={() => onOpenContactChat(contact.id)}
                                 aria-label={`Abrir conversa com ${name}`}
-                                className="inline-flex h-7 items-center gap-1 rounded-md px-2 text-xs font-medium text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/50"
+                                className="inline-flex h-10 sm:h-7 items-center gap-1 rounded-md px-2 text-xs font-medium text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/50"
                               >
                                 <MessageCircle className="w-3.5 h-3.5" aria-hidden /> Chat
                               </button>

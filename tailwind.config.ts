@@ -40,6 +40,12 @@ const config: Config = {
           900: "#1d1d1f",
           950: "#0b0b0c",
         },
+        // Verde da marca um pouco mais fechado que o emerald-600 padrão (#059669). Com texto
+        // branco o padrão dá contraste 3,8:1, abaixo do mínimo de 4,5:1 para texto de botão;
+        // este dá 4,6:1. Vale para os ~120 botões `bg-emerald-600 text-white` de uma vez.
+        emerald: {
+          600: "#04865e",
+        },
         background: "var(--background)",
         foreground: "var(--foreground)",
         card: {

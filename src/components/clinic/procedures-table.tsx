@@ -90,7 +90,7 @@ function ProcedureRow({ item }: { item: PlainClinicProcedureItem }) {
               </option>
             ))}
           </select>
-          <label className="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400">
+          <label className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
             <input
               type="checkbox"
               checked={requiresAppointment}

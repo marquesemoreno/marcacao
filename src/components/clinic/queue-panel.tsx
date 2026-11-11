@@ -218,7 +218,7 @@ function Code({ t }: { t: QueueTicketView }) {
     >
       <Ticket className="h-3.5 w-3.5" aria-hidden />
       {t.code}
-      {t.serviceName && <span className="font-sans text-[11px] font-medium opacity-70">{t.serviceName}</span>}
+      {t.serviceName && <span className="font-sans text-xs font-medium opacity-70">{t.serviceName}</span>}
     </span>
   );
 }

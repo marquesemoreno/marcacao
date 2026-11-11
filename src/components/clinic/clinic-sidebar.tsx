@@ -63,7 +63,7 @@ export function ClinicSidebar({
 
       {isCollapsed ? (
         <Tooltip>
-          <TooltipTrigger className="mx-auto mt-3 flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-emerald-500/10 border border-emerald-500/20 text-[10px] font-extrabold text-emerald-300 font-mono">
+          <TooltipTrigger className="mx-auto mt-3 flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-emerald-500/10 border border-emerald-500/20 text-xs font-extrabold text-emerald-300 font-mono">
             {initials(tradeName)}
           </TooltipTrigger>
           <TooltipContent side="right">{tradeName}</TooltipContent>

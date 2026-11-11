@@ -18,6 +18,10 @@ superfícies limpas, cantos arredondados, quase nenhuma borda, cinzas neutros.
   Não usar `gray-*`/`zinc-*`.
 - Fundo de área: `bg-slate-100 dark:bg-slate-950`. Cartão: `bg-white dark:bg-slate-900`.
 - Marca (verde): `bg-emerald-600 hover:bg-emerald-700 text-white`.
+  O `emerald-600` é remapeado em `tailwind.config.ts` para `#04865e` (11/11/2026): com texto
+  branco dá contraste 4,6:1; o padrão do Tailwind (`#059669`) dava 3,8:1.
+- Tamanho mínimo de texto: `text-xs` (12 px). Não usar `text-[10px]`/`text-[11px]`; a única
+  exceção é o rótulo das ações rápidas da ficha (§5).
   Acento suave: `bg-emerald-50 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300`.
 - Texto: principal `text-slate-900`, secundário `text-slate-500`.
 

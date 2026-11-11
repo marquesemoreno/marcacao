@@ -29,7 +29,7 @@ export function ReportDelta({
           ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-400/15 dark:text-emerald-300"
           : "bg-rose-100 text-rose-800 dark:bg-rose-400/15 dark:text-rose-300";
     return (
-      <span className={`inline-flex items-center whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold tabular-nums ${chip}`}>
+      <span className={`inline-flex items-center whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums ${chip}`}>
         {d.text}
         {sr}
         <span className="ml-1 font-medium opacity-80">vs {compareLabel}</span>

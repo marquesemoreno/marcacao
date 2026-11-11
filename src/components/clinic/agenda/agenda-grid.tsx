@@ -186,7 +186,7 @@ export function AgendaGrid({
                 {isNow ? (
                   <>
                     {time}
-                    <span className="block text-[11px]">agora</span>
+                    <span className="block text-xs">agora</span>
                   </>
                 ) : isHour ? (
                   time

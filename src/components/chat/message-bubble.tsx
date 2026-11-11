@@ -889,7 +889,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry, 
                 if (e.key === 'Escape') setIsEditing(false);
               }}
               rows={3}
-              className="w-full rounded-lg p-2 text-xs sm:text-[13.5px] leading-relaxed resize-none focus:outline-none focus:ring-2 bg-white/80 dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:ring-emerald-500/30"
+              className="w-full rounded-lg p-2 text-xs sm:text-sm leading-relaxed resize-none focus:outline-none focus:ring-2 bg-white/80 dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:ring-emerald-500/30"
             />
             <div className="flex items-center justify-end gap-2">
               <button

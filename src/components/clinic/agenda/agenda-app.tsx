@@ -550,7 +550,7 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
             onClick={() => setHelpOpen(true)}
             className="ml-auto hidden md:inline-flex h-9 items-center gap-1.5 rounded-full px-2.5 text-xs font-medium text-slate-600 dark:text-slate-400 hover:bg-white/70 dark:hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
           >
-            <Keyboard className="h-4 w-4" aria-hidden /> Atalhos <kbd className="rounded border border-slate-300 dark:border-slate-600 px-1 font-mono text-[11px]">?</kbd>
+            <Keyboard className="h-4 w-4" aria-hidden /> Atalhos <kbd className="rounded border border-slate-300 dark:border-slate-600 px-1 font-mono text-xs">?</kbd>
           </button>
         </div>
 

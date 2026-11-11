@@ -73,7 +73,7 @@ export async function BillingTab({ month }: { month?: string }) {
             ) : (
               <p className="mt-1 text-xs text-slate-500">Sem base do mês anterior para comparar.</p>
             )}
-            <p className="mt-2 text-[11px] text-slate-400">
+            <p className="mt-2 text-xs text-slate-400">
               Comparação sempre pela média por dia útil (seg–sex, sem feriado nacional), para meses de tamanhos diferentes não parecerem queda ou alta.
             </p>
           </div>
@@ -124,7 +124,7 @@ export async function BillingTab({ month }: { month?: string }) {
                   {monthLabel(t.mes)}: {t.porDia != null ? formatCurrency(t.porDia) : "—"} por dia útil, {formatCurrency(t.valor)} no mês
                   {t.partial ? " (parcial)" : ""}
                 </span>
-                <span className="text-[10px] font-semibold tabular-nums text-slate-700 dark:text-slate-200" aria-hidden>
+                <span className="text-xs font-semibold tabular-nums text-slate-700 dark:text-slate-200" aria-hidden>
                   {t.porDia != null ? compact(t.porDia) : "—"}
                 </span>
                 <div className="flex min-h-0 w-full flex-1 items-end justify-center" aria-hidden>
@@ -136,17 +136,17 @@ export async function BillingTab({ month }: { month?: string }) {
                     title={`${monthLabel(t.mes)}: ${formatCurrency(t.valor)} em ${t.dias} dias úteis`}
                   />
                 </div>
-                <span className="text-[10px] font-medium text-slate-600 dark:text-slate-400" aria-hidden>
+                <span className="text-xs font-medium text-slate-600 dark:text-slate-400" aria-hidden>
                   {monthLabel(t.mes)}
                   {t.partial ? "*" : ""}
                 </span>
-                <span className="hidden text-[10px] tabular-nums text-slate-400 sm:block" aria-hidden>
+                <span className="hidden text-xs tabular-nums text-slate-400 sm:block" aria-hidden>
                   {compact(t.valor)}
                 </span>
               </div>
             ))}
           </div>
-          {v.trend.some((t) => t.partial) && <p className="mt-2 text-[11px] text-slate-400">* mês em andamento, contado até hoje.</p>}
+          {v.trend.some((t) => t.partial) && <p className="mt-2 text-xs text-slate-400">* mês em andamento, contado até hoje.</p>}
         </section>
       )}
 

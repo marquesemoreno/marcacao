@@ -682,7 +682,7 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
                     <button
                       type="button"
                       onClick={() => setTimeMode('scheduled')}
-                      className={`px-2 py-1 rounded text-[10px] font-semibold transition-colors ${
+                      className={`px-2 py-1 rounded text-xs font-semibold transition-colors ${
                         timeMode === 'scheduled'
                           ? 'bg-emerald-600 text-white shadow-2xs'
                           : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
@@ -695,7 +695,7 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
                       onClick={() => {
                         setTimeMode('arrival');
                       }}
-                      className={`px-2 py-1 rounded text-[10px] font-semibold transition-colors ${
+                      className={`px-2 py-1 rounded text-xs font-semibold transition-colors ${
                         timeMode === 'arrival'
                           ? 'bg-emerald-600 text-white shadow-2xs'
                           : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
@@ -744,17 +744,17 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
             {fetchAgenda && doctorId && date && (
               <div className="rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/60 p-2.5">
                 {loadingAgenda ? (
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400">Consultando agenda do médico...</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Consultando agenda do médico...</p>
                 ) : occupiedTimes.length > 0 ? (
                   <div className="space-y-1">
-                    <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 font-mono">
+                    <p className="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 font-mono">
                       Horários já ocupados nesse dia:
                     </p>
                     <div className="flex flex-wrap gap-1.5">
                       {occupiedTimes.map((hora) => (
                         <span
                           key={hora}
-                          className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-mono font-semibold bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800"
+                          className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-mono font-semibold bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800"
                         >
                           {hora}
                         </span>
@@ -762,7 +762,7 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
                     </div>
                   </div>
                 ) : (
-                  <p className="text-[11px] text-emerald-700 dark:text-emerald-400 font-semibold">
+                  <p className="text-xs text-emerald-700 dark:text-emerald-400 font-semibold">
                     ✓ Nenhum horário ocupado nesse dia pra esse médico.
                   </p>
                 )}

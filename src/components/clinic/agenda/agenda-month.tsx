@@ -31,7 +31,7 @@ export function AgendaMonth({
     <div className="glass-surface overflow-hidden">
       <div className="grid grid-cols-7 border-b border-slate-900/[0.07] dark:border-white/[0.07]">
         {WEEKDAYS.map((w) => (
-          <div key={w} className="px-2 py-1.5 text-[11px] font-medium text-slate-500 dark:text-slate-400">
+          <div key={w} className="px-2 py-1.5 text-xs font-medium text-slate-500 dark:text-slate-400">
             {w}
           </div>
         ))}
@@ -68,7 +68,7 @@ export function AgendaMonth({
                 {Number(day.slice(8))}
               </span>
               {failedDays.includes(day) ? (
-                <p className="mt-1 text-[11px] text-amber-700 dark:text-amber-400">Agenda da clínica fora do ar</p>
+                <p className="mt-1 text-xs text-amber-700 dark:text-amber-400">Agenda da clínica fora do ar</p>
               ) : list.length > 0 ? (
                 <div className="mt-1 space-y-0.5">
                   <p className="text-xs font-semibold text-slate-800 dark:text-slate-100 tabular-nums">
@@ -79,7 +79,7 @@ export function AgendaMonth({
                       const n = list.filter((i) => g.statuses.includes(i.status)).length;
                       if (!n) return null;
                       return (
-                        <span key={g.id} title={g.label} className="inline-flex items-center gap-1 text-[11px] text-slate-500 dark:text-slate-400 tabular-nums">
+                        <span key={g.id} title={g.label} className="inline-flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400 tabular-nums">
                           <span className={`size-1.5 rounded-full ${g.dot}`} aria-hidden />
                           {n}
                         </span>

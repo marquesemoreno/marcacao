@@ -769,7 +769,7 @@ export function BroadcastManagement() {
                   >
                     <span
                       aria-hidden
-                      className={`grid h-5 w-5 place-items-center rounded-full text-[11px] ${current ? "bg-emerald-600 text-white" : "border border-slate-300 dark:border-slate-600"}`}
+                      className={`grid h-5 w-5 place-items-center rounded-full text-xs ${current ? "bg-emerald-600 text-white" : "border border-slate-300 dark:border-slate-600"}`}
                     >
                       {n}
                     </span>
