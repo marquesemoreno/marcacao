@@ -4,7 +4,7 @@ import { normalizeBroadcastVariants, previewBroadcastVariants } from "@/lib/broa
 import { buildTemplateParams, checkTemplateParamSources, renderTemplatePreview, templateLabel } from "@/lib/broadcast-cloud-template";
 import { PageHeader } from "@/components/clinic/page-header";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { CalendarClock, Copy, FileText, Mail, MessageCircle, MessageSquareText, ShieldCheck, Image as ImageIcon, Loader2, MoreHorizontal, Paperclip, Pause, Phone, Play, Plus, Repeat, Settings2, Trash2, Upload, X } from "lucide-react";
+import { CalendarClock, Copy, FileText, Mail, MessageCircle, MessageSquareText, ShieldCheck, Image as ImageIcon, Loader2, MoreHorizontal, Paperclip, Pause, Phone, Play, Plus, Repeat, Settings2, Tags, Trash2, Upload, X } from "lucide-react";
 import { BROADCAST_ATTACHMENT_ACCEPT, checkBroadcastAttachment } from "@/lib/broadcast-attachment";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "sonner";
@@ -42,6 +42,7 @@ import { BroadcastPreview } from "@/components/clinic/broadcast-preview";
 import { ChannelCampaignFields, ChannelConsentDialog, type ChannelSetup } from "@/components/clinic/channel-broadcast-panel";
 import { getChannelSetup } from "@/actions/clinic-channel-broadcast";
 import { AutomationRulesSheet } from "@/components/clinic/automation-rules-sheet";
+import { TagAutomationsSheet } from "@/components/clinic/tag-automations-sheet";
 
 type Campaign = Awaited<ReturnType<typeof listClinicBroadcastCampaigns>>[number];
 type StartPreview = Awaited<ReturnType<typeof getClinicCampaignStartPreview>>;
@@ -143,6 +144,7 @@ export function BroadcastManagement() {
   const [channelSetup, setChannelSetup] = useState<ChannelSetup | null>(null);
   const [consentOpen, setConsentOpen] = useState(false);
   const [rulesOpen, setRulesOpen] = useState(false);
+  const [tagAutomationsOpen, setTagAutomationsOpen] = useState(false);
   // "Nova campanha" em 2 etapas (crítica 02/11): 1 = nome + público, 2 = mensagem + anexo.
   // A revisão final é o diálogo de Iniciar. As etapas só escondem (hidden), não desmontam —
   // o seletor do sistema da clínica guarda estado interno.
@@ -616,6 +618,20 @@ export function BroadcastManagement() {
                     type="button"
                     onClick={() => {
                       setConfigOpen(false);
+                      setTagAutomationsOpen(true);
+                    }}
+                    className="w-full flex items-start gap-2 rounded-md px-2 py-2 text-left text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
+                  >
+                    <Tags className="w-4 h-4 mt-0.5 shrink-0" aria-hidden />
+                    <span>
+                      Automações por tag
+                      <span className="block text-xs text-slate-500 dark:text-slate-400">Mensagem ou lembrete quando a conversa recebe uma tag</span>
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setConfigOpen(false);
                       setConsentOpen(true);
                     }}
                     className="w-full flex items-start gap-2 rounded-md px-2 py-2 text-left text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
@@ -710,6 +726,7 @@ export function BroadcastManagement() {
       />
 
       <AutomationRulesSheet open={rulesOpen} onOpenChange={setRulesOpen} cloud={cloud} />
+      <TagAutomationsSheet open={tagAutomationsOpen} onOpenChange={setTagAutomationsOpen} />
       <ChannelConsentDialog open={consentOpen} onOpenChange={setConsentOpen} setup={channelSetup} onDone={loadChannelSetup} />
 
       <Sheet open={formOpen} onOpenChange={setFormOpen}>

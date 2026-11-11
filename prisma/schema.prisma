@@ -245,6 +245,7 @@ model Clinic {
   aiAttendantConfig    AiAttendantConfig?
   broadcastCampaigns   BroadcastCampaign[]
   automationRules      AutomationRule[]
+  tagAutomations       TagAutomation[]
   channelConsents      ChannelConsent[]
   bridgeReminderLogs   BridgeReminderLog[]
   knowledgeEntries     ClinicKnowledgeEntry[]
@@ -1009,6 +1010,57 @@ model BroadcastCampaign {
   @@index([automationRuleId])
   @@index([clinicId, status])
   @@map("broadcast_campaigns")
+}
+
+/// Automação por tag (src/lib/tag-automations.ts): quando a conversa recebe `tag`, espera
+/// `delayHours` e então envia um modelo aprovado (vira campanha de Disparos) ou deixa um
+/// lembrete para a recepção (nota interna + tag "🔔 Lembrete").
+model TagAutomation {
+  id                    String   @id @default(cuid())
+  clinicId              String   @map("clinic_id")
+  name                  String
+  tag                   String
+  delayHours            Int      @default(0) @map("delay_hours")
+  /// MESSAGE | REMINDER
+  action                String
+  /// REVIEW (campanha nasce rascunho, a recepção inicia) | AUTO (já sai enviando)
+  mode                  String   @default("REVIEW")
+  reminderText          String?  @map("reminder_text") @db.Text
+  cloudTemplateName     String?  @map("cloud_template_name")
+  cloudTemplateLanguage String?  @map("cloud_template_language")
+  cloudTemplateBody     String?  @map("cloud_template_body")
+  cloudTemplateParams   String[] @default([]) @map("cloud_template_params")
+  active                Boolean  @default(false)
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  clinic      Clinic                    @relation(fields: [clinicId], references: [id])
+  enrollments TagAutomationEnrollment[]
+
+  @@index([clinicId])
+  @@map("tag_automations")
+}
+
+/// Uma conversa dentro de uma automação por tag. Sem FK para a conversa de propósito: a
+/// entrada é apagada pelo próprio executor quando a tag sai ou a conversa deixa de existir.
+model TagAutomationEnrollment {
+  id             String    @id @default(cuid())
+  automationId   String    @map("automation_id")
+  conversationId String    @map("conversation_id")
+  /// PENDING | DONE | BASELINE | SKIPPED (ver EnrollmentStatus em tag-automations.ts)
+  status         String    @default("PENDING")
+  dueAt          DateTime  @map("due_at")
+  doneAt         DateTime? @map("done_at")
+  /// Campanha de Disparos em que esta conversa entrou (ação MESSAGE).
+  campaignId     String?   @map("campaign_id")
+  note           String?
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  automation TagAutomation @relation(fields: [automationId], references: [id], onDelete: Cascade)
+
+  @@unique([automationId, conversationId])
+  @@index([status, dueAt])
+  @@map("tag_automation_enrollments")
 }
 
 /// Passo da régua automática (src/lib/automation-rules.ts): todo dia, quem teve a última

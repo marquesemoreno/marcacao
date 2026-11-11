@@ -1,0 +1,185 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const db = vi.hoisted(() => ({
+  tagAutomation: { findMany: vi.fn() },
+  clinic: { findMany: vi.fn() },
+  conversation: { findMany: vi.fn(), update: vi.fn() },
+  tagAutomationEnrollment: { findMany: vi.fn(), findFirst: vi.fn(), deleteMany: vi.fn(), createMany: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
+  whatsappCloudAccount: { findUnique: vi.fn() },
+  broadcastCampaign: { findFirst: vi.fn(), create: vi.fn() },
+  broadcastRecipient: { findMany: vi.fn(), createMany: vi.fn() },
+  user: { findFirst: vi.fn() },
+  message: { create: vi.fn() },
+  webhookLog: { create: vi.fn() },
+}));
+vi.mock("@/lib/prisma", () => ({ prisma: db }));
+
+import { resetBaseline, runTagAutomations } from "./tag-automations-run";
+import { REMINDER_TAG } from "./tag-automations";
+import { DEMO_CLINIC_CNPJ } from "./demo-clinic";
+import { WRONG_NUMBER_TAG } from "./conversation-tags";
+
+const now = new Date("2026-11-11T15:00:00Z");
+const automation = (over: Record<string, unknown> = {}) => ({
+  id: "a1",
+  clinicId: "clinic-a",
+  name: "Aula experimental",
+  tag: "Aula experimental",
+  delayHours: 0,
+  action: "MESSAGE",
+  mode: "REVIEW",
+  reminderText: null,
+  cloudTemplateName: "pos_aula",
+  cloudTemplateLanguage: "pt_BR",
+  cloudTemplateBody: "Oi {{1}}, como foi a aula?",
+  cloudTemplateParams: ["{{nome}}"],
+  active: true,
+  ...over,
+});
+const conv = (id: string, phone: string | null, name: string, tags: string[]) => ({ id, tags, contact: { phone, name } });
+
+/** Fila já sincronizada: `due` são as entradas vencidas, `convs` as conversas delas. */
+function setup(a: ReturnType<typeof automation>, due: { id: string; conversationId: string }[], convs: ReturnType<typeof conv>[]) {
+  db.tagAutomation.findMany.mockResolvedValue([a]);
+  db.clinic.findMany.mockResolvedValue([{ id: "clinic-a", cnpj: "11", technicalDirectorName: "Dra. Ana", technicalDirectorCrm: "123" }]);
+  db.conversation.findMany.mockImplementation(async (args: { where: { tags?: unknown } }) =>
+    args.where.tags ? convs.map((c) => ({ id: c.id })) : convs,
+  );
+  db.tagAutomationEnrollment.findMany.mockImplementation(async (args: { where: { status?: string } }) =>
+    args.where.status === "PENDING" ? due : due.map((d) => ({ ...d, status: "PENDING" })),
+  );
+  db.tagAutomationEnrollment.findFirst.mockResolvedValue(null);
+  db.whatsappCloudAccount.findUnique.mockResolvedValue({ active: true });
+  db.user.findFirst.mockResolvedValue({ id: "u1" });
+  db.broadcastCampaign.create.mockResolvedValue({ id: "camp1" });
+  db.webhookLog.create.mockResolvedValue({});
+}
+
+beforeEach(() => {
+  for (const model of Object.values(db)) for (const fn of Object.values(model)) fn.mockReset();
+});
+
+describe("runTagAutomations — mensagem", () => {
+  it("modo revisão: cria campanha em rascunho com o modelo e marca as entradas como feitas", async () => {
+    setup(automation(), [{ id: "e1", conversationId: "c1" }], [conv("c1", "5577900000001", "Ana Lima", ["Aula experimental"])]);
+    const [result] = await runTagAutomations(now);
+    expect(result).toMatchObject({ status: "campanha", count: 1 });
+    const data = db.broadcastCampaign.create.mock.calls[0][0].data;
+    expect(data).toMatchObject({ clinicId: "clinic-a", status: "DRAFT", lowPriority: true, cloudTemplateName: "pos_aula", name: "Automação · Aula experimental · 11/11" });
+    expect(data.recipients.create).toEqual([{ phone: "5577900000001", variables: { nome: "Ana", saudacao: "Oi, Ana" }, status: "PENDING" }]);
+    expect(db.tagAutomationEnrollment.updateMany.mock.calls[0][0]).toMatchObject({ where: { id: { in: ["e1"] } }, data: { status: "DONE", campaignId: "camp1" } });
+  });
+
+  it("modo automático: a campanha já nasce enviando", async () => {
+    setup(automation({ mode: "AUTO" }), [{ id: "e1", conversationId: "c1" }], [conv("c1", "5577900000001", "Ana Lima", ["Aula experimental"])]);
+    await runTagAutomations(now);
+    expect(db.broadcastCampaign.create.mock.calls[0][0].data.status).toBe("RUNNING");
+  });
+
+  it("modo automático sem responsável técnico não envia e deixa a fila esperando", async () => {
+    setup(automation({ mode: "AUTO" }), [{ id: "e1", conversationId: "c1" }], [conv("c1", "5577900000001", "Ana Lima", ["Aula experimental"])]);
+    db.clinic.findMany.mockResolvedValue([{ id: "clinic-a", cnpj: "11", technicalDirectorName: null, technicalDirectorCrm: null }]);
+    const [result] = await runTagAutomations(now);
+    expect(result.status).toBe("sem responsável técnico");
+    expect(db.broadcastCampaign.create).not.toHaveBeenCalled();
+    expect(db.tagAutomationEnrollment.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("sem API oficial ativa não cria campanha", async () => {
+    setup(automation(), [{ id: "e1", conversationId: "c1" }], [conv("c1", "5577900000001", "Ana Lima", ["Aula experimental"])]);
+    db.whatsappCloudAccount.findUnique.mockResolvedValue({ active: false });
+    const [result] = await runTagAutomations(now);
+    expect(result.status).toBe("sem API oficial ativa");
+    expect(db.broadcastCampaign.create).not.toHaveBeenCalled();
+  });
+
+  it("pula sem telefone, número errado e telefone repetido", async () => {
+    setup(
+      automation(),
+      [
+        { id: "e1", conversationId: "c1" },
+        { id: "e2", conversationId: "c2" },
+        { id: "e3", conversationId: "c3" },
+        { id: "e4", conversationId: "c4" },
+      ],
+      [
+        conv("c1", "5577900000001", "Ana Lima", ["Aula experimental"]),
+        conv("c2", null, "perfil_insta", ["Aula experimental"]),
+        conv("c3", "5577900000003", "Caio Reis", ["Aula experimental", WRONG_NUMBER_TAG]),
+        conv("c4", "5577900000001", "Ana Lima", ["Aula experimental"]),
+      ],
+    );
+    await runTagAutomations(now);
+    expect(db.broadcastCampaign.create.mock.calls[0][0].data.recipients.create.map((r: { phone: string }) => r.phone)).toEqual(["5577900000001"]);
+    const skipped = db.tagAutomationEnrollment.update.mock.calls.map((c) => [c[0].where.id, c[0].data.note]);
+    expect(skipped).toEqual([
+      ["e2", "sem telefone"],
+      ["e3", "número errado"],
+      ["e4", "telefone repetido"],
+    ]);
+  });
+
+  it("no mesmo dia, entra na campanha em rascunho que já existe em vez de criar outra", async () => {
+    setup(automation(), [{ id: "e2", conversationId: "c2" }], [conv("c2", "5577900000002", "Bruno Reis", ["Aula experimental"])]);
+    db.tagAutomationEnrollment.findFirst.mockResolvedValue({ campaignId: "camp0" });
+    db.broadcastCampaign.findFirst.mockResolvedValue({ id: "camp0" });
+    db.broadcastRecipient.findMany.mockResolvedValue([]);
+    await runTagAutomations(now);
+    expect(db.broadcastCampaign.findFirst.mock.calls[0][0].where).toMatchObject({ id: "camp0", clinicId: "clinic-a", status: "DRAFT" });
+    expect(db.broadcastCampaign.create).not.toHaveBeenCalled();
+    expect(db.broadcastRecipient.createMany.mock.calls[0][0].data).toEqual([
+      { campaignId: "camp0", phone: "5577900000002", variables: { nome: "Bruno", saudacao: "Oi, Bruno" }, status: "PENDING" },
+    ]);
+  });
+
+  it("busca as conversas sempre dentro da clínica da automação", async () => {
+    setup(automation(), [{ id: "e1", conversationId: "c1" }], [conv("c1", "5577900000001", "Ana Lima", ["Aula experimental"])]);
+    await runTagAutomations(now);
+    for (const call of db.conversation.findMany.mock.calls) expect(call[0].where.clinicId).toBe("clinic-a");
+  });
+});
+
+describe("runTagAutomations — lembrete", () => {
+  it("deixa nota interna, põe a tag de lembrete e não cria campanha", async () => {
+    setup(automation({ action: "REMINDER", reminderText: "Cobrar o convênio", cloudTemplateName: null }), [{ id: "e1", conversationId: "c1" }], [
+      conv("c1", "5577900000001", "Ana Lima", ["Aguardando convênio"]),
+    ]);
+    const [result] = await runTagAutomations(now);
+    expect(result).toMatchObject({ status: "lembretes", count: 1 });
+    expect(db.message.create.mock.calls[0][0].data).toMatchObject({
+      conversationId: "c1",
+      type: "INTERNAL_NOTE",
+      content: "🔔 Lembrete automático (Aula experimental): Cobrar o convênio",
+    });
+    expect(db.conversation.update.mock.calls[0][0]).toEqual({ where: { id: "c1" }, data: { tags: { push: REMINDER_TAG } } });
+    expect(db.broadcastCampaign.create).not.toHaveBeenCalled();
+    expect(db.whatsappCloudAccount.findUnique).not.toHaveBeenCalled();
+  });
+});
+
+describe("runTagAutomations — gerais", () => {
+  it("clínica demo nunca roda", async () => {
+    setup(automation(), [{ id: "e1", conversationId: "c1" }], [conv("c1", "5577900000001", "Ana Lima", ["Aula experimental"])]);
+    db.clinic.findMany.mockResolvedValue([{ id: "clinic-a", cnpj: DEMO_CLINIC_CNPJ, technicalDirectorName: null, technicalDirectorCrm: null }]);
+    expect(await runTagAutomations(now)).toEqual([]);
+    expect(db.conversation.findMany).not.toHaveBeenCalled();
+  });
+
+  it("nada vencido: não envia nem registra log", async () => {
+    setup(automation(), [], []);
+    const [result] = await runTagAutomations(now);
+    expect(result.status).toBe("nada vencido");
+    expect(db.webhookLog.create).not.toHaveBeenCalled();
+  });
+});
+
+describe("resetBaseline", () => {
+  it("ao ligar, quem já tem a tag entra como BASELINE e não como pendente", async () => {
+    db.conversation.findMany.mockResolvedValue([{ id: "c1" }, { id: "c2" }]);
+    const count = await resetBaseline({ id: "a1", clinicId: "clinic-a", tag: "Natação" }, now);
+    expect(count).toBe(2);
+    expect(db.tagAutomationEnrollment.deleteMany).toHaveBeenCalledWith({ where: { automationId: "a1" } });
+    expect(db.conversation.findMany.mock.calls[0][0].where).toEqual({ clinicId: "clinic-a", tags: { has: "Natação" } });
+    expect(db.tagAutomationEnrollment.createMany.mock.calls[0][0].data.map((d: { status: string }) => d.status)).toEqual(["BASELINE", "BASELINE"]);
+  });
+});
