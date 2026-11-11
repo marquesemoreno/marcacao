@@ -43,6 +43,7 @@ import { classifyAppointmentReply } from "@/lib/appointment-reply-ai";
 import { privacyForConversation } from "@/lib/ai-privacy-context";
 import { buildBridgeConfirmationFollowUp } from "@/lib/bridge-confirmation";
 import { addressReply, renderWelcome, shouldSendAddressReply, shouldSendWelcome } from "@/lib/welcome-message";
+import { INSURANCE_REPLY_PREFIX, findMentionedInsurance, insuranceReply, shouldSendInsuranceReply } from "@/lib/insurance-reply";
 import { extractBridgeNumeroFromNotes, confirmBridgeAppointment, verifyBridgeAppointmentPersisted } from "@/lib/hospital-bridge";
 import {
   getAiAttendantConfig,
@@ -1119,6 +1120,30 @@ async function processWhatsappWebhook(body: Prisma.InputJsonValue, forcedClinicI
         await prisma.message.create({
           data: { conversationId: conversation.id, direction: "OUTBOUND", content: text, status: result.success ? "DELIVERED" : "FAILED" },
         });
+      }
+    }
+
+    // Convênios aceitos: "vocês aceitam Unimed?" → lista cadastrada em Ações da IA, no máximo
+    // 1x a cada 12 h. Falha aqui (tabela, envio) nunca derruba o recebimento da mensagem.
+    if (!conversation.aiEnabled && incoming.text) {
+      try {
+        const insurance = await prisma.clinicInsuranceSettings.findUnique({ where: { clinicId: conversation.clinicId } });
+        if (insurance?.enabled && insurance.accepted.length > 0) {
+          const lastInsurance = await prisma.message.findFirst({
+            where: { conversationId: conversation.id, direction: "OUTBOUND", content: { startsWith: INSURANCE_REPLY_PREFIX } },
+            orderBy: { createdAt: "desc" },
+            select: { createdAt: true },
+          });
+          if (shouldSendInsuranceReply({ enabled: true, accepted: insurance.accepted, message: incoming.text, lastReplyAt: lastInsurance?.createdAt ?? null, now: nowWelcome })) {
+            const text = insuranceReply({ accepted: insurance.accepted, mentioned: findMentionedInsurance(incoming.text, insurance.accepted), note: insurance.note ?? "" });
+            const result = await sendWhatsAppMessage(incoming.phone, text, "insurance_reply.sent", resolvedClinicId);
+            await prisma.message.create({
+              data: { conversationId: conversation.id, direction: "OUTBOUND", content: text, status: result.success ? "DELIVERED" : "FAILED" },
+            });
+          }
+        }
+      } catch (error) {
+        console.error("[convênios] resposta automática falhou:", errorSummary(error));
       }
     }
 

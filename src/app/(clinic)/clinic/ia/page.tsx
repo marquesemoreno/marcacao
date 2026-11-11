@@ -8,6 +8,8 @@ import { ClosingMessageSetting } from "@/components/clinic/closing-message-setti
 import { getClosingMessageSetting } from "@/actions/closing-message";
 import { WelcomeSettings } from "@/components/clinic/welcome-settings";
 import { getWelcomeSettings } from "@/actions/welcome-message";
+import { InsuranceSettings } from "@/components/clinic/insurance-settings";
+import { getInsuranceSettings } from "@/actions/insurance-settings";
 import type { AiActionGroup } from "@/lib/ai-actions";
 
 export const metadata = { title: "Ações da IA" };
@@ -39,12 +41,13 @@ export default async function AiActionsPage({ searchParams }: { searchParams: Pr
   const days = [7, 30, 90].includes(Number(params.days)) ? Number(params.days) : 30;
   const group = params.grupo === "decisao" || params.grupo === "atendimento" ? params.grupo : undefined;
   const query = params.q?.trim() || undefined;
-  const [rows, urgency, afterHours, closing, welcome] = await Promise.all([
+  const [rows, urgency, afterHours, closing, welcome, insurance] = await Promise.all([
     listAiActions(days, { group, query }),
     getUrgencyTagSetting(),
     getAfterHoursBookingSetting(),
     getClosingMessageSetting(),
     getWelcomeSettings(),
+    getInsuranceSettings(),
   ]);
 
   const href = (over: { days?: number; grupo?: string }) => {
@@ -72,6 +75,7 @@ export default async function AiActionsPage({ searchParams }: { searchParams: Pr
         />
         <AfterHoursBookingToggle enabled={afterHours.enabled} duringHours={afterHours.duringHours} canToggle={afterHours.canToggle} />
         <WelcomeSettings {...welcome} />
+        <InsuranceSettings {...insurance} />
         <ClosingMessageSetting enabled={closing.enabled} text={closing.text} canEdit={closing.canEdit} />
         <UrgencyTagToggle enabled={urgency.enabled} canToggle={urgency.canToggle} />
 

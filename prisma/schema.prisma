@@ -247,6 +247,7 @@ model Clinic {
   automationRules      AutomationRule[]
   tagAutomations       TagAutomation[]
   receptionTasks       ReceptionTask[]
+  insuranceSettings    ClinicInsuranceSettings?
   channelConsents      ChannelConsent[]
   bridgeReminderLogs   BridgeReminderLog[]
   knowledgeEntries     ClinicKnowledgeEntry[]
@@ -1012,6 +1013,20 @@ model BroadcastCampaign {
   @@index([automationRuleId])
   @@index([clinicId, status])
   @@map("broadcast_campaigns")
+}
+
+/// Convênios aceitos da clínica + resposta automática a "vocês aceitam X?" (roteiro 2.7,
+/// src/lib/insurance-reply.ts). Tabela à parte de propósito: não põe coluna em `clinics`.
+model ClinicInsuranceSettings {
+  clinicId  String   @id @map("clinic_id")
+  enabled   Boolean  @default(false)
+  accepted  String[] @default([])
+  note      String?
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  clinic Clinic @relation(fields: [clinicId], references: [id])
+
+  @@map("clinic_insurance_settings")
 }
 
 /// Tarefa da recepção (/clinic/tarefas): tarefa com prazo e responsável, criada à mão ou
