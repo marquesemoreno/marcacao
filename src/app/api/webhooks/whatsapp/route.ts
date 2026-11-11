@@ -507,19 +507,40 @@ export const maxDuration = 120;
  * resultado — nada de telefone, nome ou texto. Só messages.upsert, pra não encher o log
  * com os avisos de entrega/leitura. */
 async function logArrival(body: unknown, token: string, response: Response) {
-  const rec = body as { event?: unknown; instance?: unknown };
+  const rec = body as { event?: unknown; instance?: unknown; data?: Record<string, unknown> };
   const kind = typeof rec.event === "string" ? rec.event.toLowerCase().replace(/_/g, ".") : "";
   if (kind !== "messages.upsert") return;
+  // Tipo do endereço do remetente (nunca o endereço em si): "pn" = telefone, "lid" = o
+  // identificador novo do WhatsApp que não é telefone, "group" = grupo.
+  const key = rec.data?.key as Record<string, unknown> | undefined;
+  const jid = typeof key?.remoteJid === "string" ? key.remoteJid : "";
+  const jidKind = jid.endsWith("@s.whatsapp.net")
+    ? "pn"
+    : jid.endsWith("@lid")
+      ? "lid"
+      : jid.endsWith("@g.us")
+        ? "group"
+        : jid
+          ? "other"
+          : null;
+  // Atraso entre o WhatsApp carimbar a mensagem e ela chegar aqui: alto = a instância
+  // estava parada e descarregou a fila.
+  const stamp = Number(rec.data?.messageTimestamp);
+  const delaySec = Number.isFinite(stamp) && stamp > 0 ? Math.max(0, Math.round(Date.now() / 1000 - stamp)) : null;
   const parsed = (await response.clone().json().catch(() => null)) as { status?: unknown; reason?: unknown } | null;
   const result = typeof parsed?.status === "string" ? parsed.status : typeof parsed?.reason === "string" ? parsed.reason : null;
   console.log(
     JSON.stringify({
       event: "wa_webhook",
       instance: typeof rec.instance === "string" ? rec.instance.slice(0, 80) : null,
-      kind,
+      // Os campos que mais importam primeiro: a tela de logs corta a linha.
+      result: result ? result.slice(0, 60) : null,
+      jid: jidKind,
+      fromMe: key?.fromMe === true,
+      delaySec,
       token,
       http: response.status,
-      result: result ? result.slice(0, 60) : null,
+      kind,
     })
   );
 }

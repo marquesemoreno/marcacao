@@ -67,6 +67,9 @@ describe("POST /api/webhooks/whatsapp (Evolution)", () => {
       instance: "clinica-teste",
       kind: "messages.upsert",
       token: "open",
+      jid: "pn",
+      fromMe: false,
+      delaySec: null,
       http: 200,
       result: "duplicate",
     });
