@@ -9,7 +9,16 @@ import { deleteTagAutomation, listTagAutomations, saveTagAutomation, type TagAut
 import type { ClinicCloudTemplate } from "@/actions/clinic-broadcast";
 import { renderTemplatePreview, templateLabel } from "@/lib/broadcast-cloud-template";
 import { isServiceTemplate } from "@/lib/campaign-kind";
-import { DELAY_OPTIONS, STAGE_OPTIONS, stageLabel, validateTagAutomation, type TagAutomationInput } from "@/lib/tag-automations";
+import {
+  DELAY_OPTIONS,
+  MAX_EXTRA_STEPS,
+  STAGE_OPTIONS,
+  stageLabel,
+  validateTagAutomation,
+  type ExtraStepInput,
+  type TagAutomationAction,
+  type TagAutomationInput,
+} from "@/lib/tag-automations";
 
 type Cloud = { active: boolean; templates: ClinicCloudTemplate[] };
 
@@ -34,6 +43,7 @@ const EMPTY: TagAutomationInput = {
   reminderText: "",
   cloudTemplateName: null,
   cloudTemplateParams: [],
+  extraSteps: [],
   active: false,
 };
 
@@ -54,6 +64,7 @@ function toInput(a: TagAutomationView): TagAutomationInput {
     reminderText: a.reminderText,
     cloudTemplateName: a.cloudTemplateName,
     cloudTemplateParams: a.cloudTemplateParams,
+    extraSteps: a.extraSteps,
     active: a.active,
   };
 }
@@ -67,6 +78,106 @@ function savedMessage(active: boolean, wasActive: boolean, alreadyTagged: number
   if (!active && wasActive) return "Automação desligada.";
   return "Automação salva.";
 }
+
+type StepValue = Pick<ExtraStepInput, "action" | "reminderText" | "cloudTemplateName" | "cloudTemplateParams">;
+
+const ACTION_OPTIONS: [TagAutomationAction, string, string][] = [
+  ["MESSAGE", "Enviar mensagem", "Um modelo aprovado pela Meta, pelo WhatsApp."],
+  ["REMINDER", "Lembrar a recepção", "Nota na conversa e a tag 🔔 Lembrete. Nada vai para o paciente."],
+  ["LOST", "Finalizar a conversa", "Fecha como “paciente não respondeu”. Nada vai para o paciente. Só no último passo."],
+];
+
+/** Ação de um passo e os campos que ela pede (modelo, lembrete). */
+function StepFields({ uid, step, onChange, cloud, legend }: { uid: string; step: StepValue; onChange: (patch: Partial<StepValue>) => void; cloud: Cloud; legend: string }) {
+  const tpl = cloud.templates.find((t) => t.name === step.cloudTemplateName);
+  return (
+    <>
+      <fieldset>
+        <legend className={labelClass}>{legend}</legend>
+        <div className="mt-1 grid gap-2 sm:grid-cols-3">
+          {ACTION_OPTIONS.map(([value, title, help]) => (
+            <label
+              key={value}
+              className={`cursor-pointer rounded-lg border p-3 text-sm ${step.action === value ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/40" : "border-slate-200 dark:border-slate-700"}`}
+            >
+              <input type="radio" name={`${uid}-action`} value={value} checked={step.action === value} onChange={() => onChange({ action: value })} className="sr-only" />
+              <span className="font-semibold text-slate-900 dark:text-slate-100">{title}</span>
+              <span className="block text-xs text-slate-600 dark:text-slate-400">{help}</span>
+            </label>
+          ))}
+        </div>
+      </fieldset>
+
+      {step.action === "REMINDER" && (
+        <div>
+          <label htmlFor={`${uid}-reminder`} className={labelClass}>
+            Lembrete para a recepção
+          </label>
+          <textarea
+            id={`${uid}-reminder`}
+            rows={2}
+            maxLength={300}
+            value={step.reminderText}
+            onChange={(e) => onChange({ reminderText: e.target.value })}
+            placeholder="Ex.: Cobrar a autorização do convênio e avisar o paciente."
+            className={`${field} mt-1 h-auto py-2`}
+          />
+        </div>
+      )}
+
+      {step.action === "MESSAGE" && (
+        <>
+          <div>
+            <label htmlFor={`${uid}-tpl`} className={labelClass}>
+              Modelo aprovado pela Meta
+            </label>
+            <select
+              id={`${uid}-tpl`}
+              value={step.cloudTemplateName ?? ""}
+              disabled={!cloud.active}
+              onChange={(e) => onChange({ cloudTemplateName: e.target.value || null, cloudTemplateParams: [] })}
+              className={`${field} mt-1`}
+            >
+              <option value="">{cloud.active ? "Escolha um modelo…" : "Disponível com a API oficial ativa"}</option>
+              {cloud.templates.map((t) => (
+                <option key={t.name} value={t.name}>
+                  {templateLabel(t)}
+                </option>
+              ))}
+            </select>
+          </div>
+          {tpl &&
+            Array.from({ length: tpl.variableCount }, (_, i) => (
+              <label key={i} className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
+                <span className="w-16 shrink-0 text-xs font-medium" aria-hidden>{`Campo ${i + 1}`}</span>
+                <input
+                  value={step.cloudTemplateParams[i] ?? ""}
+                  placeholder="{{nome}} ou texto fixo"
+                  aria-label={`Campo ${i + 1} do modelo`}
+                  onChange={(e) => onChange({ cloudTemplateParams: Object.assign([...step.cloudTemplateParams], { [i]: e.target.value }) })}
+                  className={field}
+                />
+              </label>
+            ))}
+          {tpl && (
+            <div className="rounded-lg bg-slate-50 dark:bg-slate-800/60 p-3 text-sm text-slate-700 dark:text-slate-300">
+              <p className="mb-1 text-xs font-medium text-slate-600 dark:text-slate-400">Exemplo (paciente Maria):</p>
+              <p className="whitespace-pre-wrap">
+                {renderTemplatePreview(
+                  tpl.bodyText,
+                  step.cloudTemplateParams.map((p) => p.replace(/\{\{nome\}\}/gi, "Maria").replace(/\{\{saudacao\}\}/gi, "Oi, Maria")),
+                )}
+              </p>
+            </div>
+          )}
+        </>
+      )}
+    </>
+  );
+}
+
+const NEW_STEP: ExtraStepInput = { delayHours: 72, action: "REMINDER", reminderText: "", cloudTemplateName: null, cloudTemplateParams: [] };
+const FOLLOWING_DELAYS = DELAY_OPTIONS.filter((o) => o.hours > 0);
 
 function Editor({
   initial,
@@ -86,13 +197,27 @@ function Editor({
   const [saving, setSaving] = useState(false);
   const [tried, setTried] = useState(false);
   const set = <K extends keyof TagAutomationInput>(key: K, value: TagAutomationInput[K]) => setForm((f) => ({ ...f, [key]: value }));
-  const tpl = cloud.templates.find((t) => t.name === form.cloudTemplateName);
-  const emptyParams = tpl ? Array.from({ length: tpl.variableCount }, (_, i) => i).filter((i) => !(form.cloudTemplateParams[i] ?? "").trim()) : [];
-  const wrongCategory = form.action === "MESSAGE" && form.serviceNotice && !!tpl && !isServiceTemplate(tpl);
-  const error =
-    validateTagAutomation(form) ??
-    (form.action === "MESSAGE" && emptyParams.length ? `Preencha ${emptyParams.map((i) => `o campo ${i + 1}`).join(", ")} do modelo.` : null) ??
-    (wrongCategory ? "Aviso de serviço só com modelo da categoria Utilidade. Escolha outro modelo ou desmarque o aviso de serviço." : null);
+  const allSteps: StepValue[] = [form, ...form.extraSteps];
+  const hasMessage = allSteps.some((x) => x.action === "MESSAGE");
+  const lastIsLost = allSteps[allSteps.length - 1].action === "LOST";
+  const setExtra = (index: number, patch: Partial<ExtraStepInput>) =>
+    setForm((f) => ({ ...f, extraSteps: f.extraSteps.map((x, i) => (i === index ? { ...x, ...patch } : x)) }));
+  /** Problema de modelo em algum passo de mensagem: campo vazio ou categoria errada para aviso de serviço. */
+  const templateError = (() => {
+    for (const [i, step] of allSteps.entries()) {
+      if (step.action !== "MESSAGE") continue;
+      const tpl = cloud.templates.find((t) => t.name === step.cloudTemplateName);
+      if (!tpl) continue;
+      const where = allSteps.length > 1 ? ` no passo ${i + 1}` : "";
+      const empty = Array.from({ length: tpl.variableCount }, (_, n) => n).filter((n) => !(step.cloudTemplateParams[n] ?? "").trim());
+      if (empty.length) return `Preencha ${empty.map((n) => `o campo ${n + 1}`).join(", ")} do modelo${where}.`;
+      if (form.serviceNotice && !isServiceTemplate(tpl)) {
+        return `Aviso de serviço só com modelo da categoria Utilidade${where}. Escolha outro modelo ou desmarque o aviso de serviço.`;
+      }
+    }
+    return null;
+  })();
+  const error = validateTagAutomation(form) ?? templateError;
 
   async function save() {
     setTried(true);
@@ -212,43 +337,46 @@ function Editor({
         </label>
       </fieldset>
 
-      <fieldset>
-        <legend className={labelClass}>E então</legend>
-        <div className="mt-1 grid gap-2 sm:grid-cols-2">
-          {(
-            [
-              ["MESSAGE", "Enviar mensagem", "Um modelo aprovado pela Meta, pelo WhatsApp."],
-              ["REMINDER", "Lembrar a recepção", "Nota na conversa e a tag 🔔 Lembrete. Nada vai para o paciente."],
-            ] as const
-          ).map(([value, title, help]) => (
-            <label
-              key={value}
-              className={`cursor-pointer rounded-lg border p-3 text-sm ${form.action === value ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/40" : "border-slate-200 dark:border-slate-700"}`}
-            >
-              <input type="radio" name={`${uid}-action`} value={value} checked={form.action === value} onChange={() => set("action", value)} className="sr-only" />
-              <span className="font-semibold text-slate-900 dark:text-slate-100">{title}</span>
-              <span className="block text-xs text-slate-600 dark:text-slate-400">{help}</span>
-            </label>
-          ))}
-        </div>
-      </fieldset>
+      <StepFields uid={`${uid}-s0`} step={form} onChange={(patch) => setForm((f) => ({ ...f, ...patch }))} cloud={cloud} legend="E então" />
 
-      {form.action === "REMINDER" ? (
-        <div>
-          <label htmlFor={`${uid}-reminder`} className={labelClass}>
-            Lembrete para a recepção
-          </label>
-          <textarea
-            id={`${uid}-reminder`}
-            rows={2}
-            maxLength={300}
-            value={form.reminderText}
-            onChange={(e) => set("reminderText", e.target.value)}
-            placeholder="Ex.: Cobrar a autorização do convênio e avisar o paciente."
-            className={`${field} mt-1 h-auto py-2`}
-          />
+      {form.extraSteps.map((step, i) => (
+        <div key={i} className="space-y-3 rounded-lg border border-slate-200 dark:border-slate-700 p-3">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Passo {i + 2}</p>
+            <button
+              type="button"
+              onClick={() => setForm((f) => ({ ...f, extraSteps: f.extraSteps.filter((_, n) => n !== i) }))}
+              className="inline-flex h-8 items-center gap-1 rounded-lg px-2 text-xs font-medium text-red-700 dark:text-red-300 hover:bg-red-50 dark:hover:bg-red-950/40"
+            >
+              <Trash2 className="h-3.5 w-3.5" aria-hidden /> Remover passo
+            </button>
+          </div>
+          <div>
+            <label htmlFor={`${uid}-s${i + 1}-delay`} className={labelClass}>
+              Esperar depois do passo {i + 1}
+            </label>
+            <select id={`${uid}-s${i + 1}-delay`} value={step.delayHours} onChange={(e) => setExtra(i, { delayHours: Number(e.target.value) })} className={`${field} mt-1`}>
+              {(FOLLOWING_DELAYS.some((o) => o.hours === step.delayHours) ? FOLLOWING_DELAYS : [...FOLLOWING_DELAYS, { hours: step.delayHours, label: delayLabel(step.delayHours) }]).map((o) => (
+                <option key={o.hours} value={o.hours}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <StepFields uid={`${uid}-s${i + 1}`} step={step} onChange={(patch) => setExtra(i, patch)} cloud={cloud} legend="E então" />
         </div>
-      ) : (
+      ))}
+
+      {form.extraSteps.length < MAX_EXTRA_STEPS && !lastIsLost && (
+        <div>
+          <button type="button" onClick={() => setForm((f) => ({ ...f, extraSteps: [...f.extraSteps, NEW_STEP] }))} className={secondaryBtn}>
+            <Plus className="h-4 w-4" aria-hidden /> Adicionar passo
+          </button>
+          <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">Ex.: um segundo toque dias depois e, no fim, finalizar a conversa.</p>
+        </div>
+      )}
+
+      {hasMessage && (
         <>
           {!cloud.active && (
             <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
@@ -264,51 +392,8 @@ function Editor({
               </span>
             </span>
           </label>
-          <div>
-            <label htmlFor={`${uid}-tpl`} className={labelClass}>
-              Modelo aprovado pela Meta
-            </label>
-            <select
-              id={`${uid}-tpl`}
-              value={form.cloudTemplateName ?? ""}
-              disabled={!cloud.active}
-              onChange={(e) => setForm((f) => ({ ...f, cloudTemplateName: e.target.value || null, cloudTemplateParams: [] }))}
-              className={`${field} mt-1`}
-            >
-              <option value="">{cloud.active ? "Escolha um modelo…" : "Disponível com a API oficial ativa"}</option>
-              {cloud.templates.map((t) => (
-                <option key={t.name} value={t.name}>
-                  {templateLabel(t)}
-                </option>
-              ))}
-            </select>
-          </div>
-          {tpl &&
-            Array.from({ length: tpl.variableCount }, (_, i) => (
-              <label key={i} className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
-                <span className="w-16 shrink-0 text-xs font-medium" aria-hidden>{`Campo ${i + 1}`}</span>
-                <input
-                  value={form.cloudTemplateParams[i] ?? ""}
-                  placeholder="{{nome}} ou texto fixo"
-                  aria-label={`Campo ${i + 1} do modelo`}
-                  onChange={(e) => set("cloudTemplateParams", Object.assign([...form.cloudTemplateParams], { [i]: e.target.value }))}
-                  className={field}
-                />
-              </label>
-            ))}
-          {tpl && (
-            <div className="rounded-lg bg-slate-50 dark:bg-slate-800/60 p-3 text-sm text-slate-700 dark:text-slate-300">
-              <p className="mb-1 text-xs font-medium text-slate-600 dark:text-slate-400">Exemplo (paciente Maria):</p>
-              <p className="whitespace-pre-wrap">
-                {renderTemplatePreview(
-                  tpl.bodyText,
-                  form.cloudTemplateParams.map((p) => p.replace(/\{\{nome\}\}/gi, "Maria").replace(/\{\{saudacao\}\}/gi, "Oi, Maria")),
-                )}
-              </p>
-            </div>
-          )}
           <fieldset>
-            <legend className={labelClass}>Como enviar</legend>
+            <legend className={labelClass}>Como enviar as mensagens</legend>
             <div className="mt-1 grid gap-2 sm:grid-cols-2">
               {(
                 [
@@ -394,10 +479,10 @@ function Card({ automation, onEdit, onChanged }: { automation: TagAutomationView
     }
   }
 
-  const what =
-    automation.action === "REMINDER"
-      ? "lembra a recepção"
-      : `envia o modelo ${automation.cloudTemplateName ?? "(sem modelo)"} · ${automation.mode === "AUTO" ? "sozinho" : "com revisão"}${automation.serviceNotice ? " · aviso de serviço" : ""}`;
+  const describe = (step: StepValue) =>
+    step.action === "REMINDER" ? "lembra a recepção" : step.action === "LOST" ? "finaliza a conversa" : `envia o modelo ${step.cloudTemplateName ?? "(sem modelo)"}`;
+  const sendsMessage = [automation, ...automation.extraSteps].some((x) => x.action === "MESSAGE");
+  const what = `${describe(automation)}${sendsMessage ? ` · ${automation.mode === "AUTO" ? "sozinho" : "com revisão"}${automation.serviceNotice ? " · aviso de serviço" : ""}` : ""}`;
 
   return (
     <section className="space-y-2 rounded-xl border border-slate-200 dark:border-slate-700 p-4" aria-labelledby={titleId}>
@@ -413,6 +498,15 @@ function Card({ automation, onEdit, onChanged }: { automation: TagAutomationView
             {automation.waitFrom === "LAST_MESSAGE" ? " sem mensagem" : ""} · {what}
             {automation.stopOnReply ? " · cancela se o paciente responder" : ""}
           </p>
+          {automation.extraSteps.length > 0 && (
+            <ol className="mt-1 list-decimal pl-5 text-xs text-slate-600 dark:text-slate-400" start={2}>
+              {automation.extraSteps.map((step, i) => (
+                <li key={i}>
+                  {delayLabel(step.delayHours)}: {describe(step)}
+                </li>
+              ))}
+            </ol>
+          )}
         </div>
         <label className="flex shrink-0 items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200">
           {busy ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : automation.active ? "Ligada" : "Desligada"}

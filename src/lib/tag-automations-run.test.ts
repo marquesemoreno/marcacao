@@ -38,23 +38,26 @@ const automation = (over: Record<string, unknown> = {}) => ({
   cloudTemplateLanguage: "pt_BR",
   cloudTemplateBody: "Oi {{1}}, como foi a aula?",
   cloudTemplateParams: ["{{nome}}"],
+  extraSteps: [] as unknown[],
   active: true,
   ...over,
 });
-const conv = (id: string, phone: string | null, name: string, tags: string[], lastMessageAt: Date | null = null) => ({ id, tags, lastMessageAt, contact: { phone, name } });
+const conv = (id: string, phone: string | null, name: string, tags: string[], lastMessageAt: Date | null = null) => ({ id, status: "OPEN", tags, lastMessageAt, contact: { phone, name } });
 
 /** Fila já sincronizada: `due` são as entradas vencidas, `convs` as conversas delas. */
-function setup(a: ReturnType<typeof automation>, due: { id: string; conversationId: string; createdAt?: Date }[], convs: ReturnType<typeof conv>[]) {
+/** Campanhas em que a automação já pôs gente hoje (para o teste de reaproveitar o rascunho). */
+let campaignsToday: { campaignId: string }[] = [];
+
+function setup(a: ReturnType<typeof automation>, due: { id: string; conversationId: string; createdAt?: Date; stepIndex?: number }[], convs: ReturnType<typeof conv>[]) {
   db.tagAutomation.findMany.mockResolvedValue([a]);
   db.clinic.findMany.mockResolvedValue([{ id: "clinic-a", cnpj: "11", technicalDirectorName: "Dra. Ana", technicalDirectorCrm: "123" }]);
   db.conversation.findMany.mockImplementation(async (args: { where: { id?: unknown } }) =>
     args.where.id ? convs : convs.map((c) => ({ id: c.id })),
   );
   db.message.findMany.mockResolvedValue([]);
-  db.tagAutomationEnrollment.findMany.mockImplementation(async (args: { where: { status?: string } }) =>
-    args.where.status === "PENDING" ? due : due.map((d) => ({ ...d, status: "PENDING" })),
+  db.tagAutomationEnrollment.findMany.mockImplementation(async (args: { where: { status?: string; campaignId?: unknown } }) =>
+    args.where.campaignId ? campaignsToday : args.where.status === "PENDING" ? due : due.map((d) => ({ ...d, status: "PENDING" })),
   );
-  db.tagAutomationEnrollment.findFirst.mockResolvedValue(null);
   db.whatsappCloudAccount.findUnique.mockResolvedValue({ active: true });
   db.user.findFirst.mockResolvedValue({ id: "u1" });
   db.broadcastCampaign.create.mockResolvedValue({ id: "camp1" });
@@ -63,6 +66,7 @@ function setup(a: ReturnType<typeof automation>, due: { id: string; conversation
 
 beforeEach(() => {
   for (const model of Object.values(db)) for (const fn of Object.values(model)) fn.mockReset();
+  campaignsToday = [];
 });
 
 describe("runTagAutomations — mensagem", () => {
@@ -139,11 +143,11 @@ describe("runTagAutomations — mensagem", () => {
 
   it("no mesmo dia, entra na campanha em rascunho que já existe em vez de criar outra", async () => {
     setup(automation(), [{ id: "e2", conversationId: "c2" }], [conv("c2", "5577900000002", "Bruno Reis", ["Aula experimental"])]);
-    db.tagAutomationEnrollment.findFirst.mockResolvedValue({ campaignId: "camp0" });
+    campaignsToday = [{ campaignId: "camp0" }];
     db.broadcastCampaign.findFirst.mockResolvedValue({ id: "camp0" });
     db.broadcastRecipient.findMany.mockResolvedValue([]);
     await runTagAutomations(now);
-    expect(db.broadcastCampaign.findFirst.mock.calls[0][0].where).toMatchObject({ id: "camp0", clinicId: "clinic-a", status: "DRAFT" });
+    expect(db.broadcastCampaign.findFirst.mock.calls[0][0].where).toEqual({ id: { in: ["camp0"] }, clinicId: "clinic-a", status: "DRAFT", name: "Automação · Aula experimental · 11/11" });
     expect(db.broadcastCampaign.create).not.toHaveBeenCalled();
     expect(db.broadcastRecipient.createMany.mock.calls[0][0].data).toEqual([
       { campaignId: "camp0", phone: "5577900000002", variables: { nome: "Bruno", saudacao: "Oi, Bruno" }, status: "PENDING" },
@@ -230,6 +234,76 @@ describe("runTagAutomations — etapa, resposta e tempo parado", () => {
     await runTagAutomations(now);
     expect(db.tagAutomationEnrollment.update.mock.calls[0][0]).toEqual({ where: { id: "e1" }, data: { dueAt: new Date("2026-11-13T15:00:00Z") } });
     expect(db.broadcastCampaign.create.mock.calls[0][0].data.recipients.create.map((r: { phone: string }) => r.phone)).toEqual(["5577900000002"]);
+  });
+});
+
+describe("runTagAutomations — sequência de passos", () => {
+  const lost = { delayHours: 72, action: "LOST", reminderText: "", cloudTemplateName: null, cloudTemplateLanguage: null, cloudTemplateBody: null, cloudTemplateParams: [] };
+  const second = { delayHours: 120, action: "MESSAGE", reminderText: "", cloudTemplateName: "toque_2", cloudTemplateLanguage: "pt_BR", cloudTemplateBody: "Ainda dá tempo", cloudTemplateParams: [] };
+
+  it("depois do primeiro passo, a conversa volta para a fila esperando o segundo", async () => {
+    setup(automation({ extraSteps: [second, lost] }), [{ id: "e1", conversationId: "c1" }], [conv("c1", "5577900000001", "Ana Lima", ["Aula experimental"])]);
+    await runTagAutomations(now);
+    expect(db.broadcastCampaign.create.mock.calls[0][0].data).toMatchObject({ name: "Automação · Aula experimental · passo 1 · 11/11", cloudTemplateName: "pos_aula" });
+    expect(db.tagAutomationEnrollment.updateMany.mock.calls[0][0].data).toMatchObject({
+      status: "PENDING",
+      stepIndex: 1,
+      dueAt: new Date("2026-11-16T15:00:00Z"),
+      campaignId: "camp1",
+    });
+  });
+
+  it("o segundo passo usa o modelo dele e deixa o terceiro agendado", async () => {
+    setup(automation({ extraSteps: [second, lost] }), [{ id: "e1", conversationId: "c1", stepIndex: 1 }], [conv("c1", "5577900000001", "Ana Lima", ["Aula experimental"])]);
+    await runTagAutomations(now);
+    expect(db.broadcastCampaign.create.mock.calls[0][0].data).toMatchObject({ name: "Automação · Aula experimental · passo 2 · 11/11", cloudTemplateName: "toque_2", cloudTemplateBody: "Ainda dá tempo" });
+    expect(db.tagAutomationEnrollment.updateMany.mock.calls[0][0].data).toMatchObject({ status: "PENDING", stepIndex: 2, dueAt: new Date("2026-11-14T15:00:00Z") });
+  });
+
+  it("último passo 'finalizar': conversa vira finalizada por falta de resposta, com nota, sem mensagem ao paciente", async () => {
+    setup(automation({ extraSteps: [second, lost] }), [{ id: "e1", conversationId: "c1", stepIndex: 2 }], [conv("c1", "5577900000001", "Ana Lima", ["Aula experimental"])]);
+    const [result] = await runTagAutomations(now);
+    expect(result).toMatchObject({ status: "finalizadas", count: 1 });
+    expect(db.conversation.update.mock.calls[0][0]).toEqual({
+      where: { id: "c1" },
+      data: { status: "RESOLVED", resolutionReason: "SEM_RESPOSTA", resolutionNotes: "Automação: Aula experimental", resolvedAt: now },
+    });
+    expect(db.message.create.mock.calls[0][0].data).toMatchObject({ conversationId: "c1", type: "INTERNAL_NOTE" });
+    expect(db.tagAutomationEnrollment.update.mock.calls[0][0]).toEqual({ where: { id: "e1" }, data: { status: "DONE", doneAt: now } });
+    expect(db.broadcastCampaign.create).not.toHaveBeenCalled();
+  });
+
+  it("conversa já finalizada não é finalizada de novo", async () => {
+    const c = { ...conv("c1", "5577900000001", "Ana Lima", ["Aula experimental"]), status: "RESOLVED" };
+    setup(automation({ extraSteps: [lost] }), [{ id: "e1", conversationId: "c1", stepIndex: 1 }], [c]);
+    await runTagAutomations(now);
+    expect(db.conversation.update).not.toHaveBeenCalled();
+    expect(db.message.create).not.toHaveBeenCalled();
+  });
+
+  it("parar na resposta vale também nos passos seguintes", async () => {
+    setup(automation({ stopOnReply: true, extraSteps: [second, lost] }), [{ id: "e1", conversationId: "c1", stepIndex: 2, createdAt: new Date("2026-11-01T15:00:00Z") }], [
+      conv("c1", "5577900000001", "Ana Lima", ["Aula experimental"]),
+    ]);
+    db.message.findMany.mockResolvedValue([{ conversationId: "c1", createdAt: new Date("2026-11-09T10:00:00Z") }]);
+    await runTagAutomations(now);
+    expect(db.tagAutomationEnrollment.update.mock.calls[0][0].data).toMatchObject({ status: "SKIPPED", note: "paciente respondeu" });
+    expect(db.conversation.update).not.toHaveBeenCalled();
+  });
+
+  it("lembrete no meio da sequência também agenda o passo seguinte", async () => {
+    setup(automation({ action: "REMINDER", reminderText: "Ligar", cloudTemplateName: null, extraSteps: [lost] }), [{ id: "e1", conversationId: "c1" }], [
+      conv("c1", "5577900000001", "Ana Lima", ["Aula experimental"]),
+    ]);
+    await runTagAutomations(now);
+    expect(db.tagAutomationEnrollment.update.mock.calls[0][0].data).toMatchObject({ status: "PENDING", stepIndex: 1, dueAt: new Date("2026-11-14T15:00:00Z") });
+  });
+
+  it("se a sequência encolheu, a conversa que estava num passo que não existe mais é encerrada", async () => {
+    setup(automation(), [{ id: "e1", conversationId: "c1", stepIndex: 3 }], [conv("c1", "5577900000001", "Ana Lima", ["Aula experimental"])]);
+    await runTagAutomations(now);
+    expect(db.tagAutomationEnrollment.update.mock.calls[0][0]).toEqual({ where: { id: "e1" }, data: { status: "DONE", doneAt: now } });
+    expect(db.broadcastCampaign.create).not.toHaveBeenCalled();
   });
 });
 

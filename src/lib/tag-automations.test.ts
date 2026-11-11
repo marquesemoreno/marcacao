@@ -2,6 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   REMINDER_TAG,
   idlePostponedDue,
+  lostNote,
+  parseStoredSteps,
+  stepsOf,
   planEnrollments,
   sameTrigger,
   triggerWhere,
@@ -69,6 +72,7 @@ describe("validateTagAutomation", () => {
     reminderText: "",
     cloudTemplateName: "pos_aula",
     cloudTemplateParams: ["{{nome}}"],
+    extraSteps: [],
     active: true,
   };
 
@@ -134,6 +138,7 @@ describe("gatilho por etapa, tempo parado e parada na resposta", () => {
     reminderText: "Ligar para o paciente",
     cloudTemplateName: null,
     cloudTemplateParams: [],
+    extraSteps: [],
     active: true,
   };
 
@@ -176,5 +181,80 @@ describe("gatilho por etapa, tempo parado e parada na resposta", () => {
     // última mensagem há 4 dias → já está parado o bastante
     expect(idlePostponedDue({ lastMessageAt: new Date("2026-11-07T15:00:00Z"), delayHours: 72, now })).toBeNull();
     expect(idlePostponedDue({ lastMessageAt: null, delayHours: 72, now })).toBeNull();
+  });
+});
+
+describe("sequência de passos", () => {
+  const base: TagAutomationInput = {
+    name: "Aguardando retorno",
+    triggerKind: "TAG",
+    stage: null,
+    tag: "Aguardando retorno",
+    delayHours: 48,
+    waitFrom: "ENTRY",
+    stopOnReply: true,
+    serviceNotice: false,
+    action: "MESSAGE",
+    mode: "REVIEW",
+    reminderText: "",
+    cloudTemplateName: "toque_1",
+    cloudTemplateParams: ["{{nome}}"],
+    extraSteps: [
+      { delayHours: 120, action: "MESSAGE", reminderText: "", cloudTemplateName: "toque_2", cloudTemplateParams: [] },
+      { delayHours: 72, action: "LOST", reminderText: "", cloudTemplateName: null, cloudTemplateParams: [] },
+    ],
+    active: true,
+  };
+
+  it("aceita toque, segundo toque e finalizar no fim", () => {
+    expect(validateTagAutomation(base)).toBeNull();
+  });
+
+  it("finalizar a conversa só pode ser o último passo", () => {
+    const steps = [base.extraSteps[1], base.extraSteps[0]];
+    expect(validateTagAutomation({ ...base, extraSteps: steps })).toMatch(/último passo/i);
+    expect(validateTagAutomation({ ...base, action: "LOST", cloudTemplateName: null })).toMatch(/último passo/i);
+  });
+
+  it("finalizar pode ser o único passo", () => {
+    expect(validateTagAutomation({ ...base, action: "LOST", cloudTemplateName: null, extraSteps: [] })).toBeNull();
+  });
+
+  it("passo seguinte precisa de espera de 1 hora a 30 dias, e do que a ação pede", () => {
+    const step = base.extraSteps[0];
+    expect(validateTagAutomation({ ...base, extraSteps: [{ ...step, delayHours: 0 }] })).toMatch(/passo 2/);
+    expect(validateTagAutomation({ ...base, extraSteps: [{ ...step, cloudTemplateName: null }] })).toMatch(/modelo.*passo 2/i);
+    expect(validateTagAutomation({ ...base, extraSteps: [{ ...step, action: "REMINDER", reminderText: "" }] })).toMatch(/lembrete.*passo 2/i);
+  });
+
+  it("limita o tamanho da sequência", () => {
+    const step = base.extraSteps[0];
+    expect(validateTagAutomation({ ...base, extraSteps: [step, step, step, step, step] })).toMatch(/passos/i);
+  });
+
+  it("stepsOf junta o primeiro passo com os seguintes e ignora lixo no JSON", () => {
+    const steps = stepsOf({
+      delayHours: 48,
+      action: "MESSAGE",
+      reminderText: null,
+      cloudTemplateName: "toque_1",
+      cloudTemplateLanguage: "pt_BR",
+      cloudTemplateBody: "Oi",
+      cloudTemplateParams: [],
+      extraSteps: [{ delayHours: 72, action: "LOST" }, "lixo", { action: "INVENTADA" }, null],
+    });
+    expect(steps.map((x) => [x.action, x.delayHours])).toEqual([
+      ["MESSAGE", 48],
+      ["LOST", 72],
+    ]);
+    expect(parseStoredSteps("nada")).toEqual([]);
+  });
+
+  it("nome da campanha traz o passo quando há sequência", () => {
+    expect(tagAutomationCampaignName("Retorno", new Date("2026-11-11T15:00:00Z"), 2)).toBe("Automação · Retorno · passo 2 · 11/11");
+  });
+
+  it("nota de finalização identifica a automação", () => {
+    expect(lostNote("Retorno")).toContain('automação "Retorno"');
   });
 });

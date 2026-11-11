@@ -9,8 +9,11 @@ import { isServiceTemplate } from "@/lib/campaign-kind";
 import {
   MAX_TAG_AUTOMATIONS,
   REMINDER_TAG,
+  parseStoredSteps,
   sameTrigger,
   validateTagAutomation,
+  type ExtraStepInput,
+  type StoredStep,
   type TagAutomationAction,
   type TagAutomationInput,
   type TagAutomationMode,
@@ -35,6 +38,7 @@ export type TagAutomationView = {
   reminderText: string;
   cloudTemplateName: string | null;
   cloudTemplateParams: string[];
+  extraSteps: ExtraStepInput[];
   active: boolean;
   /** Conversas com a tag esperando a hora de disparar. */
   pending: number;
@@ -71,6 +75,13 @@ export async function listTagAutomations(): Promise<{ automations: TagAutomation
         reminderText: r.reminderText ?? "",
         cloudTemplateName: r.cloudTemplateName,
         cloudTemplateParams: r.cloudTemplateParams,
+        extraSteps: parseStoredSteps(r.extraSteps).map((x) => ({
+          delayHours: x.delayHours,
+          action: x.action,
+          reminderText: x.reminderText,
+          cloudTemplateName: x.cloudTemplateName,
+          cloudTemplateParams: x.cloudTemplateParams,
+        })),
         active: r.active,
         pending,
         done30d,
@@ -93,24 +104,31 @@ export async function saveTagAutomation(input: TagAutomationInput & { id?: strin
     return { success: false as const, error: `O limite é de ${MAX_TAG_AUTOMATIONS} automações por clínica.` };
   }
 
-  let template: { name: string; language: string; bodyText: string; params: string[] } | null = null;
-  if (input.action === "MESSAGE") {
+  // Modelos: o mesmo conjunto de checagens vale para o primeiro passo e para os seguintes.
+  type Tpl = { name: string; language: string; bodyText: string; params: string[] };
+  const messageSteps = [input, ...input.extraSteps].filter((x) => x.action === "MESSAGE");
+  const templates = new Map<object, Tpl | null>();
+  if (messageSteps.length) {
     const cloud = await getAutomationCloudSetup();
-    if (input.cloudTemplateName) {
-      const tpl = cloud.templates.find((t) => t.name === input.cloudTemplateName);
-      if (!tpl) return { success: false as const, error: "Modelo não encontrado entre os aprovados pela Meta." };
-      const params = input.cloudTemplateParams.slice(0, tpl.variableCount).map((p) => p.trim());
-      const problem = checkTemplateParamSources(tpl.variableCount, params, ["nome", "saudacao"]);
-      if (problem) return { success: false as const, error: problem.replace("A planilha não tem a coluna", "Use só {{nome}} ou {{saudacao}} — não existe") };
-      // Trava do aviso de serviço: quem classifica o modelo como Utilidade é a Meta.
-      if (input.serviceNotice && !isServiceTemplate(tpl)) {
-        return { success: false as const, error: "Aviso de serviço só com modelo da categoria Utilidade. Esse modelo é de marketing: desmarque o aviso de serviço ou escolha outro modelo." };
+    for (const step of messageSteps) {
+      let template: Tpl | null = null;
+      if (step.cloudTemplateName) {
+        const tpl = cloud.templates.find((t) => t.name === step.cloudTemplateName);
+        if (!tpl) return { success: false as const, error: "Modelo não encontrado entre os aprovados pela Meta." };
+        const params = step.cloudTemplateParams.slice(0, tpl.variableCount).map((p) => p.trim());
+        const problem = checkTemplateParamSources(tpl.variableCount, params, ["nome", "saudacao"]);
+        if (problem) return { success: false as const, error: problem.replace("A planilha não tem a coluna", "Use só {{nome}} ou {{saudacao}} — não existe") };
+        // Trava do aviso de serviço: quem classifica o modelo como Utilidade é a Meta.
+        if (input.serviceNotice && !isServiceTemplate(tpl)) {
+          return { success: false as const, error: "Aviso de serviço só com modelo da categoria Utilidade. Esse modelo é de marketing: desmarque o aviso de serviço ou escolha outro modelo." };
+        }
+        template = { name: tpl.name, language: tpl.language, bodyText: tpl.bodyText, params };
       }
-      template = { name: tpl.name, language: tpl.language, bodyText: tpl.bodyText, params };
+      templates.set(step, template);
     }
     if (input.active) {
       if (!cloud.active) return { success: false as const, error: "Mensagem automática só liga com a API oficial do WhatsApp ativa (evita bloqueio do número)." };
-      if (!template) return { success: false as const, error: "Escolha um modelo aprovado pela Meta antes de ligar." };
+      if ([...templates.values()].some((t) => !t)) return { success: false as const, error: "Escolha um modelo aprovado pela Meta antes de ligar." };
       if (input.mode === "AUTO" && !input.serviceNotice) {
         const clinic = await prisma.clinic.findUniqueOrThrow({ where: { id: clinicId }, select: { technicalDirectorName: true, technicalDirectorCrm: true } });
         if (!clinic.technicalDirectorName?.trim() || !clinic.technicalDirectorCrm?.trim()) {
@@ -119,6 +137,19 @@ export async function saveTagAutomation(input: TagAutomationInput & { id?: strin
       }
     }
   }
+  const template = templates.get(input) ?? null;
+  const extraSteps: StoredStep[] = input.extraSteps.map((step) => {
+    const tpl = templates.get(step) ?? null;
+    return {
+      delayHours: step.delayHours,
+      action: step.action,
+      reminderText: step.action === "REMINDER" ? step.reminderText.trim() : "",
+      cloudTemplateName: tpl?.name ?? null,
+      cloudTemplateLanguage: tpl?.language ?? null,
+      cloudTemplateBody: tpl?.bodyText ?? null,
+      cloudTemplateParams: tpl?.params ?? [],
+    };
+  });
 
   const data = {
     name: input.name.trim(),
@@ -128,7 +159,7 @@ export async function saveTagAutomation(input: TagAutomationInput & { id?: strin
     delayHours: input.delayHours,
     waitFrom: input.waitFrom,
     stopOnReply: input.stopOnReply,
-    serviceNotice: input.action === "MESSAGE" && input.serviceNotice,
+    serviceNotice: messageSteps.length > 0 && input.serviceNotice,
     action: input.action,
     mode: input.mode,
     reminderText: input.action === "REMINDER" ? input.reminderText.trim() : null,
@@ -136,6 +167,7 @@ export async function saveTagAutomation(input: TagAutomationInput & { id?: strin
     cloudTemplateLanguage: template?.language ?? null,
     cloudTemplateBody: template?.bodyText ?? null,
     cloudTemplateParams: template?.params ?? [],
+    extraSteps,
     active: input.active,
   };
   const saved = current

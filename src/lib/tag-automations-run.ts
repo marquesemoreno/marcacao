@@ -4,9 +4,13 @@ import { technicalDirectorLine } from "@/lib/broadcast-csv";
 import { SERVICE_NOTICE_MARK } from "@/lib/campaign-kind";
 import { displayName, isUsableContactName } from "@/lib/contact-display";
 import {
+  LOST_REASON,
   REMINDER_TAG,
   brtDayStart,
   idlePostponedDue,
+  lostNote,
+  stepsOf,
+  type StoredStep,
   triggerWhere,
   messageSkipReason,
   planEnrollments,
@@ -23,7 +27,7 @@ type Automation = Awaited<ReturnType<typeof prisma.tagAutomation.findMany>>[numb
 
 async function logRun(r: RunResult) {
   await prisma.webhookLog
-    .create({ data: { event: "tag_automation.run", payload: r, status: r.status === "campanha" || r.status === "lembretes" ? "SUCCESS" : "SKIPPED" } })
+    .create({ data: { event: "tag_automation.run", payload: r, status: /campanha|lembretes|finalizadas/.test(r.status) ? "SUCCESS" : "SKIPPED" } })
     .catch(() => {});
 }
 
@@ -83,6 +87,10 @@ export async function resetBaseline(automation: Trigger, now: Date) {
   return tagged.length;
 }
 
+type Entry = Awaited<ReturnType<typeof prisma.tagAutomationEnrollment.findMany>>[number];
+type Conv = { id: string; status: string; tags: string[]; lastMessageAt: Date | null; contact: { phone: string | null; name: string } };
+type StepResult = { status: string; count?: number };
+
 async function runOne(
   automation: Automation,
   clinic: { technicalDirectorName: string | null; technicalDirectorCrm: string | null },
@@ -98,14 +106,15 @@ async function runOne(
   });
   if (allDue.length === 0) return { ...base, status: "nada vencido" };
 
+  const steps = stepsOf(automation);
   // clinicId de novo no filtro: a entrada guarda só o id da conversa, e ela tem que ser desta clínica.
   const conversations = await prisma.conversation.findMany({
     where: { id: { in: allDue.map((d) => d.conversationId) }, clinicId: automation.clinicId },
-    select: { id: true, tags: true, lastMessageAt: true, contact: { select: { phone: true, name: true } } },
+    select: { id: true, status: true, tags: true, lastMessageAt: true, contact: { select: { phone: true, name: true } } },
   });
-  const byId = new Map(conversations.map((c) => [c.id, c]));
+  const byId = new Map<string, Conv>(conversations.map((c) => [c.id, c]));
 
-  // Parar na resposta: paciente escreveu depois de entrar na automação → sai da fila.
+  // Parar na resposta: paciente escreveu depois de entrar na automação → sai da fila (em qualquer passo).
   const replied = new Set<string>();
   if (automation.stopOnReply) {
     const enteredAt = new Map(allDue.map((d) => [d.conversationId, d.createdAt]));
@@ -120,58 +129,117 @@ async function runOne(
       if (!entered || m.createdAt > entered) replied.add(m.conversationId);
     }
   }
-  const due: typeof allDue = [];
+
+  const dueByStep = new Map<number, Entry[]>();
   for (const entry of allDue) {
+    const index = entry.stepIndex ?? 0;
+    const step = steps[index];
     if (replied.has(entry.conversationId)) {
       await prisma.tagAutomationEnrollment.update({ where: { id: entry.id }, data: { status: "SKIPPED", doneAt: now, note: "paciente respondeu" } });
       continue;
     }
+    // A sequência encolheu depois que a conversa entrou: não há mais passo para ela.
+    if (!step) {
+      await prisma.tagAutomationEnrollment.update({ where: { id: entry.id }, data: { status: "DONE", doneAt: now } });
+      continue;
+    }
     // Tempo parado: mensagem recente na conversa adia o vencimento em vez de disparar.
     if (automation.waitFrom === "LAST_MESSAGE") {
-      const postponed = idlePostponedDue({ lastMessageAt: byId.get(entry.conversationId)?.lastMessageAt ?? null, delayHours: automation.delayHours, now });
+      const postponed = idlePostponedDue({ lastMessageAt: byId.get(entry.conversationId)?.lastMessageAt ?? null, delayHours: step.delayHours, now });
       if (postponed) {
         await prisma.tagAutomationEnrollment.update({ where: { id: entry.id }, data: { dueAt: postponed } });
         continue;
       }
     }
-    due.push(entry);
+    dueByStep.set(index, [...(dueByStep.get(index) ?? []), entry]);
   }
-  if (due.length === 0) return { ...base, status: "nada vencido" };
+  if (dueByStep.size === 0) return { ...base, status: "nada vencido" };
 
-  if (automation.action === "REMINDER") {
-    let count = 0;
-    for (const entry of due) {
-      const conv = byId.get(entry.conversationId);
-      if (!conv) continue;
-      await prisma.message.create({
-        data: {
-          conversationId: conv.id,
-          direction: "OUTBOUND",
-          type: "INTERNAL_NOTE",
-          content: reminderNote(automation.name, automation.reminderText ?? ""),
-          status: "SENT",
-        },
+  const results: StepResult[] = [];
+  for (const [index, entries] of [...dueByStep.entries()].sort((a, b) => a[0] - b[0])) {
+    const ctx: StepContext = { automation, clinic, now, byId, step: steps[index], stepNumber: steps.length > 1 ? index + 1 : undefined, next: steps[index + 1] ?? null, nextIndex: index + 1 };
+    const step = steps[index];
+    results.push(step.action === "REMINDER" ? await runReminderStep(ctx, entries) : step.action === "LOST" ? await runLostStep(ctx, entries) : await runMessageStep(ctx, entries));
+  }
+  if (results.length === 1) return { ...base, ...results[0] };
+  return { ...base, status: results.map((r) => r.status).join(" + "), count: results.reduce((sum, r) => sum + (r.count ?? 0), 0) };
+}
+
+type StepContext = {
+  automation: Automation;
+  clinic: { technicalDirectorName: string | null; technicalDirectorCrm: string | null };
+  now: Date;
+  byId: Map<string, Conv>;
+  step: StoredStep;
+  /** 1, 2, 3… quando a automação tem mais de um passo (vai no nome da campanha). */
+  stepNumber: number | undefined;
+  next: StoredStep | null;
+  nextIndex: number;
+};
+
+/** O que gravar na entrada depois de executar o passo: terminou, ou espera o próximo. */
+function afterStep(ctx: StepContext, extra: Record<string, unknown> = {}) {
+  return ctx.next
+    ? { status: "PENDING", stepIndex: ctx.nextIndex, dueAt: new Date(ctx.now.getTime() + ctx.next.delayHours * 3_600_000), doneAt: ctx.now, ...extra }
+    : { status: "DONE", doneAt: ctx.now, ...extra };
+}
+
+async function runReminderStep(ctx: StepContext, due: Entry[]): Promise<StepResult> {
+  let count = 0;
+  for (const entry of due) {
+    const conv = ctx.byId.get(entry.conversationId);
+    if (!conv) continue;
+    await prisma.message.create({
+      data: {
+        conversationId: conv.id,
+        direction: "OUTBOUND",
+        type: "INTERNAL_NOTE",
+        content: reminderNote(ctx.automation.name, ctx.step.reminderText),
+        status: "SENT",
+      },
+    });
+    if (!conv.tags.includes(REMINDER_TAG)) await prisma.conversation.update({ where: { id: conv.id }, data: { tags: { push: REMINDER_TAG } } });
+    await prisma.tagAutomationEnrollment.update({ where: { id: entry.id }, data: afterStep(ctx) });
+    count++;
+  }
+  return { status: "lembretes", count };
+}
+
+/** Último passo: finaliza a conversa como "paciente não respondeu". Não manda despedida. */
+async function runLostStep(ctx: StepContext, due: Entry[]): Promise<StepResult> {
+  let count = 0;
+  for (const entry of due) {
+    const conv = ctx.byId.get(entry.conversationId);
+    if (conv && conv.status !== "RESOLVED") {
+      await prisma.conversation.update({
+        where: { id: conv.id },
+        data: { status: "RESOLVED", resolutionReason: LOST_REASON, resolutionNotes: `Automação: ${ctx.automation.name}`, resolvedAt: ctx.now },
       });
-      if (!conv.tags.includes(REMINDER_TAG)) await prisma.conversation.update({ where: { id: conv.id }, data: { tags: { push: REMINDER_TAG } } });
-      await prisma.tagAutomationEnrollment.update({ where: { id: entry.id }, data: { status: "DONE", doneAt: now } });
+      await prisma.message.create({
+        data: { conversationId: conv.id, direction: "OUTBOUND", type: "INTERNAL_NOTE", content: lostNote(ctx.automation.name), status: "SENT" },
+      });
       count++;
     }
-    return { ...base, status: "lembretes", count };
+    await prisma.tagAutomationEnrollment.update({ where: { id: entry.id }, data: { status: "DONE", doneAt: ctx.now } });
   }
+  return { status: "finalizadas", count };
+}
 
+async function runMessageStep(ctx: StepContext, due: Entry[]): Promise<StepResult> {
+  const { automation, clinic, now, step } = ctx;
   // Mensagem: só com a API oficial e modelo aprovado. Sem isso a fila fica esperando.
   const cloud = await prisma.whatsappCloudAccount.findUnique({ where: { clinicId: automation.clinicId }, select: { active: true } });
-  if (!cloud?.active) return { ...base, status: "sem API oficial ativa" };
-  if (!automation.cloudTemplateName) return { ...base, status: "sem modelo aprovado" };
+  if (!cloud?.active) return { status: "sem API oficial ativa" };
+  if (!step.cloudTemplateName) return { status: "sem modelo aprovado" };
   // Aviso de serviço não é propaganda: não exige responsável técnico (regra do CFM é de publicidade).
   if (automation.mode === "AUTO" && !automation.serviceNotice && !technicalDirectorLine(clinic.technicalDirectorName, clinic.technicalDirectorCrm)) {
-    return { ...base, status: "sem responsável técnico" };
+    return { status: "sem responsável técnico" };
   }
 
   const recipients: { entryId: string; phone: string; variables: Record<string, string> }[] = [];
   const seenPhones = new Set<string>();
   for (const entry of due) {
-    const conv = byId.get(entry.conversationId);
+    const conv = ctx.byId.get(entry.conversationId);
     if (!conv) continue;
     const skip = messageSkipReason({ phone: conv.contact.phone, tags: conv.tags }, automation.tag);
     const phone = conv.contact.phone;
@@ -188,19 +256,21 @@ async function runOne(
     const first = usable ? displayName(conv.contact).split(/\s+/)[0] : "";
     recipients.push({ entryId: entry.id, phone, variables: { nome: first, saudacao: usable ? `Oi, ${first}` : "Oi" } });
   }
-  if (recipients.length === 0) return { ...base, status: "ninguém para enviar", count: 0 };
+  if (recipients.length === 0) return { status: "ninguém para enviar", count: 0 };
 
-  // Uma campanha por automação por dia: quem vence mais tarde no mesmo dia entra na mesma,
-  // enquanto ela ainda for rascunho (REVIEW) ou estiver enviando (AUTO).
+  // Uma campanha por automação, por passo e por dia: quem vence mais tarde no mesmo dia entra
+  // na mesma, enquanto ela ainda for rascunho (REVIEW) ou estiver enviando (AUTO).
   const wantedStatus = automation.mode === "AUTO" ? "RUNNING" : "DRAFT";
-  const lastToday = await prisma.tagAutomationEnrollment.findFirst({
+  const campaignName = tagAutomationCampaignName(automation.name, now, ctx.stepNumber);
+  const today = await prisma.tagAutomationEnrollment.findMany({
     where: { automationId: automation.id, campaignId: { not: null }, doneAt: { gte: brtDayStart(now) } },
-    orderBy: { doneAt: "desc" },
+    distinct: ["campaignId"],
     select: { campaignId: true },
   });
-  let campaign = lastToday?.campaignId
+  const candidateIds = today.map((t) => t.campaignId).filter((id): id is string => !!id);
+  let campaign = candidateIds.length
     ? await prisma.broadcastCampaign.findFirst({
-        where: { id: lastToday.campaignId, clinicId: automation.clinicId, status: wantedStatus },
+        where: { id: { in: candidateIds }, clinicId: automation.clinicId, status: wantedStatus, name: campaignName },
         select: { id: true },
       })
     : null;
@@ -222,16 +292,16 @@ async function runOne(
       orderBy: [{ isManager: "desc" }, { createdAt: "asc" }],
       select: { id: true },
     });
-    if (!owner) return { ...base, status: "clínica sem usuário" };
+    if (!owner) return { status: "clínica sem usuário" };
     campaign = await prisma.broadcastCampaign.create({
       data: {
         clinicId: automation.clinicId,
-        name: tagAutomationCampaignName(automation.name, now),
-        messageTemplate: automation.cloudTemplateBody ?? "",
-        cloudTemplateName: automation.cloudTemplateName,
-        cloudTemplateLanguage: automation.cloudTemplateLanguage,
-        cloudTemplateBody: automation.cloudTemplateBody,
-        cloudTemplateParams: automation.cloudTemplateParams,
+        name: campaignName,
+        messageTemplate: step.cloudTemplateBody ?? "",
+        cloudTemplateName: step.cloudTemplateName,
+        cloudTemplateLanguage: step.cloudTemplateLanguage,
+        cloudTemplateBody: step.cloudTemplateBody,
+        cloudTemplateParams: step.cloudTemplateParams,
         status: wantedStatus,
         // Marca interna lida pelo envio: dispensa o aceite de marketing (campaign-kind.ts).
         tagOnSend: automation.serviceNotice ? SERVICE_NOTICE_MARK : null,
@@ -245,7 +315,7 @@ async function runOne(
 
   await prisma.tagAutomationEnrollment.updateMany({
     where: { id: { in: recipients.map((r) => r.entryId) } },
-    data: { status: "DONE", doneAt: now, campaignId: campaign.id },
+    data: afterStep(ctx, { campaignId: campaign.id }),
   });
-  return { ...base, status: "campanha", count: toSend.length };
+  return { status: "campanha", count: toSend.length };
 }

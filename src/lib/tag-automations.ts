@@ -8,7 +8,24 @@
  * existe o público "Por tag" numa campanha comum). */
 import { NON_PATIENT_TAG, WRONG_NUMBER_TAG } from "./conversation-tags";
 
-export type TagAutomationAction = "MESSAGE" | "REMINDER";
+/** MESSAGE: envia modelo aprovado. REMINDER: nota + tag para a recepção. LOST: finaliza a
+ * conversa como "paciente não respondeu" (só pode ser o último passo). */
+export type TagAutomationAction = "MESSAGE" | "REMINDER" | "LOST";
+
+/** Motivo de finalização usado pelo passo LOST (ver REASON_LABELS em actions/inbox.ts). */
+export const LOST_REASON = "SEM_RESPOSTA";
+export const MAX_EXTRA_STEPS = 4;
+
+/** Passo seguinte da sequência, como vem da tela. A espera conta do passo anterior. */
+export type ExtraStepInput = {
+  delayHours: number;
+  action: TagAutomationAction;
+  reminderText: string;
+  cloudTemplateName: string | null;
+  cloudTemplateParams: string[];
+};
+/** Passo como fica guardado (tag_automations.extra_steps) e como o executor lê. */
+export type StoredStep = ExtraStepInput & { cloudTemplateLanguage: string | null; cloudTemplateBody: string | null };
 /** TAG: a conversa recebeu a tag. STAGE: a conversa entrou na etapa do CRM (e segue em aberto). */
 export type TagAutomationTrigger = "TAG" | "STAGE";
 /** ENTRY: a espera conta de quando recebeu a tag / entrou na etapa. LAST_MESSAGE: conta da
@@ -65,8 +82,20 @@ export type TagAutomationInput = {
   reminderText: string;
   cloudTemplateName: string | null;
   cloudTemplateParams: string[];
+  /** Passos depois do primeiro (até MAX_EXTRA_STEPS). */
+  extraSteps: ExtraStepInput[];
   active: boolean;
 };
+
+function stepProblem(step: { action: string; reminderText: string; cloudTemplateName: string | null }, active: boolean, label: string): string | null {
+  if (step.action !== "MESSAGE" && step.action !== "REMINDER" && step.action !== "LOST") return `Ação desconhecida ${label}.`;
+  if (step.action === "REMINDER") {
+    const text = step.reminderText.trim();
+    if (!text || text.length > 300) return `Escreva o lembrete para a recepção ${label} (até 300 letras).`;
+  }
+  if (step.action === "MESSAGE" && active && !step.cloudTemplateName) return `Escolha um modelo aprovado pela Meta ${label} antes de ligar.`;
+  return null;
+}
 
 export function validateTagAutomation(input: TagAutomationInput): string | null {
   const name = input.name.trim();
@@ -84,15 +113,66 @@ export function validateTagAutomation(input: TagAutomationInput): string | null 
     return "A espera vai de na hora até 30 dias.";
   }
   if (input.waitFrom === "LAST_MESSAGE" && input.delayHours < 1) return "Para contar o tempo parado, escolha uma espera de pelo menos 1 hora.";
-  if (input.action !== "MESSAGE" && input.action !== "REMINDER") return "Ação desconhecida.";
   if (input.mode !== "REVIEW" && input.mode !== "AUTO") return "Modo de envio desconhecido.";
-  if (input.action === "REMINDER") {
-    const text = input.reminderText.trim();
-    if (!text || text.length > 300) return "Escreva o lembrete para a recepção (até 300 letras).";
-  } else if (input.active && !input.cloudTemplateName) {
-    return "Escolha um modelo aprovado pela Meta antes de ligar.";
+  const extra = input.extraSteps ?? [];
+  if (extra.length > MAX_EXTRA_STEPS) return `A sequência vai até ${MAX_EXTRA_STEPS + 1} passos.`;
+  const first = stepProblem(input, input.active, extra.length ? "no passo 1" : "");
+  if (first) return first.replace("  ", " ").replace(" .", ".").replace(" (", " (");
+  for (const [i, step] of extra.entries()) {
+    const label = `no passo ${i + 2}`;
+    if (!Number.isInteger(step.delayHours) || step.delayHours < 1 || step.delayHours > MAX_DELAY_HOURS) return `A espera ${label} vai de 1 hora a 30 dias.`;
+    const problem = stepProblem(step, input.active, label);
+    if (problem) return problem;
   }
+  const all = [input.action, ...extra.map((e) => e.action)];
+  if (all.slice(0, -1).includes("LOST")) return "Finalizar a conversa só pode ser o último passo.";
   return null;
+}
+
+/** Lê extra_steps do banco sem confiar no formato (coluna JSON). */
+export function parseStoredSteps(raw: unknown): StoredStep[] {
+  if (!Array.isArray(raw)) return [];
+  const steps: StoredStep[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== "object") continue;
+    const o = item as Record<string, unknown>;
+    if (o.action !== "MESSAGE" && o.action !== "REMINDER" && o.action !== "LOST") continue;
+    steps.push({
+      delayHours: typeof o.delayHours === "number" && Number.isInteger(o.delayHours) && o.delayHours >= 0 ? o.delayHours : 24,
+      action: o.action,
+      reminderText: typeof o.reminderText === "string" ? o.reminderText : "",
+      cloudTemplateName: typeof o.cloudTemplateName === "string" ? o.cloudTemplateName : null,
+      cloudTemplateLanguage: typeof o.cloudTemplateLanguage === "string" ? o.cloudTemplateLanguage : null,
+      cloudTemplateBody: typeof o.cloudTemplateBody === "string" ? o.cloudTemplateBody : null,
+      cloudTemplateParams: Array.isArray(o.cloudTemplateParams) ? o.cloudTemplateParams.filter((p): p is string => typeof p === "string") : [],
+    });
+  }
+  return steps.slice(0, MAX_EXTRA_STEPS);
+}
+
+/** Todos os passos da automação, na ordem: o primeiro vem das colunas, o resto de extra_steps. */
+export function stepsOf(a: {
+  delayHours: number;
+  action: string;
+  reminderText: string | null;
+  cloudTemplateName: string | null;
+  cloudTemplateLanguage: string | null;
+  cloudTemplateBody: string | null;
+  cloudTemplateParams: string[];
+  extraSteps?: unknown;
+}): StoredStep[] {
+  return [
+    {
+      delayHours: a.delayHours,
+      action: a.action as TagAutomationAction,
+      reminderText: a.reminderText ?? "",
+      cloudTemplateName: a.cloudTemplateName,
+      cloudTemplateLanguage: a.cloudTemplateLanguage,
+      cloudTemplateBody: a.cloudTemplateBody,
+      cloudTemplateParams: a.cloudTemplateParams,
+    },
+    ...parseStoredSteps(a.extraSteps),
+  ];
 }
 
 type TriggerShape = { triggerKind: string; tag: string; stage: string | null };
@@ -152,9 +232,14 @@ export function brtDayStart(now: Date): Date {
   return new Date(`${brtDay(now)}T03:00:00Z`);
 }
 
-export function tagAutomationCampaignName(name: string, now: Date): string {
+/** `step` (1, 2, 3…) só aparece no nome quando a automação tem mais de um passo. */
+export function tagAutomationCampaignName(name: string, now: Date, step?: number): string {
   const [, mm, dd] = brtDay(now).split("-");
-  return `Automação · ${name} · ${dd}/${mm}`;
+  return `Automação · ${name}${step ? ` · passo ${step}` : ""} · ${dd}/${mm}`;
+}
+
+export function lostNote(automationName: string): string {
+  return `🏁 Atendimento finalizado pela automação "${automationName}" • Motivo: ⏳ Paciente Não Respondeu / Inativo`;
 }
 
 export function reminderNote(automationName: string, text: string): string {

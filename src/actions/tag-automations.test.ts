@@ -29,6 +29,7 @@ const input: TagAutomationInput = {
   reminderText: "",
   cloudTemplateName: "pos_aula",
   cloudTemplateParams: ["{{nome}}"],
+  extraSteps: [],
   active: true,
 };
 const template = { name: "pos_aula", language: "pt_BR", category: "MARKETING", bodyText: "Oi {{1}}", variableCount: 1 };
@@ -118,6 +119,36 @@ describe("saveTagAutomation", () => {
   it("lembrete nunca fica marcado como aviso de serviço", async () => {
     await saveTagAutomation({ ...input, action: "REMINDER", cloudTemplateName: null, reminderText: "Cobrar", serviceNotice: true });
     expect(db.tagAutomation.create.mock.calls[0][0].data.serviceNotice).toBe(false);
+  });
+
+  it("sequência: guarda os passos seguintes com idioma e texto do modelo de cada um", async () => {
+    await saveTagAutomation({
+      ...input,
+      extraSteps: [
+        { delayHours: 120, action: "MESSAGE", reminderText: "", cloudTemplateName: "laudo_pronto", cloudTemplateParams: ["{{nome}}"] },
+        { delayHours: 72, action: "LOST", reminderText: "x", cloudTemplateName: null, cloudTemplateParams: [] },
+      ],
+    });
+    expect(db.tagAutomation.create.mock.calls[0][0].data.extraSteps).toEqual([
+      { delayHours: 120, action: "MESSAGE", reminderText: "", cloudTemplateName: "laudo_pronto", cloudTemplateLanguage: "pt_BR", cloudTemplateBody: "Oi {{1}}, seu laudo está pronto", cloudTemplateParams: ["{{nome}}"] },
+      { delayHours: 72, action: "LOST", reminderText: "", cloudTemplateName: null, cloudTemplateLanguage: null, cloudTemplateBody: null, cloudTemplateParams: [] },
+    ]);
+  });
+
+  it("sequência: modelo inexistente num passo seguinte recusa tudo", async () => {
+    const r = await saveTagAutomation({ ...input, extraSteps: [{ delayHours: 24, action: "MESSAGE", reminderText: "", cloudTemplateName: "nao_existe", cloudTemplateParams: [] }] });
+    expect(r.success).toBe(false);
+    expect(db.tagAutomation.create).not.toHaveBeenCalled();
+  });
+
+  it("aviso de serviço confere a categoria também nos passos seguintes", async () => {
+    const r = await saveTagAutomation({
+      ...input,
+      serviceNotice: true,
+      cloudTemplateName: "laudo_pronto",
+      extraSteps: [{ delayHours: 24, action: "MESSAGE", reminderText: "", cloudTemplateName: "pos_aula", cloudTemplateParams: ["{{nome}}"] }],
+    });
+    expect(r.success).toBe(false);
   });
 
   it("lembrete liga sem API oficial e sem modelo", async () => {

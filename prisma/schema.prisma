@@ -1031,6 +1031,8 @@ model TagAutomation {
   /// Aviso de serviço (não propaganda): a campanha nasce com tagOnSend = SERVICE_NOTICE_MARK
   /// e o envio dispensa o aceite de marketing (src/lib/campaign-kind.ts). Exige modelo Utilidade.
   serviceNotice         Boolean  @default(false) @map("service_notice")
+  /// Passos depois do primeiro (StoredStep[] em tag-automations.ts). O primeiro são as colunas acima.
+  extraSteps            Json     @default("[]") @map("extra_steps")
   /// MESSAGE | REMINDER
   action                String
   /// REVIEW (campanha nasce rascunho, a recepção inicia) | AUTO (já sai enviando)
@@ -1059,6 +1061,8 @@ model TagAutomationEnrollment {
   conversationId String    @map("conversation_id")
   /// PENDING | DONE | BASELINE | SKIPPED (ver EnrollmentStatus em tag-automations.ts)
   status         String    @default("PENDING")
+  /// Passo que esta conversa está esperando (0 = primeiro).
+  stepIndex      Int       @default(0) @map("step_index")
   dueAt          DateTime  @map("due_at")
   doneAt         DateTime? @map("done_at")
   /// Campanha de Disparos em que esta conversa entrou (ação MESSAGE).
