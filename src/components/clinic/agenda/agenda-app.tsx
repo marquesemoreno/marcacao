@@ -153,12 +153,20 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
   // aqui: ele é uma navegação, e o Next descarta as server actions que estão na fila quando
   // uma navegação acontece. Ao abrir a tela, o getAgenda abaixo era descartado e a promessa
   // nunca resolvia: a Agenda ficava presa no carregamento até alguém clicar em atualizar.
-  // history.replaceState troca a URL sem navegar (o Next acompanha a URL mesmo assim).
+  //
+  // history.replaceState com `null` também não serve: o Next intercepta a chamada e avisa o
+  // roteador (o que conta como navegação e derruba a action do mesmo jeito). Passando o
+  // próprio history.state — que já carrega a marca interna do Next — a chamada vai direto
+  // pro navegador: a URL muda e o roteador não é acionado. A tela não lê a URL depois de
+  // montar (só o servidor lê, ao recarregar), então não faz falta o roteador saber.
   useEffect(() => {
     const url = `/clinic/agenda?data=${date}&visao=${view}`;
-    if (window.location.pathname + window.location.search !== url) {
-      window.history.replaceState(null, "", url);
-    }
+    if (window.location.pathname + window.location.search === url) return;
+    const state = window.history.state as Record<string, unknown> | null;
+    // Sem a marca do Next no estado não dá pra trocar a URL sem acionar o roteador: melhor
+    // deixar a URL como está do que arriscar prender a tela.
+    if (!state || (!state.__NA && !state._N)) return;
+    window.history.replaceState(state, "", url);
   }, [date, view]);
 
   useEffect(() => {
