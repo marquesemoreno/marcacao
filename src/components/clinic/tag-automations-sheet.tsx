@@ -72,7 +72,7 @@ function toInput(a: TagAutomationView): TagAutomationInput {
 function savedMessage(active: boolean, wasActive: boolean, alreadyTagged: number | null): string {
   if (active && !wasActive) {
     return alreadyTagged
-      ? `Ligada. ${alreadyTagged === 1 ? "1 conversa já estava" : `${alreadyTagged} conversas já estavam`} nessa situação e não recebe nada; vale para quem entrar a partir de agora.`
+      ? `Ligada. ${alreadyTagged === 1 ? "1 conversa já estava nessa situação e não recebe" : `${alreadyTagged} conversas já estavam nessa situação e não recebem`} nada; vale para quem entrar a partir de agora.`
       : "Ligada. Vale para quem entrar a partir de agora.";
   }
   if (!active && wasActive) return "Automação desligada.";
