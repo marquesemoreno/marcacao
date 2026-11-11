@@ -246,6 +246,7 @@ model Clinic {
   broadcastCampaigns   BroadcastCampaign[]
   automationRules      AutomationRule[]
   tagAutomations       TagAutomation[]
+  receptionTasks       ReceptionTask[]
   channelConsents      ChannelConsent[]
   bridgeReminderLogs   BridgeReminderLog[]
   knowledgeEntries     ClinicKnowledgeEntry[]
@@ -668,6 +669,7 @@ model Conversation {
   triages      MessageTriage[]
   qualityAudit ConversationQualityAudit?
   stageChanges ConversationStageChange[]
+  receptionTasks ReceptionTask[]
   adClick      AdClick?
 
   @@index([clinicId, status])
@@ -1010,6 +1012,29 @@ model BroadcastCampaign {
   @@index([automationRuleId])
   @@index([clinicId, status])
   @@map("broadcast_campaigns")
+}
+
+/// Tarefa da recepção (/clinic/tarefas): tarefa com prazo e responsável, criada à mão ou
+/// por uma automação (`source` = nome da automação). Apagado junto com a conversa (LGPD).
+model ReceptionTask {
+  id              String    @id @default(cuid())
+  clinicId        String    @map("clinic_id")
+  conversationId  String?   @map("conversation_id")
+  text            String    @db.Text
+  dueAt           DateTime? @map("due_at")
+  assignedUserId  String?   @map("assigned_user_id")
+  doneAt          DateTime? @map("done_at")
+  doneByUserId    String?   @map("done_by_user_id")
+  createdByUserId String?   @map("created_by_user_id")
+  source          String?
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  clinic       Clinic        @relation(fields: [clinicId], references: [id])
+  conversation Conversation? @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([clinicId, doneAt])
+  @@index([conversationId])
+  @@map("reception_tasks")
 }
 
 /// Automação por tag (src/lib/tag-automations.ts): quando a conversa recebe `tag`, espera

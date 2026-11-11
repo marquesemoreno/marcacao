@@ -5,7 +5,6 @@ import { SERVICE_NOTICE_MARK } from "@/lib/campaign-kind";
 import { displayName, isUsableContactName } from "@/lib/contact-display";
 import {
   LOST_REASON,
-  REMINDER_TAG,
   brtDayStart,
   idlePostponedDue,
   lostNote,
@@ -88,7 +87,7 @@ export async function resetBaseline(automation: Trigger, now: Date) {
 }
 
 type Entry = Awaited<ReturnType<typeof prisma.tagAutomationEnrollment.findMany>>[number];
-type Conv = { id: string; status: string; tags: string[]; lastMessageAt: Date | null; contact: { phone: string | null; name: string } };
+type Conv = { id: string; status: string; tags: string[]; lastMessageAt: Date | null; assignedUserId: string | null; contact: { phone: string | null; name: string } };
 type StepResult = { status: string; count?: number };
 
 async function runOne(
@@ -110,7 +109,7 @@ async function runOne(
   // clinicId de novo no filtro: a entrada guarda só o id da conversa, e ela tem que ser desta clínica.
   const conversations = await prisma.conversation.findMany({
     where: { id: { in: allDue.map((d) => d.conversationId) }, clinicId: automation.clinicId },
-    select: { id: true, status: true, tags: true, lastMessageAt: true, contact: { select: { phone: true, name: true } } },
+    select: { id: true, status: true, tags: true, lastMessageAt: true, assignedUserId: true, contact: { select: { phone: true, name: true } } },
   });
   const byId = new Map<string, Conv>(conversations.map((c) => [c.id, c]));
 
@@ -198,7 +197,17 @@ async function runReminderStep(ctx: StepContext, due: Entry[]): Promise<StepResu
         status: "SENT",
       },
     });
-    if (!conv.tags.includes(REMINDER_TAG)) await prisma.conversation.update({ where: { id: conv.id }, data: { tags: { push: REMINDER_TAG } } });
+    // Vai para a lista de tarefas (/clinic/tarefas): vence hoje, com quem atende a conversa.
+    await prisma.receptionTask.create({
+      data: {
+        clinicId: ctx.automation.clinicId,
+        conversationId: conv.id,
+        text: ctx.step.reminderText.trim(),
+        dueAt: ctx.now,
+        assignedUserId: conv.assignedUserId ?? null,
+        source: ctx.automation.name,
+      },
+    });
     await prisma.tagAutomationEnrollment.update({ where: { id: entry.id }, data: afterStep(ctx) });
     count++;
   }

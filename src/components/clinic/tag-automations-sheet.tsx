@@ -83,7 +83,7 @@ type StepValue = Pick<ExtraStepInput, "action" | "reminderText" | "cloudTemplate
 
 const ACTION_OPTIONS: [TagAutomationAction, string, string][] = [
   ["MESSAGE", "Enviar mensagem", "Um modelo aprovado pela Meta, pelo WhatsApp."],
-  ["REMINDER", "Lembrar a recepção", "Nota na conversa e a tag 🔔 Lembrete. Nada vai para o paciente."],
+  ["REMINDER", "Criar tarefa para a recepção", "Entra na lista de Tarefas, com nota na conversa. Nada vai para o paciente."],
   ["LOST", "Finalizar a conversa", "Fecha como “paciente não respondeu”. Nada vai para o paciente. Só no último passo."],
 ];
 
@@ -111,7 +111,7 @@ function StepFields({ uid, step, onChange, cloud, legend }: { uid: string; step:
       {step.action === "REMINDER" && (
         <div>
           <label htmlFor={`${uid}-reminder`} className={labelClass}>
-            Lembrete para a recepção
+            Tarefa para a recepção
           </label>
           <textarea
             id={`${uid}-reminder`}
@@ -480,7 +480,7 @@ function Card({ automation, onEdit, onChanged }: { automation: TagAutomationView
   }
 
   const describe = (step: StepValue) =>
-    step.action === "REMINDER" ? "lembra a recepção" : step.action === "LOST" ? "finaliza a conversa" : `envia o modelo ${step.cloudTemplateName ?? "(sem modelo)"}`;
+    step.action === "REMINDER" ? "cria tarefa para a recepção" : step.action === "LOST" ? "finaliza a conversa" : `envia o modelo ${step.cloudTemplateName ?? "(sem modelo)"}`;
   const sendsMessage = [automation, ...automation.extraSteps].some((x) => x.action === "MESSAGE");
   const what = `${describe(automation)}${sendsMessage ? ` · ${automation.mode === "AUTO" ? "sozinho" : "com revisão"}${automation.serviceNotice ? " · aviso de serviço" : ""}` : ""}`;
 

@@ -40,7 +40,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from '@/components/ui/command';
 import { useClickOutside } from '@/hooks/use-click-outside';
 import { toast } from "sonner";
-import {
+import { ListTodo,
   Search,
   Send,
   Lock,
@@ -2068,6 +2068,19 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                         <UserPlus className="w-3.5 h-3.5 text-purple-600" />
                         <span>Transferir conversa</span>
                       </button>
+
+                      {patientPageHref && (
+                        <button
+                          onClick={() => {
+                            setIsMoreMenuOpen(false);
+                            router.push(`/clinic/tarefas?c=${selectedContact.id}`);
+                          }}
+                          className="w-full px-3 py-2 text-left hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center gap-2 text-slate-700 dark:text-slate-200"
+                        >
+                          <ListTodo className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>Criar tarefa</span>
+                        </button>
+                      )}
 
                       <button
                         onClick={() => {

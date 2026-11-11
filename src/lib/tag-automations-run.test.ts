@@ -11,11 +11,11 @@ const db = vi.hoisted(() => ({
   user: { findFirst: vi.fn() },
   message: { create: vi.fn(), findMany: vi.fn() },
   webhookLog: { create: vi.fn() },
+  receptionTask: { create: vi.fn() },
 }));
 vi.mock("@/lib/prisma", () => ({ prisma: db }));
 
 import { resetBaseline, runTagAutomations } from "./tag-automations-run";
-import { REMINDER_TAG } from "./tag-automations";
 import { DEMO_CLINIC_CNPJ } from "./demo-clinic";
 import { WRONG_NUMBER_TAG } from "./conversation-tags";
 
@@ -42,7 +42,7 @@ const automation = (over: Record<string, unknown> = {}) => ({
   active: true,
   ...over,
 });
-const conv = (id: string, phone: string | null, name: string, tags: string[], lastMessageAt: Date | null = null) => ({ id, status: "OPEN", tags, lastMessageAt, contact: { phone, name } });
+const conv = (id: string, phone: string | null, name: string, tags: string[], lastMessageAt: Date | null = null) => ({ id, status: "OPEN", tags, lastMessageAt, assignedUserId: "u-dona", contact: { phone, name } });
 
 /** Fila já sincronizada: `due` são as entradas vencidas, `convs` as conversas delas. */
 /** Campanhas em que a automação já pôs gente hoje (para o teste de reaproveitar o rascunho). */
@@ -162,7 +162,7 @@ describe("runTagAutomations — mensagem", () => {
 });
 
 describe("runTagAutomations — lembrete", () => {
-  it("deixa nota interna, põe a tag de lembrete e não cria campanha", async () => {
+  it("deixa nota interna, cria a tarefa na lista com quem atende a conversa e não cria campanha", async () => {
     setup(automation({ action: "REMINDER", reminderText: "Cobrar o convênio", cloudTemplateName: null }), [{ id: "e1", conversationId: "c1" }], [
       conv("c1", "5577900000001", "Ana Lima", ["Aguardando convênio"]),
     ]);
@@ -173,7 +173,15 @@ describe("runTagAutomations — lembrete", () => {
       type: "INTERNAL_NOTE",
       content: "🔔 Lembrete automático (Aula experimental): Cobrar o convênio",
     });
-    expect(db.conversation.update.mock.calls[0][0]).toEqual({ where: { id: "c1" }, data: { tags: { push: REMINDER_TAG } } });
+    expect(db.receptionTask.create.mock.calls[0][0].data).toEqual({
+      clinicId: "clinic-a",
+      conversationId: "c1",
+      text: "Cobrar o convênio",
+      dueAt: now,
+      assignedUserId: "u-dona",
+      source: "Aula experimental",
+    });
+    expect(db.conversation.update).not.toHaveBeenCalled();
     expect(db.broadcastCampaign.create).not.toHaveBeenCalled();
     expect(db.whatsappCloudAccount.findUnique).not.toHaveBeenCalled();
   });
