@@ -139,6 +139,7 @@ import {
 } from "@/lib/browser-notifications";
 import { InboxLayout } from "./inbox-layout";
 import { CRMKanban } from "./crm-kanban";
+import { FINALIZED_PAGE_SIZE, hasMoreFinalized, nextFinalizedLimit } from "@/lib/finalized-page";
 import { BudgetFollowupPanel } from "./budget-followup-panel";
 import type { NewContactExtra } from "@/lib/new-contact-extra";
 import { NewContactDialog } from "./new-contact-dialog";
@@ -152,13 +153,15 @@ type ListChatContactsFn = (
   filter: InboxFilter,
   search?: string,
   clinicId?: string,
-  assignedUserIdFilter?: string
+  assignedUserIdFilter?: string,
+  /** Só para "finalizadas": quantas trazer (ver finalized-page.ts). */
+  limit?: number
 ) => Promise<Contact[]>;
 
 const ACTIONS_BY_SCOPE = {
   clinic: {
-    listChatContacts: ((filter, search, _clinicId, assignedUserIdFilter) =>
-      listChatContacts(filter, search, assignedUserIdFilter)) as ListChatContactsFn,
+    listChatContacts: ((filter, search, _clinicId, assignedUserIdFilter, limit) =>
+      listChatContacts(filter, search, assignedUserIdFilter, limit)) as ListChatContactsFn,
     getChatContact: (id: string) => getChatContact(id),
     listChatAgents: () => listChatAgents(),
     getChatMessages: (id: string) => getChatMessages(id),
@@ -202,8 +205,8 @@ const ACTIONS_BY_SCOPE = {
     getReplySuggestions: (id: string) => getReplySuggestions(id),
   },
   admin: {
-    listChatContacts: ((filter, search, clinicId) =>
-      listChatContactsAdmin(filter, search, clinicId)) as ListChatContactsFn,
+    listChatContacts: ((filter, search, clinicId, _assignedUserIdFilter, limit) =>
+      listChatContactsAdmin(filter, search, clinicId, limit)) as ListChatContactsFn,
     getChatContact: (id: string) => getChatContactAdmin(id),
     listChatAgents: () => listChatAgentsAdmin(),
     getChatMessages: (id: string) => getChatMessagesAdmin(id),
@@ -341,6 +344,10 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
   const finalizedLoadedAtRef = useRef<number | null>(null);
   const finalizedKeyRef = useRef<string | null>(null);
   const forceFinalizedRef = useRef(false);
+  // Finalizadas vêm paginadas: as mais recentes primeiro; "Carregar mais" aumenta o limite.
+  const [finalizedLimit, setFinalizedLimit] = useState(FINALIZED_PAGE_SIZE);
+  const [moreFinalized, setMoreFinalized] = useState(false);
+  const [isLoadingMoreFinalized, setIsLoadingMoreFinalized] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
   const [outboundFromDeviceStats, setOutboundFromDeviceStats] = useState<{
     total: number;
@@ -391,7 +398,7 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
     let result: Contact[];
     try {
       if (view === "crm") {
-        const key = `${clinicIdArg ?? ""}|${searchQuery}`;
+        const key = `${clinicIdArg ?? ""}|${searchQuery}|${finalizedLimit}`;
         const reloadFinalized = shouldRefreshFinalized({
           lastLoadedAt: finalizedLoadedAtRef.current,
           lastKey: finalizedKeyRef.current,
@@ -405,12 +412,16 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
         loadStats();
         const active = await activePromise;
         // Só depois das ativas: a consulta pesada não disputa conexão com a que o usuário está esperando.
-        const finalizedPromise = reloadFinalized ? actions.listChatContacts("finalizadas", searchQuery || undefined, clinicIdArg) : null;
+        const finalizedPromise = reloadFinalized
+          ? actions.listChatContacts("finalizadas", searchQuery || undefined, clinicIdArg, undefined, finalizedLimit)
+          : null;
         const activeIds = new Set(active.map((c) => c.id));
         result = [...active, ...finalizedCacheRef.current.filter((c) => !activeIds.has(c.id))];
         finalizedPromise
           ?.then((list) => {
             finalizedCacheRef.current = list;
+            setMoreFinalized(hasMoreFinalized(list.length, finalizedLimit));
+            setIsLoadingMoreFinalized(false);
             finalizedLoadedAtRef.current = Date.now();
             finalizedKeyRef.current = key;
             setContacts((current) => {
@@ -421,11 +432,20 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
           .catch((error) => {
             console.error("Falha ao carregar finalizadas:", error);
             forceFinalizedRef.current = true; // tenta de novo na próxima atualização
+            setIsLoadingMoreFinalized(false);
           });
       } else {
-        const listPromise = actions.listChatContacts(filterTab, searchQuery || undefined, clinicIdArg, agentFilter || undefined);
+        const listPromise = actions.listChatContacts(
+          filterTab,
+          searchQuery || undefined,
+          clinicIdArg,
+          agentFilter || undefined,
+          filterTab === "finalizadas" ? finalizedLimit : undefined
+        );
         loadStats();
         result = await listPromise;
+        if (filterTab === "finalizadas") setMoreFinalized(hasMoreFinalized(result.length, finalizedLimit));
+        setIsLoadingMoreFinalized(false);
       }
     } catch (error) {
       console.error("Falha ao carregar conversas:", error);
@@ -434,6 +454,7 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
       void checkSessionAfterError();
       setContactsLoadError(true);
       setIsLoadingContacts(false);
+      setIsLoadingMoreFinalized(false);
       return;
     }
     setContactsLoadError(false);
@@ -478,7 +499,12 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
       return result[0]?.id ?? null;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [actions, filterTab, searchQuery, scope, view, clinicFilter, agentFilter]);
+  }, [actions, filterTab, searchQuery, scope, view, clinicFilter, agentFilter, finalizedLimit]);
+
+  const loadMoreFinalized = useCallback(() => {
+    setIsLoadingMoreFinalized(true);
+    setFinalizedLimit((current) => nextFinalizedLimit(current));
+  }, []);
 
   useEffect(() => {
     requestNotificationPermission();
@@ -1256,6 +1282,9 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
       {view === "inbox" ? (
         <InboxLayout
           contacts={contacts}
+          hasMoreFinalized={filterTab === "finalizadas" && moreFinalized}
+          isLoadingMoreFinalized={isLoadingMoreFinalized}
+          onLoadMoreFinalized={loadMoreFinalized}
           agents={agents}
           messages={messages}
           isLoadingContacts={isLoadingContacts}
@@ -1359,6 +1388,9 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
       ) : (
         <CRMKanban
           contacts={contacts}
+          hasMoreFinalized={moreFinalized}
+          isLoadingMoreFinalized={isLoadingMoreFinalized}
+          onLoadMoreFinalized={loadMoreFinalized}
           isLoading={isLoadingContacts}
           ticket={clinicTicket}
           onAssign={async (contactId, agentId) => {

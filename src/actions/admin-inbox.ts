@@ -1,5 +1,6 @@
 "use server";
 
+import { finalizedTake } from "@/lib/finalized-page";
 import { CONTACT_WITH_PROFILES, profileOf, upsertProfile } from "@/lib/contact-profile";
 import { getAttendantLoad } from "@/lib/attendant-load-server";
 
@@ -181,7 +182,13 @@ export async function getChatContactAdmin(conversationId: string) {
   return toChatContact({ ...conversation, unreadCount }, userId);
 }
 
-export async function listChatContactsAdmin(filter: InboxFilter, search?: string, clinicId?: string) {
+export async function listChatContactsAdmin(
+  filter: InboxFilter,
+  search?: string,
+  clinicId?: string,
+  /** Só para "finalizadas": quantas trazer (ver finalized-page.ts). */
+  limit?: number
+) {
   const { userId } = await requireAdminSession();
 
   // Com busca ativa, ignora o filtro de aba e procura em todas as conversas —
@@ -234,6 +241,8 @@ export async function listChatContactsAdmin(filter: InboxFilter, search?: string
       },
     },
     orderBy: { lastMessageAt: filter === "pendentes" ? "asc" : "desc" },
+    // Finalizadas só crescem: vêm as mais recentes, e o "Carregar mais" aumenta o limite.
+    ...(filter === "finalizadas" ? { take: finalizedTake(limit) } : {}),
   });
 
   const filteredConversations =

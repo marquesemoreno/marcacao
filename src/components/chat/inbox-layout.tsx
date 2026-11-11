@@ -164,6 +164,10 @@ interface InboxLayoutProps {
   isLoadingContacts?: boolean;
   /** Primeira carga das mensagens da conversa aberta. */
   isLoadingMessages?: boolean;
+  /** Aba "Finalizadas" vem paginada: há mais no servidor além das carregadas. */
+  hasMoreFinalized?: boolean;
+  isLoadingMoreFinalized?: boolean;
+  onLoadMoreFinalized?: () => void;
   onLoadOlderMessages?: () => void;
   attendantCapacity?: { awaiting: number; level: "ok" | "busy" | "high" } | null;
   /** WhatsApp da clínica desconectado (instância Evolution "close") — faixa no topo e
@@ -549,6 +553,9 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
   isLoadingOlderMessages,
   isLoadingContacts = false,
   isLoadingMessages = false,
+  hasMoreFinalized = false,
+  isLoadingMoreFinalized = false,
+  onLoadMoreFinalized,
   onLoadOlderMessages,
   attendantCapacity,
   whatsappDown = false,
@@ -1735,6 +1742,19 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
               </React.Fragment>
               );
             })
+          )}
+          {hasMoreFinalized && onLoadMoreFinalized && filteredContacts.length > 0 && (
+            <div className="p-3">
+              <button
+                type="button"
+                disabled={isLoadingMoreFinalized}
+                onClick={onLoadMoreFinalized}
+                title="Mostrando as finalizadas mais recentes. Para achar uma antiga, use a busca."
+                className="w-full rounded-full border border-slate-300 dark:border-white/15 py-2 text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-white/80 dark:hover:bg-white/[0.08] disabled:opacity-60"
+              >
+                {isLoadingMoreFinalized ? 'Carregando…' : 'Carregar mais finalizadas'}
+              </button>
+            </div>
           )}
         </div>
         {bulkSelected.size > 0 && onBulkAssign && (

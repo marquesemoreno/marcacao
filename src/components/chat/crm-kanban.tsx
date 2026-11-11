@@ -63,6 +63,10 @@ interface CRMKanbanProps {
   onAddToStage?: (stage: FunnelStage) => void;
   /** Faixa logo abaixo da barra superior (ex.: Orçamentos a cobrar). */
   topSlot?: React.ReactNode;
+  /** Finalizadas vêm paginadas: há mais no servidor além das carregadas. */
+  hasMoreFinalized?: boolean;
+  isLoadingMoreFinalized?: boolean;
+  onLoadMoreFinalized?: () => void;
 }
 
 const STAGES: { id: KanbanStage; title: string; accent: string }[] = [
@@ -124,6 +128,9 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
   onFinish,
   onReopen,
   topSlot,
+  hasMoreFinalized = false,
+  isLoadingMoreFinalized = false,
+  onLoadMoreFinalized,
 }) => {
   const [search, setSearch] = useState('');
   const [selectedAgent, setSelectedAgent] = useState<string>('todos');
@@ -332,7 +339,7 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
               }`}
             >
               {f.label}
-              {f.id === 'todos' && finalizedCount > 0 && <span className="ml-1 text-xs opacity-70 tabular-nums">(+{finalizedCount} finalizados)</span>}
+              {f.id === 'todos' && finalizedCount > 0 && <span className="ml-1 text-xs opacity-70 tabular-nums">(+{finalizedCount}{hasMoreFinalized ? '+' : ''} finalizados)</span>}
             </button>
           ))}
         </div>
@@ -497,7 +504,7 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
                     <span className={`size-2 rounded-full ${stage.accent}`} aria-hidden />
                     <Icon className="w-4 h-4 text-slate-500 dark:text-slate-400" aria-hidden />
                     <h3 className="text-sm font-semibold">{stage.title}</h3>
-                    <span className="ml-auto text-xs font-medium text-slate-500 dark:text-slate-400 tabular-nums">{loadingEmpty ? '–' : cards.length}</span>
+                    <span className="ml-auto text-xs font-medium text-slate-500 dark:text-slate-400 tabular-nums">{loadingEmpty ? '–' : cards.length}{stage.id === 'finalizado' && hasMoreFinalized ? '+' : ''}</span>
                   </div>
                   {value.total > 0 && stage.id !== 'finalizado' && (
                     <p
@@ -643,6 +650,17 @@ export const CRMKanban: React.FC<CRMKanbanProps> = ({
                         </article>
                       );
                     })
+                  )}
+                  {stage.id === 'finalizado' && hasMoreFinalized && onLoadMoreFinalized && (
+                    <button
+                      type="button"
+                      disabled={isLoadingMoreFinalized}
+                      onClick={onLoadMoreFinalized}
+                      title="Mostrando as finalizadas mais recentes. Para achar uma antiga, use a busca."
+                      className="w-full rounded-full border border-slate-300 dark:border-white/15 py-1.5 text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-white/80 dark:hover:bg-white/[0.08] disabled:opacity-60"
+                    >
+                      {isLoadingMoreFinalized ? 'Carregando…' : 'Carregar mais finalizadas'}
+                    </button>
                   )}
                   {onAddToStage && stage.id !== 'finalizado' && (
                     <button

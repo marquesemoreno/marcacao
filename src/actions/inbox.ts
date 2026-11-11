@@ -1,5 +1,6 @@
 "use server";
 
+import { finalizedTake } from "@/lib/finalized-page";
 import { errorSummary } from "@/lib/safe-error";
 import { applyAutoFunnelStage } from "@/lib/auto-funnel-stage-server";
 import { recordPatientAccess } from "@/lib/access-log-server";
@@ -384,7 +385,13 @@ export async function listForwardTargets(sourceConversationId: string, search?: 
   }));
 }
 
-export async function listConversations(filter: ConversationFilter, search?: string, assignedUserIdFilter?: string) {
+export async function listConversations(
+  filter: ConversationFilter,
+  search?: string,
+  assignedUserIdFilter?: string,
+  /** Só para "resolved": quantas finalizadas trazer (ver finalized-page.ts). */
+  limit?: number
+) {
   const { clinicId, userId } = await requireClinicSession();
 
   // Com busca ativa, ignora o filtro de aba (fila) e procura em todas as
@@ -448,6 +455,8 @@ export async function listConversations(filter: ConversationFilter, search?: str
     // direção abaixo e a ordenação por SLA em listChatContacts, prioriza quem está
     // esperando há mais tempo.
     orderBy: { lastMessageAt: filter === "pending" ? "asc" : "desc" },
+    // Finalizadas só crescem: vêm as mais recentes, e o "Carregar mais" aumenta o limite.
+    ...(filter === "resolved" ? { take: finalizedTake(limit) } : {}),
   });
 
   // Aba "Pendentes": mesma base de "todas" (status ativo), mas só quem realmente está
@@ -1965,9 +1974,9 @@ const INBOX_FILTER_TO_CONVERSATION_FILTER: Record<InboxFilter, ConversationFilte
 
 /** Camada visual do módulo de atendimento (src/components/chat/) — mesmo dado de
  * listConversations, mapeado para o formato Contact usado pelo design novo. */
-export async function listChatContacts(filter: InboxFilter, search?: string, assignedUserIdFilter?: string) {
+export async function listChatContacts(filter: InboxFilter, search?: string, assignedUserIdFilter?: string, limit?: number) {
   const { userId } = await requireClinicSession();
-  const conversations = await listConversations(INBOX_FILTER_TO_CONVERSATION_FILTER[filter], search, assignedUserIdFilter);
+  const conversations = await listConversations(INBOX_FILTER_TO_CONVERSATION_FILTER[filter], search, assignedUserIdFilter, limit);
   const contacts = conversations.map((c) => toChatContact(c, userId));
   // Aba "Pendentes": crítico (maior tempo útil de espera) primeiro — mais preciso que
   // ordenar só por lastMessageAt cru, já que o SLA pula noite/fim de semana.
