@@ -67,7 +67,7 @@ export async function listTasks(input: { scope: "mine" | "all"; includeDone: boo
 /** Equipe da clínica (para escolher o responsável) + quem está logado. */
 export async function listTaskAssignees(): Promise<{ me: string; users: { id: string; name: string }[] }> {
   const { clinicId, userId } = await requireClinicSession();
-  const users = await prisma.user.findMany({ where: { clinicId }, select: { id: true, name: true }, orderBy: { name: "asc" } });
+  const users = await prisma.user.findMany({ where: { clinicId, clinicRole: { not: "MEDICO" } }, select: { id: true, name: true }, orderBy: { name: "asc" } });
   return { me: userId, users: users.map((u) => ({ id: u.id, name: u.name ?? "Sem nome" })) };
 }
 
@@ -86,7 +86,7 @@ export async function createTask(input: { text: string; dueDate: string | null; 
   const invalid = validateTaskInput(input);
   if (invalid) return { success: false as const, error: invalid };
   // Responsável e conversa têm que ser desta clínica.
-  if (input.assignedUserId && !(await prisma.user.findFirst({ where: { id: input.assignedUserId, clinicId }, select: { id: true } }))) {
+  if (input.assignedUserId && !(await prisma.user.findFirst({ where: { id: input.assignedUserId, clinicId, clinicRole: { not: "MEDICO" } }, select: { id: true } }))) {
     return { success: false as const, error: "Responsável não encontrado na clínica." };
   }
   if (input.conversationId && !(await prisma.conversation.findFirst({ where: { id: input.conversationId, clinicId }, select: { id: true } }))) {

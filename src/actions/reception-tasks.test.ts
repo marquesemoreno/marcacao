@@ -38,7 +38,7 @@ describe("createTask", () => {
   it("recusa responsável de outra clínica", async () => {
     db.user.findFirst.mockResolvedValue(null);
     const r = await createTask({ text: "Ligar", dueDate: null, assignedUserId: "de-outra", conversationId: null });
-    expect(db.user.findFirst.mock.calls[0][0].where).toEqual({ id: "de-outra", clinicId: "clinic-a" });
+    expect(db.user.findFirst.mock.calls[0][0].where).toMatchObject({ id: "de-outra", clinicId: "clinic-a" });
     expect(r.success).toBe(false);
     expect(db.receptionTask.create).not.toHaveBeenCalled();
   });
@@ -119,5 +119,22 @@ describe("getTaskPatient", () => {
     db.conversation.findFirst.mockResolvedValue(null);
     expect(await getTaskPatient("de-outra")).toBeNull();
     expect(db.conversation.findFirst.mock.calls[0][0].where).toEqual({ id: "de-outra", clinicId: "clinic-a" });
+  });
+});
+
+describe("responsáveis", () => {
+  it("a lista não traz médicos: eles não têm acesso à página de tarefas", async () => {
+    db.user.findMany.mockResolvedValue([{ id: "u1", name: "Bia" }]);
+    const { listTaskAssignees } = await import("./reception-tasks");
+    const r = await listTaskAssignees();
+    expect(db.user.findMany.mock.calls[0][0].where).toEqual({ clinicId: "clinic-a", clinicRole: { not: "MEDICO" } });
+    expect(r).toEqual({ me: "u1", users: [{ id: "u1", name: "Bia" }] });
+  });
+
+  it("criar tarefa para um médico é recusado", async () => {
+    db.user.findFirst.mockResolvedValue(null);
+    const r = await createTask({ text: "Ligar", dueDate: null, assignedUserId: "medico", conversationId: null });
+    expect(db.user.findFirst.mock.calls[0][0].where).toEqual({ id: "medico", clinicId: "clinic-a", clinicRole: { not: "MEDICO" } });
+    expect(r.success).toBe(false);
   });
 });
