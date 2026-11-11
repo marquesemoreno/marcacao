@@ -48,7 +48,7 @@ Auditoria só de leitura e medição: nada foi alterado no código nem no banco.
 - **Fora desta entrega:**
   - índice parcial de não lidas em `messages`: o Prisma não representa índice parcial no schema, então ficaria fora do controle dele. Só vale criar se o `pg_stat_statements` mostrar essa consulta entre as mais caras;
   - paginar as finalizadas (mexe no Chat e no CRM, pede entrega própria);
-  - painel de afiliados e `/api/chat`: desligar é decisão de produto, ainda não tomada.
+- **Desligados por padrão (11/11, decisão do usuário):** o painel do marcador (`/afiliados/painel`) e o assistente do site (`/api/chat` e o balão nas páginas públicas). Religam com `AFFILIATE_PANEL_ENABLED=1` e `PUBLIC_CHAT_ENABLED=1` na Vercel, mas só depois de corrigir o que falta: limite de tentativas e cookie assinado no painel, limite de taxa no assistente. O cadastro de marcador, o rastreio `?ref=` e a gestão em `/admin/afiliados` seguem funcionando. O painel agora só devolve dados à sessão do próprio marcador.
 
 ## 1. Pontos fortes
 

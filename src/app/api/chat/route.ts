@@ -2,12 +2,17 @@ import { errorSummary } from "@/lib/safe-error";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { buildWhatsAppLink } from "@/lib/format";
+import { isPublicChatEnabled } from "@/lib/public-features";
 
 type ChatRequestBody = {
   message: string;
 };
 
 export async function POST(request: Request) {
+  // Desligado por padrão: rota pública que consulta o banco sem limite de taxa.
+  if (!isPublicChatEnabled()) {
+    return NextResponse.json({ error: "not_found" }, { status: 404 });
+  }
   try {
     const body: ChatRequestBody = await request.json();
     const userMessage = body.message?.trim() || "";

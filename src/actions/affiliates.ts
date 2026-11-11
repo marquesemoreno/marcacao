@@ -5,6 +5,7 @@ import type { AffiliateStatus } from "@prisma/client";
 import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { requireAdminSession } from "@/lib/session";
+import { isAffiliatePanelEnabled } from "@/lib/public-features";
 import { AFFILIATE_SESSION_COOKIE, AFFILIATE_SESSION_MAX_AGE, maskPatientName } from "@/lib/affiliate";
 import {
   registerAffiliateSchema,
@@ -44,6 +45,9 @@ export async function registerAffiliate(input: RegisterAffiliateInput) {
 
 /** "Login simples" do painel do marcador: WhatsApp + código, sem senha. */
 export async function loginAffiliateAction(input: LoginAffiliateInput) {
+  if (!isAffiliatePanelEnabled()) {
+    throw new Error("O painel do marcador está temporariamente indisponível.");
+  }
   const data = loginAffiliateSchema.parse(input);
 
   const affiliate = await prisma.affiliate.findFirst({
@@ -71,6 +75,7 @@ export async function logoutAffiliateAction() {
 }
 
 export async function getAffiliateSession() {
+  if (!isAffiliatePanelEnabled()) return null;
   const cookieStore = await cookies();
   const affiliateId = cookieStore.get(AFFILIATE_SESSION_COOKIE)?.value;
   if (!affiliateId) return null;
@@ -79,6 +84,12 @@ export async function getAffiliateSession() {
 
 /** Métricas + histórico (nomes mascarados) exibidos no painel do marcador. */
 export async function getAffiliateDashboard(affiliateId: string) {
+  // Todo export deste arquivo é um endpoint público: sem esta checagem, qualquer um com o
+  // id de um marcador lia o painel dele. Só a sessão do próprio marcador passa.
+  const session = await getAffiliateSession();
+  if (!session || session.id !== affiliateId) {
+    throw new Error("Não autorizado");
+  }
   const affiliate = await prisma.affiliate.findUniqueOrThrow({
     where: { id: affiliateId },
     include: { payments: { orderBy: { createdAt: "desc" } } },

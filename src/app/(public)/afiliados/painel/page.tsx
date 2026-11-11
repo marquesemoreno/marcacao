@@ -7,6 +7,7 @@ import { AffiliateLoginForm } from "@/components/public/affiliate-login-form";
 import { AffiliateCopyLinkButton } from "@/components/public/affiliate-copy-link-button";
 import { AffiliateLogoutButton } from "@/components/public/affiliate-logout-button";
 import { getAffiliateSession, getAffiliateDashboard } from "@/actions/affiliates";
+import { isAffiliatePanelEnabled } from "@/lib/public-features";
 import {
   formatCurrency,
   formatDate,
@@ -23,6 +24,18 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export default async function AffiliatePanelPage() {
+  if (!isAffiliatePanelEnabled()) {
+    return (
+      <main className="mx-auto flex max-w-md flex-col gap-3 px-4 py-16 text-center sm:px-6">
+        <h1 className="text-2xl font-bold text-slate-900">Painel do Marcador</h1>
+        <p className="text-sm text-slate-600">
+          O painel está temporariamente indisponível. Suas indicações continuam sendo registradas
+          normalmente. Para consultar seu saldo, fale com a nossa equipe.
+        </p>
+      </main>
+    );
+  }
+
   const session = await getAffiliateSession();
 
   if (!session) {
