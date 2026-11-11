@@ -1,3 +1,4 @@
+import { errorSummary } from "@/lib/safe-error";
 import { applyAutoFunnelStage } from "@/lib/auto-funnel-stage-server";
 import { isMarketingOptInReply, MARKETING_OPT_IN_REPLY } from "@/lib/marketing-consent";
 import { matchClinicalUrgency } from "@/lib/clinical-urgency";
@@ -308,7 +309,7 @@ async function recordBridgeReminderResponse(clinicId: string, phone: string, res
       if (response === "CANCELLED") after(() => startSlotOfferForItem(clinicId, { source: "BRIDGE", externalId: String(log.bridgeNumero), phone }));
     }
   } catch (error) {
-    console.error("Falha ao registrar resposta do lembrete do bridge:", error);
+    console.error("Falha ao registrar resposta do lembrete do bridge:", errorSummary(error));
   }
 }
 
@@ -715,7 +716,7 @@ async function processWhatsappWebhook(body: Prisma.InputJsonValue, forcedClinicI
     try {
       outcome = await handleDeviceOutbound(body, keyObj, resolvedClinicId, evolutionConfig);
     } catch (error) {
-      console.error("Falha ao gravar mensagem enviada pelo celular:", error);
+      console.error("Falha ao gravar mensagem enviada pelo celular:", errorSummary(error));
     }
     if (outcome !== "duplicate") {
       await logInbound(
@@ -890,7 +891,7 @@ async function processWhatsappWebhook(body: Prisma.InputJsonValue, forcedClinicI
           });
         }
       } catch (error) {
-        console.error("Falha ao registrar sugestão de dados do paciente:", error);
+        console.error("Falha ao registrar sugestão de dados do paciente:", errorSummary(error));
       }
     }
     // Intenção do paciente pro Chat (Jev) — roda depois da resposta, nunca atrasa o webhook.
@@ -961,7 +962,7 @@ async function processWhatsappWebhook(body: Prisma.InputJsonValue, forcedClinicI
         if (tag && tag !== RESCHEDULE_PENDING_TAG && !conversation.tags.includes(tag) && !tagsToPush.includes(tag)) tagsToPush.push(tag);
       }
     } catch (error) {
-      console.error("Falha ao marcar resposta de campanha:", error);
+      console.error("Falha ao marcar resposta de campanha:", errorSummary(error));
     }
     if (isNewConversation) {
       const sourceTag = detectSourceTag(incoming.text);
@@ -985,7 +986,7 @@ async function processWhatsappWebhook(body: Prisma.InputJsonValue, forcedClinicI
           },
         });
       } catch (error) {
-        console.error("Falha ao detectar canal de aquisição:", error);
+        console.error("Falha ao detectar canal de aquisição:", errorSummary(error));
       }
     }
 
@@ -1012,7 +1013,7 @@ async function processWhatsappWebhook(body: Prisma.InputJsonValue, forcedClinicI
           }
         }
       } catch (error) {
-        console.error("Falha ao ligar clique de anúncio à conversa:", error instanceof Error ? error.message : error);
+        console.error("Falha ao ligar clique de anúncio à conversa:", errorSummary(error));
       }
     }
 
@@ -1037,7 +1038,7 @@ async function processWhatsappWebhook(body: Prisma.InputJsonValue, forcedClinicI
           });
         }
       } catch (error) {
-        console.error("Falha ao registrar indicação de marcador:", error);
+        console.error("Falha ao registrar indicação de marcador:", errorSummary(error));
       }
     }
 
@@ -1395,7 +1396,7 @@ async function processWhatsappWebhook(body: Prisma.InputJsonValue, forcedClinicI
           data: { conversationId: conversation.id, direction: "OUTBOUND", content: ackText, status: "DELIVERED" },
         });
       } catch (error) {
-        console.error("Falha ao enviar confirmação de remarcação:", error);
+        console.error("Falha ao enviar confirmação de remarcação:", errorSummary(error));
       }
       notifyInboxRealtime(conversation.clinicId).catch(() => {});
     }
@@ -1507,7 +1508,7 @@ async function processWhatsappWebhook(body: Prisma.InputJsonValue, forcedClinicI
           });
         }
       } catch (error) {
-        console.error("Falha ao enviar confirmação de resposta ao lembrete (bridge):", error);
+        console.error("Falha ao enviar confirmação de resposta ao lembrete (bridge):", errorSummary(error));
       }
       notifyInboxRealtime(conversation.clinicId).catch(() => {});
     }
@@ -1618,7 +1619,7 @@ async function processWhatsappWebhook(body: Prisma.InputJsonValue, forcedClinicI
             await confirmBridgeAppointment(updated.clinicProcedure.clinicId, numero);
             confirmedInFirebird = true;
           } catch (error) {
-            console.error("Falha ao confirmar agendamento no Firebird (bridge):", error);
+            console.error("Falha ao confirmar agendamento no Firebird (bridge):", errorSummary(error));
           }
 
           // Risco conhecido (documentado no index.js do bridge da Urolaser): os
@@ -1648,7 +1649,7 @@ async function processWhatsappWebhook(body: Prisma.InputJsonValue, forcedClinicI
         await sendAppointmentConfirmation(updated, conversation?.id);
       }
     } catch (error) {
-      console.error("Falha ao enviar confirmação com Guia QR Code:", error);
+      console.error("Falha ao enviar confirmação com Guia QR Code:", errorSummary(error));
     }
   } else if (newStatus === "CANCELLED") {
     const cancelMsg = `Olá ${updated.patientName}! Seu agendamento para ${updated.clinicProcedure.procedure.name} na ${updated.clinicProcedure.clinic.tradeName} foi cancelado com sucesso. Caso precise remarcar, acesse nosso site!`;
@@ -1660,7 +1661,7 @@ async function processWhatsappWebhook(body: Prisma.InputJsonValue, forcedClinicI
         });
       }
     } catch (error) {
-      console.error("Falha ao enviar confirmação de cancelamento:", error);
+      console.error("Falha ao enviar confirmação de cancelamento:", errorSummary(error));
     }
   }
 

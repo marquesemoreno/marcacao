@@ -1,3 +1,4 @@
+import { errorSummary } from "@/lib/safe-error";
 import "server-only";
 import type { BridgeCampaignPatient } from "@/lib/campaign-audience";
 import { prisma } from "@/lib/prisma";
@@ -396,7 +397,7 @@ export async function createBridgeAppointment(
     });
     await prisma.conversation.update({ where: { id: conversation.id }, data: { lastMessageAt: new Date() } });
   } catch (error) {
-    console.error("Falha ao enviar confirmação do agendamento (bridge):", error);
+    console.error("Falha ao enviar confirmação do agendamento (bridge):", errorSummary(error));
   }
 
   // Confere se o agendamento sobreviveu no Firebird — na criação isso normalmente é
@@ -429,7 +430,7 @@ export async function createBridgeAppointment(
       }
     }
   } catch (error) {
-    console.error("Falha ao conferir persistência do agendamento recém-criado (bridge):", error);
+    console.error("Falha ao conferir persistência do agendamento recém-criado (bridge):", errorSummary(error));
   }
 
   // Espelha o agendamento (já real no Firebird a essa altura) num Appointment de
@@ -474,7 +475,7 @@ export async function createBridgeAppointment(
       },
     });
   } catch (error) {
-    console.error("Falha ao espelhar agendamento do bridge no Postgres (só relatório):", error);
+    console.error("Falha ao espelhar agendamento do bridge no Postgres (só relatório):", errorSummary(error));
   }
 
   const now = new Date();

@@ -1,3 +1,4 @@
+import { errorSummary } from "@/lib/safe-error";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { buildWhatsAppLink } from "@/lib/format";
@@ -77,7 +78,7 @@ Posso te ajudar a agendar o melhor horário diretamente com a recepção da clí
       },
     });
   } catch (error) {
-    console.error("Erro na API de Chat:", error);
+    console.error("Erro na API de Chat:", errorSummary(error));
     return NextResponse.json(
       { error: "Erro ao processar mensagem da equipe" },
       { status: 500 }

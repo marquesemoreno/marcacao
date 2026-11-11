@@ -1,3 +1,4 @@
+import { errorSummary } from "@/lib/safe-error";
 import "server-only";
 import type OpenAI from "openai";
 import { aiChat, isAiConfigured } from "@/lib/ai-gateway";
@@ -52,7 +53,7 @@ Regras:
     });
     return completion.choices[0]?.message?.content?.trim() || null;
   } catch (error) {
-    console.error("Falha ao gerar mensagem de outreach:", error);
+    console.error("Falha ao gerar mensagem de outreach:", errorSummary(error));
     return null;
   }
 }

@@ -1,5 +1,6 @@
 "use server";
 
+import { errorSummary } from "@/lib/safe-error";
 import { applyAutoFunnelStage } from "@/lib/auto-funnel-stage-server";
 import { recordPatientAccess } from "@/lib/access-log-server";
 import { CONTACT_WITH_PROFILES, profileOf, profileWhere, upsertProfile } from "@/lib/contact-profile";
@@ -1641,7 +1642,7 @@ export async function resolveConversation(
       recentOutbound: recentOutbound.map((m) => ({ content: m.content ?? "", createdAt: m.createdAt })),
       now,
     });
-    if (ok) await sendMessage(conversationId, text).catch((e) => console.error("[despedida] falha ao enviar:", e));
+    if (ok) await sendMessage(conversationId, text).catch((e) => console.error("[despedida] falha ao enviar:", errorSummary(e)));
   }
 
   const currentUser = await prisma.user.findUnique({

@@ -2,6 +2,7 @@
  * confiança, em vez de texto. Usado nas classificações que não conversam com o
  * paciente; o que gera texto continua na OpenAI. Chave em JEVAI_API_KEY (só servidor). */
 
+import { errorSummary } from "@/lib/safe-error";
 import type { AppointmentReplyAction } from "./appointment-reply-ai";
 import { aiJev, type AiCallContext } from "./ai-gateway";
 
@@ -54,7 +55,7 @@ export async function classifyReplyWithJev(
     if (!json) return null;
     return actionFromJevAnswer(json.answers?.acao);
   } catch (error) {
-    console.error("Falha ao classificar resposta via Jev:", error);
+    console.error("Falha ao classificar resposta via Jev:", errorSummary(error));
     return null;
   }
 }
@@ -73,7 +74,7 @@ export async function askJevChoice(
     );
     return json?.answers?.q;
   } catch (error) {
-    console.error("Falha ao consultar o Jev:", error);
+    console.error("Falha ao consultar o Jev:", errorSummary(error));
     return undefined;
   }
 }

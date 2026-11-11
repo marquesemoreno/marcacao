@@ -1,5 +1,6 @@
 "use server";
 
+import { errorSummary } from "@/lib/safe-error";
 import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { createAppointmentSchema, type CreateAppointmentInput } from "@/lib/schemas/appointment";
@@ -82,7 +83,7 @@ export async function createAppointment(input: CreateAppointmentInput) {
   try {
     await sendAppointmentConfirmation(appointment);
   } catch (error) {
-    console.error("Falha ao notificar novo agendamento via WhatsApp:", error);
+    console.error("Falha ao notificar novo agendamento via WhatsApp:", errorSummary(error));
   }
 
   // Serializado (Decimal -> number) porque esta action é chamada direto de

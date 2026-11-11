@@ -1,4 +1,5 @@
 "use server";
+import { errorSummary } from "@/lib/safe-error";
 import "server-only";
 
 import type OpenAI from "openai";
@@ -99,7 +100,7 @@ export async function runCopilotCommand(history: CopilotChatMessage[]): Promise<
       pendingAction,
     };
   } catch (error) {
-    console.error("Falha ao processar comando do Copiloto da Recepção:", error);
+    console.error("Falha ao processar comando do Copiloto da Recepção:", errorSummary(error));
     return { message: "Não consegui processar esse comando agora — tente de novo em instantes." };
   }
 }

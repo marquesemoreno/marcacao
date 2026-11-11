@@ -1,3 +1,4 @@
+import { errorSummary } from "@/lib/safe-error";
 import "server-only";
 import type OpenAI from "openai";
 import { aiChat, isAiConfigured } from "@/lib/ai-gateway";
@@ -65,7 +66,7 @@ export async function upsertBookingRequestFromConversation(conversationId: strin
     await notifyAgenda(conversation.clinicId);
     return saved;
   } catch (error) {
-    console.error("[pré-agendamento] falha ao extrair pedido:", error);
+    console.error("[pré-agendamento] falha ao extrair pedido:", errorSummary(error));
     return null;
   }
 }

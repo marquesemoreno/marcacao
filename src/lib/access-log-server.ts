@@ -1,3 +1,4 @@
+import { errorSummary } from "@/lib/safe-error";
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import { READ_DEDUPE_MIN, shouldRecordAccess, type AccessAction } from "@/lib/access-log";
@@ -20,6 +21,6 @@ export async function recordPatientAccess(input: { clinicId: string; userId: str
     if (!shouldRecordAccess(input.action, last?.createdAt ?? null)) return;
     await prisma.patientAccessLog.create({ data: input });
   } catch (error) {
-    console.error("Falha ao registrar acesso ao paciente:", error);
+    console.error("Falha ao registrar acesso ao paciente:", errorSummary(error));
   }
 }

@@ -1,3 +1,4 @@
+import { errorSummary } from "@/lib/safe-error";
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import type { AiCallContext } from "@/lib/ai-gateway";
@@ -44,7 +45,7 @@ export async function privacyForConversation(conversationId: string): Promise<Ai
       ],
     };
   } catch (error) {
-    console.error("Falha ao montar contexto de privacidade da IA:", error);
+    console.error("Falha ao montar contexto de privacidade da IA:", errorSummary(error));
     return {};
   }
 }
@@ -67,7 +68,7 @@ export async function privacyForClinic(clinicId: string): Promise<AiPrivacy> {
       preserveTerms: [clinic?.name, clinic?.tradeName, clinic?.technicalDirectorName, clinic?.aiAttendantConfig?.assistantName],
     };
   } catch (error) {
-    console.error("Falha ao montar contexto de privacidade da IA:", error);
+    console.error("Falha ao montar contexto de privacidade da IA:", errorSummary(error));
     return { clinicId };
   }
 }

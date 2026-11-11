@@ -1,3 +1,4 @@
+import { errorSummary } from "@/lib/safe-error";
 import "server-only";
 import type OpenAI from "openai";
 import { aiChat, isAiConfigured } from "@/lib/ai-gateway";
@@ -73,7 +74,7 @@ Responda em JSON, exatamente neste formato:
       complianceNotes: typeof parsed?.complianceNotes === "string" ? parsed.complianceNotes.trim() : "",
     };
   } catch (error) {
-    console.error("Falha ao analisar sentimento da conversa:", error);
+    console.error("Falha ao analisar sentimento da conversa:", errorSummary(error));
     return null;
   }
 }

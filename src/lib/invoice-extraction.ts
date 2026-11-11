@@ -1,3 +1,4 @@
+import { errorSummary } from "@/lib/safe-error";
 import "server-only";
 import type OpenAI from "openai";
 import { aiChat, isAiConfigured, type AiCallContext } from "@/lib/ai-gateway";
@@ -79,7 +80,7 @@ export async function extractInvoiceData(
 
     return Object.keys(result).length > 0 ? result : null;
   } catch (error) {
-    console.error("Falha ao extrair dados de nota fiscal:", error);
+    console.error("Falha ao extrair dados de nota fiscal:", errorSummary(error));
     return null;
   }
 }

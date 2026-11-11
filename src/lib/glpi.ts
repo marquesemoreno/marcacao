@@ -1,3 +1,4 @@
+import { errorSummary } from "@/lib/safe-error";
 import "server-only";
 
 /** Integração com o GLPI (help desk interno da TIVDC) — cria um Ticket a partir de
@@ -42,7 +43,7 @@ async function initGlpiSession(config: NonNullable<ReturnType<typeof getGlpiConf
     const body = await response.json().catch(() => null);
     return typeof body?.session_token === "string" ? body.session_token : null;
   } catch (error) {
-    console.error("Falha ao abrir sessão no GLPI:", error instanceof Error ? error.message : error);
+    console.error("Falha ao abrir sessão no GLPI:", errorSummary(error));
     return null;
   }
 }
@@ -59,7 +60,7 @@ async function killGlpiSession(config: NonNullable<ReturnType<typeof getGlpiConf
     });
   } catch (error) {
     // Best-effort — a sessão do GLPI expira sozinha mesmo se isso falhar.
-    console.error("Falha ao encerrar sessão no GLPI (não crítico):", error instanceof Error ? error.message : error);
+    console.error("Falha ao encerrar sessão no GLPI (não crítico):", errorSummary(error));
   }
 }
 
@@ -105,7 +106,7 @@ export async function createGlpiTicket(name: string, content: string, entitiesId
     }
     return { success: true, ticketId: body.id };
   } catch (error) {
-    console.error("Falha ao criar chamado no GLPI:", error instanceof Error ? error.message : error);
+    console.error("Falha ao criar chamado no GLPI:", errorSummary(error));
     return { success: false, error: "Erro de rede ao falar com o GLPI." };
   } finally {
     await killGlpiSession(config, sessionToken);
@@ -137,7 +138,7 @@ export async function listGlpiEntities(): Promise<GlpiEntity[]> {
       .filter((entity): entity is { id: number; name: string } => typeof entity?.id === "number" && entity.id !== 0)
       .map((entity) => ({ id: entity.id, name: entity.name }));
   } catch (error) {
-    console.error("Falha ao listar entidades do GLPI:", error instanceof Error ? error.message : error);
+    console.error("Falha ao listar entidades do GLPI:", errorSummary(error));
     return [];
   } finally {
     await killGlpiSession(config, sessionToken);

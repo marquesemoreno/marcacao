@@ -1,3 +1,4 @@
+import { errorSummary } from "@/lib/safe-error";
 import "server-only";
 import { randomBytes } from "crypto";
 import { prisma } from "@/lib/prisma";
@@ -246,7 +247,7 @@ async function syncAgendaWithTicket(clinicId: string, id: string, status: Ticket
       after: { status: next },
     });
   } catch (e) {
-    console.error("[senhas] falha ao atualizar a Agenda", e);
+    console.error("[senhas] falha ao atualizar a Agenda", errorSummary(e));
   }
 }
 

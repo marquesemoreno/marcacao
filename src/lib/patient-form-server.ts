@@ -1,3 +1,4 @@
+import { errorSummary } from "@/lib/safe-error";
 import "server-only";
 import { createHash } from "crypto";
 import { prisma } from "@/lib/prisma";
@@ -59,7 +60,7 @@ export async function formLinkForReminder(input: {
     const { raw } = await issuePatientToken({ clinicId: input.clinicId, kind: "ANAMNESE", phone: input.phone, appointment: input.appointment });
     return formLinkLine(`${getBaseUrl()}/p/${raw}`);
   } catch (e) {
-    console.error("[ficha] não gerou o link do lembrete", e);
+    console.error("[ficha] não gerou o link do lembrete", errorSummary(e));
     return null;
   }
 }

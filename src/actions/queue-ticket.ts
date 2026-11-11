@@ -1,5 +1,6 @@
 "use server";
 
+import { errorSummary } from "@/lib/safe-error";
 import { prisma } from "@/lib/prisma";
 import { requireClinicPermission } from "@/lib/session";
 import { resolveTvDisplay } from "@/lib/tv-call-server";
@@ -59,7 +60,7 @@ export async function takeTicket(
   try {
     return { ok: true, ticket: await issueQueueTicket(clinicId, { type: input.type, identifier: input.identifier?.slice(0, 20), serviceId: input.serviceId ?? null }) };
   } catch (e) {
-    console.error("[totem] falha ao gerar senha", e);
+    console.error("[totem] falha ao gerar senha", errorSummary(e));
     return { ok: false, error: "Não deu pra gerar a senha. Tente de novo ou procure a recepção." };
   }
 }

@@ -1,3 +1,4 @@
+import { errorSummary } from "@/lib/safe-error";
 import "server-only";
 import type OpenAI from "openai";
 import { aiChat, isAiConfigured } from "@/lib/ai-gateway";
@@ -162,7 +163,7 @@ export async function generateAiReply(
     });
     return second.choices[0]?.message?.content?.trim() || null;
   } catch (error) {
-    console.error("Falha ao gerar resposta do atendente de IA:", error);
+    console.error("Falha ao gerar resposta do atendente de IA:", errorSummary(error));
     return null;
   }
 }

@@ -1,5 +1,6 @@
 "use server";
 
+import { errorSummary } from "@/lib/safe-error";
 import { headers } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { recordAudit } from "@/lib/audit-server";
@@ -111,7 +112,7 @@ export async function submitPatientForm(
     });
   } catch (e) {
     if ((e as { code?: string }).code === "P2002") return { ok: true }; // já enviada (toque duplo)
-    console.error("[ficha] falha ao gravar", e);
+    console.error("[ficha] falha ao gravar", errorSummary(e));
     return { ok: false, error: "Não conseguimos salvar agora. Tente de novo em instantes." };
   }
   await notifyAgenda(token.clinicId); // selo "ficha enviada" aparece na hora
@@ -134,7 +135,7 @@ export async function patientCheckIn(raw: string): Promise<{ ok: true; ticket?: 
   const withTicket = async () => {
     if (before && ["CANCELLED", "NO_SHOW", "COMPLETED"].includes(before.status)) return null;
     return ticketForCheckin(token.clinicId, token.phone, token.appointmentExternalId!).catch((e) => {
-      console.error("[cheguei] falha ao gerar senha", e);
+      console.error("[cheguei] falha ao gerar senha", errorSummary(e));
       return null;
     });
   };

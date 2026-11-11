@@ -1,3 +1,4 @@
+import { errorSummary } from "@/lib/safe-error";
 import "server-only";
 import type OpenAI from "openai";
 import { aiChat, isAiConfigured } from "@/lib/ai-gateway";
@@ -88,7 +89,7 @@ Responda em JSON, exatamente neste formato: {"suggestions": ["sugestão 1", "sug
       .map((s: string) => s.trim())
       .slice(0, 3);
   } catch (error) {
-    console.error("Falha ao gerar sugestões do copilot:", error);
+    console.error("Falha ao gerar sugestões do copilot:", errorSummary(error));
     return [];
   }
 }

@@ -1,5 +1,6 @@
 "use server";
 
+import { errorSummary } from "@/lib/safe-error";
 import { normalizeReviewUrl } from "@/lib/nps";
 import { revalidatePath } from "next/cache";
 import type { AppointmentStatus } from "@prisma/client";
@@ -389,7 +390,7 @@ async function reopenConversationForRebooking(clinicId: string, patientPhone: st
     });
     notifyInboxRealtime(clinicId).catch(() => {});
   } catch (error) {
-    console.error("Falha ao reabrir conversa para remarcação:", error);
+    console.error("Falha ao reabrir conversa para remarcação:", errorSummary(error));
   }
 }
 
@@ -448,7 +449,7 @@ export async function updateAppointmentStatus(appointmentId: string, status: App
   try {
     await notifyAppointmentStatus(validStatus, updated);
   } catch (error) {
-    console.error("Falha ao notificar mudança de status via WhatsApp:", error);
+    console.error("Falha ao notificar mudança de status via WhatsApp:", errorSummary(error));
   }
 
   if (validStatus === "CANCELLED" || validStatus === "NO_SHOW") {

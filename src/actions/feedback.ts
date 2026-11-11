@@ -1,5 +1,6 @@
 "use server";
 
+import { errorSummary } from "@/lib/safe-error";
 import { prisma } from "@/lib/prisma";
 import { requireClinicSession, requireAdminSession } from "@/lib/session";
 import { sendWhatsAppMessage, sendWhatsAppMedia } from "@/lib/whatsapp";
@@ -59,7 +60,7 @@ async function sendFeedbackReport(
       const buffer = Buffer.from(await imageFile.arrayBuffer());
       uploaded = await uploadWhatsAppMedia(`feedback-${Date.now()}`, buffer, imageFile.type);
     } catch (error) {
-      console.error("Falha ao ler/subir a imagem do relato de feedback:", error);
+      console.error("Falha ao ler/subir a imagem do relato de feedback:", errorSummary(error));
       uploaded = null;
     }
     if (!uploaded) {

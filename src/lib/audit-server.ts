@@ -1,3 +1,4 @@
+import { errorSummary } from "@/lib/safe-error";
 import "server-only";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
@@ -28,6 +29,6 @@ export async function recordAudit(input: {
       },
     });
   } catch (e) {
-    console.error("[audit] falha ao gravar", input.action, input.entityId, e);
+    console.error("[audit] falha ao gravar", input.action, input.entityId, errorSummary(e));
   }
 }

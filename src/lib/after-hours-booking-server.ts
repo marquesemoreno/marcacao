@@ -1,3 +1,4 @@
+import { errorSummary } from "@/lib/safe-error";
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import { sendWhatsAppMessage } from "@/lib/whatsapp";
@@ -99,6 +100,6 @@ export async function replyAfterHoursBooking(
       after: { step: missing ?? "done", summary },
     });
   } catch (error) {
-    console.error("[marcação fora do horário] falha:", error);
+    console.error("[marcação fora do horário] falha:", errorSummary(error));
   }
 }

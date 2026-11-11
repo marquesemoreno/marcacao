@@ -1,3 +1,4 @@
+import { errorSummary } from "@/lib/safe-error";
 import "server-only";
 import type OpenAI from "openai";
 import { aiChat, isAiConfigured, type AiCallContext } from "@/lib/ai-gateway";
@@ -142,7 +143,7 @@ export async function processDocumentMessage(params: {
     const extracted = await extractStructuredFields(ctx, rawOcrText);
     return { rawOcrText, extracted };
   } catch (error) {
-    console.error("Falha ao processar documento médico:", error);
+    console.error("Falha ao processar documento médico:", errorSummary(error));
     return null;
   }
 }

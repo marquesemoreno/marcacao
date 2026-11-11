@@ -1,3 +1,4 @@
+import { errorSummary } from "@/lib/safe-error";
 import { NextResponse } from "next/server";
 import { isCronAuthorized } from "@/lib/request-auth";
 import { sendMetaConversions, syncAdConversions } from "@/lib/ad-conversions-server";
@@ -16,7 +17,7 @@ export async function GET(request: Request) {
   try {
     meta = await sendMetaConversions();
   } catch (error) {
-    console.error("Falha ao enviar conversões à Meta:", error instanceof Error ? error.message : error);
+    console.error("Falha ao enviar conversões à Meta:", errorSummary(error));
     meta = { error: "falha" };
   }
   return NextResponse.json({ sync, meta });

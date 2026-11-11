@@ -38,6 +38,18 @@ Auditoria só de leitura e medição: nada foi alterado no código nem no banco.
 - Relatório: primeiro byte em 0,25 s e página completa em ~2 s; trocando pelo menu, os blocos chegam em 0,9 a 1,8 s.
 - Ressalvas: uma amostra por página, clínica demo com poucos dados, e o painel do navegador ficou oculto em parte da medição (tempos de rede valem; tempos de tela são aproximados). Falta confirmar numa clínica real em horário de uso.
 
+### Andamento da Prioridade 3 (11/11)
+
+- **Feito:**
+  - o log `[WhatsApp Envio] Disparando para: <telefone>` foi removido;
+  - os logs de erro do servidor (35 arquivos) passam por `errorSummary` (`src/lib/safe-error.ts`): só código e primeira linha, com números longos mascarados;
+  - índices no `schema.prisma` e migration `20261111090000_audit_indexes` (só `CREATE INDEX IF NOT EXISTS`).
+- **Pendente (passo do usuário):** rodar a migration em produção.
+- **Fora desta entrega:**
+  - índice parcial de não lidas em `messages`: o Prisma não representa índice parcial no schema, então ficaria fora do controle dele. Só vale criar se o `pg_stat_statements` mostrar essa consulta entre as mais caras;
+  - paginar as finalizadas (mexe no Chat e no CRM, pede entrega própria);
+  - painel de afiliados e `/api/chat`: desligar é decisão de produto, ainda não tomada.
+
 ## 1. Pontos fortes
 
 - **Isolamento entre clínicas consistente.** Das ~480 actions exportadas, as que não checam sessão são públicas de propósito (totem, TV, portal do paciente por token, busca do site). Nos pontos conferidos em `src/actions/inbox.ts` e `src/actions/clinic-broadcast.ts`, toda escrita por id passa antes por `assertClinicOwnsConversation` ou `assertClinicOwnsCampaign`.

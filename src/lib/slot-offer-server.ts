@@ -1,3 +1,4 @@
+import { errorSummary } from "@/lib/safe-error";
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import { sendWhatsAppMessage, formatToWhatsAppNumber, toggleNinthDigit } from "@/lib/whatsapp";
@@ -27,7 +28,7 @@ export async function startSlotOffer(clinicId: string, slotKey: string, slot: Op
     });
     await advanceOffer(offer, slot.exceptPhone ?? null);
   } catch (e) {
-    console.error("[vaga] falha ao iniciar oferta", e);
+    console.error("[vaga] falha ao iniciar oferta", errorSummary(e));
   }
 }
 
@@ -175,7 +176,7 @@ export async function startSlotOfferForItem(clinicId: string, ref: { source: "BR
     if (!item?.time) return;
     await startSlotOffer(clinicId, `${ref.source}:${ref.externalId}`, { date: item.date, time: item.time, doctor: item.doctor, procedure: item.procedure, exceptPhone: ref.phone ?? item.phone });
   } catch (e) {
-    console.error("[vaga] falha ao oferecer vaga", e);
+    console.error("[vaga] falha ao oferecer vaga", errorSummary(e));
   }
 }
 

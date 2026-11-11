@@ -509,6 +509,7 @@ model Appointment {
 
   @@index([clinicProcedureId, date])
   @@index([affiliateId])
+  @@index([patientPhone])
   @@map("appointments")
 }
 
@@ -671,6 +672,8 @@ model Conversation {
   @@index([clinicId, status])
   @@index([contactId])
   @@index([marcadorId])
+  @@index([clinicId, lastMessageAt])
+  @@index([assignedUserId])
   @@map("conversations")
 }
 
@@ -841,6 +844,7 @@ model WebhookLog {
   responseCode Int?     @map("response_code")
   createdAt    DateTime @default(now()) @map("created_at")
 
+  @@index([createdAt])
   @@map("webhook_logs")
 }
 
@@ -1003,6 +1007,7 @@ model BroadcastCampaign {
   recipients BroadcastRecipient[]
 
   @@index([automationRuleId])
+  @@index([clinicId, status])
   @@map("broadcast_campaigns")
 }
 
@@ -1061,6 +1066,7 @@ model BroadcastRecipient {
 
   @@index([campaignId, status])
   @@index([providerMessageId])
+  @@index([phone])
   @@map("broadcast_recipients")
 }
 

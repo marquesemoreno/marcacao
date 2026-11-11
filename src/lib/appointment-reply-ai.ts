@@ -1,3 +1,4 @@
+import { errorSummary } from "@/lib/safe-error";
 import "server-only";
 import type OpenAI from "openai";
 import { aiChat, isAiConfigured, type AiCallContext } from "@/lib/ai-gateway";
@@ -82,7 +83,7 @@ export async function classifyAppointmentReply(
     const args = JSON.parse(call.function.arguments) as { acao?: string };
     return VALID_ACTIONS.includes(args.acao as AppointmentReplyAction) ? (args.acao as AppointmentReplyAction) : "UNCLEAR";
   } catch (error) {
-    console.error("Falha ao classificar resposta de agendamento via IA:", error);
+    console.error("Falha ao classificar resposta de agendamento via IA:", errorSummary(error));
     return "UNCLEAR";
   }
 }

@@ -1,3 +1,4 @@
+import { errorSummary } from "@/lib/safe-error";
 import { prisma } from "@/lib/prisma";
 
 /** Grava uma ação da IA para a tela /clinic/ia. Nunca derruba o fluxo que a chamou. */
@@ -19,6 +20,6 @@ export async function logAiAction(input: {
       },
     });
   } catch (error) {
-    console.error("Falha ao registrar ação da IA:", error);
+    console.error("Falha ao registrar ação da IA:", errorSummary(error));
   }
 }

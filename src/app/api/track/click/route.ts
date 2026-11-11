@@ -1,3 +1,4 @@
+import { errorSummary } from "@/lib/safe-error";
 import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
@@ -85,7 +86,7 @@ export async function POST(request: Request) {
     // Token repetido (mesma visita recarregando) não sobrescreve o primeiro registro.
     await prisma.adClick.upsert({ where: { token: click.token }, create: click, update: {} });
   } catch (error) {
-    console.error("Falha ao gravar clique de anúncio:", error instanceof Error ? error.message : error);
+    console.error("Falha ao gravar clique de anúncio:", errorSummary(error));
     return new NextResponse(null, { status: 500, headers });
   }
   return new NextResponse(null, { status: 204, headers });

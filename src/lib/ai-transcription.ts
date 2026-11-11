@@ -1,3 +1,4 @@
+import { errorSummary } from "@/lib/safe-error";
 import "server-only";
 import { aiTranscribe } from "./ai-gateway";
 
@@ -38,7 +39,7 @@ export async function transcribeAudio(
       },
     );
   } catch (error) {
-    console.error("Falha ao transcrever áudio:", error);
+    console.error("Falha ao transcrever áudio:", errorSummary(error));
     return null;
   }
 }

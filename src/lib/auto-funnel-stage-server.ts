@@ -1,3 +1,4 @@
+import { errorSummary } from "@/lib/safe-error";
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import { stageFromStaffMessage } from "@/lib/auto-funnel-stage";
@@ -24,6 +25,6 @@ export async function applyAutoFunnelStage(conversationId: string, text: string,
       data: { conversationId, fromStage: conversation.funnelStage, toStage: next, userId },
     });
   } catch (error) {
-    console.error("[etapa automática] falha:", error);
+    console.error("[etapa automática] falha:", errorSummary(error));
   }
 }

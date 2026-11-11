@@ -1,3 +1,4 @@
+import { errorSummary } from "@/lib/safe-error";
 import { NextResponse } from "next/server";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
@@ -97,7 +98,7 @@ async function forwardToAutomation(event: Extract<CloudEvent, { kind: "inbound" 
     });
     return res.ok;
   } catch (error) {
-    console.error("Falha ao encaminhar mensagem da API oficial para a automação:", error);
+    console.error("Falha ao encaminhar mensagem da API oficial para a automação:", errorSummary(error));
     return false;
   }
 }
@@ -165,7 +166,7 @@ export async function POST(request: Request) {
       touched.add(clinicId);
     } catch (error) {
       failed++;
-      console.error("Falha ao gravar evento da API oficial do WhatsApp:", error instanceof Error ? error.message : error);
+      console.error("Falha ao gravar evento da API oficial do WhatsApp:", errorSummary(error));
     }
   }
   for (const clinicId of touched) notifyInboxRealtime(clinicId).catch(() => {});

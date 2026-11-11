@@ -1,3 +1,4 @@
+import { errorSummary } from "@/lib/safe-error";
 import { allowsNinthDigitFallback } from "@/lib/ninth-digit-policy";
 import type { AppointmentStatus, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
@@ -180,7 +181,6 @@ export async function sendWhatsAppMessage(
   if (cloud) return cloudSend.cloudSendText(cloud, formatToWhatsAppNumber(to), text, event);
   const { apiUrl, apiKey, instanceName } = await getEvolutionConfig(clinicId);
   const target = formatToWhatsAppNumber(to);
-  console.log('[WhatsApp Envio] Disparando para:', target);
 
   if (!apiUrl || !apiKey || !instanceName) {
     await prisma.webhookLog.create({
@@ -252,7 +252,7 @@ export async function sendWhatsAppMessage(
         // envio futuro pra esse número repetiria a falha + fallback à toa.
         await prisma.contact
           .updateMany({ where: { phone: target }, data: { phone: fallbackNumber } })
-          .catch((error) => console.error("Falha ao atualizar telefone do contato pro formato que funciona:", error));
+          .catch((error) => console.error("Falha ao atualizar telefone do contato pro formato que funciona:", errorSummary(error)));
       }
     }
   }
@@ -419,7 +419,7 @@ export async function sendWhatsAppMedia(
       if (result.success) {
         await prisma.contact
           .updateMany({ where: { phone: target }, data: { phone: fallbackNumber } })
-          .catch((error) => console.error("Falha ao atualizar telefone do contato pro formato que funciona:", error));
+          .catch((error) => console.error("Falha ao atualizar telefone do contato pro formato que funciona:", errorSummary(error)));
       }
     }
   }
@@ -520,7 +520,7 @@ export async function sendWhatsAppAudio(
       if (result.success) {
         await prisma.contact
           .updateMany({ where: { phone: target }, data: { phone: fallbackNumber } })
-          .catch((error) => console.error("Falha ao atualizar telefone do contato pro formato que funciona:", error));
+          .catch((error) => console.error("Falha ao atualizar telefone do contato pro formato que funciona:", errorSummary(error)));
       }
     }
   }

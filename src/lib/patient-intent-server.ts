@@ -1,3 +1,4 @@
+import { errorSummary } from "@/lib/safe-error";
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import { askJevChoice } from "@/lib/jev";
@@ -33,6 +34,6 @@ export async function classifyAndStorePatientIntent(conversationId: string): Pro
       if (saved) await replyAfterHoursBooking(conversationId, saved);
     }
   } catch (error) {
-    console.error("Falha ao classificar intenção do paciente:", error);
+    console.error("Falha ao classificar intenção do paciente:", errorSummary(error));
   }
 }
