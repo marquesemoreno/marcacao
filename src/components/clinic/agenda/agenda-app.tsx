@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { useAgendaRealtime } from "@/hooks/use-agenda-realtime";
 import { AlertTriangle, CalendarX2, Keyboard, RefreshCw, Search, X } from "lucide-react";
@@ -87,7 +86,6 @@ const panel = "glass-surface";
  * compartilhável). Pensada pro pico da manhã: resumo do dia no topo (também filtra),
  * grade só do primeiro ao último paciente, linha "agora", troca de status com desfazer. */
 export function AgendaApp({ initialDate, initialView }: { initialDate: string; initialView: AgendaView }) {
-  const router = useRouter();
   const [date, setDate] = useState(initialDate);
   const [view, setView] = useState<AgendaView>(initialView);
   const [data, setData] = useState<AgendaResult | null>(null);
@@ -151,9 +149,17 @@ export function AgendaApp({ initialDate, initialView }: { initialDate: string; i
 
   const range = useMemo(() => rangeFor(view, date), [view, date]);
 
+  // Só espelha o dia e a visão na URL (pra recarregar/compartilhar). Não usar router.replace
+  // aqui: ele é uma navegação, e o Next descarta as server actions que estão na fila quando
+  // uma navegação acontece. Ao abrir a tela, o getAgenda abaixo era descartado e a promessa
+  // nunca resolvia: a Agenda ficava presa no carregamento até alguém clicar em atualizar.
+  // history.replaceState troca a URL sem navegar (o Next acompanha a URL mesmo assim).
   useEffect(() => {
-    router.replace(`/clinic/agenda?data=${date}&visao=${view}`, { scroll: false });
-  }, [date, view, router]);
+    const url = `/clinic/agenda?data=${date}&visao=${view}`;
+    if (window.location.pathname + window.location.search !== url) {
+      window.history.replaceState(null, "", url);
+    }
+  }, [date, view]);
 
   useEffect(() => {
     const t = setInterval(() => setNowTime(nowInBahia()), 60_000);
