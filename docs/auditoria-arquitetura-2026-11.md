@@ -44,7 +44,7 @@ Auditoria só de leitura e medição: nada foi alterado no código nem no banco.
   - o log `[WhatsApp Envio] Disparando para: <telefone>` foi removido;
   - os logs de erro do servidor (35 arquivos) passam por `errorSummary` (`src/lib/safe-error.ts`): só código e primeira linha, com números longos mascarados;
   - índices no `schema.prisma` e migration `20261111090000_audit_indexes` (só `CREATE INDEX IF NOT EXISTS`).
-- **Pendente (passo do usuário):** rodar a migration em produção.
+- **Migration aplicada em produção em 11/11** (informado pelo usuário).
 - **Fora desta entrega:**
   - índice parcial de não lidas em `messages`: o Prisma não representa índice parcial no schema, então ficaria fora do controle dele. Só vale criar se o `pg_stat_statements` mostrar essa consulta entre as mais caras;
   - paginar as finalizadas (mexe no Chat e no CRM, pede entrega própria);
