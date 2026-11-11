@@ -8,7 +8,7 @@ import { getAutomationCloudSetup } from "@/actions/automation-rules";
 import { deleteTagAutomation, listTagAutomations, saveTagAutomation, type TagAutomationView } from "@/actions/tag-automations";
 import type { ClinicCloudTemplate } from "@/actions/clinic-broadcast";
 import { renderTemplatePreview, templateLabel } from "@/lib/broadcast-cloud-template";
-import { DELAY_OPTIONS, validateTagAutomation, type TagAutomationInput } from "@/lib/tag-automations";
+import { DELAY_OPTIONS, STAGE_OPTIONS, stageLabel, validateTagAutomation, type TagAutomationInput } from "@/lib/tag-automations";
 
 type Cloud = { active: boolean; templates: ClinicCloudTemplate[] };
 
@@ -21,8 +21,12 @@ const primaryBtn = "inline-flex h-9 items-center gap-1.5 rounded-lg bg-emerald-6
 
 const EMPTY: TagAutomationInput = {
   name: "",
+  triggerKind: "TAG",
   tag: "",
+  stage: null,
   delayHours: 24,
+  waitFrom: "ENTRY",
+  stopOnReply: false,
   action: "MESSAGE",
   mode: "REVIEW",
   reminderText: "",
@@ -36,8 +40,12 @@ const delayLabel = (hours: number) => DELAY_OPTIONS.find((o) => o.hours === hour
 function toInput(a: TagAutomationView): TagAutomationInput {
   return {
     name: a.name,
+    triggerKind: a.triggerKind,
     tag: a.tag,
+    stage: a.stage,
     delayHours: a.delayHours,
+    waitFrom: a.waitFrom,
+    stopOnReply: a.stopOnReply,
     action: a.action,
     mode: a.mode,
     reminderText: a.reminderText,
@@ -50,8 +58,8 @@ function toInput(a: TagAutomationView): TagAutomationInput {
 function savedMessage(active: boolean, wasActive: boolean, alreadyTagged: number | null): string {
   if (active && !wasActive) {
     return alreadyTagged
-      ? `Ligada. ${alreadyTagged === 1 ? "1 conversa já tinha" : `${alreadyTagged} conversas já tinham`} a tag e não recebe nada; vale para quem receber a tag a partir de agora.`
-      : "Ligada. Vale para quem receber a tag a partir de agora.";
+      ? `Ligada. ${alreadyTagged === 1 ? "1 conversa já estava" : `${alreadyTagged} conversas já estavam`} nessa situação e não recebe nada; vale para quem entrar a partir de agora.`
+      : "Ligada. Vale para quem entrar a partir de agora.";
   }
   if (!active && wasActive) return "Automação desligada.";
   return "Automação salva.";
@@ -105,18 +113,56 @@ function Editor({
         <input id={`${uid}-name`} value={form.name} maxLength={60} onChange={(e) => set("name", e.target.value)} placeholder="Ex.: Depois da aula experimental" className={`${field} mt-1`} />
       </div>
 
-      <div>
-        <label htmlFor={`${uid}-tag`} className={labelClass}>
-          Quando a conversa receber a tag
-        </label>
-        <input id={`${uid}-tag`} list={`${uid}-tags`} value={form.tag} maxLength={100} onChange={(e) => set("tag", e.target.value)} placeholder="Escolha ou digite a tag" className={`${field} mt-1`} />
-        <datalist id={`${uid}-tags`}>
-          {tags.map((t) => (
-            <option key={t} value={t} />
+      <fieldset>
+        <legend className={labelClass}>Quando a conversa</legend>
+        <div className="mt-1 grid gap-2 sm:grid-cols-2">
+          {(
+            [
+              ["TAG", "Receber uma tag", "Ex.: Aula experimental, Aguardando convênio."],
+              ["STAGE", "Entrar numa etapa do CRM", "Ex.: Orçamento, Em atendimento."],
+            ] as const
+          ).map(([value, title, help]) => (
+            <label
+              key={value}
+              className={`cursor-pointer rounded-lg border p-3 text-sm ${form.triggerKind === value ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/40" : "border-slate-200 dark:border-slate-700"}`}
+            >
+              <input type="radio" name={`${uid}-trigger`} value={value} checked={form.triggerKind === value} onChange={() => set("triggerKind", value)} className="sr-only" />
+              <span className="font-semibold text-slate-900 dark:text-slate-100">{title}</span>
+              <span className="block text-xs text-slate-600 dark:text-slate-400">{help}</span>
+            </label>
           ))}
-        </datalist>
-        <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">Escreva igual à tag usada no Chat e no CRM. Se a tag sair antes da hora, nada é enviado.</p>
-      </div>
+        </div>
+      </fieldset>
+
+      {form.triggerKind === "STAGE" ? (
+        <div>
+          <label htmlFor={`${uid}-stage`} className={labelClass}>
+            Etapa
+          </label>
+          <select id={`${uid}-stage`} value={form.stage ?? ""} onChange={(e) => set("stage", e.target.value || null)} className={`${field} mt-1`}>
+            <option value="">Escolha a etapa…</option>
+            {STAGE_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+          <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">Vale para conversas em aberto. Se a conversa sair da etapa ou for finalizada antes da hora, nada acontece.</p>
+        </div>
+      ) : (
+        <div>
+          <label htmlFor={`${uid}-tag`} className={labelClass}>
+            Tag
+          </label>
+          <input id={`${uid}-tag`} list={`${uid}-tags`} value={form.tag} maxLength={100} onChange={(e) => set("tag", e.target.value)} placeholder="Escolha ou digite a tag" className={`${field} mt-1`} />
+          <datalist id={`${uid}-tags`}>
+            {tags.map((t) => (
+              <option key={t} value={t} />
+            ))}
+          </datalist>
+          <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">Escreva igual à tag usada no Chat e no CRM. Se a tag sair antes da hora, nada acontece.</p>
+        </div>
+      )}
 
       <div>
         <label htmlFor={`${uid}-delay`} className={labelClass}>
@@ -130,6 +176,34 @@ function Editor({
           ))}
         </select>
       </div>
+
+      <fieldset>
+        <legend className={labelClass}>Contar a espera</legend>
+        <div className="mt-1 grid gap-2 sm:grid-cols-2">
+          {(
+            [
+              ["ENTRY", "Desde que entrou", "Passou o tempo, executa — mesmo que tenham conversado."],
+              ["LAST_MESSAGE", "Desde a última mensagem", "Só executa se a conversa ficar parada esse tempo todo."],
+            ] as const
+          ).map(([value, title, help]) => (
+            <label
+              key={value}
+              className={`cursor-pointer rounded-lg border p-3 text-sm ${form.waitFrom === value ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/40" : "border-slate-200 dark:border-slate-700"}`}
+            >
+              <input type="radio" name={`${uid}-wait`} value={value} checked={form.waitFrom === value} onChange={() => set("waitFrom", value)} className="sr-only" />
+              <span className="font-semibold text-slate-900 dark:text-slate-100">{title}</span>
+              <span className="block text-xs text-slate-600 dark:text-slate-400">{help}</span>
+            </label>
+          ))}
+        </div>
+        <label className="mt-2 flex items-start gap-2 text-sm text-slate-700 dark:text-slate-200">
+          <input type="checkbox" checked={form.stopOnReply} onChange={(e) => set("stopOnReply", e.target.checked)} className="mt-0.5 h-4 w-4 rounded border-slate-300 accent-emerald-600" />
+          <span>
+            Cancelar se o paciente responder antes
+            <span className="block text-xs text-slate-600 dark:text-slate-400">Se ele escrever depois de entrar na automação, nada é enviado nem lembrado.</span>
+          </span>
+        </label>
+      </fieldset>
 
       <fieldset>
         <legend className={labelClass}>E então</legend>
@@ -313,7 +387,11 @@ function Card({ automation, onEdit, onChanged }: { automation: TagAutomationView
             {automation.name}
           </h3>
           <p className="text-sm text-slate-600 dark:text-slate-400">
-            Tag <strong className="font-semibold text-slate-800 dark:text-slate-200">{automation.tag}</strong> · {delayLabel(automation.delayHours)} · {what}
+            {automation.triggerKind === "STAGE" ? "Etapa" : "Tag"}{" "}
+            <strong className="font-semibold text-slate-800 dark:text-slate-200">{automation.triggerKind === "STAGE" ? stageLabel(automation.stage) : automation.tag}</strong> ·{" "}
+            {delayLabel(automation.delayHours)}
+            {automation.waitFrom === "LAST_MESSAGE" ? " sem mensagem" : ""} · {what}
+            {automation.stopOnReply ? " · cancela se o paciente responder" : ""}
           </p>
         </div>
         <label className="flex shrink-0 items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200">
@@ -393,10 +471,10 @@ export function TagAutomationsSheet({ open, onOpenChange }: { open: boolean; onO
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
         <SheetHeader>
-          <SheetTitle>Automações por tag</SheetTitle>
+          <SheetTitle>Automações</SheetTitle>
           <SheetDescription>
-            Quando uma conversa recebe a tag, o sistema espera o tempo escolhido e envia um modelo aprovado ou lembra a recepção. Quem já tem a tag na hora de ligar não
-            recebe nada.
+            Quando uma conversa recebe uma tag ou entra numa etapa do CRM, o sistema espera o tempo escolhido e envia um modelo aprovado ou lembra a recepção. Quem já
+            está nessa situação na hora de ligar não recebe nada.
           </SheetDescription>
         </SheetHeader>
         <div className="space-y-4 p-4">
@@ -415,7 +493,8 @@ export function TagAutomationsSheet({ open, onOpenChange }: { open: boolean; onO
             <>
               {data.automations.length === 0 && editing !== "new" && (
                 <p className="rounded-xl border border-dashed border-slate-300 dark:border-slate-700 p-4 text-sm text-slate-600 dark:text-slate-400">
-                  Nenhuma automação ainda. Exemplo: tag “Aula experimental”, 1 dia depois, enviar o modelo perguntando como foi.
+                  Nenhuma automação ainda. Exemplos: tag “Aula experimental”, 1 dia depois, enviar o modelo perguntando como foi. Etapa “Orçamento”, 3 dias sem mensagem,
+                  lembrar a recepção.
                 </p>
               )}
               {data.automations.map((a) =>

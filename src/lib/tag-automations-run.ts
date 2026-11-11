@@ -5,6 +5,8 @@ import { displayName, isUsableContactName } from "@/lib/contact-display";
 import {
   REMINDER_TAG,
   brtDayStart,
+  idlePostponedDue,
+  triggerWhere,
   messageSkipReason,
   planEnrollments,
   reminderNote,
@@ -47,10 +49,12 @@ export async function runTagAutomations(now = new Date()): Promise<RunResult[]> 
   return results;
 }
 
-/** Sincroniza a fila da automação com as tags atuais das conversas da clínica dela. */
-export async function syncEnrollments(automation: { id: string; clinicId: string; tag: string; delayHours: number }, now: Date) {
+type Trigger = { id: string; clinicId: string; triggerKind: string; tag: string; stage: string | null };
+
+/** Sincroniza a fila da automação com as conversas que estão no gatilho (tag ou etapa) agora. */
+export async function syncEnrollments(automation: Trigger & { delayHours: number }, now: Date) {
   const [tagged, existing] = await Promise.all([
-    prisma.conversation.findMany({ where: { clinicId: automation.clinicId, tags: { has: automation.tag } }, select: { id: true } }),
+    prisma.conversation.findMany({ where: triggerWhere(automation), select: { id: true } }),
     prisma.tagAutomationEnrollment.findMany({ where: { automationId: automation.id }, select: { id: true, conversationId: true, status: true } }),
   ]);
   const plan = planEnrollments({ delayHours: automation.delayHours, taggedConversationIds: tagged.map((c) => c.id), existing, now });
@@ -66,9 +70,9 @@ export async function syncEnrollments(automation: { id: string; clinicId: string
 
 /** Ao ligar (ou trocar a tag de) uma automação: quem já tem a tag entra como BASELINE e não
  * recebe nada. Só quem receber a tag daqui para a frente dispara. */
-export async function resetBaseline(automation: { id: string; clinicId: string; tag: string }, now: Date) {
+export async function resetBaseline(automation: Trigger, now: Date) {
   await prisma.tagAutomationEnrollment.deleteMany({ where: { automationId: automation.id } });
-  const tagged = await prisma.conversation.findMany({ where: { clinicId: automation.clinicId, tags: { has: automation.tag } }, select: { id: true } });
+  const tagged = await prisma.conversation.findMany({ where: triggerWhere(automation), select: { id: true } });
   if (tagged.length) {
     await prisma.tagAutomationEnrollment.createMany({
       data: tagged.map((c) => ({ automationId: automation.id, conversationId: c.id, dueAt: now, status: "BASELINE", doneAt: now })),
@@ -86,19 +90,52 @@ async function runOne(
   const base = { automationId: automation.id, clinicId: automation.clinicId, name: automation.name };
   await syncEnrollments(automation, now);
 
-  const due = await prisma.tagAutomationEnrollment.findMany({
+  const allDue = await prisma.tagAutomationEnrollment.findMany({
     where: { automationId: automation.id, status: "PENDING", dueAt: { lte: now } },
     orderBy: { dueAt: "asc" },
     take: MAX_DUE_PER_RUN,
   });
-  if (due.length === 0) return { ...base, status: "nada vencido" };
+  if (allDue.length === 0) return { ...base, status: "nada vencido" };
 
   // clinicId de novo no filtro: a entrada guarda só o id da conversa, e ela tem que ser desta clínica.
   const conversations = await prisma.conversation.findMany({
-    where: { id: { in: due.map((d) => d.conversationId) }, clinicId: automation.clinicId },
-    select: { id: true, tags: true, contact: { select: { phone: true, name: true } } },
+    where: { id: { in: allDue.map((d) => d.conversationId) }, clinicId: automation.clinicId },
+    select: { id: true, tags: true, lastMessageAt: true, contact: { select: { phone: true, name: true } } },
   });
   const byId = new Map(conversations.map((c) => [c.id, c]));
+
+  // Parar na resposta: paciente escreveu depois de entrar na automação → sai da fila.
+  const replied = new Set<string>();
+  if (automation.stopOnReply) {
+    const enteredAt = new Map(allDue.map((d) => [d.conversationId, d.createdAt]));
+    const inbound = await prisma.message.findMany({
+      where: { conversationId: { in: allDue.map((d) => d.conversationId) }, direction: "INBOUND", type: { not: "INTERNAL_NOTE" } },
+      orderBy: { createdAt: "desc" },
+      distinct: ["conversationId"],
+      select: { conversationId: true, createdAt: true },
+    });
+    for (const m of inbound) {
+      const entered = enteredAt.get(m.conversationId);
+      if (!entered || m.createdAt > entered) replied.add(m.conversationId);
+    }
+  }
+  const due: typeof allDue = [];
+  for (const entry of allDue) {
+    if (replied.has(entry.conversationId)) {
+      await prisma.tagAutomationEnrollment.update({ where: { id: entry.id }, data: { status: "SKIPPED", doneAt: now, note: "paciente respondeu" } });
+      continue;
+    }
+    // Tempo parado: mensagem recente na conversa adia o vencimento em vez de disparar.
+    if (automation.waitFrom === "LAST_MESSAGE") {
+      const postponed = idlePostponedDue({ lastMessageAt: byId.get(entry.conversationId)?.lastMessageAt ?? null, delayHours: automation.delayHours, now });
+      if (postponed) {
+        await prisma.tagAutomationEnrollment.update({ where: { id: entry.id }, data: { dueAt: postponed } });
+        continue;
+      }
+    }
+    due.push(entry);
+  }
+  if (due.length === 0) return { ...base, status: "nada vencido" };
 
   if (automation.action === "REMINDER") {
     let count = 0;

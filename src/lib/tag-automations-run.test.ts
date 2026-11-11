@@ -9,7 +9,7 @@ const db = vi.hoisted(() => ({
   broadcastCampaign: { findFirst: vi.fn(), create: vi.fn() },
   broadcastRecipient: { findMany: vi.fn(), createMany: vi.fn() },
   user: { findFirst: vi.fn() },
-  message: { create: vi.fn() },
+  message: { create: vi.fn(), findMany: vi.fn() },
   webhookLog: { create: vi.fn() },
 }));
 vi.mock("@/lib/prisma", () => ({ prisma: db }));
@@ -24,7 +24,11 @@ const automation = (over: Record<string, unknown> = {}) => ({
   id: "a1",
   clinicId: "clinic-a",
   name: "Aula experimental",
+  triggerKind: "TAG",
   tag: "Aula experimental",
+  stage: null,
+  waitFrom: "ENTRY",
+  stopOnReply: false,
   delayHours: 0,
   action: "MESSAGE",
   mode: "REVIEW",
@@ -36,15 +40,16 @@ const automation = (over: Record<string, unknown> = {}) => ({
   active: true,
   ...over,
 });
-const conv = (id: string, phone: string | null, name: string, tags: string[]) => ({ id, tags, contact: { phone, name } });
+const conv = (id: string, phone: string | null, name: string, tags: string[], lastMessageAt: Date | null = null) => ({ id, tags, lastMessageAt, contact: { phone, name } });
 
 /** Fila já sincronizada: `due` são as entradas vencidas, `convs` as conversas delas. */
-function setup(a: ReturnType<typeof automation>, due: { id: string; conversationId: string }[], convs: ReturnType<typeof conv>[]) {
+function setup(a: ReturnType<typeof automation>, due: { id: string; conversationId: string; createdAt?: Date }[], convs: ReturnType<typeof conv>[]) {
   db.tagAutomation.findMany.mockResolvedValue([a]);
   db.clinic.findMany.mockResolvedValue([{ id: "clinic-a", cnpj: "11", technicalDirectorName: "Dra. Ana", technicalDirectorCrm: "123" }]);
-  db.conversation.findMany.mockImplementation(async (args: { where: { tags?: unknown } }) =>
-    args.where.tags ? convs.map((c) => ({ id: c.id })) : convs,
+  db.conversation.findMany.mockImplementation(async (args: { where: { id?: unknown } }) =>
+    args.where.id ? convs : convs.map((c) => ({ id: c.id })),
   );
+  db.message.findMany.mockResolvedValue([]);
   db.tagAutomationEnrollment.findMany.mockImplementation(async (args: { where: { status?: string } }) =>
     args.where.status === "PENDING" ? due : due.map((d) => ({ ...d, status: "PENDING" })),
   );
@@ -157,6 +162,64 @@ describe("runTagAutomations — lembrete", () => {
   });
 });
 
+describe("runTagAutomations — etapa, resposta e tempo parado", () => {
+  it("gatilho por etapa procura conversas em aberto naquela etapa da clínica", async () => {
+    setup(automation({ triggerKind: "STAGE", tag: "", stage: "ORCAMENTO" }), [{ id: "e1", conversationId: "c1" }], [conv("c1", "5577900000001", "Ana Lima", [])]);
+    await runTagAutomations(now);
+    expect(db.conversation.findMany.mock.calls[0][0].where).toEqual({ clinicId: "clinic-a", funnelStage: "ORCAMENTO", status: { not: "RESOLVED" } });
+    expect(db.broadcastCampaign.create).toHaveBeenCalled();
+  });
+
+  it("parar na resposta: quem escreveu depois de entrar sai da fila e não recebe", async () => {
+    const entered = new Date("2026-11-10T15:00:00Z");
+    setup(
+      automation({ stopOnReply: true }),
+      [
+        { id: "e1", conversationId: "c1", createdAt: entered },
+        { id: "e2", conversationId: "c2", createdAt: entered },
+      ],
+      [conv("c1", "5577900000001", "Ana Lima", ["Aula experimental"]), conv("c2", "5577900000002", "Bruno Reis", ["Aula experimental"])],
+    );
+    db.message.findMany.mockResolvedValue([{ conversationId: "c1", createdAt: new Date("2026-11-11T10:00:00Z") }]);
+    await runTagAutomations(now);
+    expect(db.message.findMany.mock.calls[0][0].where).toMatchObject({ direction: "INBOUND", conversationId: { in: ["c1", "c2"] } });
+    expect(db.tagAutomationEnrollment.update.mock.calls[0][0]).toMatchObject({ where: { id: "e1" }, data: { status: "SKIPPED", note: "paciente respondeu" } });
+    expect(db.broadcastCampaign.create.mock.calls[0][0].data.recipients.create.map((r: { phone: string }) => r.phone)).toEqual(["5577900000002"]);
+  });
+
+  it("resposta anterior à entrada na automação não cancela", async () => {
+    setup(automation({ stopOnReply: true }), [{ id: "e1", conversationId: "c1", createdAt: new Date("2026-11-11T12:00:00Z") }], [
+      conv("c1", "5577900000001", "Ana Lima", ["Aula experimental"]),
+    ]);
+    db.message.findMany.mockResolvedValue([{ conversationId: "c1", createdAt: new Date("2026-11-11T09:00:00Z") }]);
+    await runTagAutomations(now);
+    expect(db.broadcastCampaign.create).toHaveBeenCalled();
+  });
+
+  it("sem parar na resposta, nem consulta as mensagens", async () => {
+    setup(automation(), [{ id: "e1", conversationId: "c1" }], [conv("c1", "5577900000001", "Ana Lima", ["Aula experimental"])]);
+    await runTagAutomations(now);
+    expect(db.message.findMany).not.toHaveBeenCalled();
+  });
+
+  it("tempo parado: conversa com mensagem recente é adiada em vez de disparar", async () => {
+    setup(
+      automation({ waitFrom: "LAST_MESSAGE", delayHours: 72 }),
+      [
+        { id: "e1", conversationId: "c1" },
+        { id: "e2", conversationId: "c2" },
+      ],
+      [
+        conv("c1", "5577900000001", "Ana Lima", ["Aula experimental"], new Date("2026-11-10T15:00:00Z")),
+        conv("c2", "5577900000002", "Bruno Reis", ["Aula experimental"], new Date("2026-11-01T15:00:00Z")),
+      ],
+    );
+    await runTagAutomations(now);
+    expect(db.tagAutomationEnrollment.update.mock.calls[0][0]).toEqual({ where: { id: "e1" }, data: { dueAt: new Date("2026-11-13T15:00:00Z") } });
+    expect(db.broadcastCampaign.create.mock.calls[0][0].data.recipients.create.map((r: { phone: string }) => r.phone)).toEqual(["5577900000002"]);
+  });
+});
+
 describe("runTagAutomations — gerais", () => {
   it("clínica demo nunca roda", async () => {
     setup(automation(), [{ id: "e1", conversationId: "c1" }], [conv("c1", "5577900000001", "Ana Lima", ["Aula experimental"])]);
@@ -176,7 +239,7 @@ describe("runTagAutomations — gerais", () => {
 describe("resetBaseline", () => {
   it("ao ligar, quem já tem a tag entra como BASELINE e não como pendente", async () => {
     db.conversation.findMany.mockResolvedValue([{ id: "c1" }, { id: "c2" }]);
-    const count = await resetBaseline({ id: "a1", clinicId: "clinic-a", tag: "Natação" }, now);
+    const count = await resetBaseline({ id: "a1", clinicId: "clinic-a", triggerKind: "TAG", tag: "Natação", stage: null }, now);
     expect(count).toBe(2);
     expect(db.tagAutomationEnrollment.deleteMany).toHaveBeenCalledWith({ where: { automationId: "a1" } });
     expect(db.conversation.findMany.mock.calls[0][0].where).toEqual({ clinicId: "clinic-a", tags: { has: "Natação" } });

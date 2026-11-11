@@ -9,6 +9,19 @@
 import { NON_PATIENT_TAG, WRONG_NUMBER_TAG } from "./conversation-tags";
 
 export type TagAutomationAction = "MESSAGE" | "REMINDER";
+/** TAG: a conversa recebeu a tag. STAGE: a conversa entrou na etapa do CRM (e segue em aberto). */
+export type TagAutomationTrigger = "TAG" | "STAGE";
+/** ENTRY: a espera conta de quando recebeu a tag / entrou na etapa. LAST_MESSAGE: conta da
+ * última mensagem da conversa ("parado há N dias") — cada mensagem nova recomeça a contagem. */
+export type TagAutomationWaitFrom = "ENTRY" | "LAST_MESSAGE";
+
+export const STAGE_OPTIONS: { value: string; label: string }[] = [
+  { value: "NOVOS", label: "Novos" },
+  { value: "TRIAGEM", label: "Em atendimento" },
+  { value: "ORCAMENTO", label: "Orçamento" },
+  { value: "AGENDADO", label: "Agendado" },
+];
+export const stageLabel = (stage: string | null | undefined) => STAGE_OPTIONS.find((o) => o.value === stage)?.label ?? "etapa";
 /** REVIEW: a campanha nasce como rascunho e a recepção inicia. AUTO: já sai enviando. */
 export type TagAutomationMode = "REVIEW" | "AUTO";
 /** PENDING: esperando a hora. DONE: virou campanha ou lembrete. BASELINE: já tinha a tag
@@ -35,8 +48,15 @@ export const DELAY_OPTIONS: { hours: number; label: string }[] = [
 
 export type TagAutomationInput = {
   name: string;
+  triggerKind: TagAutomationTrigger;
+  /** Só para triggerKind TAG. */
   tag: string;
+  /** Só para triggerKind STAGE. */
+  stage: string | null;
   delayHours: number;
+  waitFrom: TagAutomationWaitFrom;
+  /** Paciente escreveu depois de entrar na automação: não envia nem lembra. */
+  stopOnReply: boolean;
   action: TagAutomationAction;
   mode: TagAutomationMode;
   reminderText: string;
@@ -49,11 +69,18 @@ export function validateTagAutomation(input: TagAutomationInput): string | null 
   const name = input.name.trim();
   const tag = input.tag.trim();
   if (!name || name.length > 60) return "Dê um nome à automação (até 60 letras).";
-  if (!tag || tag.length > 100) return "Escolha a tag que dispara a automação.";
-  if (tag === WRONG_NUMBER_TAG || tag === REMINDER_TAG) return "Essa tag não pode disparar automação. Escolha outra tag.";
+  if (input.triggerKind !== "TAG" && input.triggerKind !== "STAGE") return "Gatilho desconhecido.";
+  if (input.triggerKind === "STAGE") {
+    if (!STAGE_OPTIONS.some((o) => o.value === input.stage)) return "Escolha a etapa do CRM que dispara a automação.";
+  } else {
+    if (!tag || tag.length > 100) return "Escolha a tag que dispara a automação.";
+    if (tag === WRONG_NUMBER_TAG || tag === REMINDER_TAG) return "Essa tag não pode disparar automação. Escolha outra tag.";
+  }
+  if (input.waitFrom !== "ENTRY" && input.waitFrom !== "LAST_MESSAGE") return "Forma de contar a espera desconhecida.";
   if (!Number.isInteger(input.delayHours) || input.delayHours < 0 || input.delayHours > MAX_DELAY_HOURS) {
     return "A espera vai de na hora até 30 dias.";
   }
+  if (input.waitFrom === "LAST_MESSAGE" && input.delayHours < 1) return "Para contar o tempo parado, escolha uma espera de pelo menos 1 hora.";
   if (input.action !== "MESSAGE" && input.action !== "REMINDER") return "Ação desconhecida.";
   if (input.mode !== "REVIEW" && input.mode !== "AUTO") return "Modo de envio desconhecido.";
   if (input.action === "REMINDER") {
@@ -63,6 +90,28 @@ export function validateTagAutomation(input: TagAutomationInput): string | null 
     return "Escolha um modelo aprovado pela Meta antes de ligar.";
   }
   return null;
+}
+
+type TriggerShape = { triggerKind: string; tag: string; stage: string | null };
+
+/** Filtro (Prisma) das conversas que estão no gatilho agora — sempre dentro da clínica. */
+export function triggerWhere(a: TriggerShape & { clinicId: string }) {
+  return a.triggerKind === "STAGE"
+    ? { clinicId: a.clinicId, funnelStage: a.stage as "NOVOS" | "TRIAGEM" | "ORCAMENTO" | "AGENDADO", status: { not: "RESOLVED" as const } }
+    : { clinicId: a.clinicId, tags: { has: a.tag } };
+}
+
+export function sameTrigger(a: TriggerShape, b: TriggerShape): boolean {
+  if (a.triggerKind !== b.triggerKind) return false;
+  return a.triggerKind === "STAGE" ? a.stage === b.stage : a.tag === b.tag;
+}
+
+/** Tempo parado: se a última mensagem ainda não tem `delayHours`, devolve o novo vencimento
+ * (última mensagem + espera). null = já está parado o bastante, pode executar. */
+export function idlePostponedDue(input: { lastMessageAt: Date | null; delayHours: number; now: Date }): Date | null {
+  if (!input.lastMessageAt) return null;
+  const due = new Date(input.lastMessageAt.getTime() + input.delayHours * 3_600_000);
+  return due.getTime() > input.now.getTime() ? due : null;
 }
 
 export function planEnrollments(input: {

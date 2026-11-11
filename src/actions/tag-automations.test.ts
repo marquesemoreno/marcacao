@@ -17,7 +17,11 @@ import type { TagAutomationInput } from "@/lib/tag-automations";
 
 const input: TagAutomationInput = {
   name: "Aula experimental",
+  triggerKind: "TAG",
   tag: "Aula experimental",
+  stage: null,
+  waitFrom: "ENTRY",
+  stopOnReply: false,
   delayHours: 24,
   action: "MESSAGE",
   mode: "REVIEW",
@@ -44,7 +48,7 @@ describe("saveTagAutomation", () => {
     const r = await saveTagAutomation(input);
     expect(mocks.requireClinicPermission).toHaveBeenCalledWith("disparos");
     expect(db.tagAutomation.create.mock.calls[0][0].data).toMatchObject({ clinicId: "clinic-a", tag: "Aula experimental", mode: "REVIEW", cloudTemplateName: "pos_aula", cloudTemplateBody: "Oi {{1}}" });
-    expect(mocks.resetBaseline).toHaveBeenCalledWith({ id: "a1", clinicId: "clinic-a", tag: "Aula experimental" }, expect.any(Date));
+    expect(mocks.resetBaseline).toHaveBeenCalledWith({ id: "a1", clinicId: "clinic-a", triggerKind: "TAG", tag: "Aula experimental", stage: null }, expect.any(Date));
     expect(r).toEqual({ success: true, id: "a1", alreadyTagged: 7 });
   });
 
@@ -59,15 +63,27 @@ describe("saveTagAutomation", () => {
   it("salvar sem ligar não marca ninguém; religar marca de novo", async () => {
     await saveTagAutomation({ ...input, active: false });
     expect(mocks.resetBaseline).not.toHaveBeenCalled();
-    db.tagAutomation.findFirst.mockResolvedValue({ id: "a1", clinicId: "clinic-a", active: false, tag: "Aula experimental" });
+    db.tagAutomation.findFirst.mockResolvedValue({ id: "a1", clinicId: "clinic-a", active: false, triggerKind: "TAG", tag: "Aula experimental", stage: null });
     await saveTagAutomation({ ...input, id: "a1", active: true });
     expect(mocks.resetBaseline).toHaveBeenCalledTimes(1);
   });
 
   it("editar ligada sem trocar a tag não refaz a marcação", async () => {
-    db.tagAutomation.findFirst.mockResolvedValue({ id: "a1", clinicId: "clinic-a", active: true, tag: "Aula experimental" });
+    db.tagAutomation.findFirst.mockResolvedValue({ id: "a1", clinicId: "clinic-a", active: true, triggerKind: "TAG", tag: "Aula experimental", stage: null });
     await saveTagAutomation({ ...input, id: "a1", delayHours: 48 });
     expect(mocks.resetBaseline).not.toHaveBeenCalled();
+  });
+
+  it("gatilho por etapa grava a etapa, deixa a tag vazia e marca quem já está na etapa", async () => {
+    await saveTagAutomation({ ...input, triggerKind: "STAGE", stage: "ORCAMENTO", tag: "qualquer", waitFrom: "LAST_MESSAGE", stopOnReply: true });
+    expect(db.tagAutomation.create.mock.calls[0][0].data).toMatchObject({ triggerKind: "STAGE", stage: "ORCAMENTO", tag: "", waitFrom: "LAST_MESSAGE", stopOnReply: true });
+    expect(mocks.resetBaseline).toHaveBeenCalledWith({ id: "a1", clinicId: "clinic-a", triggerKind: "STAGE", tag: "", stage: "ORCAMENTO" }, expect.any(Date));
+  });
+
+  it("trocar a etapa com a automação ligada refaz a marcação", async () => {
+    db.tagAutomation.findFirst.mockResolvedValue({ id: "a1", clinicId: "clinic-a", active: true, triggerKind: "STAGE", tag: "", stage: "NOVOS" });
+    await saveTagAutomation({ ...input, id: "a1", triggerKind: "STAGE", stage: "ORCAMENTO", tag: "" });
+    expect(mocks.resetBaseline).toHaveBeenCalledTimes(1);
   });
 
   it("mensagem não liga sem a API oficial", async () => {

@@ -5,15 +5,29 @@ import { prisma } from "@/lib/prisma";
 import { requireClinicPermission } from "@/lib/session";
 import { getAutomationCloudSetup } from "@/actions/automation-rules";
 import { checkTemplateParamSources } from "@/lib/broadcast-cloud-template";
-import { MAX_TAG_AUTOMATIONS, REMINDER_TAG, validateTagAutomation, type TagAutomationAction, type TagAutomationInput, type TagAutomationMode } from "@/lib/tag-automations";
+import {
+  MAX_TAG_AUTOMATIONS,
+  REMINDER_TAG,
+  sameTrigger,
+  validateTagAutomation,
+  type TagAutomationAction,
+  type TagAutomationInput,
+  type TagAutomationMode,
+  type TagAutomationTrigger,
+  type TagAutomationWaitFrom,
+} from "@/lib/tag-automations";
 import { resetBaseline } from "@/lib/tag-automations-run";
 import { WRONG_NUMBER_TAG } from "@/lib/conversation-tags";
 
 export type TagAutomationView = {
   id: string;
   name: string;
+  triggerKind: TagAutomationTrigger;
   tag: string;
+  stage: string | null;
   delayHours: number;
+  waitFrom: TagAutomationWaitFrom;
+  stopOnReply: boolean;
   action: TagAutomationAction;
   mode: TagAutomationMode;
   reminderText: string;
@@ -43,8 +57,12 @@ export async function listTagAutomations(): Promise<{ automations: TagAutomation
       return {
         id: r.id,
         name: r.name,
+        triggerKind: r.triggerKind as TagAutomationTrigger,
         tag: r.tag,
+        stage: r.stage,
         delayHours: r.delayHours,
+        waitFrom: r.waitFrom as TagAutomationWaitFrom,
+        stopOnReply: r.stopOnReply,
         action: r.action as TagAutomationAction,
         mode: r.mode as TagAutomationMode,
         reminderText: r.reminderText ?? "",
@@ -97,8 +115,12 @@ export async function saveTagAutomation(input: TagAutomationInput & { id?: strin
 
   const data = {
     name: input.name.trim(),
-    tag: input.tag.trim(),
+    triggerKind: input.triggerKind,
+    tag: input.triggerKind === "TAG" ? input.tag.trim() : "",
+    stage: input.triggerKind === "STAGE" ? input.stage : null,
     delayHours: input.delayHours,
+    waitFrom: input.waitFrom,
+    stopOnReply: input.stopOnReply,
     action: input.action,
     mode: input.mode,
     reminderText: input.action === "REMINDER" ? input.reminderText.trim() : null,
@@ -112,10 +134,10 @@ export async function saveTagAutomation(input: TagAutomationInput & { id?: strin
     ? await prisma.tagAutomation.update({ where: { id: current.id }, data })
     : await prisma.tagAutomation.create({ data: { clinicId, ...data } });
 
-  // Ligou agora, ou trocou a tag com ela ligada: quem já tem a tag não recebe nada.
+  // Ligou agora, ou trocou o gatilho com ela ligada: quem já está no gatilho não recebe nada.
   let alreadyTagged: number | null = null;
-  if (saved.active && (!current?.active || current.tag !== saved.tag)) {
-    alreadyTagged = await resetBaseline({ id: saved.id, clinicId, tag: saved.tag }, new Date());
+  if (saved.active && (!current?.active || !sameTrigger(current, saved))) {
+    alreadyTagged = await resetBaseline({ id: saved.id, clinicId, triggerKind: saved.triggerKind, tag: saved.tag, stage: saved.stage }, new Date());
   }
   revalidatePath("/clinic/disparos");
   return { success: true as const, id: saved.id, alreadyTagged };

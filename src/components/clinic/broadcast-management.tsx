@@ -624,8 +624,8 @@ export function BroadcastManagement() {
                   >
                     <Tags className="w-4 h-4 mt-0.5 shrink-0" aria-hidden />
                     <span>
-                      Automações por tag
-                      <span className="block text-xs text-slate-500 dark:text-slate-400">Mensagem ou lembrete quando a conversa recebe uma tag</span>
+                      Automações
+                      <span className="block text-xs text-slate-500 dark:text-slate-400">Mensagem ou lembrete por tag ou etapa do CRM</span>
                     </span>
                   </button>
                   <button

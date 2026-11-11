@@ -1019,8 +1019,15 @@ model TagAutomation {
   id                    String   @id @default(cuid())
   clinicId              String   @map("clinic_id")
   name                  String
+  /// TAG (recebeu a tag) | STAGE (entrou na etapa do CRM; `stage` guarda qual, `tag` fica vazio)
+  triggerKind           String   @default("TAG") @map("trigger_kind")
   tag                   String
+  stage                 String?
   delayHours            Int      @default(0) @map("delay_hours")
+  /// ENTRY (conta de quando entrou) | LAST_MESSAGE (conta da última mensagem: "parado há N")
+  waitFrom              String   @default("ENTRY") @map("wait_from")
+  /// Paciente escreveu depois de entrar na automação: não envia nem lembra.
+  stopOnReply           Boolean  @default(false) @map("stop_on_reply")
   /// MESSAGE | REMINDER
   action                String
   /// REVIEW (campanha nasce rascunho, a recepção inicia) | AUTO (já sai enviando)
