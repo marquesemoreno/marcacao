@@ -8,6 +8,7 @@ import { getAutomationCloudSetup } from "@/actions/automation-rules";
 import { deleteTagAutomation, listTagAutomations, saveTagAutomation, type TagAutomationView } from "@/actions/tag-automations";
 import type { ClinicCloudTemplate } from "@/actions/clinic-broadcast";
 import { renderTemplatePreview, templateLabel } from "@/lib/broadcast-cloud-template";
+import { isServiceTemplate } from "@/lib/campaign-kind";
 import { DELAY_OPTIONS, STAGE_OPTIONS, stageLabel, validateTagAutomation, type TagAutomationInput } from "@/lib/tag-automations";
 
 type Cloud = { active: boolean; templates: ClinicCloudTemplate[] };
@@ -27,6 +28,7 @@ const EMPTY: TagAutomationInput = {
   delayHours: 24,
   waitFrom: "ENTRY",
   stopOnReply: false,
+  serviceNotice: false,
   action: "MESSAGE",
   mode: "REVIEW",
   reminderText: "",
@@ -46,6 +48,7 @@ function toInput(a: TagAutomationView): TagAutomationInput {
     delayHours: a.delayHours,
     waitFrom: a.waitFrom,
     stopOnReply: a.stopOnReply,
+    serviceNotice: a.serviceNotice,
     action: a.action,
     mode: a.mode,
     reminderText: a.reminderText,
@@ -85,7 +88,11 @@ function Editor({
   const set = <K extends keyof TagAutomationInput>(key: K, value: TagAutomationInput[K]) => setForm((f) => ({ ...f, [key]: value }));
   const tpl = cloud.templates.find((t) => t.name === form.cloudTemplateName);
   const emptyParams = tpl ? Array.from({ length: tpl.variableCount }, (_, i) => i).filter((i) => !(form.cloudTemplateParams[i] ?? "").trim()) : [];
-  const error = validateTagAutomation(form) ?? (form.action === "MESSAGE" && emptyParams.length ? `Preencha ${emptyParams.map((i) => `o campo ${i + 1}`).join(", ")} do modelo.` : null);
+  const wrongCategory = form.action === "MESSAGE" && form.serviceNotice && !!tpl && !isServiceTemplate(tpl);
+  const error =
+    validateTagAutomation(form) ??
+    (form.action === "MESSAGE" && emptyParams.length ? `Preencha ${emptyParams.map((i) => `o campo ${i + 1}`).join(", ")} do modelo.` : null) ??
+    (wrongCategory ? "Aviso de serviço só com modelo da categoria Utilidade. Escolha outro modelo ou desmarque o aviso de serviço." : null);
 
   async function save() {
     setTried(true);
@@ -248,6 +255,15 @@ function Editor({
               Mensagem automática só liga com a API oficial do WhatsApp ativa. Dá para salvar desligada, ou usar o lembrete para a recepção.
             </p>
           )}
+          <label className="flex items-start gap-2 rounded-lg border border-slate-200 dark:border-slate-700 p-3 text-sm text-slate-700 dark:text-slate-200">
+            <input type="checkbox" checked={form.serviceNotice} onChange={(e) => set("serviceNotice", e.target.checked)} className="mt-0.5 h-4 w-4 rounded border-slate-300 accent-emerald-600" />
+            <span>
+              <span className="font-semibold text-slate-900 dark:text-slate-100">É aviso de serviço, não propaganda</span>
+              <span className="block text-xs text-slate-600 dark:text-slate-400">
+                Ex.: laudo pronto, convênio autorizou, documento pendente. Vai também para quem não aceitou marketing. Só funciona com modelo da categoria Utilidade.
+              </span>
+            </span>
+          </label>
           <div>
             <label htmlFor={`${uid}-tpl`} className={labelClass}>
               Modelo aprovado pela Meta
@@ -310,7 +326,11 @@ function Editor({
                 </label>
               ))}
             </div>
-            <p className="mt-2 text-xs text-slate-600 dark:text-slate-400">Só recebe quem aceitou mensagens de marketing da clínica e não pediu para sair.</p>
+            <p className="mt-2 text-xs text-slate-600 dark:text-slate-400">
+              {form.serviceNotice
+                ? "Aviso de serviço: recebe todo paciente que entrar na automação, menos quem pediu para sair."
+                : "Só recebe quem aceitou mensagens de marketing da clínica e não pediu para sair."}
+            </p>
           </fieldset>
         </>
       )}
@@ -377,7 +397,7 @@ function Card({ automation, onEdit, onChanged }: { automation: TagAutomationView
   const what =
     automation.action === "REMINDER"
       ? "lembra a recepção"
-      : `envia o modelo ${automation.cloudTemplateName ?? "(sem modelo)"} · ${automation.mode === "AUTO" ? "sozinho" : "com revisão"}`;
+      : `envia o modelo ${automation.cloudTemplateName ?? "(sem modelo)"} · ${automation.mode === "AUTO" ? "sozinho" : "com revisão"}${automation.serviceNotice ? " · aviso de serviço" : ""}`;
 
   return (
     <section className="space-y-2 rounded-xl border border-slate-200 dark:border-slate-700 p-4" aria-labelledby={titleId}>

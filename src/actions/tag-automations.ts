@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { requireClinicPermission } from "@/lib/session";
 import { getAutomationCloudSetup } from "@/actions/automation-rules";
 import { checkTemplateParamSources } from "@/lib/broadcast-cloud-template";
+import { isServiceTemplate } from "@/lib/campaign-kind";
 import {
   MAX_TAG_AUTOMATIONS,
   REMINDER_TAG,
@@ -28,6 +29,7 @@ export type TagAutomationView = {
   delayHours: number;
   waitFrom: TagAutomationWaitFrom;
   stopOnReply: boolean;
+  serviceNotice: boolean;
   action: TagAutomationAction;
   mode: TagAutomationMode;
   reminderText: string;
@@ -63,6 +65,7 @@ export async function listTagAutomations(): Promise<{ automations: TagAutomation
         delayHours: r.delayHours,
         waitFrom: r.waitFrom as TagAutomationWaitFrom,
         stopOnReply: r.stopOnReply,
+        serviceNotice: r.serviceNotice,
         action: r.action as TagAutomationAction,
         mode: r.mode as TagAutomationMode,
         reminderText: r.reminderText ?? "",
@@ -99,12 +102,16 @@ export async function saveTagAutomation(input: TagAutomationInput & { id?: strin
       const params = input.cloudTemplateParams.slice(0, tpl.variableCount).map((p) => p.trim());
       const problem = checkTemplateParamSources(tpl.variableCount, params, ["nome", "saudacao"]);
       if (problem) return { success: false as const, error: problem.replace("A planilha não tem a coluna", "Use só {{nome}} ou {{saudacao}} — não existe") };
+      // Trava do aviso de serviço: quem classifica o modelo como Utilidade é a Meta.
+      if (input.serviceNotice && !isServiceTemplate(tpl)) {
+        return { success: false as const, error: "Aviso de serviço só com modelo da categoria Utilidade. Esse modelo é de marketing: desmarque o aviso de serviço ou escolha outro modelo." };
+      }
       template = { name: tpl.name, language: tpl.language, bodyText: tpl.bodyText, params };
     }
     if (input.active) {
       if (!cloud.active) return { success: false as const, error: "Mensagem automática só liga com a API oficial do WhatsApp ativa (evita bloqueio do número)." };
       if (!template) return { success: false as const, error: "Escolha um modelo aprovado pela Meta antes de ligar." };
-      if (input.mode === "AUTO") {
+      if (input.mode === "AUTO" && !input.serviceNotice) {
         const clinic = await prisma.clinic.findUniqueOrThrow({ where: { id: clinicId }, select: { technicalDirectorName: true, technicalDirectorCrm: true } });
         if (!clinic.technicalDirectorName?.trim() || !clinic.technicalDirectorCrm?.trim()) {
           return { success: false as const, error: "Para enviar sozinho, cadastre o responsável técnico (nome e CRM) em Configurações." };
@@ -121,6 +128,7 @@ export async function saveTagAutomation(input: TagAutomationInput & { id?: strin
     delayHours: input.delayHours,
     waitFrom: input.waitFrom,
     stopOnReply: input.stopOnReply,
+    serviceNotice: input.action === "MESSAGE" && input.serviceNotice,
     action: input.action,
     mode: input.mode,
     reminderText: input.action === "REMINDER" ? input.reminderText.trim() : null,

@@ -9,6 +9,7 @@ import { broadcastMediaFile } from "@/lib/broadcast-attachment";
 import { buildTemplateParams, cloudBroadcastMode } from "@/lib/broadcast-cloud-template";
 import { activeCloudAccount, cloudSendTemplate } from "@/lib/whatsapp-cloud-send";
 import { RESCHEDULE_PENDING_TAG } from "@/lib/conversation-tags";
+import { skipsMarketingConsent, tagToApplyOnSend } from "@/lib/campaign-kind";
 import { lastAutomatedSend } from "@/lib/automated-pacing-server";
 import { isWithinReminderWindow, lowPriorityMustYield } from "@/lib/automated-pacing";
 import { isMarketingGapElapsed, isWithinMarketingWindow, MARKETING_DAILY_CAP, startOfBrazilDay } from "@/lib/broadcast-schedule";
@@ -99,12 +100,13 @@ export async function dispatchNextBatch(): Promise<{ processed: number }> {
           select: { id: true },
         })
       );
-      // Marketing só com consentimento da clínica (LGPD); aviso de remarcação é transacional.
+      // Marketing só com consentimento da clínica (LGPD); aviso de remarcação e aviso de
+      // serviço das automações são transacionais (ver campaign-kind.ts). Opt-out vale sempre.
       const decision = marketingSendDecision({
         optedOut: Boolean(contact?.optedOutOfBroadcastsAt),
         consentAt: contact?.clinicProfiles[0]?.marketingConsentAt ?? null,
         isMarcador,
-        isTransactional: campaign.tagOnSend === RESCHEDULE_PENDING_TAG,
+        isTransactional: skipsMarketingConsent(campaign.tagOnSend),
       });
       if (decision !== "ENVIAR") {
         await prisma.broadcastRecipient.update({
@@ -178,7 +180,8 @@ export async function dispatchNextBatch(): Promise<{ processed: number }> {
       // Aviso de remarcação em massa (e qualquer futura campanha que precise disso):
       // marca a conversa do destinatário e reabre ela pra voltar a aparecer na fila
       // (ver RESCHEDULE_PENDING_TAG em conversation-tags.ts e computeQueueState).
-      if (result.success && campaign.tagOnSend && contact) {
+      const tagOnSend = tagToApplyOnSend(campaign.tagOnSend);
+      if (result.success && tagOnSend && contact) {
         const conversation = await prisma.conversation.findFirst({
           where: { clinicId: campaign.clinicId, contactId: contact.id },
         });
@@ -189,7 +192,7 @@ export async function dispatchNextBatch(): Promise<{ processed: number }> {
               // Campanha de marketing só marca a conversa (pra acompanhar quem recebeu);
               // não reabre nem joga pro topo da fila — isso é só do aviso de remarcação.
               ...(isMarketing ? {} : { status: "OPEN" as const, lastMessageAt: new Date() }),
-              ...(conversation.tags.includes(campaign.tagOnSend) ? {} : { tags: { push: campaign.tagOnSend } }),
+              ...(conversation.tags.includes(tagOnSend) ? {} : { tags: { push: tagOnSend } }),
             },
           });
         }

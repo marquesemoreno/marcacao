@@ -1028,6 +1028,9 @@ model TagAutomation {
   waitFrom              String   @default("ENTRY") @map("wait_from")
   /// Paciente escreveu depois de entrar na automação: não envia nem lembra.
   stopOnReply           Boolean  @default(false) @map("stop_on_reply")
+  /// Aviso de serviço (não propaganda): a campanha nasce com tagOnSend = SERVICE_NOTICE_MARK
+  /// e o envio dispensa o aceite de marketing (src/lib/campaign-kind.ts). Exige modelo Utilidade.
+  serviceNotice         Boolean  @default(false) @map("service_notice")
   /// MESSAGE | REMINDER
   action                String
   /// REVIEW (campanha nasce rascunho, a recepção inicia) | AUTO (já sai enviando)

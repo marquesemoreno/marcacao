@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { DEMO_CLINIC_CNPJ } from "@/lib/demo-clinic";
 import { technicalDirectorLine } from "@/lib/broadcast-csv";
+import { SERVICE_NOTICE_MARK } from "@/lib/campaign-kind";
 import { displayName, isUsableContactName } from "@/lib/contact-display";
 import {
   REMINDER_TAG,
@@ -162,7 +163,8 @@ async function runOne(
   const cloud = await prisma.whatsappCloudAccount.findUnique({ where: { clinicId: automation.clinicId }, select: { active: true } });
   if (!cloud?.active) return { ...base, status: "sem API oficial ativa" };
   if (!automation.cloudTemplateName) return { ...base, status: "sem modelo aprovado" };
-  if (automation.mode === "AUTO" && !technicalDirectorLine(clinic.technicalDirectorName, clinic.technicalDirectorCrm)) {
+  // Aviso de serviço não é propaganda: não exige responsável técnico (regra do CFM é de publicidade).
+  if (automation.mode === "AUTO" && !automation.serviceNotice && !technicalDirectorLine(clinic.technicalDirectorName, clinic.technicalDirectorCrm)) {
     return { ...base, status: "sem responsável técnico" };
   }
 
@@ -231,6 +233,8 @@ async function runOne(
         cloudTemplateBody: automation.cloudTemplateBody,
         cloudTemplateParams: automation.cloudTemplateParams,
         status: wantedStatus,
+        // Marca interna lida pelo envio: dispensa o aceite de marketing (campaign-kind.ts).
+        tagOnSend: automation.serviceNotice ? SERVICE_NOTICE_MARK : null,
         lowPriority: true,
         createdByUserId: owner.id,
         recipients: { create: recipients.map((r) => ({ phone: r.phone, variables: r.variables, status: "PENDING" as const })) },

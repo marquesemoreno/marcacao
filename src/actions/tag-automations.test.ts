@@ -22,6 +22,7 @@ const input: TagAutomationInput = {
   stage: null,
   waitFrom: "ENTRY",
   stopOnReply: false,
+  serviceNotice: false,
   delayHours: 24,
   action: "MESSAGE",
   mode: "REVIEW",
@@ -30,13 +31,14 @@ const input: TagAutomationInput = {
   cloudTemplateParams: ["{{nome}}"],
   active: true,
 };
-const template = { name: "pos_aula", language: "pt_BR", bodyText: "Oi {{1}}", variableCount: 1 };
+const template = { name: "pos_aula", language: "pt_BR", category: "MARKETING", bodyText: "Oi {{1}}", variableCount: 1 };
+const utility = { name: "laudo_pronto", language: "pt_BR", category: "UTILITY", bodyText: "Oi {{1}}, seu laudo está pronto", variableCount: 1 };
 
 beforeEach(() => {
   for (const model of Object.values(db)) for (const fn of Object.values(model)) fn.mockReset();
   for (const fn of Object.values(mocks)) fn.mockReset();
   mocks.requireClinicPermission.mockResolvedValue({ clinicId: "clinic-a", userId: "u1" });
-  mocks.getAutomationCloudSetup.mockResolvedValue({ active: true, templates: [template] });
+  mocks.getAutomationCloudSetup.mockResolvedValue({ active: true, templates: [template, utility] });
   mocks.resetBaseline.mockResolvedValue(7);
   db.tagAutomation.count.mockResolvedValue(0);
   db.tagAutomation.create.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => ({ id: "a1", ...data }));
@@ -98,6 +100,24 @@ describe("saveTagAutomation", () => {
     const r = await saveTagAutomation({ ...input, mode: "AUTO" });
     expect(r).toMatchObject({ success: false });
     expect(db.tagAutomation.create).not.toHaveBeenCalled();
+  });
+
+  it("aviso de serviço recusa modelo de marketing", async () => {
+    const r = await saveTagAutomation({ ...input, serviceNotice: true });
+    expect(r).toMatchObject({ success: false });
+    expect(db.tagAutomation.create).not.toHaveBeenCalled();
+  });
+
+  it("aviso de serviço com modelo de utilidade salva e envia sozinho sem responsável técnico", async () => {
+    db.clinic.findUniqueOrThrow.mockResolvedValue({ technicalDirectorName: null, technicalDirectorCrm: null });
+    const r = await saveTagAutomation({ ...input, serviceNotice: true, mode: "AUTO", cloudTemplateName: "laudo_pronto" });
+    expect(r.success).toBe(true);
+    expect(db.tagAutomation.create.mock.calls[0][0].data).toMatchObject({ serviceNotice: true, cloudTemplateName: "laudo_pronto" });
+  });
+
+  it("lembrete nunca fica marcado como aviso de serviço", async () => {
+    await saveTagAutomation({ ...input, action: "REMINDER", cloudTemplateName: null, reminderText: "Cobrar", serviceNotice: true });
+    expect(db.tagAutomation.create.mock.calls[0][0].data.serviceNotice).toBe(false);
   });
 
   it("lembrete liga sem API oficial e sem modelo", async () => {

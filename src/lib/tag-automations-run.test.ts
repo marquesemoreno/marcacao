@@ -29,6 +29,7 @@ const automation = (over: Record<string, unknown> = {}) => ({
   stage: null,
   waitFrom: "ENTRY",
   stopOnReply: false,
+  serviceNotice: false,
   delayHours: 0,
   action: "MESSAGE",
   mode: "REVIEW",
@@ -88,6 +89,18 @@ describe("runTagAutomations — mensagem", () => {
     expect(result.status).toBe("sem responsável técnico");
     expect(db.broadcastCampaign.create).not.toHaveBeenCalled();
     expect(db.tagAutomationEnrollment.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("campanha comum nasce sem marca; aviso de serviço nasce marcado e não exige responsável técnico", async () => {
+    setup(automation(), [{ id: "e1", conversationId: "c1" }], [conv("c1", "5577900000001", "Ana Lima", ["Aula experimental"])]);
+    await runTagAutomations(now);
+    expect(db.broadcastCampaign.create.mock.calls[0][0].data.tagOnSend).toBeNull();
+
+    db.broadcastCampaign.create.mockClear();
+    setup(automation({ mode: "AUTO", serviceNotice: true }), [{ id: "e1", conversationId: "c1" }], [conv("c1", "5577900000001", "Ana Lima", ["Aula experimental"])]);
+    db.clinic.findMany.mockResolvedValue([{ id: "clinic-a", cnpj: "11", technicalDirectorName: null, technicalDirectorCrm: null }]);
+    await runTagAutomations(now);
+    expect(db.broadcastCampaign.create.mock.calls[0][0].data).toMatchObject({ tagOnSend: "__aviso_de_servico__", status: "RUNNING" });
   });
 
   it("sem API oficial ativa não cria campanha", async () => {

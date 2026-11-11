@@ -57,6 +57,9 @@ export type TagAutomationInput = {
   waitFrom: TagAutomationWaitFrom;
   /** Paciente escreveu depois de entrar na automação: não envia nem lembra. */
   stopOnReply: boolean;
+  /** Só para ação MESSAGE: aviso de serviço (laudo pronto, convênio autorizou), não propaganda.
+   * Vai também para quem não aceitou marketing; exige modelo da categoria Utilidade. */
+  serviceNotice: boolean;
   action: TagAutomationAction;
   mode: TagAutomationMode;
   reminderText: string;

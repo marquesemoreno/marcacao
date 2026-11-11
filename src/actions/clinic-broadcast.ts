@@ -14,6 +14,7 @@ import { uploadWhatsAppMedia } from "@/lib/whatsapp-media";
 import { technicalDirectorLine, buildBroadcastMessage, type ParsedBroadcastRecipient } from "@/lib/broadcast-csv";
 import { campaignSituation, estimateCampaignFinish, patientsNeedingCall, startOfBrazilDay, unfilledPlaceholders, unknownTemplateVariables, urgentSendTimes } from "@/lib/broadcast-schedule";
 import { RESCHEDULE_PENDING_TAG } from "@/lib/conversation-tags";
+import { requiresTechnicalDirector } from "@/lib/campaign-kind";
 import { formatDate, getBaseUrl } from "@/lib/format";
 import { fetchBridgeCampaignPatients, fetchBridgeDoctors } from "@/lib/hospital-bridge";
 import { lastAutomatedSend } from "@/lib/automated-pacing-server";
@@ -435,7 +436,7 @@ export async function startClinicBroadcastCampaign(campaignId: string) {
   if (c && c.channel === "WHATSAPP" && !c.cloudTemplateName && (await getClinicCloudBroadcastSetup()).active) {
     return { success: false as const, error: "A clínica usa a API oficial: duplique a campanha e escolha um modelo aprovado pela Meta." };
   }
-  if (c && c.tagOnSend !== RESCHEDULE_PENDING_TAG && !technicalDirectorLine(c.clinic.technicalDirectorName, c.clinic.technicalDirectorCrm)) {
+  if (c && requiresTechnicalDirector(c.tagOnSend) && !technicalDirectorLine(c.clinic.technicalDirectorName, c.clinic.technicalDirectorCrm)) {
     return { success: false as const, error: "Cadastre o responsável técnico (nome e CRM) em Configurações antes de iniciar a campanha." };
   }
   // SMS e e-mail dependem de chaves do provedor no servidor: sem elas a campanha ficaria
