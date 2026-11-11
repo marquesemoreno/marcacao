@@ -31,6 +31,8 @@ import {
 } from "@/actions/clinic-broadcast";
 import { BridgeAudiencePicker } from "@/components/clinic/bridge-audience-picker";
 import { listMarcadoresAudience } from "@/actions/marcadores";
+import { getTagAudience, listTagAudienceOptions } from "@/actions/tag-audience";
+import type { TagAudienceOption } from "@/lib/tag-audience";
 import { SELECTION_BROADCAST_KEY } from "@/components/clinic/patient-list-table";
 import { buildBroadcastMessage, parseBroadcastCsv, BROADCAST_OPT_OUT_FOOTER, type ParsedBroadcastRecipient } from "@/lib/broadcast-csv";
 import { estimateCampaignFinish, MARKETING_DAILY_CAP, unfilledPlaceholders, unknownTemplateVariables } from "@/lib/broadcast-schedule";
@@ -59,7 +61,7 @@ function healthLabel(h: NumberHealthView): string {
   const conn = h.connection === "open" ? "Número conectado" : "Conexão não verificada";
   return `${conn} · ${h.automatedToday} mensagens automáticas hoje, ${h.automated7d} na semana`;
 }
-type Source = "csv" | "bridge" | "selecao" | "marcadores";
+type Source = "csv" | "bridge" | "selecao" | "marcadores" | "tag";
 type FormChannel = "WHATSAPP" | "SMS" | "EMAIL";
 const CHANNEL_OPTIONS: { value: FormChannel; label: string; Icon: typeof Mail }[] = [
   { value: "WHATSAPP", label: "WhatsApp", Icon: MessageCircle },
@@ -164,6 +166,10 @@ export function BroadcastManagement() {
   const [rescheduleModalOpen, setRescheduleModalOpen] = useState(false);
   const [hasBridge, setHasBridge] = useState(false);
   const [marcadoresAudience, setMarcadoresAudience] = useState<ParsedBroadcastRecipient[]>([]);
+  const [tagOptions, setTagOptions] = useState<TagAudienceOption[]>([]);
+  const [audienceTag, setAudienceTag] = useState("");
+  const [tagLoading, setTagLoading] = useState(false);
+  const tagRequest = useRef(0);
   const [audienceSource, setAudienceSource] = useState<Source>("csv");
   const [pickerKey, setPickerKey] = useState(0);
   const templateRef = useRef<HTMLTextAreaElement>(null);
@@ -203,6 +209,7 @@ export function BroadcastManagement() {
     loadCampaigns();
     clinicHasBridgeAudience().then(setHasBridge).catch(() => {});
     listMarcadoresAudience().then(setMarcadoresAudience).catch(() => {});
+    listTagAudienceOptions().then(setTagOptions).catch(() => {});
     getClinicCloudBroadcastSetup().then(setCloud).catch(() => {});
     loadChannelSetup();
     loadHealth();
@@ -238,6 +245,30 @@ export function BroadcastManagement() {
     setRecipients(next === "marcadores" ? marcadoresAudience : []);
     setCsvText("");
     setCsvError(null);
+    setAudienceTag("");
+    tagRequest.current++;
+    setTagLoading(false);
+  }
+
+  /** Público "Por tag": busca os pacientes da tag escolhida. O contador descarta a resposta
+   * de uma tag anterior que chegue depois de o usuário já ter trocado. */
+  async function pickAudienceTag(tag: string) {
+    setAudienceTag(tag);
+    setRecipients([]);
+    const request = ++tagRequest.current;
+    if (!tag) {
+      setTagLoading(false);
+      return;
+    }
+    setTagLoading(true);
+    try {
+      const list = await getTagAudience(tag);
+      if (request === tagRequest.current) setRecipients(list);
+    } catch {
+      if (request === tagRequest.current) toast.error("Não foi possível carregar os pacientes dessa tag. Tente de novo.");
+    } finally {
+      if (request === tagRequest.current) setTagLoading(false);
+    }
   }
 
   function handleCsvChange(value: string) {
@@ -315,7 +346,9 @@ export function BroadcastManagement() {
           ? "Clique em “Ver prévia do público” e confira antes de criar a campanha."
           : audienceSource === "csv"
             ? "Cole ou envie a lista de contatos antes de criar a campanha."
-            : "O público está vazio."
+            : audienceSource === "tag" && !audienceTag
+              ? "Escolha a tag do público antes de criar a campanha."
+              : "O público está vazio."
       );
       return;
     }
@@ -513,6 +546,7 @@ export function BroadcastManagement() {
     ...(audienceSource === "selecao" ? ([["selecao", `Seleção da lista de pacientes`]] as [Source, string][]) : []),
     ...(hasBridge ? ([["bridge", "Pacientes do sistema da clínica"]] as [Source, string][]) : []),
     ...(marcadoresAudience.length > 0 ? ([["marcadores", `Marcadores (${marcadoresAudience.length})`]] as [Source, string][]) : []),
+    ...(tagOptions.length > 0 ? ([["tag", "Por tag"]] as [Source, string][]) : []),
     ["csv", "Colar lista / arquivo"],
   ];
 
@@ -849,6 +883,32 @@ export function BroadcastManagement() {
                     Usar modelo de aviso de novos médicos
                   </button>
                 )}
+              </div>
+            ) : audienceSource === "tag" ? (
+              <div className="space-y-1.5">
+                <label htmlFor="broadcast-tag" className={labelClass}>
+                  Tag dos pacientes
+                </label>
+                <select id="broadcast-tag" value={audienceTag} onChange={(e) => pickAudienceTag(e.target.value)} className={inputClass}>
+                  <option value="">Escolha uma tag…</option>
+                  {tagOptions.map((o) => (
+                    <option key={o.tag} value={o.tag}>
+                      {o.tag} ({o.count})
+                    </option>
+                  ))}
+                </select>
+                <p className="text-sm text-slate-600 dark:text-slate-400" aria-live="polite">
+                  {tagLoading ? (
+                    "Carregando pacientes…"
+                  ) : audienceTag ? (
+                    <>
+                      <strong className="text-emerald-700 dark:text-emerald-400">{plural(recipients.length, "paciente", "pacientes")}</strong> com essa tag
+                      e telefone. Use {"{{nome}}"} ou {"{{saudacao}}"} na mensagem. Quem está como número errado fica de fora.
+                    </>
+                  ) : (
+                    "A tag é a mesma que a recepção põe na conversa, no Chat ou no CRM."
+                  )}
+                </p>
               </div>
             ) : audienceSource === "bridge" ? (
               <BridgeAudiencePicker key={pickerKey} onRecipients={setRecipients} />
