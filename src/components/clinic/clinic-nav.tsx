@@ -100,9 +100,11 @@ export function ClinicNav({
         key={item.href}
         href={item.href}
         aria-current={isActive ? "page" : undefined}
-        aria-label={count > 0 ? `${item.label} (${count} aguardando resposta)` : undefined}
+        // Recolhido o link é só um ícone: sem aria-label ele fica sem nome pro leitor de tela
+        // (a dica que aparece ao passar o mouse não conta como nome).
+        aria-label={count > 0 ? `${item.label} (${count} aguardando resposta)` : collapsed ? item.label : undefined}
         className={`group relative flex shrink-0 items-center gap-2.5 rounded-lg text-sm font-semibold transition-colors duration-150 ${
-          collapsed ? "justify-center px-2 py-2.5" : isHorizontal ? "min-h-11 px-3.5 py-2 whitespace-nowrap" : "px-3 py-2.5"
+          collapsed ? "justify-center px-2 py-2" : isHorizontal ? "min-h-11 px-3.5 py-2 whitespace-nowrap" : "px-3 py-2.5"
         } ${isActive ? "bg-emerald-600 text-white shadow-sm shadow-emerald-950/40" : "text-slate-300 hover:bg-slate-800/80 hover:text-white"}`}
       >
         <Icon className={`h-4 w-4 shrink-0 ${isActive ? "text-white" : "text-slate-400 group-hover:text-slate-200"}`} />
@@ -138,11 +140,13 @@ export function ClinicNav({
   }
 
   return (
-    <nav className="flex flex-col gap-3 px-2.5 py-3" aria-label="Navegação do painel da clínica">
-      {groups.map((g) => (
-        <div key={g.label} className="flex flex-col gap-0.5">
+    // Recolhido: espaçamento mais justo pra o menu inteiro (16 itens na Gestão) caber sem rolar
+    // numa tela de 900 px de altura. O grupo vira `role="group"` com nome, já que o título some.
+    <nav className={`flex flex-col px-2.5 ${collapsed ? "gap-1.5 py-2" : "gap-3 py-3"}`} aria-label="Navegação do painel da clínica">
+      {groups.map((g, index) => (
+        <div key={g.label} role="group" aria-label={g.label} className="flex flex-col gap-0.5">
           {collapsed ? (
-            <div className="mx-2 mb-1 border-t border-slate-800" aria-hidden="true" />
+            index > 0 && <div className="mx-2 mb-1 border-t border-slate-800" aria-hidden="true" />
           ) : (
             <p className="px-3 pb-1 text-xs font-medium text-slate-400">{g.label}</p>
           )}

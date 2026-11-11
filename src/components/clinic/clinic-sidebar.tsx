@@ -95,7 +95,9 @@ export function ClinicSidebar({
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto overflow-x-hidden mt-1">
+      {/* Em tela baixa o menu ainda rola: barra fina e discreta, em vez da barra padrão do
+          navegador ocupando um quarto dos 64 px do menu recolhido. */}
+      <div className="flex-1 overflow-y-auto overflow-x-hidden mt-1 [scrollbar-width:thin] [scrollbar-color:#3a3a3c_transparent]">
         <ClinicNav exclusiveWhatsapp={isExclusive} collapsed={isCollapsed} role={role} />
       </div>
 
