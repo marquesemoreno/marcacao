@@ -3,6 +3,8 @@
  * - WhatsApp "falso": instância apontando pra demo.invalid → nenhum envio sai de verdade.
  * - Sem integração de ponte: Faturamento/Financeiro/Estoque usam o modo demo
  *   (src/lib/bi/demo-bridge.ts, números fictícios). Régua criada DESLIGADA; campanha já CONCLUÍDA.
+ * - Automações (Disparos › Configurar) aparecem LIGADAS, mas o executor pula a clínica demo:
+ *   nada roda nem é enviado. Tarefas e convênios aceitos são só exemplos para os vídeos.
  * Idempotente: apaga TUDO da clínica demo (CNPJ fixo) e recria. Datas relativas a hoje —
  * rode na manhã da gravação.
  *
@@ -21,6 +23,8 @@ import { hashPatientToken } from "../src/lib/patient-token";
 import { encryptToken } from "../src/lib/token-crypto";
 import { seriesFor, ticketCode } from "../src/lib/queue-ticket";
 import { doctorKey } from "../src/lib/tv-call";
+import { DEMO_CLOUD_TEMPLATES } from "../src/lib/demo-regua";
+import type { StoredStep } from "../src/lib/tag-automations";
 
 const prisma = new PrismaClient();
 const CNPJ = DEMO_CLINIC_CNPJ;
@@ -530,6 +534,67 @@ async function main() {
   for (const [i, score] of scores.entries()) {
     await prisma.npsResponse.create({
       data: { clinicId: clinic.id, phone: phone(i), score, commentEncrypted: NPS_COMMENTS[i] ? enc({ comment: NPS_COMMENTS[i] }) : null, submittedAt: daysAgo(1 + ((i * 3) % 27), 12 + (i % 6)) },
+    });
+  }
+
+  // ---------- Convênios aceitos, automações e tarefas (11/11/2026) ----------
+  await prisma.clinicInsuranceSettings.create({
+    data: { clinicId: clinic.id, enabled: true, accepted: ["Unimed", "Bradesco Saúde", "Cassi", "Planserv", "SulAmérica"], note: "Também atendemos particular." },
+  });
+
+  const tplOf = (name: string) => {
+    const t = DEMO_CLOUD_TEMPLATES.find((x) => x.name === name)!;
+    return { cloudTemplateName: t.name, cloudTemplateLanguage: t.language, cloudTemplateBody: t.bodyText, cloudTemplateParams: ["{{nome}}"] };
+  };
+  const followUp: StoredStep[] = [
+    { delayHours: 120, action: "MESSAGE", reminderText: "", ...tplOf("reativacao") },
+    { delayHours: 72, action: "LOST", reminderText: "", cloudTemplateName: null, cloudTemplateLanguage: null, cloudTemplateBody: null, cloudTemplateParams: [] },
+  ];
+  await prisma.tagAutomation.create({
+    data: {
+      clinicId: clinic.id, name: "Aguardando retorno", triggerKind: "TAG", tag: "Aguardando retorno", delayHours: 48, waitFrom: "LAST_MESSAGE", stopOnReply: true,
+      action: "MESSAGE", mode: "REVIEW", ...tplOf("retorno_lembrete"), extraSteps: followUp as unknown as Prisma.InputJsonValue, active: true, createdAt: daysAgo(9, 9),
+    },
+  });
+  await prisma.tagAutomation.create({
+    data: {
+      clinicId: clinic.id, name: "Orçamento parado", triggerKind: "STAGE", tag: "", stage: "ORCAMENTO", delayHours: 72, waitFrom: "LAST_MESSAGE", stopOnReply: true,
+      action: "REMINDER", mode: "REVIEW", reminderText: "Ligar para o paciente e perguntar se ficou alguma dúvida sobre o orçamento.", active: true, createdAt: daysAgo(8, 9),
+    },
+  });
+  await prisma.tagAutomation.create({
+    data: {
+      clinicId: clinic.id, name: "Como foi a consulta", triggerKind: "TAG", tag: "Atendido", delayHours: 24, waitFrom: "ENTRY", stopOnReply: false,
+      action: "MESSAGE", mode: "AUTO", serviceNotice: true, ...tplOf("pos_consulta"), active: true, createdAt: daysAgo(7, 9),
+    },
+  });
+
+  // Tarefas: atrasada, para hoje (uma criada pela automação), futura, sem prazo e uma concluída.
+  const openConvs = await prisma.conversation.findMany({
+    where: { clinicId: clinic.id, status: { not: "RESOLVED" }, channel: "WHATSAPP" },
+    orderBy: { createdAt: "asc" },
+    select: { id: true, funnelStage: true },
+  });
+  const budgetConv = openConvs.find((x) => x.funnelStage === "ORCAMENTO") ?? openConvs[0];
+  const otherConvs = openConvs.filter((x) => x.id !== budgetConv?.id);
+  /** Fim do dia de hoje + n dias, em Brasília (mesmo formato que a tela grava). */
+  const dueIn = (n: number) => new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + n, 26, 59));
+  const TASKS: { text: string; due: Date | null; who: string | null; conv?: string; source?: string; done?: boolean }[] = [
+    { text: "Cobrar a autorização do convênio e avisar a paciente.", due: dueIn(-2), who: manager.id, conv: otherConvs[0]?.id },
+    { text: "Ligar para o paciente e perguntar se ficou alguma dúvida sobre o orçamento.", due: dueIn(0), who: null, conv: budgetConv?.id, source: "Orçamento parado" },
+    { text: "Confirmar com a Dra. Lívia o encaixe de quinta à tarde.", due: dueIn(0), who: manager.id },
+    { text: "Enviar o laudo do exame por e-mail.", due: dueIn(2), who: attendants[0].id, conv: otherConvs[1]?.id },
+    { text: "Atualizar a tabela de preços dos exames de imagem.", due: null, who: manager.id },
+    { text: "Retornar a ligação do laboratório parceiro.", due: dueIn(-1), who: attendants[1].id, done: true },
+  ];
+  for (const [i, t] of TASKS.entries()) {
+    await prisma.receptionTask.create({
+      data: {
+        clinicId: clinic.id, text: t.text, dueAt: t.due, assignedUserId: t.who, conversationId: t.conv ?? null,
+        source: t.source ?? null, createdByUserId: t.source ? null : manager.id,
+        doneAt: t.done ? daysAgo(1, 16) : null, doneByUserId: t.done ? attendants[1].id : null,
+        createdAt: daysAgo(3 - Math.min(i, 3), 10 + i),
+      },
     });
   }
 
