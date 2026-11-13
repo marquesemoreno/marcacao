@@ -177,16 +177,30 @@ export function stepsOf(a: {
 
 type TriggerShape = { triggerKind: string; tag: string; stage: string | null };
 
-/** Filtro (Prisma) das conversas que estão no gatilho agora — sempre dentro da clínica. */
-export function triggerWhere(a: TriggerShape & { clinicId: string }) {
-  return a.triggerKind === "STAGE"
-    ? { clinicId: a.clinicId, funnelStage: a.stage as "NOVOS" | "TRIAGEM" | "ORCAMENTO" | "AGENDADO", status: { not: "RESOLVED" as const } }
-    : { clinicId: a.clinicId, tags: { has: a.tag } };
+/** Como a tag é comparada: sem maiúsculas, sem acentos, sem espaço sobrando. A recepção digita
+ * "Teste", "teste" ou "TESTE" e é a mesma tag para a automação. */
+export function tagKey(tag: string): string {
+  return tag.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
+}
+
+/** A tag da automação mais as grafias dela que existem nas conversas da clínica. */
+export function tagVariants(tag: string, clinicTags: string[]): string[] {
+  const key = tagKey(tag);
+  return [...new Set([tag, ...clinicTags.filter((t) => tagKey(t) === key)])];
+}
+
+/** Filtro (Prisma) das conversas que estão no gatilho agora — sempre dentro da clínica.
+ * `variants`: grafias da tag (ver tagVariants); sem elas, compara a tag exata. */
+export function triggerWhere(a: TriggerShape & { clinicId: string }, variants: string[] = [a.tag]) {
+  if (a.triggerKind === "STAGE") {
+    return { clinicId: a.clinicId, funnelStage: a.stage as "NOVOS" | "TRIAGEM" | "ORCAMENTO" | "AGENDADO", status: { not: "RESOLVED" as const } };
+  }
+  return variants.length > 1 ? { clinicId: a.clinicId, tags: { hasSome: variants } } : { clinicId: a.clinicId, tags: { has: variants[0] ?? a.tag } };
 }
 
 export function sameTrigger(a: TriggerShape, b: TriggerShape): boolean {
   if (a.triggerKind !== b.triggerKind) return false;
-  return a.triggerKind === "STAGE" ? a.stage === b.stage : a.tag === b.tag;
+  return a.triggerKind === "STAGE" ? a.stage === b.stage : tagKey(a.tag) === tagKey(b.tag);
 }
 
 /** Tempo parado: se a última mensagem ainda não tem `delayHours`, devolve o novo vencimento

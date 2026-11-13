@@ -12,6 +12,7 @@ const db = vi.hoisted(() => ({
   message: { create: vi.fn(), findMany: vi.fn() },
   webhookLog: { create: vi.fn() },
   receptionTask: { create: vi.fn() },
+  $queryRaw: vi.fn(),
 }));
 vi.mock("@/lib/prisma", () => ({ prisma: db }));
 
@@ -65,7 +66,12 @@ function setup(a: ReturnType<typeof automation>, due: { id: string; conversation
 }
 
 beforeEach(() => {
-  for (const model of Object.values(db)) for (const fn of Object.values(model)) fn.mockReset();
+  for (const model of Object.values(db)) {
+    if (typeof model === "function") continue;
+    for (const fn of Object.values(model)) fn.mockReset();
+  }
+  db.$queryRaw.mockReset();
+  db.$queryRaw.mockResolvedValue([]);
   campaignsToday = [];
 });
 
@@ -328,6 +334,28 @@ describe("runTagAutomations — gerais", () => {
     const [result] = await runTagAutomations(now);
     expect(result.status).toBe("nada vencido");
     expect(db.webhookLog.create).not.toHaveBeenCalled();
+  });
+});
+
+describe("tag escrita de outro jeito", () => {
+  it("automação da tag \"teste\" pega a conversa marcada como \"Teste\" (maiúscula não importa)", async () => {
+    db.$queryRaw.mockResolvedValue([{ tag: "Teste" }, { tag: "Outra" }, { tag: "TESTE " }]);
+    setup(automation({ tag: "teste", action: "REMINDER", reminderText: "Ligar" }), [], []);
+    await runTagAutomations(now);
+    expect(db.conversation.findMany.mock.calls[0][0].where).toEqual({ clinicId: "clinic-a", tags: { hasSome: ["teste", "Teste", "TESTE "] } });
+  });
+
+  it("sem variação na clínica, continua filtrando pela tag exata", async () => {
+    db.$queryRaw.mockResolvedValue([{ tag: "Outra" }]);
+    setup(automation({ tag: "teste" }), [], []);
+    await runTagAutomations(now);
+    expect(db.conversation.findMany.mock.calls[0][0].where).toEqual({ clinicId: "clinic-a", tags: { has: "teste" } });
+  });
+
+  it("gatilho por etapa não consulta as tags", async () => {
+    setup(automation({ triggerKind: "STAGE", tag: "", stage: "ORCAMENTO" }), [], []);
+    await runTagAutomations(now);
+    expect(db.$queryRaw).not.toHaveBeenCalled();
   });
 });
 

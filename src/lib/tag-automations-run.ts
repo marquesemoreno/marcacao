@@ -9,6 +9,7 @@ import {
   idlePostponedDue,
   lostNote,
   stepsOf,
+  tagVariants,
   type StoredStep,
   triggerWhere,
   messageSkipReason,
@@ -55,10 +56,19 @@ export async function runTagAutomations(now = new Date()): Promise<RunResult[]> 
 
 type Trigger = { id: string; clinicId: string; triggerKind: string; tag: string; stage: string | null };
 
+/** Filtro do gatilho. Por tag, busca antes as grafias que existem na clínica ("Teste", "teste"),
+ * porque o Postgres compara o texto da tag exatamente. */
+async function triggerFilter(a: Trigger) {
+  if (a.triggerKind !== "TAG") return triggerWhere(a);
+  const rows = await prisma.$queryRaw<{ tag: string }[]>`
+    SELECT DISTINCT unnest(tags) AS tag FROM conversations WHERE clinic_id = ${a.clinicId} AND cardinality(tags) > 0`;
+  return triggerWhere(a, tagVariants(a.tag, rows.map((r) => r.tag)));
+}
+
 /** Sincroniza a fila da automação com as conversas que estão no gatilho (tag ou etapa) agora. */
 export async function syncEnrollments(automation: Trigger & { delayHours: number }, now: Date) {
   const [tagged, existing] = await Promise.all([
-    prisma.conversation.findMany({ where: triggerWhere(automation), select: { id: true } }),
+    prisma.conversation.findMany({ where: await triggerFilter(automation), select: { id: true } }),
     prisma.tagAutomationEnrollment.findMany({ where: { automationId: automation.id }, select: { id: true, conversationId: true, status: true } }),
   ]);
   const plan = planEnrollments({ delayHours: automation.delayHours, taggedConversationIds: tagged.map((c) => c.id), existing, now });
@@ -76,7 +86,7 @@ export async function syncEnrollments(automation: Trigger & { delayHours: number
  * recebe nada. Só quem receber a tag daqui para a frente dispara. */
 export async function resetBaseline(automation: Trigger, now: Date) {
   await prisma.tagAutomationEnrollment.deleteMany({ where: { automationId: automation.id } });
-  const tagged = await prisma.conversation.findMany({ where: triggerWhere(automation), select: { id: true } });
+  const tagged = await prisma.conversation.findMany({ where: await triggerFilter(automation), select: { id: true } });
   if (tagged.length) {
     await prisma.tagAutomationEnrollment.createMany({
       data: tagged.map((c) => ({ automationId: automation.id, conversationId: c.id, dueAt: now, status: "BASELINE", doneAt: now })),

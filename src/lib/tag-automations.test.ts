@@ -7,6 +7,8 @@ import {
   stepsOf,
   planEnrollments,
   sameTrigger,
+  tagKey,
+  tagVariants,
   triggerWhere,
   reminderNote,
   tagAutomationCampaignName,
@@ -164,6 +166,25 @@ describe("gatilho por etapa, tempo parado e parada na resposta", () => {
       funnelStage: "ORCAMENTO",
       status: { not: "RESOLVED" },
     });
+  });
+
+  it("tagKey ignora maiúsculas, acentos e espaços sobrando", () => {
+    expect(tagKey("  Natação  Infantil ")).toBe("natacao infantil");
+    expect(tagKey("Teste")).toBe(tagKey("teste"));
+    expect(tagKey("Retorno")).not.toBe(tagKey("Retornos"));
+  });
+
+  it("tagVariants junta a tag da automação com as grafias que existem na clínica", () => {
+    expect(tagVariants("teste", ["Teste", "Outra", "TESTE", "Teste"])).toEqual(["teste", "Teste", "TESTE"]);
+    expect(tagVariants("teste", [])).toEqual(["teste"]);
+  });
+
+  it("triggerWhere com várias grafias usa hasSome", () => {
+    expect(triggerWhere({ clinicId: "c1", triggerKind: "TAG", tag: "teste", stage: null }, ["teste", "Teste"])).toEqual({ clinicId: "c1", tags: { hasSome: ["teste", "Teste"] } });
+  });
+
+  it("sameTrigger: mudar só maiúscula ou acento da tag não é troca de gatilho", () => {
+    expect(sameTrigger({ triggerKind: "TAG", tag: "teste", stage: null }, { triggerKind: "TAG", tag: "Teste", stage: null })).toBe(true);
   });
 
   it("sameTrigger percebe troca de tag, de etapa e de tipo", () => {
