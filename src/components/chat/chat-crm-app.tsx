@@ -355,6 +355,14 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
     unidentified: number;
   } | null>(null);
 
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
   const refreshContacts = useCallback(async () => {
     const clinicIdArg = scope === "admin" && clinicFilter ? clinicFilter : undefined;
 
@@ -448,6 +456,8 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
         setIsLoadingMoreFinalized(false);
       }
     } catch (error) {
+      // Saiu do Chat com a lista ainda carregando: não há tela para avisar (MARCACAO-6).
+      if (!mountedRef.current) return;
       console.error("Falha ao carregar conversas:", error);
       // Sessão caiu (vencida, senha trocada, encerrada em outro aparelho)? Vai pro login
       // em vez de deixar a tela parada tentando de novo (MARCACAO-8).
