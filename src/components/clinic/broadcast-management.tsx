@@ -4,7 +4,7 @@ import { normalizeBroadcastVariants, previewBroadcastVariants } from "@/lib/broa
 import { buildTemplateParams, checkTemplateParamSources, renderTemplatePreview, templateLabel } from "@/lib/broadcast-cloud-template";
 import { PageHeader } from "@/components/clinic/page-header";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { CalendarClock, Copy, FileText, Mail, MessageCircle, MessageSquareText, ShieldCheck, Image as ImageIcon, Loader2, MoreHorizontal, Paperclip, Pause, Phone, Play, Plus, Repeat, Settings2, Tags, Trash2, Upload, X } from "lucide-react";
+import { BellOff, CalendarClock, Copy, FileText, Mail, MessageCircle, MessageSquareText, ShieldCheck, Image as ImageIcon, Loader2, MoreHorizontal, Paperclip, Pause, Phone, Play, Plus, Repeat, Settings2, Tags, Trash2, Upload, X } from "lucide-react";
 import { BROADCAST_ATTACHMENT_ACCEPT, checkBroadcastAttachment } from "@/lib/broadcast-attachment";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "sonner";
@@ -28,7 +28,10 @@ import {
   getClinicNumberHealth,
   pauseAllClinicBroadcastCampaigns,
   resumeClinicBroadcastCampaigns,
+  getClinicReminderPause,
+  setClinicReminderPause,
 } from "@/actions/clinic-broadcast";
+import { REMINDER_PAUSE_OPTIONS } from "@/lib/reminder-pause";
 import { BridgeAudiencePicker } from "@/components/clinic/bridge-audience-picker";
 import { listMarcadoresAudience } from "@/actions/marcadores";
 import { getTagAudience, listTagAudienceOptions } from "@/actions/tag-audience";
@@ -49,6 +52,10 @@ type StartPreview = Awaited<ReturnType<typeof getClinicCampaignStartPreview>>;
 type NumberHealthView = Awaited<ReturnType<typeof getClinicNumberHealth>>;
 
 const FOCUS_RING = "focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60 focus-visible:ring-offset-1 dark:focus-visible:ring-offset-slate-950";
+
+function formatPauseUntil(iso: string): string {
+  return new Date(iso).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", weekday: "short", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+}
 
 const HEALTH_TONE = {
   ok: "border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-200",
@@ -186,9 +193,26 @@ export function BroadcastManagement() {
   const [switchingPriority, setSwitchingPriority] = useState(false);
   const [startHealth, setStartHealth] = useState<NumberHealthView | null>(null);
   const [pausingAll, setPausingAll] = useState(false);
+  // Pausa dos lembretes D-1 (16/11/2026: número restrito pelo WhatsApp não pode abrir conversa).
+  const [reminderPause, setReminderPause] = useState<{ available: boolean; pausedUntil: string | null } | null>(null);
+  const [savingReminderPause, setSavingReminderPause] = useState(false);
   const loadHealth = useCallback(() => {
     getClinicNumberHealth().then(setHealth).catch(() => {});
+    getClinicReminderPause().then(setReminderPause).catch(() => {});
   }, []);
+  const changeReminderPause = async (days: number | null) => {
+    setSavingReminderPause(true);
+    try {
+      const { pausedUntil } = await setClinicReminderPause(days);
+      setReminderPause({ available: true, pausedUntil });
+      setConfigOpen(false);
+      toast.success(pausedUntil ? `Lembretes pausados até ${formatPauseUntil(pausedUntil)}` : "Lembretes retomados");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Não foi possível alterar os lembretes");
+    } finally {
+      setSavingReminderPause(false);
+    }
+  };
 
   const loadCampaigns = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
@@ -599,7 +623,7 @@ export function BroadcastManagement() {
                   <Settings2 className="w-4 h-4" aria-hidden />
                   Configurar
                 </PopoverTrigger>
-                <PopoverContent align="end" className="w-64 p-1">
+                <PopoverContent align="end" className="w-72 p-1">
                   <button
                     type="button"
                     onClick={() => {
@@ -642,6 +666,45 @@ export function BroadcastManagement() {
                       <span className="block text-xs text-slate-500 dark:text-slate-400">Quem autorizou receber por esses canais</span>
                     </span>
                   </button>
+                  {reminderPause?.available && (
+                    <div className="mt-1 border-t border-slate-200 dark:border-slate-700 px-2 pt-2 pb-1.5">
+                      <p className="flex items-start gap-2 text-sm text-slate-700 dark:text-slate-200">
+                        <BellOff className="w-4 h-4 mt-0.5 shrink-0" aria-hidden />
+                        <span>
+                          Lembretes de consulta
+                          <span className="block text-xs text-slate-500 dark:text-slate-400">
+                            {reminderPause.pausedUntil
+                              ? `Pausados até ${formatPauseUntil(reminderPause.pausedUntil)}`
+                              : "Ligados. Pause se o WhatsApp restringir o número."}
+                          </span>
+                        </span>
+                      </p>
+                      <div className="mt-2 flex flex-wrap gap-1.5 pl-6">
+                        {reminderPause.pausedUntil ? (
+                          <button
+                            type="button"
+                            disabled={savingReminderPause}
+                            onClick={() => changeReminderPause(null)}
+                            className={`h-8 rounded-full px-3 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 ${FOCUS_RING}`}
+                          >
+                            Retomar agora
+                          </button>
+                        ) : (
+                          REMINDER_PAUSE_OPTIONS.map((d) => (
+                            <button
+                              key={d}
+                              type="button"
+                              disabled={savingReminderPause}
+                              onClick={() => changeReminderPause(d)}
+                              className={`h-8 rounded-full px-3 text-xs font-medium text-slate-700 dark:text-slate-200 ring-1 ring-slate-300 dark:ring-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-60 ${FOCUS_RING}`}
+                            >
+                              Pausar {d === 1 ? "1 dia" : `${d} dias`}
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </PopoverContent>
               </Popover>
             )}
@@ -678,6 +741,25 @@ export function BroadcastManagement() {
         <div role="alert" className="rounded-2xl border border-red-300 dark:border-red-800 bg-red-50/90 dark:bg-red-950/40 p-4 text-sm text-red-800 dark:text-red-300">
           <p className="font-semibold">O número de WhatsApp está desconectado — nenhuma campanha, lembrete ou mensagem do Chat sai agora.</p>
           <p className="mt-0.5">Reconecte o celular da clínica no WhatsApp ou fale com o suporte da Conecta Saúde. Os envios voltam sozinhos quando ele reconectar.</p>
+        </div>
+      )}
+
+      {reminderPause?.pausedUntil && (
+        <div role="status" className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-amber-300 dark:border-amber-800 bg-amber-50/90 dark:bg-amber-950/40 px-4 py-3 text-sm text-amber-900 dark:text-amber-200">
+          <p>
+            <span className="font-semibold">Lembretes de consulta pausados até {formatPauseUntil(reminderPause.pausedUntil)}.</span>{" "}
+            Voltam sozinhos depois disso. Confirme por telefone quem tem consulta nesse período.
+          </p>
+          {channelSetup?.isManager && (
+            <button
+              type="button"
+              disabled={savingReminderPause}
+              onClick={() => changeReminderPause(null)}
+              className={`h-8 rounded-full px-3 text-xs font-semibold text-amber-900 dark:text-amber-100 ring-1 ring-amber-400 dark:ring-amber-700 hover:bg-amber-100 dark:hover:bg-amber-900/40 disabled:opacity-60 ${FOCUS_RING}`}
+            >
+              Retomar agora
+            </button>
+          )}
         </div>
       )}
 

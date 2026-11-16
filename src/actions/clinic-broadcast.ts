@@ -25,6 +25,7 @@ import { buildEmailContent, buildSmsContent } from "@/lib/channel-content";
 
 import { attachmentKindOf, checkBroadcastAttachment } from "@/lib/broadcast-attachment";
 import { numberHealth } from "@/lib/number-health";
+import { reminderPauseUntil, remindersPausedNow } from "@/lib/reminder-pause";
 import { getWhatsappChannelStatus } from "@/actions/inbox";
 
 /** Mirror de listBroadcastCampaigns (admin-broadcast.ts) — clinicId vem da sessão,
@@ -149,6 +150,27 @@ function buildCallList(recipients: RecipientRow[], now: Date) {
 async function clinicRemindersActive(clinicId: string, now: Date): Promise<boolean> {
   const h = await prisma.hospitalIntegration.findUnique({ where: { clinicId }, select: { active: true, remindersPausedUntil: true } });
   return !!h?.active && (!h.remindersPausedUntil || h.remindersPausedUntil < now);
+}
+
+/** Estado da pausa dos lembretes D-1 (só existe para clínica com ponte ativa). */
+export async function getClinicReminderPause(): Promise<{ available: boolean; pausedUntil: string | null }> {
+  const { clinicId } = await requireClinicSession();
+  const h = await prisma.hospitalIntegration.findUnique({ where: { clinicId }, select: { active: true, remindersPausedUntil: true } });
+  if (!h?.active) return { available: false, pausedUntil: null };
+  return {
+    available: true,
+    pausedUntil: remindersPausedNow(h.remindersPausedUntil) ? h.remindersPausedUntil!.toISOString() : null,
+  };
+}
+
+/** Pausa os lembretes D-1 por N dias (1, 2 ou 7) ou retoma agora (null). Só a gestão. */
+export async function setClinicReminderPause(days: number | null): Promise<{ pausedUntil: string | null }> {
+  const { clinicId } = await requireClinicManager();
+  const pausedUntil = days === null ? null : reminderPauseUntil(days);
+  const updated = await prisma.hospitalIntegration.updateMany({ where: { clinicId, active: true }, data: { remindersPausedUntil: pausedUntil } });
+  if (updated.count === 0) throw new Error("Esta clínica não tem lembretes automáticos");
+  revalidatePath("/clinic/disparos");
+  return { pausedUntil: pausedUntil?.toISOString() ?? null };
 }
 
 /** Quando deve sair a próxima mensagem automática da clínica (lembrete, campanha ou aviso),
