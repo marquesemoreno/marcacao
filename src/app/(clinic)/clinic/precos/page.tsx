@@ -42,7 +42,7 @@ export default async function ClinicSettingsPage() {
     // próprio contêiner de rolagem, senão o foco na aba rola o <main> escondido.
     <div className="soft-canvas h-full overflow-y-auto">
       <div className="space-y-6 p-4 sm:p-6 md:p-8 max-w-7xl mx-auto w-full">
-        <PageHeader title="Configurações" subtitle={`Preços, horários e parâmetros · ${clinicProcedures.length} procedimento(s)`} />
+        <PageHeader title="Preços e horários" subtitle={`Preços, horários e parâmetros · ${clinicProcedures.length} procedimento(s)`} />
         <SettingsSectionNav active="precos" />
 
       <PrecosPageTabs

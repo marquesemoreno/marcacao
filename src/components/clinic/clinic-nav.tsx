@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  Repeat,
   MessageCircle,
   KanbanSquare,
   Users,
@@ -14,10 +13,8 @@ import {
   BarChart3,
   Megaphone,
   Sparkles,
-  ShieldCheck,
-  BookOpen,
-  Smartphone,
-  type LucideIcon, ClipboardList, ListTodo, MonitorPlay, Ticket } from "lucide-react";
+  type LucideIcon, ListTodo, Ticket } from "lucide-react";
+import { isSettingsRoute } from "@/components/clinic/settings-sections";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { useTaskCount, useUnreadCount } from "@/lib/use-unread-count";
 import { can, type ClinicPermission, type ClinicRole } from "@/lib/clinic-permissions";
@@ -53,14 +50,10 @@ const NAV_GROUPS: NavGroup[] = [
       { href: "/clinic/disparos", label: "Disparos", icon: Megaphone, perm: "disparos" },
       { href: "/clinic/relatorio", label: "Relatórios", icon: BarChart3, perm: "relatorios" },
       { href: "/clinic/ia", label: "Ações da IA", icon: Sparkles },
-      { href: "/clinic/processos", label: "Processos", icon: BookOpen },
-      { href: "/clinic/ficha", label: "Ficha prévia", icon: ClipboardList, perm: "config" },
-      { href: "/clinic/retorno", label: "Retorno", icon: Repeat, perm: "config" },
-      { href: "/clinic/tv", label: "TV da sala de espera", icon: MonitorPlay, perm: "config" },
-      { href: "/clinic/acessos", label: "Acessos", icon: ShieldCheck, perm: "config" },
-      { href: "/clinic/whatsapp", label: "WhatsApp", icon: Smartphone, perm: "config" },
-      // Visível também pras clínicas só-WhatsApp (horários e ticket médio valem pra elas).
-      { href: "/clinic/precos", label: "Configurações", icon: Settings, perm: "config" },
+      // Hub (16/11/2026): WhatsApp, Preços e horários, Retorno, Ficha prévia, TV, Acessos e
+      // Processos viraram cartões em /clinic/configuracoes (ver settings-sections.ts). Sem
+      // `perm`: a recepção também entra, para ver Processos; o hub filtra os cartões.
+      { href: "/clinic/configuracoes", label: "Configurações", icon: Settings },
     ],
   },
 ];
@@ -92,7 +85,7 @@ export function ClinicNav({
     const isActive =
       pathname?.startsWith(item.href) ||
       (item.href === "/clinic/contatos" && pathname?.startsWith("/clinic/pacientes")) ||
-      (item.href === "/clinic/precos" && pathname?.startsWith("/clinic/perfil"));
+      (item.href === "/clinic/configuracoes" && isSettingsRoute(pathname));
     const Icon = item.icon;
     const count = item.badge === "unread" ? unread : item.badge === "tasks" ? dueTasks : 0;
     const countLabel = item.badge === "tasks" ? "para hoje ou atrasadas" : "aguardando resposta";
