@@ -2,7 +2,7 @@ import type { AuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
-import { isLoginLocked, LOGIN_WINDOW_MIN, SESSION_MAX_AGE_SEC } from "@/lib/login-guard";
+import { isIpLocked, isLoginLocked, LOGIN_WINDOW_MIN, SESSION_MAX_AGE_SEC } from "@/lib/login-guard";
 import { requiresTwoFactor, TWO_FACTOR_INVALID, TWO_FACTOR_REQUIRED } from "@/lib/auth-security";
 import { verifyTotp } from "@/lib/totp";
 import { decryptToken } from "@/lib/token-crypto";
@@ -12,6 +12,14 @@ const header = (req: ReqLike, name: string) => {
   const v = req?.headers?.[name];
   return (Array.isArray(v) ? v[0] : v) ?? null;
 };
+
+const clientIp = (req: ReqLike) => header(req, "x-forwarded-for")?.split(",")[0].trim().slice(0, 64) || null;
+
+/** Hash de uma senha qualquer, calculado uma vez: quando o e-mail não existe, compara contra
+ * ele para a resposta demorar o mesmo que a de um e-mail real (não dá para descobrir
+ * quais e-mails têm cadastro medindo o tempo). */
+let dummyHash: string | null = null;
+const timingDummyHash = () => (dummyHash ??= bcrypt.hashSync("senha-que-nao-existe", 10));
 
 /** Histórico de entradas (login certo e errado) — nunca derruba o login se falhar. */
 async function logLogin(
@@ -23,7 +31,7 @@ async function logLogin(
       data: {
         ...data,
         clinicId: data.clinicId ?? null,
-        ip: header(req, "x-forwarded-for")?.split(",")[0].trim().slice(0, 64) ?? null,
+        ip: clientIp(req),
         userAgent: header(req, "user-agent")?.slice(0, 300) ?? null,
       },
     })
@@ -56,11 +64,27 @@ export const authOptions: AuthOptions = {
           return null;
         }
 
+        // Mesma origem errando muito (senha ou código), em qualquer e-mail: bloqueia a origem.
+        const ip = clientIp(req);
+        if (ip) {
+          const fromIp = await prisma.loginEvent
+            .count({
+              where: { ip, success: false, reason: { in: ["SENHA", "CODIGO_2FA"] }, createdAt: { gte: new Date(Date.now() - LOGIN_WINDOW_MIN * 60_000) } },
+            })
+            .catch(() => 0);
+          if (isIpLocked(fromIp)) {
+            await logLogin(req, { email, success: false, reason: "BLOQUEADO_IP" });
+            return null;
+          }
+        }
+
         // E-mail sem diferenciar maiúscula (cadastros antigos podem ter maiúscula salva).
         const user = await prisma.user.findFirst({
           where: { email: { equals: email, mode: "insensitive" } },
         });
-        const passwordMatches = user ? await bcrypt.compare(credentials.password, user.passwordHash) : false;
+        const passwordMatches = user
+          ? await bcrypt.compare(credentials.password, user.passwordHash)
+          : (await bcrypt.compare(credentials.password, timingDummyHash()), false);
         if (!user || !passwordMatches) {
           await prisma.loginFailure.create({ data: { email } }).catch(() => {});
           await logLogin(req, { email, success: false, reason: "SENHA", userId: user?.id, clinicId: user?.clinicId });

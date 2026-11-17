@@ -152,6 +152,8 @@ O que está bem feito e vale registrar: as server actions do painel filtram por 
 - **Esforço:** 4–6 h.
 
 #### M10 — Login: bloqueio só por e-mail e 2FA opcional até para o admin
+
+> **Corrigido em 17/11/2026 (falta push/deploy).** (1) Limite por origem: 20 erros de senha ou código do mesmo IP em 15 min bloqueiam aquele IP, em qualquer e-mail (`src/lib/auth.ts`, motivo `BLOQUEADO_IP`). (2) 2FA obrigatório para admin e gestão, **desligado até criar `TWO_FACTOR_ENFORCE=1` na Vercel**: quem não ativou é levado à tela Minha conta com um aviso e ativa sozinho (`twoFactorGate` nos layouts). É uma trava de tela; as ações do servidor seguem conferindo sessão e função como antes. (3) B4: e-mail inexistente demora o mesmo que um real. Continua valendo: quem souber o e-mail de alguém ainda consegue travar aquele login com 5 erros a cada 15 min (o bloqueio por e-mail foi mantido de propósito).
 - **Onde:** `src/lib/auth.ts:49-56,65` e `src/lib/login-guard.ts`.
 - **O que é:** o bloqueio conta erros por e-mail, não por IP. Quem souber o e-mail da recepção mantém o login travado com 5 tentativas a cada 15 min; e uma mesma origem pode testar uma senha comum contra muitos e-mails sem nunca ser bloqueada. O 2FA é opcional inclusive para `role = ADMIN`, que enxerga todas as clínicas.
 - **Correção:** somar limite por IP (ex.: 20 erros / 15 min); 2FA obrigatório para ADMIN e GESTAO; aviso por e-mail quando houver bloqueio.

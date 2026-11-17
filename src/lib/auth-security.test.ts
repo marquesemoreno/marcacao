@@ -54,3 +54,37 @@ describe("sessão", () => {
     expect(requiresTwoFactor({ totpSecret: null, totpEnabledAt: null })).toBe(false);
   });
 });
+
+import { isTwoFactorEnforced, twoFactorSetupRedirect } from "./auth-security";
+
+describe("2FA obrigatório para admin e gestão (auditoria 16/11/2026, M10)", () => {
+  const off = { totpSecret: null, totpEnabledAt: null };
+  const on = { totpSecret: "x", totpEnabledAt: new Date() };
+
+  it("só vale com TWO_FACTOR_ENFORCE ligado (liga depois de avisar a equipe)", () => {
+    expect(isTwoFactorEnforced(undefined)).toBe(false);
+    expect(isTwoFactorEnforced("")).toBe(false);
+    expect(isTwoFactorEnforced("1")).toBe(true);
+    expect(isTwoFactorEnforced("true")).toBe(true);
+    expect(twoFactorSetupRedirect({ role: "ADMIN", clinicRole: null, ...off }, "/admin/inbox", false)).toBeNull();
+  });
+  it("admin sem 2FA vai para Minha conta", () => {
+    expect(twoFactorSetupRedirect({ role: "ADMIN", clinicRole: null, ...off }, "/admin/inbox", true)).toBe("/admin/conta?2fa=obrigatorio");
+  });
+  it("gestão sem 2FA vai para Minha conta", () => {
+    expect(twoFactorSetupRedirect({ role: "CLINIC", clinicRole: "GESTAO", ...off }, "/clinic/relatorio", true)).toBe("/clinic/perfil?2fa=obrigatorio");
+  });
+  it("já na tela de ativar: não redireciona (senão entra em laço)", () => {
+    expect(twoFactorSetupRedirect({ role: "CLINIC", clinicRole: "GESTAO", ...off }, "/clinic/perfil", true)).toBeNull();
+    expect(twoFactorSetupRedirect({ role: "ADMIN", clinicRole: null, ...off }, "/admin/conta", true)).toBeNull();
+  });
+  it("quem já ativou, recepção, marketing e médico seguem normalmente", () => {
+    expect(twoFactorSetupRedirect({ role: "CLINIC", clinicRole: "GESTAO", ...on }, "/clinic/relatorio", true)).toBeNull();
+    for (const clinicRole of ["RECEPCAO", "MARKETING", "MEDICO", null]) {
+      expect(twoFactorSetupRedirect({ role: "CLINIC", clinicRole, ...off }, "/clinic/inbox", true)).toBeNull();
+    }
+  });
+  it("sem saber a página atual, não redireciona (falha aberta, nunca em laço)", () => {
+    expect(twoFactorSetupRedirect({ role: "ADMIN", clinicRole: null, ...off }, null, true)).toBeNull();
+  });
+});

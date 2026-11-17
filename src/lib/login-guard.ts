@@ -10,3 +10,13 @@ export function isLoginLocked(recentFailures: Date[], now: Date = new Date()): b
   const since = now.getTime() - LOGIN_WINDOW_MIN * 60_000;
   return recentFailures.filter((d) => d.getTime() >= since).length >= LOGIN_MAX_FAILURES;
 }
+
+/** Limite por origem (auditoria de segurança 16/11/2026, M10). O bloqueio por e-mail não
+ * segura quem testa UMA senha comum contra muitos e-mails; este conta os erros de senha ou
+ * de código vindos do mesmo IP na mesma janela de LOGIN_WINDOW_MIN. 20 dá folga para uma
+ * recepção inteira atrás do mesmo Wi-Fi errar a senha de manhã. */
+export const LOGIN_MAX_FAILURES_PER_IP = 20;
+
+export function isIpLocked(recentFailuresFromIp: number): boolean {
+  return recentFailuresFromIp >= LOGIN_MAX_FAILURES_PER_IP;
+}

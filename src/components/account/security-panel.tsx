@@ -18,6 +18,7 @@ type Security = Awaited<ReturnType<typeof getMySecurity>>;
 const REASON: Record<string, string> = {
   SENHA: "senha errada",
   BLOQUEADO: "bloqueado (muitas tentativas)",
+  BLOQUEADO_IP: "bloqueado (muitas tentativas desta rede)",
   INATIVO: "usuário desativado",
   CODIGO_2FA: "código errado",
 };

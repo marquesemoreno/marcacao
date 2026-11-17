@@ -16,3 +16,16 @@ describe("isLoginLocked", () => {
     expect(SESSION_MAX_AGE_SEC).toBe(12 * 60 * 60);
   });
 });
+
+import { isIpLocked, LOGIN_MAX_FAILURES_PER_IP } from "./login-guard";
+
+describe("isIpLocked (auditoria 16/11/2026, M10)", () => {
+  it("bloqueia a origem com 20 erros na janela, qualquer que seja o e-mail", () => {
+    expect(isIpLocked(LOGIN_MAX_FAILURES_PER_IP)).toBe(true);
+    expect(isIpLocked(LOGIN_MAX_FAILURES_PER_IP + 5)).toBe(true);
+  });
+  it("uma recepção inteira errando a senha no mesmo Wi-Fi não bloqueia", () => {
+    expect(isIpLocked(LOGIN_MAX_FAILURES_PER_IP - 1)).toBe(false);
+    expect(LOGIN_MAX_FAILURES_PER_IP).toBeGreaterThanOrEqual(15);
+  });
+});

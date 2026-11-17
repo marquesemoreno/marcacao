@@ -9,7 +9,7 @@ import { ClinicNav } from "@/components/clinic/clinic-nav";
 import { ClinicSidebar } from "@/components/clinic/clinic-sidebar";
 import { CopilotLauncher } from "@/components/clinic/copilot/copilot-launcher";
 import { getClinicInfo } from "@/actions/clinic";
-import { getClinicRole, isLive } from "@/lib/session";
+import { getClinicRole, isLive, twoFactorGate } from "@/lib/session";
 import { redirect } from "next/navigation";
 import { cache } from "react";
 
@@ -35,6 +35,8 @@ export default async function ClinicLayout({
 }>) {
   const session = await getServerSession(authOptions);
   if (session && !(await isLive(session))) redirect("/sair");
+  const twoFactorSetup = await twoFactorGate(session);
+  if (twoFactorSetup) redirect(twoFactorSetup);
   const clinic = await loadClinicInfo();
   const isExclusive = Boolean(clinic.whatsappInstance);
   const role = session?.user.id ? await getClinicRole(session.user.id) : "RECEPCAO";

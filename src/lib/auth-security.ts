@@ -45,3 +45,26 @@ export function sessionStillValid(
 export function requiresTwoFactor(user: { totpSecret: string | null; totpEnabledAt: Date | null }): boolean {
   return !!user.totpSecret && !!user.totpEnabledAt;
 }
+
+/** Valor de TWO_FACTOR_ENFORCE que liga a exigência ("1" ou "true"). Desligado por padrão:
+ * ligar na Vercel só depois de avisar admin e gestão para ativarem em Minha conta. */
+export function isTwoFactorEnforced(value: string | undefined): boolean {
+  const v = value?.trim().toLowerCase();
+  return v === "1" || v === "true";
+}
+
+/** 2FA obrigatório para quem enxerga mais (auditoria de segurança 16/11/2026, M10): admin da
+ * TIVDC (todas as clínicas) e gestão da clínica (relatórios, configurações, acessos).
+ * Devolve para onde mandar quem ainda não ativou — a tela Minha conta, onde ativa sozinho —
+ * ou null se pode seguir. Na própria tela de ativar não redireciona; sem saber a página
+ * atual também não (melhor deixar passar do que prender em laço). */
+export function twoFactorSetupRedirect(
+  user: { role: string; clinicRole: string | null; totpSecret: string | null; totpEnabledAt: Date | null },
+  pathname: string | null,
+  enforce: boolean,
+): string | null {
+  if (!enforce || !pathname || requiresTwoFactor(user)) return null;
+  const setupPath = user.role === "ADMIN" ? "/admin/conta" : user.role === "CLINIC" && user.clinicRole === "GESTAO" ? "/clinic/perfil" : null;
+  if (!setupPath || pathname === setupPath || pathname.startsWith(`${setupPath}/`)) return null;
+  return `${setupPath}?2fa=obrigatorio`;
+}

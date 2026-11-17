@@ -36,7 +36,9 @@ export default withAuth(
       return NextResponse.redirect(new URL(isDoctor ? "/clinic/medico" : "/clinic/inbox", req.url));
     }
 
-    const response = NextResponse.next();
+    const requestHeaders = new Headers(req.headers);
+    requestHeaders.set("x-pathname", pathname);
+    const response = NextResponse.next({ request: { headers: requestHeaders } });
 
     // Tracking de afiliados: ?ref=CODIGO em qualquer página pública vira
     // cookie de 30 dias, lido depois em createAppointment (ver docs/obsidian/13).

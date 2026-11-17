@@ -1,13 +1,14 @@
 import { cache } from "react";
 import { getServerSession } from "next-auth";
-import { sessionStillValid } from "@/lib/auth-security";
+import { headers } from "next/headers";
+import { isTwoFactorEnforced, sessionStillValid, twoFactorSetupRedirect } from "@/lib/auth-security";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { can, parseClinicRole, type ClinicPermission, type ClinicRole } from "@/lib/clinic-permissions";
 
 /** Usuário lido 1x por requisição (cache do React) — ativo, versão da sessão e função. */
 const loadUser = cache((id: string) =>
-  prisma.user.findUnique({ where: { id }, select: { active: true, sessionVersion: true, clinicRole: true } })
+  prisma.user.findUnique({ where: { id }, select: { active: true, sessionVersion: true, clinicRole: true, role: true, totpSecret: true, totpEnabledAt: true } })
 );
 
 /** Sessão ainda vale? Cai na hora se o usuário foi desativado, trocou a senha ou teve as
@@ -73,4 +74,15 @@ export async function requireClinicManager() {
   const session = await requireClinicSession();
   if (!(await isClinicManager(session.userId))) throw new Error("Acesso restrito à gestão da clínica");
   return session;
+}
+
+/** Para os layouts do painel: admin ou gestão sem verificação em duas etapas é levado à tela
+ * Minha conta para ativar (só com TWO_FACTOR_ENFORCE ligado). null = pode seguir. É uma
+ * trava de tela: as ações do servidor continuam conferindo sessão e função como antes. */
+export async function twoFactorGate(session: { user: { id: string } } | null): Promise<string | null> {
+  if (!session || !isTwoFactorEnforced(process.env.TWO_FACTOR_ENFORCE)) return null;
+  const user = await loadUser(session.user.id);
+  if (!user) return null;
+  const pathname = (await headers()).get("x-pathname");
+  return twoFactorSetupRedirect(user, pathname, true);
 }
