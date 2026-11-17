@@ -9,7 +9,7 @@ import { MAX_CLICK_BODY_BYTES, parseClickPayload } from "@/lib/ad-tracking";
  * "Aceitar" dos cookies e só quando a visita tem gclid/gbraid/wbraid/fbclid. Público, mas:
  * - CORS só para os sites cadastrados em TRACK_CLICK_ORIGINS (padrão: site da Urolaser);
  * - corpo de no máximo 2 KB, validado campo a campo (ver parseClickPayload);
- * - limite por visitante (hash do IP, nunca gravado) e por instância;
+ * - limite por visitante (hash do IP, nunca gravado) e por instância, mais um teto no banco;
  * - grava só token → identificadores de clique + utm_*. Sem IP, sem página, sem referrer.
  * Responde 204 sempre que aceitou (o beacon não lê a resposta).
  */
@@ -25,6 +25,9 @@ function corsHeaders(origin: string | null): Record<string, string> {
   if (!origin || !allowedOrigins().includes(origin)) return {};
   return {
     "Access-Control-Allow-Origin": origin,
+    // Mantido de propósito (auditoria B1): o sendBeacon sempre manda credenciais; se o track.js
+    // enviar como JSON, a pré-verificação exige este cabeçalho e, sem ele, o clique não chega.
+    // A rota não usa cookie nem devolve corpo — nada a ler do outro lado.
     "Access-Control-Allow-Credentials": "true",
     "Access-Control-Allow-Methods": "POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type",
@@ -39,6 +42,9 @@ const PER_VISITOR = 20;
 const VISITOR_WINDOW_MS = 10 * 60_000;
 const GLOBAL_PER_MINUTE = 600;
 const visitors = new Map<string, number[]>();
+/** Teto no banco, que vale entre instâncias (auditoria B1): clique pago real é bem menos que
+ * isso; acima, é script enchendo a tabela. Usa o índice de created_at. */
+const DB_MAX_PER_10_MIN = 1000;
 let globalWindow = { start: 0, count: 0 };
 
 function visitorKey(request: Request): string {
@@ -69,6 +75,8 @@ export async function POST(request: Request) {
   const declared = Number(request.headers.get("content-length") ?? 0);
   if (declared > MAX_CLICK_BODY_BYTES) return new NextResponse(null, { status: 413, headers });
   if (rateLimited(visitorKey(request))) return new NextResponse(null, { status: 429, headers });
+  const recent = await prisma.adClick.count({ where: { createdAt: { gte: new Date(Date.now() - VISITOR_WINDOW_MS) } } }).catch(() => 0);
+  if (recent >= DB_MAX_PER_10_MIN) return new NextResponse(null, { status: 429, headers });
 
   // sendBeacon pode mandar application/json ou text/plain — lê como texto nos dois casos.
   const raw = await request.text();
