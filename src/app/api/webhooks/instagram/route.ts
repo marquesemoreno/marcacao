@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { errorSummary } from "@/lib/safe-error";
 import { decryptToken } from "@/lib/token-crypto";
 import { formatFileSize } from "@/lib/format";
 import { notifyInboxRealtime } from "@/lib/supabase-server";
@@ -162,7 +163,9 @@ export async function POST(request: Request) {
         await prisma.message.updateMany({ where: { whatsappKeyId: event.mid }, data: { deletedAt: new Date() } });
       }
     } catch (error) {
-      await log({ event: JSON.parse(JSON.stringify(event)), error: error instanceof Error ? error.message : String(error) }, "FAILED");
+      // Só o tipo, o id da mensagem e o resumo do erro: o evento inteiro traz o texto do
+      // paciente e error.message traz os argumentos do Prisma (auditoria 16/11/2026, B2).
+      await log({ kind: event.kind, mid: event.mid, error: errorSummary(error) }, "FAILED");
     }
   }
 
