@@ -1,13 +1,11 @@
-import { profileInclude, profileOf } from "@/lib/contact-profile";
 import "server-only";
 import type OpenAI from "openai";
 import { prisma } from "@/lib/prisma";
-import { createAppointmentForClinic, parseAppointmentInput } from "@/lib/appointment-create";
+import { notifyAgenda } from "@/lib/realtime-server";
 import {
   hasHospitalBridgeIntegration,
   fetchBridgeAgenda,
-  fetchBridgeProcedures,
-  adaptBridgeProcedureToPlainItem,
+  fetchBridgeDoctors,
 } from "@/lib/hospital-bridge";
 import { getTivdcClinicId } from "@/lib/tivdc";
 import { createGlpiTicket } from "@/lib/glpi";
@@ -15,9 +13,9 @@ import { formatPhone } from "@/lib/format";
 
 /**
  * Function calling do atendente de IA (ver generateAiReply em ai-attendant.ts).
- * Escopo v1, só o pedido explícito: consultar agenda e criar um pré-agendamento
- * (nasce como Appointment.status PENDING — mesmo status de um agendamento feito
- * por uma atendente pelo modal, ninguém fica "confirmado" sem revisão humana).
+ * Escopo v1, só o pedido explícito: consultar agenda e registrar um PEDIDO de marcação
+ * (BookingRequest, a fila "Pedidos de marcação" da Agenda) — a IA não grava agendamento:
+ * quem marca é a recepção (auditoria de segurança 16/11/2026, M3).
  * Não é um agente autônomo de verdade (sem loop multi-step, sem outras tools);
  * é a base pra isso, não o produto final — testar com dado de mentira antes de
  * confiar a IA marcando consulta real de paciente.
@@ -44,7 +42,7 @@ const BASE_TOOL_DEFINITIONS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     function: {
       name: "criarPreAgendamento",
       description:
-        "Cria um pré-agendamento (fica pendente de confirmação pela recepção, não é uma marcação definitiva) para o paciente desta conversa.",
+        "Registra um PEDIDO de marcação do paciente desta conversa para a recepção. Não marca nada: a recepção confere a agenda e confirma o horário com o paciente. Depois de chamar, diga que o pedido foi anotado e que a recepção vai confirmar — nunca que está marcado.",
       parameters: {
         type: "object",
         properties: {
@@ -98,63 +96,62 @@ async function runConsultarHorariosDisponiveis(clinicId: string, args: { medicoI
   return { medicoId: args.medicoId, data: args.data, horariosOcupados };
 }
 
-/** Acha o clinicProcedureId (formato bridge ou marketplace, o mesmo que createAppointment
- * espera) casando pelo nome — busca simples por substring, primeira ocorrência.
- * Não tenta ser esperta (sem ranking/fuzzy match de verdade): num catálogo pequeno
- * e bem nomeado isso já resolve a maioria dos casos reais. */
-async function resolveClinicProcedureId(clinicId: string, procedimentoQuery: string): Promise<string | null> {
-  const normalized = procedimentoQuery.trim().toLowerCase();
-  if (!normalized) return null;
-
-  if (await hasHospitalBridgeIntegration(clinicId)) {
-    const procedures = await fetchBridgeProcedures(clinicId);
-    const match = procedures.find((p) => p.nome.toLowerCase().includes(normalized));
-    return match ? adaptBridgeProcedureToPlainItem(clinicId, match).id : null;
-  }
-
-  const match = await prisma.clinicProcedure.findFirst({
-    where: { clinicId, clinic: { active: true }, procedure: { name: { contains: normalized, mode: "insensitive" } } },
-    select: { id: true },
-  });
-  return match?.id ?? null;
-}
-
+/** Pedido de marcação feito pela atendente virtual (auditoria de segurança 16/11/2026, M3).
+ * Antes esta ferramenta chamava createAppointment: em clínica com ponte isso era um INSERT
+ * no sistema da clínica + mensagem de confirmação, decidido só pelo texto do paciente — dava
+ * para encher a agenda escrevendo instruções para a IA. Agora ela só REGISTRA O PEDIDO na
+ * fila da Agenda ("Pedidos de marcação"); quem marca é a recepção.
+ * Um pedido aberto por conversa: pedir de novo atualiza o mesmo, não empilha. */
 async function runCriarPreAgendamento(
   context: ToolContext,
   args: { procedimento: string; data: string; horario?: string; medicoId?: number }
 ) {
   const conversation = await prisma.conversation.findUnique({
     where: { id: context.conversationId },
-    select: { contact: { select: { name: true, phone: true, ...profileInclude(context.clinicId) } } },
+    select: { clinicId: true, contact: { select: { name: true, phone: true } } },
   });
-  if (!conversation) return { erro: "Conversa não encontrada." };
-  if (!conversation.contact.phone) {
-    return { erro: "Este contato não tem telefone cadastrado — peça o celular com DDD ao paciente e transfira pra recepção concluir o agendamento." };
-  }
-  const patientPhone = conversation.contact.phone;
+  if (!conversation || conversation.clinicId !== context.clinicId) return { erro: "Conversa não encontrada." };
 
-  const clinicProcedureId = await resolveClinicProcedureId(context.clinicId, args.procedimento);
-  if (!clinicProcedureId) {
-    return { erro: `Não encontrei o procedimento "${args.procedimento}" no catálogo desta clínica — descreva de outra forma ou peça pra recepção confirmar.` };
+  // O que vem do modelo não é confiável: formato conferido e tamanho cortado.
+  const procedure = String(args.procedimento ?? "").replace(/\s+/g, " ").trim().slice(0, 120);
+  if (!procedure) return { erro: "Diga qual consulta ou exame o paciente quer." };
+  const date = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(args.data ?? ""));
+  if (!date) return { erro: "Data inválida — use o formato AAAA-MM-DD." };
+  const time = /^\d{2}:\d{2}$/.test(String(args.horario ?? "")) ? String(args.horario) : null;
+  const preferredDates = `${date[3]}/${date[2]}/${date[1]}${time ? ` às ${time}` : ""}`;
+
+  let doctorName: string | null = null;
+  if (typeof args.medicoId === "number" && (await hasHospitalBridgeIntegration(context.clinicId))) {
+    const doctors = await fetchBridgeDoctors(context.clinicId).catch(() => []);
+    doctorName = doctors.find((d) => Number(d.id) === args.medicoId)?.nome ?? null;
   }
 
+  const fields = { procedure, doctorName, preferredDates, notes: "Pedido registrado pela atendente virtual." };
   try {
-    // Clínica vem da conversa (servidor), nunca do que o modelo escreveu.
-    const appointment = await createAppointmentForClinic(
-      context.clinicId,
-      parseAppointmentInput({
-        patientName: conversation.contact.name,
-        patientCpf: profileOf(conversation.contact, context.clinicId).cpf ?? undefined,
-        patientPhone,
-        clinicProcedureId,
-        date: args.data,
-        timeSlot: args.horario,
-        medicoId: args.medicoId != null ? String(args.medicoId) : undefined,
-      }),
-    );
-    return { success: true, appointmentId: appointment.id, status: "PENDENTE — aguardando confirmação da recepção" };
-  } catch (error) {
-    return { erro: error instanceof Error ? error.message : "Não foi possível criar o pré-agendamento." };
+    const open = await prisma.bookingRequest.findFirst({
+      where: { conversationId: context.conversationId, clinicId: context.clinicId, status: "OPEN" },
+      select: { id: true },
+    });
+    if (open) {
+      await prisma.bookingRequest.update({ where: { id: open.id }, data: fields });
+    } else {
+      await prisma.bookingRequest.create({
+        data: {
+          clinicId: context.clinicId,
+          conversationId: context.conversationId,
+          phone: conversation.contact.phone,
+          patientName: conversation.contact.name,
+          ...fields,
+        },
+      });
+    }
+    await notifyAgenda(context.clinicId);
+    return {
+      success: true,
+      status: "PEDIDO REGISTRADO — a recepção vai conferir a agenda e confirmar o horário. NÃO diga que a consulta está marcada.",
+    };
+  } catch {
+    return { erro: "Não foi possível registrar o pedido — diga que a recepção vai dar continuidade." };
   }
 }
 

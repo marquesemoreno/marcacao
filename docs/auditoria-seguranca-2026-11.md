@@ -85,6 +85,8 @@ O que está bem feito e vale registrar: as server actions do painel filtram por 
 - **Esforço:** 4–6 h (inclui migração do nome).
 
 #### M3 — Atendente virtual cria agendamento sozinha a partir da mensagem do paciente
+
+> **Corrigido em 17/11/2026 (falta push/deploy).** `criarPreAgendamento` não chama mais a criação de agendamento: registra um `BookingRequest` na fila "Pedidos de marcação" da Agenda, um por conversa (pedir de novo atualiza o mesmo), com data e horário validados e texto cortado em 120 caracteres. A recepção é quem marca. `abrirChamadoSuporte` (GLPI, só na clínica TIVDC) continua agindo sem confirmação.
 - **Onde:** `src/lib/ai-tools.ts:45-60` e `:122-158` (`criarPreAgendamento` → `createAppointment`), chamada em `src/lib/ai-attendant.ts:124-160`.
 - **O que é:** a descrição da ferramenta diz "pré-agendamento pendente", mas em clínica com ponte é um INSERT real no Firebird mais mensagem de confirmação. Não há confirmação humana. O modelo escolhe data, hora, médico e procedimento a partir do texto do paciente.
 - **Exploração:** paciente (ou qualquer número) escreve instruções para a IA e gera marcações em série, em qualquer horário.
