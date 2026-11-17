@@ -5,7 +5,7 @@ import React, { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { Contact } from '@/types/chat-crm';
 import { X, Calendar, CheckCircle2 } from 'lucide-react';
-import { createAppointment } from '@/actions/appointments';
+import { createClinicAppointment } from '@/actions/appointments';
 import { formatCurrency, appointmentTypeLabels } from '@/lib/format';
 import type { PlainClinicProcedureItem } from '@/lib/serialize';
 import { useDialogA11y } from '@/hooks/use-dialog-a11y';
@@ -333,7 +333,7 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
 
     setSubmitting(true);
     try {
-      const appointment = await createAppointment({
+      const appointment = await createClinicAppointment({
         patientName,
         patientCpf: cpf || undefined,
         patientPhone: phone,

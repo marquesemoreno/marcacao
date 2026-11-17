@@ -2,7 +2,7 @@ import { profileInclude, profileOf } from "@/lib/contact-profile";
 import "server-only";
 import type OpenAI from "openai";
 import { prisma } from "@/lib/prisma";
-import { createAppointment } from "@/actions/appointments";
+import { createAppointmentForClinic, parseAppointmentInput } from "@/lib/appointment-create";
 import {
   hasHospitalBridgeIntegration,
   fetchBridgeAgenda,
@@ -139,15 +139,19 @@ async function runCriarPreAgendamento(
   }
 
   try {
-    const appointment = await createAppointment({
-      patientName: conversation.contact.name,
-      patientCpf: profileOf(conversation.contact, context.clinicId).cpf ?? undefined,
-      patientPhone,
-      clinicProcedureId,
-      date: args.data,
-      timeSlot: args.horario,
-      medicoId: args.medicoId != null ? String(args.medicoId) : undefined,
-    });
+    // Clínica vem da conversa (servidor), nunca do que o modelo escreveu.
+    const appointment = await createAppointmentForClinic(
+      context.clinicId,
+      parseAppointmentInput({
+        patientName: conversation.contact.name,
+        patientCpf: profileOf(conversation.contact, context.clinicId).cpf ?? undefined,
+        patientPhone,
+        clinicProcedureId,
+        date: args.data,
+        timeSlot: args.horario,
+        medicoId: args.medicoId != null ? String(args.medicoId) : undefined,
+      }),
+    );
     return { success: true, appointmentId: appointment.id, status: "PENDENTE — aguardando confirmação da recepção" };
   } catch (error) {
     return { erro: error instanceof Error ? error.message : "Não foi possível criar o pré-agendamento." };

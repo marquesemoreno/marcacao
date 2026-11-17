@@ -6,6 +6,7 @@ export const createAppointmentSchema = z.object({
     .string()
     .trim()
     .min(3, "Informe o nome completo")
+    .max(120, "Nome muito longo")
     .refine((value) => value.split(/\s+/).filter(Boolean).length >= 2, "Informe nome e sobrenome"),
   // Opcional a pedido da Santa Clara: nem sempre o atendente consegue o CPF do
   // paciente pelo WhatsApp, e travar o agendamento por isso trazia mais problema
@@ -27,12 +28,12 @@ export const createAppointmentSchema = z.object({
       return digits.length > 11 && digits.startsWith("55") ? digits.slice(2) : digits;
     })
     .refine((value) => value.length >= 10 && value.length <= 11, "WhatsApp inválido"),
-  clinicProcedureId: z.string().min(1),
-  date: z.string().min(1, "Escolha uma data"),
-  timeSlot: z.string().optional(),
+  clinicProcedureId: z.string().min(1).max(200),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Escolha uma data"),
+  timeSlot: z.string().max(20).optional(),
   /** Atendimento por ordem de chegada: `timeSlot` é só o "a partir de" daquele paciente. */
   arrivalOrder: z.boolean().optional(),
-  notes: z.string().optional(),
+  notes: z.string().max(1000, "Observação muito longa (até 1000 caracteres)").optional(),
   /** Só usado no fluxo de integração hospitalar (Santa Clara/bridge) — clínicas do
    * marketplace não têm conceito de médico específico no agendamento rápido. */
   medicoId: z.string().optional(),

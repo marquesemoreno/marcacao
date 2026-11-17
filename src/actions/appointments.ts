@@ -1,13 +1,24 @@
 "use server";
 
-import { errorSummary } from "@/lib/safe-error";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { prisma } from "@/lib/prisma";
-import { createAppointmentSchema, type CreateAppointmentInput } from "@/lib/schemas/appointment";
-import { sendAppointmentConfirmation } from "@/lib/whatsapp";
-import { toPlainAppointment } from "@/lib/serialize";
-import { AFFILIATE_REF_COOKIE, AFFILIATE_COMMISSION_FLAT } from "@/lib/affiliate";
-import { isBridgeId, getBridgeClinicId, createBridgeAppointment } from "@/lib/hospital-bridge";
+import { type CreateAppointmentInput } from "@/lib/schemas/appointment";
+import { AFFILIATE_REF_COOKIE } from "@/lib/affiliate";
+import { isBridgeId } from "@/lib/hospital-bridge";
+import { getClinicSessionOrNull, requireAdminSession } from "@/lib/session";
+import {
+  clinicIdOfProcedure,
+  createAppointmentForClinic,
+  createCatalogAppointment,
+  parseAppointmentInput,
+} from "@/lib/appointment-create";
+
+/** Todo export deste arquivo é endpoint chamável direto da internet. São dois, de propósito
+ * (auditoria de segurança 16/11/2026, C1):
+ * - `createAppointment`: PÚBLICA (site, sem login). Só catálogo de clínica listada no
+ *   marketplace; nunca fala com a ponte da clínica.
+ * - `createClinicAppointment`: painel (Chat, Agenda, Pacientes). Exige sessão e só agenda na
+ *   clínica de quem está logado (o admin agenda em qualquer uma). */
 
 /**
  * `cookies()` só funciona dentro do ciclo de request do Next (Server Action
@@ -26,69 +37,71 @@ async function getAffiliateRefCode() {
   }
 }
 
-export async function createAppointment(input: CreateAppointmentInput) {
-  // ZodError não chega legível no client (o Next redige o erro em produção e
-  // mostra só uma mensagem genérica) — converte pra um Error simples com o
-  // motivo real antes de propagar pra Server Action.
-  const parsed = createAppointmentSchema.safeParse(input);
-  if (!parsed.success) {
-    throw new Error(parsed.error.issues[0]?.message || "Dados do agendamento inválidos.");
-  }
-  const data = parsed.data;
-
-  // Procedimento veio do sistema hospitalar da clínica (Firebird via bridge),
-  // não do catálogo de ClinicProcedure do marketplace — grava lá em vez de aqui.
-  if (isBridgeId(data.clinicProcedureId)) {
-    return createBridgeAppointment(getBridgeClinicId(data.clinicProcedureId), {
-      patientName: data.patientName,
-      patientCpf: data.patientCpf,
-      patientPhone: data.patientPhone,
-      clinicProcedureId: data.clinicProcedureId,
-      date: data.date,
-      timeSlot: data.timeSlot,
-      arrivalOrder: data.arrivalOrder,
-      medicoId: data.medicoId,
-      convenioId: data.convenioId,
-      patientId: data.patientId,
-      notes: data.notes,
-    });
-  }
-
-  const affiliateCode = await getAffiliateRefCode();
-  const affiliate = affiliateCode
-    ? await prisma.affiliate.findUnique({ where: { code: affiliateCode.toUpperCase() } })
-    : null;
-
-  const appointment = await prisma.appointment.create({
-    data: {
-      patientName: data.patientName,
-      patientCpf: data.patientCpf ?? "",
-      patientPhone: data.patientPhone,
-      clinicProcedureId: data.clinicProcedureId,
-      date: new Date(`${data.date}T00:00:00Z`),
-      timeSlot: data.timeSlot || null,
-      notes: data.notes || null,
-      affiliateId: affiliate?.id ?? null,
-      affiliateCommission: affiliate ? AFFILIATE_COMMISSION_FLAT : null,
-      commissionReleased: false,
-    },
-    include: { clinicProcedure: { include: { clinic: true, procedure: true } } },
-  });
-
-  // Dispara a mensagem oficial de confirmação no WhatsApp via Evolution API v2.
-  // Com `await` — sem esperar, a função serverless da Vercel pode encerrar antes
-  // do envio em segundo plano terminar (confirmado em produção: agendamento
-  // gravava certinho, mensagem nunca saía). Em try/catch isolado: o agendamento
-  // já é real a essa altura, uma falha só no envio não pode derrubar a resposta.
+async function visitorIp(): Promise<string | null> {
   try {
-    await sendAppointmentConfirmation(appointment);
-  } catch (error) {
-    console.error("Falha ao notificar novo agendamento via WhatsApp:", errorSummary(error));
+    const h = await headers();
+    return h.get("x-forwarded-for")?.split(",")[0]?.trim() || h.get("x-real-ip") || null;
+  } catch {
+    return null; // fora de um request (teste de integração)
   }
+}
 
-  // Serializado (Decimal -> number) porque esta action é chamada direto de
-  // Client Components (BookingDialog, CreateAppointmentShortcut do inbox) —
-  // o valor de retorno cruza a fronteira Server->Client igual a props de
-  // Server Component, e Decimal não é um tipo serializável nela.
-  return toPlainAppointment(appointment);
+// Freio do agendamento público: cada pedido manda um WhatsApp pelo número da clínica.
+// Por telefone (no banco, vale entre instâncias): 3 pedidos por hora.
+// Por visitante (em memória, por instância — segura o abuso casual): 5 a cada 10 min.
+const MAX_PER_PHONE_PER_HOUR = 3;
+const MAX_PER_VISITOR = 5;
+const VISITOR_WINDOW_MS = 10 * 60_000;
+const TOO_MANY = "Muitos pedidos de agendamento em pouco tempo. Aguarde alguns minutos ou fale com a clínica pelo WhatsApp.";
+const visitors = new Map<string, number[]>();
+
+function visitorLimited(ip: string | null, now = Date.now()): boolean {
+  if (!ip) return false;
+  const hits = (visitors.get(ip) ?? []).filter((t) => now - t < VISITOR_WINDOW_MS);
+  if (hits.length >= MAX_PER_VISITOR) {
+    visitors.set(ip, hits);
+    return true;
+  }
+  hits.push(now);
+  visitors.set(ip, hits);
+  if (visitors.size > 5000) visitors.clear();
+  return false;
+}
+
+const UNAVAILABLE = "Este agendamento não está disponível por aqui. Fale com a clínica pelo WhatsApp.";
+
+/** Agendamento público do site. Só catálogo de clínica ativa e listada no marketplace. */
+export async function createAppointment(input: CreateAppointmentInput) {
+  const data = parseAppointmentInput(input);
+
+  // Procedimento do sistema hospitalar (ponte) só pelo painel, com login: daqui qualquer
+  // pessoa gravaria na agenda real da clínica.
+  if (isBridgeId(data.clinicProcedureId)) throw new Error(UNAVAILABLE);
+
+  const procedure = await prisma.clinicProcedure.findUnique({
+    where: { id: data.clinicProcedureId },
+    select: { clinic: { select: { active: true, listedInMarketplace: true } } },
+  });
+  if (!procedure || !procedure.clinic.active || !procedure.clinic.listedInMarketplace) throw new Error(UNAVAILABLE);
+
+  const recentForPhone = await prisma.appointment.count({
+    where: { patientPhone: data.patientPhone, createdAt: { gte: new Date(Date.now() - 3_600_000) } },
+  });
+  if (recentForPhone >= MAX_PER_PHONE_PER_HOUR || visitorLimited(await visitorIp())) throw new Error(TOO_MANY);
+
+  // Campos da ponte (médico, convênio, paciente cadastrado) não valem no site.
+  return createCatalogAppointment(
+    { ...data, medicoId: undefined, convenioId: undefined, patientId: undefined, arrivalOrder: undefined },
+    await getAffiliateRefCode(),
+  );
+}
+
+/** Agendamento pelo painel: clínica da sessão (ou, para o admin, a dona do procedimento). */
+export async function createClinicAppointment(input: CreateAppointmentInput) {
+  const clinicSession = await getClinicSessionOrNull();
+  if (!clinicSession) await requireAdminSession();
+  const data = parseAppointmentInput(input);
+  const clinicId = clinicSession?.clinicId ?? (await clinicIdOfProcedure(data.clinicProcedureId));
+  if (!clinicId) throw new Error("Procedimento não encontrado.");
+  return createAppointmentForClinic(clinicId, data);
 }
