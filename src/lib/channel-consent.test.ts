@@ -72,14 +72,14 @@ describe("planConsentChanges", () => {
   ]);
 
   it("endereço novo: cria", () => {
-    expect(planConsentChanges(existing, ["novo@x.com"])).toEqual({ create: ["novo@x.com"], renew: [], already: 0 });
+    expect(planConsentChanges(existing, ["novo@x.com"])).toEqual({ create: ["novo@x.com"], optedOut: [], already: 0 });
   });
 
   it("já consentido e ativo: não mexe (preserva a data do aceite original)", () => {
-    expect(planConsentChanges(existing, ["ativo@x.com", "voltou@x.com"])).toEqual({ create: [], renew: [], already: 2 });
+    expect(planConsentChanges(existing, ["ativo@x.com", "voltou@x.com"])).toEqual({ create: [], optedOut: [], already: 2 });
   });
 
-  it("quem saiu e aceita de novo: renova o consentimento", () => {
-    expect(planConsentChanges(existing, ["saiu@x.com"])).toEqual({ create: [], renew: ["saiu@x.com"], already: 0 });
+  it("quem pediu para sair NÃO volta por reimportação da lista (auditoria 16/11/2026, M4)", () => {
+    expect(planConsentChanges(existing, ["saiu@x.com"])).toEqual({ create: [], optedOut: ["saiu@x.com"], already: 0 });
   });
 });

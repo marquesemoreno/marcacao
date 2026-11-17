@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { requireClinicSession } from "@/lib/session";
+import { isClinicManager, requireClinicSession } from "@/lib/session";
 import {
   buildMarcadorLink,
   cleanMarcadorName,
@@ -107,10 +107,15 @@ export async function getMarcadoresReport(from: string, to: string): Promise<{ r
   return { rows, clinicWhatsapp: clinic?.whatsapp ?? null };
 }
 
+const MANAGER_ONLY = "Só a gestão cadastra marcador ou troca o telefone de um: marcador recebe campanha sem o aceite de marketing.";
+
 /** Cadastra marcadores a partir de uma lista colada ("Nome – telefone" por linha). Pula
- * telefones já cadastrados. */
-export async function importMarcadores(text: string): Promise<{ created: number; skipped: number }> {
-  const { clinicId } = await requireClinicSession();
+ * telefones já cadastrados. Só gestão (auditoria de segurança 16/11/2026, M4): telefone de
+ * marcador é dispensado do aceite de marketing nas campanhas, então cadastrar pacientes
+ * como marcadores burlava o consentimento. */
+export async function importMarcadores(text: string): Promise<{ created: number; skipped: number; error?: string }> {
+  const { clinicId, userId } = await requireClinicSession();
+  if (!(await isClinicManager(userId))) return { created: 0, skipped: 0, error: MANAGER_ONLY };
   const parsed = parseMarcadorList(text);
   const existing = await prisma.marcador.findMany({ where: { clinicId }, select: { code: true, phone: true } });
   const codes = new Set(existing.map((m) => m.code));
@@ -128,8 +133,12 @@ export async function importMarcadores(text: string): Promise<{ created: number;
   return { created: data.length, skipped: parsed.length - data.length };
 }
 
-export async function updateMarcador(id: string, input: { name?: string; phone?: string; active?: boolean }) {
-  const { clinicId } = await requireClinicSession();
+export async function updateMarcador(
+  id: string,
+  input: { name?: string; phone?: string; active?: boolean },
+): Promise<{ success: true } | { success: false; error: string }> {
+  const { clinicId, userId } = await requireClinicSession();
+  if (input.phone !== undefined && !(await isClinicManager(userId))) return { success: false, error: MANAGER_ONLY };
   const m = await prisma.marcador.findFirst({ where: { id, clinicId } });
   if (!m) throw new Error("Marcador não encontrado.");
   const phone = input.phone?.replace(/\D/g, "");
@@ -143,7 +152,7 @@ export async function updateMarcador(id: string, input: { name?: string; phone?:
     },
   });
   revalidatePath("/clinic/marcadores");
-  return { success: true as const };
+  return { success: true };
 }
 
 /** Público "Marcadores" pro Disparos: marcadores ativos, com {{nome}} e {{link}} (link

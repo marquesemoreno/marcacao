@@ -309,7 +309,9 @@ export function ChannelConsentDialog({
         toast.error(result.error);
         return;
       }
-      toast.success(`Aceites registrados: ${result.created} novos, ${result.renewed} renovados, ${result.already} já existiam.`);
+      toast.success(
+        `Aceites registrados: ${result.created} novos, ${result.already} já existiam.${result.optedOut ? ` ${result.optedOut} pediram para sair e continuam fora da lista.` : ""}`,
+      );
       setInvalidLines(result.invalid);
       setRaw("");
       onDone();

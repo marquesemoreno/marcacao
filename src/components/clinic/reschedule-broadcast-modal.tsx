@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { getDistinctDoctorNames, getAppointmentsByDoctorAndDate } from "@/actions/clinic";
 import { createRescheduleBroadcast } from "@/actions/clinic-broadcast";
+import { rescheduleTextProblem } from "@/lib/reschedule-text";
 import { patientsNeedingCall, urgentSendTimes } from "@/lib/broadcast-schedule";
 
 function formatSendTime(d: Date): string {
@@ -205,8 +206,13 @@ export function RescheduleBroadcastModal({ open, onOpenChange }: { open: boolean
               className="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 resize-none"
             />
             <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-              Variáveis disponíveis: {"{{nome}}"}, {"{{medico}}"}, {"{{data}}"}
+              Variáveis disponíveis: {"{{nome}}"}, {"{{medico}}"}, {"{{data}}"}. Mantenha {"{{medico}}"} e {"{{data}}"}; sem link.
             </p>
+            {rescheduleTextProblem(template) && (
+              <p role="alert" className="mt-1 text-xs font-medium text-red-600 dark:text-red-400">
+                {rescheduleTextProblem(template)}
+              </p>
+            )}
           </div>
 
           {confirming ? (
@@ -265,7 +271,7 @@ export function RescheduleBroadcastModal({ open, onOpenChange }: { open: boolean
               </DialogClose>
               <button
                 type="button"
-                disabled={preview.length === 0}
+                disabled={preview.length === 0 || !!rescheduleTextProblem(template)}
                 onClick={() => setConfirming(true)}
                 className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-white bg-amber-600 hover:bg-amber-700 disabled:opacity-50 rounded-lg transition-all"
               >

@@ -142,7 +142,8 @@ export async function sendClinicChannelTest(input: {
 /** Registra aceites de marketing por SMS/e-mail (só gestão). `source` é obrigatório: é de onde
  * veio o consentimento (ficha, formulário…), a prova em caso de questionamento (LGPD). */
 export async function registerChannelConsents(channel: "SMS" | "EMAIL", raw: string, source: string) {
-  const { clinicId } = await requireClinicPermission("disparos");
+  // Gestão, não só quem dispara: registrar aceite é o que libera o envio de marketing.
+  const { clinicId } = await requireClinicManager();
 
   const trimmedSource = source.trim();
   if (!trimmedSource) return fail("Informe de onde veio o aceite (ex.: ficha de papel 10/2026).");
@@ -162,18 +163,13 @@ export async function registerChannelConsents(channel: "SMS" | "EMAIL", raw: str
       data: plan.create.map((address) => ({ clinicId, channel, address, consentAt: now, source: trimmedSource })),
     });
   }
-  if (plan.renew.length > 0) {
-    await prisma.channelConsent.updateMany({
-      where: { clinicId, channel, address: { in: plan.renew } },
-      data: { consentAt: now, source: trimmedSource },
-    });
-  }
 
   revalidatePath("/clinic/disparos");
   return {
     success: true as const,
     created: plan.create.length,
-    renewed: plan.renew.length,
+    // Pediram para sair e continuam fora: a lista não desfaz o descadastro do paciente.
+    optedOut: plan.optedOut.length,
     already: plan.already,
     invalid: invalid.slice(0, 10),
     invalidCount: invalid.length,

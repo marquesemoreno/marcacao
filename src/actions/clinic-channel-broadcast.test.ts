@@ -160,26 +160,23 @@ describe("registerChannelConsents", () => {
     expect(prismaMock.channelConsent.createMany).not.toHaveBeenCalled();
   });
 
-  it("só quem tem a permissão de disparos registra", async () => {
-    session.requireClinicPermission.mockRejectedValue(new Error("Acesso restrito pela sua função na clínica"));
-    await expect(registerChannelConsents("EMAIL", "a@x.com", "ficha")).rejects.toThrow(/função/i);
+  it("só a gestão registra aceites", async () => {
+    session.requireClinicManager.mockRejectedValue(new Error("Acesso restrito à gestão da clínica"));
+    await expect(registerChannelConsents("EMAIL", "a@x.com", "ficha")).rejects.toThrow(/gestão/i);
     expect(prismaMock.channelConsent.createMany).not.toHaveBeenCalled();
   });
 
-  it("cria os novos, renova quem saiu e não toca em quem já está ativo", async () => {
+  it("cria os novos, não toca em quem já está ativo e NÃO reativa quem pediu para sair", async () => {
     prismaMock.channelConsent.findMany.mockResolvedValue([
       { address: "ativo@x.com", consentAt: new Date("2026-10-01T10:00:00Z"), revokedAt: null },
       { address: "saiu@x.com", consentAt: new Date("2026-10-01T10:00:00Z"), revokedAt: new Date("2026-10-05T10:00:00Z") },
     ]);
     const out = await registerChannelConsents("EMAIL", "novo@x.com\nativo@x.com\nsaiu@x.com\nlixo", "ficha de papel 10/2026");
-    expect(out).toMatchObject({ success: true, created: 1, renewed: 1, already: 1, invalid: ["lixo"] });
+    expect(out).toMatchObject({ success: true, created: 1, optedOut: 1, already: 1, invalid: ["lixo"] });
     expect(prismaMock.channelConsent.createMany).toHaveBeenCalledWith({
       data: [{ clinicId: "clinic1", channel: "EMAIL", address: "novo@x.com", consentAt: expect.any(Date), source: "ficha de papel 10/2026" }],
     });
-    expect(prismaMock.channelConsent.updateMany).toHaveBeenCalledWith({
-      where: { clinicId: "clinic1", channel: "EMAIL", address: { in: ["saiu@x.com"] } },
-      data: { consentAt: expect.any(Date), source: "ficha de papel 10/2026" },
-    });
+    expect(prismaMock.channelConsent.updateMany).not.toHaveBeenCalled();
   });
 
   it("recusa lista gigante de uma vez", async () => {

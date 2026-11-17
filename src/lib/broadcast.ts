@@ -96,7 +96,7 @@ export async function dispatchNextBatch(): Promise<{ processed: number }> {
       const isMarcador = Boolean(
         await prisma.marcador.findFirst({
           // Cadastro de marcadores pode estar com ou sem o 9º dígito (importação de 15/10).
-          where: { clinicId: campaign.clinicId, phone: { in: [recipient.phone, toggleNinthDigit(recipient.phone)].filter((p): p is string => !!p) } },
+          where: { clinicId: campaign.clinicId, active: true, phone: { in: [recipient.phone, toggleNinthDigit(recipient.phone)].filter((p): p is string => !!p) } },
           select: { id: true },
         })
       );

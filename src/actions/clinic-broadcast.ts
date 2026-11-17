@@ -7,6 +7,7 @@ import { buildTemplateParams, checkTemplateParamSources, renderTemplatePreview }
 import { listCloudTemplates } from "@/lib/whatsapp-cloud";
 import { decryptToken } from "@/lib/token-crypto";
 import { revalidatePath } from "next/cache";
+import { rescheduleTextProblem } from "@/lib/reschedule-text";
 import { prisma } from "@/lib/prisma";
 import { requireClinicManager, requireClinicSession, requireClinicPermission } from "@/lib/session";
 import { formatToWhatsAppNumber } from "@/lib/whatsapp";
@@ -550,12 +551,12 @@ export async function getClinicNumberHealth(campaignPending?: number) {
  * `tagOnSend` faz o dispatcher (src/lib/broadcast.ts) marcar e reabrir cada conversa
  * assim que a mensagem sai (ver RESCHEDULE_PENDING_TAG). */
 export async function createRescheduleBroadcast(doctorName: string, date: Date, messageTemplate: string) {
-  const { clinicId, userId } = await requireClinicSession();
+  const { clinicId, userId } = await requireClinicPermission("disparos");
 
+  // Sai sem aceite de marketing: o texto tem que ser mesmo um aviso de remarcação.
   const trimmedTemplate = messageTemplate.trim();
-  if (!trimmedTemplate) {
-    throw new Error("Preencha o texto da mensagem.");
-  }
+  const problem = rescheduleTextProblem(trimmedTemplate);
+  if (problem) throw new Error(problem);
 
   const appointments = await prisma.appointment.findMany({
     where: {

@@ -67,7 +67,11 @@ export function MarcadoresTable({
   async function toggleActive(r: MarcadorWithStats) {
     setBusy(r.id);
     try {
-      await updateMarcador(r.id, { active: !r.active });
+      const res = await updateMarcador(r.id, { active: !r.active });
+      if (!res.success) {
+        toast.error(res.error);
+        return;
+      }
       toast.success(r.active ? `${r.name} desativado — o link deixa de contar.` : `${r.name} reativado.`);
       router.refresh();
     } catch (e) {
@@ -81,6 +85,10 @@ export function MarcadoresTable({
     setImporting(true);
     try {
       const r = await importMarcadores(importText);
+      if (r.error) {
+        toast.error(r.error);
+        return;
+      }
       toast.success(`${r.created} marcador(es) cadastrado(s)${r.skipped ? ` · ${r.skipped} já existia(m)` : ""}.`);
       setImportText("");
       setImportOpen(false);

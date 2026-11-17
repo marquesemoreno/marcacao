@@ -39,21 +39,22 @@ export function parseConsentList(channel: "SMS" | "EMAIL", raw: string): { addre
   return { addresses, invalid };
 }
 
-/** O que gravar ao registrar uma lista de aceites: endereço novo cria; quem tinha saído e
- * aceita de novo renova (consentAt passa a ser depois da saída); quem já está ativo não é
- * tocado — preserva a data do aceite original, que é a prova. */
+/** O que gravar ao registrar uma lista de aceites: endereço novo cria; quem já está ativo não
+ * é tocado — preserva a data do aceite original, que é a prova. Quem PEDIU PARA SAIR não
+ * volta por aqui (`optedOut`): antes a lista "renovava" o aceite, e bastava reimportar para
+ * desfazer o descadastro do paciente (auditoria de segurança 16/11/2026, M4). */
 export function planConsentChanges(
   existing: Map<string, { consentAt: Date; revokedAt: Date | null }>,
   addresses: string[]
-): { create: string[]; renew: string[]; already: number } {
+): { create: string[]; optedOut: string[]; already: number } {
   const create: string[] = [];
-  const renew: string[] = [];
+  const optedOut: string[] = [];
   let already = 0;
   for (const address of addresses) {
     const current = existing.get(address);
     if (!current) create.push(address);
-    else if (current.revokedAt && current.revokedAt.getTime() >= current.consentAt.getTime()) renew.push(address);
+    else if (current.revokedAt && current.revokedAt.getTime() >= current.consentAt.getTime()) optedOut.push(address);
     else already++;
   }
-  return { create, renew, already };
+  return { create, optedOut, already };
 }
