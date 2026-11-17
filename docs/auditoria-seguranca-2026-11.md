@@ -57,6 +57,8 @@ O que está bem feito e vale registrar: as server actions do painel filtram por 
 - **Esforço:** 3–4 h com testes.
 
 #### C2 — Next.js 15.5.23 com avisos críticos
+
+> **Corrigido em 16/11/2026 (commit `9c0ec5f`, falta push/deploy).** Next e `eslint-config-next` em 15.5.29; o `npm audit` não lista mais nenhum aviso do próprio Next. Restam, por dependência: `postcss` (só em build) e `sharp` 0.34.5 (só importa se a otimização de imagem rodar no nosso processo; o código não usa `next/image`). O texto abaixo descreve a situação anterior.
 - **Onde:** `package.json` (`next ^15.5.23`, instalado 15.5.23).
 - **O que o `npm audit` aponta:** execução remota de código na otimização de imagens com AVIF (`GHSA-2xp9-vwfh-vxw4`, corrigido em 15.5.24) e com SVG (`GHSA-2464-fhr4-w9xw`, afeta até 15.5.27), negação de serviço em Server Actions (`GHSA-p3m5-59mp-jv5r`, até 15.5.27), envenenamento de cache SSG/ISR (corrigido em 15.5.27) e RCE em servidor Windows (`GHSA-p293-qw3h-jr36`, não se aplica à Vercel).
 - **Exploração em uma frase:** requisição sem login a `/_next/image` ou a qualquer Server Action pública.
