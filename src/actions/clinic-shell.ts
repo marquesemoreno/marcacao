@@ -1,6 +1,7 @@
 "use server";
 
 import { profileWhere } from "@/lib/contact-profile";
+import { recordBulkAccess } from "@/lib/access-log-server";
 import { prisma } from "@/lib/prisma";
 import { requireClinicSession } from "@/lib/session";
 import { displayName } from "@/lib/contact-display";
@@ -35,7 +36,7 @@ export type GlobalSearchResult = {
 /** N3 — busca global (atalho "/"): paciente por nome/telefone/CPF e conversa pelo texto
  * das mensagens. Só da clínica da sessão. */
 export async function globalSearch(query: string): Promise<GlobalSearchResult[]> {
-  const { clinicId } = await requireClinicSession();
+  const { clinicId, userId } = await requireClinicSession();
   const q = query.trim();
   if (q.length < 2) return [];
   const digits = q.replace(/\D/g, "");
@@ -85,5 +86,7 @@ export async function globalSearch(query: string): Promise<GlobalSearchResult[]>
     const snippet = (at > 30 ? "…" : "") + text.slice(Math.max(0, at - 30), at + q.length + 50);
     results.push({ conversationId: m.conversation.id, name: displayName(m.conversation.contact), subtitle: snippet, match: "conversa" });
   }
+  // Busca por nome, telefone, CPF ou texto de conversa: registra quem buscou (nunca o termo).
+  await recordBulkAccess({ clinicId, userId, action: "BUSCOU_PACIENTES", count: results.length });
   return results;
 }

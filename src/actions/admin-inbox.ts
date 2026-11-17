@@ -9,6 +9,7 @@ import { revalidatePath } from "next/cache";
 import { ConversationStatus, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireAdminSession } from "@/lib/session";
+import { recordSupportAccess } from "@/lib/access-log-server";
 import { assertCanSendText, dispatchOutboundText, requireWhatsAppPhone } from "@/lib/outbound-dispatch";
 import { whatsappService, sendWhatsAppMedia, sendWhatsAppAudio, sendWhatsAppContact, sendWhatsAppReaction, formatToWhatsAppNumber, isValidWhatsAppNumber, fetchWhatsAppProfilePicture, editWhatsAppMessage, type QuotedMessageRef } from "@/lib/whatsapp";
 import { BUDGET_SENT_TAG, SCHEDULED_TAG } from "@/lib/conversation-tags";
@@ -164,6 +165,7 @@ export async function listForwardTargetsAdmin(sourceConversationId: string, sear
 /** Mesmo que getChatContact (inbox.ts), para o admin. */
 export async function getChatContactAdmin(conversationId: string) {
   const { userId } = await requireAdminSession();
+  await recordSupportAccess(userId, conversationId);
   const conversation = await prisma.conversation.findUnique({
     where: { id: conversationId },
     include: {
@@ -439,7 +441,8 @@ export async function listChatAgentsAdmin() {
 /** Só as `MESSAGE_PAGE_SIZE` mensagens mais recentes — ver getOlderChatMessagesAdmin
  * pro histórico mais antigo, carregado sob demanda pelo botão na tela. */
 export async function getChatMessagesAdmin(conversationId: string) {
-  await requireAdminSession();
+  const { userId } = await requireAdminSession();
+  await recordSupportAccess(userId, conversationId);
   const latest = await prisma.message.findMany({
     where: { conversationId },
     orderBy: { createdAt: "desc" },
@@ -478,7 +481,8 @@ export async function getOlderChatMessagesAdmin(conversationId: string, beforeMe
 }
 
 export async function getChatContactHistoryAdmin(conversationId: string) {
-  await requireAdminSession();
+  const { userId } = await requireAdminSession();
+  await recordSupportAccess(userId, conversationId);
   const conversation = await prisma.conversation.findUnique({
     where: { id: conversationId },
     select: { contact: { select: { phone: true } } },
@@ -514,7 +518,8 @@ export async function getChatContactHistoryAdmin(conversationId: string) {
 
 /** Mesma ideia de listContactMedia em inbox.ts — ver lá pro porquê. */
 export async function listContactMediaAdmin(conversationId: string) {
-  await requireAdminSession();
+  const { userId } = await requireAdminSession();
+  await recordSupportAccess(userId, conversationId);
   const messages = await prisma.message.findMany({
     where: { conversationId, type: { in: ["ATTACHMENT", "AUDIO"] }, deletedAt: null },
     orderBy: { createdAt: "desc" },
@@ -1502,7 +1507,7 @@ export async function updateContactInfoAdmin(
     notes?: string;
   }
 ) {
-  await requireAdminSession();
+  const { userId: adminUserId } = await requireAdminSession();
 
   const trimmedName = data.name.trim();
   if (trimmedName.length < 2) {
@@ -1516,6 +1521,7 @@ export async function updateContactInfoAdmin(
   if (!conversation) {
     return { success: false as const, error: "Conversa não encontrada" };
   }
+  await recordSupportAccess(adminUserId, conversationId, "SUPORTE_EDITOU_CADASTRO");
 
   let fullPhone: string | undefined;
   if (data.phone !== undefined) {

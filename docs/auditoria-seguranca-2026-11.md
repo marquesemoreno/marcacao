@@ -140,6 +140,8 @@ O que está bem feito e vale registrar: as server actions do painel filtram por 
 - **Esforço:** 1 dia com testes.
 
 #### M9 — Registro de acessos não cobre todas as leituras
+
+> **Corrigido em 17/11/2026 (falta push/deploy).** O painel admin da TIVDC passa a registrar abrir conversa, ficha, histórico, mídias e editar cadastro como "Suporte (TIVDC)…" na clínica da conversa (`recordSupportAccess`). Na clínica, entram também histórico, mídias, `getConversation` e o resumo do paciente na Agenda. Lista de pacientes e busca (inclusive por CPF) gravam um registro por usuário por hora, com a quantidade e nunca o termo buscado (`recordBulkAccess`, em `audit_logs`); a tela Acessos mostra esses registros. Ainda sem registro: CSV de relatórios, prévia de público pela ponte e as listagens do próprio admin (fila de conversas, lista de contatos).
 - **Onde registra:** abrir conversa (`inbox.ts:2003`), abrir ficha (`patient-profile.ts:30`), editar cadastro (`inbox.ts:1771`), ver ficha prévia (`patient-form-view-server.ts:23-24`, com registro mesmo sem conversa).
 - **Onde não registra:**
   - **todo o painel admin da TIVDC** — `src/actions/admin-inbox.ts` não tem nenhuma chamada a `recordPatientAccess`, e é quem lê conversas de todas as clínicas;

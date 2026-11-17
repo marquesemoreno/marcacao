@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { startSlotOfferForItem } from "@/lib/slot-offer-server";
+import { recordPatientAccess } from "@/lib/access-log-server";
 import { prisma } from "@/lib/prisma";
 import { requireClinicPermission, requireClinicSession } from "@/lib/session";
 import { createPatientCall } from "@/lib/tv-call-server";
@@ -109,7 +110,7 @@ export async function getAgendaRealtimeTopic(): Promise<string | null> {
 /** Painel lateral do paciente na Agenda: conversa no Chat (pra abrir a ficha e o
  * WhatsApp) e histórico curto de agendamentos/lembretes pelo telefone. */
 export async function getAgendaPatient(phone: string | null) {
-  const { clinicId } = await requireClinicSession();
+  const { clinicId, userId } = await requireClinicSession();
   if (!phone) return null;
   const digits = phone.replace(/\D/g, "");
   const tail = digits.slice(-8);
@@ -119,6 +120,7 @@ export async function getAgendaPatient(phone: string | null) {
     orderBy: { lastMessageAt: "desc" },
     select: { id: true, lastMessageAt: true, contact: { select: { name: true } }, assignedUser: { select: { name: true } } },
   });
+  if (conversation) await recordPatientAccess({ clinicId, userId, conversationId: conversation.id, action: "VIU_RESUMO_AGENDA" });
   const phones = [digits, toggleNinthDigit(digits)].filter((p): p is string => !!p);
   const [appointments, reminders] = await Promise.all([
     prisma.appointment.findMany({

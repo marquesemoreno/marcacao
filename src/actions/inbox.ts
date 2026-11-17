@@ -3,7 +3,7 @@
 import { finalizedTake } from "@/lib/finalized-page";
 import { errorSummary } from "@/lib/safe-error";
 import { applyAutoFunnelStage } from "@/lib/auto-funnel-stage-server";
-import { recordPatientAccess } from "@/lib/access-log-server";
+import { recordBulkAccess, recordPatientAccess } from "@/lib/access-log-server";
 import { CONTACT_WITH_PROFILES, profileOf, profileWhere, upsertProfile } from "@/lib/contact-profile";
 import { sortPatientList, type PatientSort } from "@/lib/patient-list";
 import { CHAT_LIMIT_ENABLED } from "@/lib/chat-limit";
@@ -120,7 +120,7 @@ export async function checkContactPhone(phone: string) {
 /** Uma linha por contato já cadastrado nesta clínica (cada um tem no máximo uma
  * conversa por clínica) — usado na aba "Contatos" pra buscar por nome/telefone/CPF. */
 export async function listAllContacts(search?: string) {
-  const { clinicId } = await requireClinicSession();
+  const { clinicId, userId } = await requireClinicSession();
 
   const conversations = await prisma.conversation.findMany({
     where: {
@@ -141,6 +141,8 @@ export async function listAllContacts(search?: string) {
     include: { contact: CONTACT_WITH_PROFILES },
     orderBy: { contact: { name: "asc" } },
   });
+  // Lista com CPF e convênio: fica registrado quem abriu e quantos pacientes vieram.
+  await recordBulkAccess({ clinicId, userId, action: search ? "BUSCOU_PACIENTES" : "LISTOU_PACIENTES", count: conversations.length });
   return buildContactRows(conversations, clinicId);
 }
 
@@ -296,9 +298,10 @@ async function filteredSortedConversations(clinicId: string, params: ContactsLis
  * (convênio, médico da última consulta, etapa, atendente) e ordenação ("esperando
  * resposta" por padrão). */
 export async function listContactsPage(params: ContactsListParams) {
-  const { clinicId } = await requireClinicSession();
+  const { clinicId, userId } = await requireClinicSession();
   const page = Math.max(1, Math.floor(params.page ?? 1));
   const sorted = await filteredSortedConversations(clinicId, params);
+  await recordBulkAccess({ clinicId, userId, action: "LISTOU_PACIENTES", count: sorted.length });
   const total = sorted.length;
   const pageItems = sorted.slice((page - 1) * CONTACTS_PAGE_SIZE, page * CONTACTS_PAGE_SIZE);
   const ids = pageItems.map((i) => i.id);
@@ -347,8 +350,9 @@ export async function listContactsPage(params: ContactsListParams) {
 /** "Selecionar todos os N do filtro": conversa, nome e telefone de todos os resultados
  * (não só da página) — base pra Enviar disparo / Atribuir em massa. */
 export async function listContactsSelection(params: ContactsListParams) {
-  const { clinicId } = await requireClinicSession();
+  const { clinicId, userId } = await requireClinicSession();
   const sorted = await filteredSortedConversations(clinicId, params);
+  await recordBulkAccess({ clinicId, userId, action: "LISTOU_PACIENTES", count: sorted.length });
   return sorted.map((i) => ({ conversationId: i.id, name: i.name, phone: i.phone ?? "", instagramUsername: i.instagramUsername }));
 }
 
@@ -513,7 +517,7 @@ export async function getChatContact(conversationId: string) {
 }
 
 export async function getConversation(conversationId: string) {
-  const { clinicId } = await requireClinicSession();
+  const { clinicId, userId } = await requireClinicSession();
 
   const conversation = await prisma.conversation.findUnique({
     where: { id: conversationId },
@@ -533,6 +537,7 @@ export async function getConversation(conversationId: string) {
   if (!conversation || conversation.clinicId !== clinicId) {
     throw new Error("Conversa não encontrada");
   }
+  await recordPatientAccess({ clinicId, userId, conversationId, action: "ABRIU_CONVERSA" });
 
   return maskForeignAssignee(conversation, clinicId);
 }
@@ -2056,7 +2061,7 @@ export async function listChatAgents() {
  * casado por telefone dentro da própria clínica — Appointment não tem FK para
  * Contact porque o fluxo público de agendamento não exige login/cadastro prévio. */
 export async function getChatContactHistory(conversationId: string) {
-  const { clinicId } = await requireClinicSession();
+  const { clinicId, userId } = await requireClinicSession();
   const conversation = await prisma.conversation.findUnique({
     where: { id: conversationId },
     select: { clinicId: true, contact: { select: { phone: true } } },
@@ -2064,6 +2069,7 @@ export async function getChatContactHistory(conversationId: string) {
   if (!conversation || conversation.clinicId !== clinicId) {
     throw new Error("Conversa não encontrada");
   }
+  await recordPatientAccess({ clinicId, userId, conversationId, action: "ABRIU_CONVERSA" });
   // Contato de Instagram (sem telefone) não tem como casar com agendamento.
   if (!conversation.contact.phone) return [];
 
@@ -2105,7 +2111,7 @@ export async function getChatContactHistory(conversationId: string) {
  * não precisa varrer outras conversas. attachSignedUrls já existe (mesma função usada
  * pro histórico de mensagens) — só reaproveita. */
 export async function listContactMedia(conversationId: string) {
-  const { clinicId } = await requireClinicSession();
+  const { clinicId, userId } = await requireClinicSession();
   const conversation = await prisma.conversation.findUnique({
     where: { id: conversationId },
     select: { clinicId: true },
@@ -2113,6 +2119,7 @@ export async function listContactMedia(conversationId: string) {
   if (!conversation || conversation.clinicId !== clinicId) {
     throw new Error("Conversa não encontrada");
   }
+  await recordPatientAccess({ clinicId, userId, conversationId, action: "ABRIU_CONVERSA" });
 
   const messages = await prisma.message.findMany({
     where: { conversationId, type: { in: ["ATTACHMENT", "AUDIO"] }, deletedAt: null },

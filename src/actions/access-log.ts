@@ -2,7 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { requireClinicManager } from "@/lib/session";
-import { accessActionLabel } from "@/lib/access-log";
+import { accessActionLabel, BULK_ACCESS_ENTITY } from "@/lib/access-log";
 
 /** Registro de acessos a dados de paciente da clínica (só gestão). Filtra por nome ou
  * telefone do paciente e por usuário; últimos `limit` registros. */
@@ -27,8 +27,19 @@ export async function listPatientAccess(params: { q?: string; userId?: string; l
     orderBy: { createdAt: "desc" },
     take: Math.min(params.limit ?? 300, 1000),
   });
+  // Lista e busca de pacientes não têm um paciente só: aparecem quando não há filtro por nome.
+  const bulk = conversationIds
+    ? []
+    : await prisma.auditLog.findMany({
+        where: { clinicId, entity: BULK_ACCESS_ENTITY, ...(params.userId ? { userId: params.userId } : {}) },
+        orderBy: { createdAt: "desc" },
+        take: 200,
+      });
   const [users, convs] = await Promise.all([
-    prisma.user.findMany({ where: { id: { in: [...new Set(logs.map((l) => l.userId))] } }, select: { id: true, name: true } }),
+    prisma.user.findMany({
+      where: { id: { in: [...new Set([...logs.map((l) => l.userId), ...bulk.map((b) => b.userId).filter((id): id is string => !!id)])] } },
+      select: { id: true, name: true },
+    }),
     prisma.conversation.findMany({
       where: { id: { in: [...new Set(logs.map((l) => l.conversationId))] } },
       select: { id: true, contact: { select: { name: true, phone: true } } },
@@ -36,15 +47,28 @@ export async function listPatientAccess(params: { q?: string; userId?: string; l
   ]);
   const userName = new Map(users.map((u) => [u.id, u.name]));
   const patient = new Map(convs.map((c) => [c.id, c.contact]));
-  return logs.map((l) => ({
+  const rows = logs.map((l) => ({
     id: l.id,
     at: l.createdAt.toISOString(),
     user: userName.get(l.userId) ?? "—",
     patient: patient.get(l.conversationId)?.name ?? "—",
     phone: patient.get(l.conversationId)?.phone ?? null,
-    conversationId: l.conversationId,
+    conversationId: l.conversationId as string | null,
     action: accessActionLabel(l.action),
   }));
+  const bulkRows = bulk.map((b) => {
+    const count = (b.changes as { count?: number } | null)?.count ?? 0;
+    return {
+      id: b.id,
+      at: b.createdAt.toISOString(),
+      user: (b.userId && userName.get(b.userId)) || "—",
+      patient: `${count} paciente${count === 1 ? "" : "s"}`,
+      phone: null,
+      conversationId: null as string | null,
+      action: accessActionLabel(b.action),
+    };
+  });
+  return [...rows, ...bulkRows].sort((a, b) => b.at.localeCompare(a.at));
 }
 
 export async function listClinicUsersForAccess() {
