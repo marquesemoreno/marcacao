@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { decryptToken } from "@/lib/token-crypto";
 import { formatFileSize } from "@/lib/format";
 import { notifyInboxRealtime } from "@/lib/supabase-server";
 import { reopenIfResolved } from "@/lib/conversation-reopen";
@@ -63,7 +64,7 @@ async function handleMessage(event: Extract<InstagramEvent, { kind: "message" }>
   // Mensagem que nós mesmos enviamos volta como echo — já está gravada com o mid.
   if (await prisma.message.findUnique({ where: { whatsappKeyId: event.mid }, select: { id: true } })) return null;
 
-  const contact = await findOrCreateContact(event.userId, account.accessToken);
+  const contact = await findOrCreateContact(event.userId, decryptToken(account.accessToken));
   let conversation = await prisma.conversation.findFirst({
     where: { clinicId: account.clinicId, contactId: contact.id, channel: "INSTAGRAM" },
     orderBy: { createdAt: "desc" },

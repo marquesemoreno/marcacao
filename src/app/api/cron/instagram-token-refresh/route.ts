@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { decryptToken, encryptToken } from "@/lib/token-crypto";
 import { isCronAuthorized } from "@/lib/request-auth";
 import { refreshInstagramToken, shouldRefreshInstagramToken } from "@/lib/instagram-token";
 
@@ -16,9 +17,9 @@ export async function GET(request: Request) {
   const results: { username: string | null; status: string }[] = [];
   for (const a of accounts) {
     if (!shouldRefreshInstagramToken(a)) continue;
-    const r = await refreshInstagramToken(a.accessToken);
+    const r = await refreshInstagramToken(decryptToken(a.accessToken));
     if (r.ok) {
-      await prisma.instagramAccount.update({ where: { id: a.id }, data: { accessToken: r.accessToken, tokenExpiresAt: r.expiresAt } });
+      await prisma.instagramAccount.update({ where: { id: a.id }, data: { accessToken: encryptToken(r.accessToken), tokenExpiresAt: r.expiresAt } });
       results.push({ username: a.username, status: "renovado" });
     } else {
       await prisma.webhookLog

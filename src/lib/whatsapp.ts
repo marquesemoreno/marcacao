@@ -2,6 +2,7 @@ import { errorSummary } from "@/lib/safe-error";
 import { allowsNinthDigitFallback } from "@/lib/ninth-digit-policy";
 import type { AppointmentStatus, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { decryptToken } from "@/lib/token-crypto";
 import { getBaseUrl } from "@/lib/format";
 
 type SendAttemptResult = {
@@ -121,7 +122,7 @@ export async function getEvolutionConfig(clinicId?: string) {
   if (clinicId) {
     const dedicated = await prisma.whatsappInstance.findUnique({ where: { clinicId } });
     if (dedicated) {
-      return { apiUrl: dedicated.apiUrl, apiKey: dedicated.apiKey, instanceName: dedicated.instanceName };
+      return { apiUrl: dedicated.apiUrl, apiKey: decryptToken(dedicated.apiKey), instanceName: dedicated.instanceName };
     }
   }
   return getGlobalEvolutionConfig();

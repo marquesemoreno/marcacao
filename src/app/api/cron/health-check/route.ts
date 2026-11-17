@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { decryptToken } from "@/lib/token-crypto";
 import { isCronAuthorized } from "@/lib/request-auth";
 import { getEvolutionConfig } from "@/lib/whatsapp";
 import { sendEmailViaResend } from "@/lib/resend";
@@ -81,7 +82,7 @@ export async function GET(request: Request) {
     }
   }
   for (const a of igAccounts) {
-    jobs.push(checkInstagram(a.accessToken, a.tokenExpiresAt).then((r) => ({ key: `instagram:${a.clinicId}`, label: `Instagram @${a.username ?? "?"}`, ...r })));
+    jobs.push(checkInstagram(decryptToken(a.accessToken), a.tokenExpiresAt).then((r) => ({ key: `instagram:${a.clinicId}`, label: `Instagram @${a.username ?? "?"}`, ...r })));
   }
   const checks = await Promise.all(jobs);
 

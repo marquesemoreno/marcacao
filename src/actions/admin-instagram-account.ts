@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
+import { decryptToken, encryptToken } from "@/lib/token-crypto";
 import { requireAdminSession } from "@/lib/session";
 
 const GRAPH_BASE = "https://graph.instagram.com/v23.0";
@@ -15,7 +16,7 @@ export async function getInstagramAccount(clinicId: string) {
     igUserId: account.igUserId,
     username: account.username,
     active: account.active,
-    tokenMasked: `••••${account.accessToken.slice(-4)}`,
+    tokenMasked: `••••${decryptToken(account.accessToken).slice(-4)}`,
     updatedAt: account.updatedAt,
   };
 }
@@ -26,7 +27,8 @@ export async function getInstagramAccount(clinicId: string) {
 export async function saveInstagramAccount(clinicId: string, input: { accessToken: string }) {
   await requireAdminSession();
   const existing = await prisma.instagramAccount.findUnique({ where: { clinicId } });
-  const accessToken = input.accessToken.trim() || existing?.accessToken || "";
+  const previous = existing ? decryptToken(existing.accessToken) : "";
+  const accessToken = input.accessToken.trim() || previous;
   if (!accessToken) throw new Error("Cole o token de acesso da conta do Instagram.");
 
   const meRes = await fetch(`${GRAPH_BASE}/me?fields=user_id,username`, {
@@ -54,15 +56,16 @@ export async function saveInstagramAccount(clinicId: string, input: { accessToke
 
   await prisma.instagramAccount.upsert({
     where: { clinicId },
+    // Token cifrado em repouso (auditoria 16/11/2026, M6).
     update: {
-      accessToken,
+      accessToken: encryptToken(accessToken),
       igUserId,
       username: me.username ?? null,
       active: true,
       // Token novo colado: validade desconhecida até o cron de renovação rodar.
-      ...(accessToken !== existing?.accessToken ? { tokenExpiresAt: null } : {}),
+      ...(accessToken !== previous ? { tokenExpiresAt: null } : {}),
     },
-    create: { clinicId, accessToken, igUserId, username: me.username ?? null },
+    create: { clinicId, accessToken: encryptToken(accessToken), igUserId, username: me.username ?? null },
   });
   revalidatePath("/admin/clinicas");
   return { success: true as const, username: me.username ?? null };

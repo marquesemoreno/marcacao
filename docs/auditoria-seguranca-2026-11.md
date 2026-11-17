@@ -116,6 +116,8 @@ O que está bem feito e vale registrar: as server actions do painel filtram por 
 - **Esforço:** 30 min.
 
 #### M6 — Segredos de integração em texto puro no banco
+
+> **Corrigido em 17/11/2026 (falta push/deploy + rodar o script).** As três chaves passam a ser gravadas com `encryptToken` (mesma chave da API oficial) e toda leitura passa por `decryptToken`, que aceita o valor antigo em texto puro — nada para de funcionar antes da recifragem. Para cifrar o que já está no banco: `npx tsx scripts/encrypt-integration-secrets.ts` (só conta) e depois com `--apply`. Trava no CI: `src/lib/integration-secrets.guard.test.ts` falha se alguém ler esses campos da linha do banco sem decifrar. As pontes nas clínicas (`CLIENTES/`) não mudam: o token continua o mesmo, só fica cifrado do nosso lado.
 - **Onde:** `WhatsappInstance.apiKey` (lido em `src/actions/clinic-whatsapp-qr.ts:20`), `HospitalIntegration.apiToken` (`src/lib/hospital-bridge.ts:28`), `InstagramAccount.accessToken` (`src/actions/admin-instagram-account.ts:19`). Só a API oficial, o TOTP e a ficha passam por `encryptToken`.
 - **Exploração:** vazamento do banco (ou S1) entrega acesso de escrita ao Firebird das clínicas, às instâncias da Evolution e ao Direct do Instagram.
 - **Correção:** cifrar os três campos com `token-crypto` (o `decryptToken` já aceita valor antigo em texto puro, então dá para migrar aos poucos).

@@ -2,6 +2,7 @@ import { errorSummary } from "@/lib/safe-error";
 import "server-only";
 import type { BridgeCampaignPatient } from "@/lib/campaign-audience";
 import { prisma } from "@/lib/prisma";
+import { decryptToken } from "@/lib/token-crypto";
 import type { PlainClinicProcedureItem, PlainAppointment } from "@/lib/serialize";
 import { sendWhatsAppMessage, formatToWhatsAppNumber } from "@/lib/whatsapp";
 import { buildBridgeConfirmationMessage, UROLASER_RETURN_POLICY_NOTICE } from "@/lib/bridge-confirmation";
@@ -26,7 +27,7 @@ export type BridgePatient = { id: number; nome: string; cpf: string | null };
 async function getBridgeConfig(clinicId: string) {
   const integration = await prisma.hospitalIntegration.findUnique({ where: { clinicId } });
   if (!integration || !integration.active) return null;
-  return { apiUrl: integration.apiUrl.replace(/\/$/, ""), apiToken: integration.apiToken };
+  return { apiUrl: integration.apiUrl.replace(/\/$/, ""), apiToken: decryptToken(integration.apiToken) };
 }
 
 export function isBridgeId(id: string): boolean {

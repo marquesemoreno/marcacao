@@ -15,6 +15,7 @@
  * são "server-only" e não rodam fora do Next. Idempotente: pula whatsappKeyId que já existe.
  */
 import { PrismaClient } from "@prisma/client";
+import { decryptToken } from "../src/lib/token-crypto";
 import { createClient } from "@supabase/supabase-js";
 import { formatContactCardMessage } from "../src/lib/whatsapp-vcard";
 
@@ -97,7 +98,7 @@ function parse(r: Rec): Parsed | null {
 async function evo(inst: { apiUrl: string; apiKey: string; instanceName: string }, path: string, body: unknown) {
   const res = await fetch(`${inst.apiUrl.replace(/\/$/, "")}/${path}/${encodeURIComponent(inst.instanceName)}`, {
     method: "POST",
-    headers: { apikey: inst.apiKey, "Content-Type": "application/json" },
+    headers: { apikey: decryptToken(inst.apiKey), "Content-Type": "application/json" },
     body: JSON.stringify(body),
     signal: AbortSignal.timeout(60000),
   });

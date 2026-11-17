@@ -7,6 +7,7 @@ import { handleSlotOfferReply, startSlotOfferForItem } from "@/lib/slot-offer-se
 import { classifyAndStorePatientIntent } from "@/lib/patient-intent-server";
 import type { AppointmentStatus, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { decryptToken } from "@/lib/token-crypto";
 import { isInternalSecretAuthorized, isWebhookEnforced, webhookTokenVerdict } from "@/lib/request-auth";
 import { logAiAction } from "@/lib/ai-action-log-server";
 import { extractPatientData } from "@/lib/patient-data-extraction";
@@ -627,7 +628,7 @@ async function processWhatsappWebhook(body: Prisma.InputJsonValue, forcedClinicI
     : null;
   const resolvedClinicId = forcedClinicId ?? dedicatedInstance?.clinicId;
   const evolutionConfig = dedicatedInstance
-    ? { apiUrl: dedicatedInstance.apiUrl, apiKey: dedicatedInstance.apiKey, instanceName: dedicatedInstance.instanceName }
+    ? { apiUrl: dedicatedInstance.apiUrl, apiKey: decryptToken(dedicatedInstance.apiKey), instanceName: dedicatedInstance.instanceName }
     : await getEvolutionConfig();
 
   // =========================================================================

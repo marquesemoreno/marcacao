@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import type { WhatsappInstanceStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { decryptToken, encryptToken } from "@/lib/token-crypto";
 import { requireAdminSession } from "@/lib/session";
 import { getEvolutionConfig } from "@/lib/whatsapp";
 import {
@@ -28,7 +29,7 @@ export async function getWhatsappInstance(clinicId: string) {
   if (!instance) return null;
   return {
     apiUrl: instance.apiUrl,
-    apiKeyMasked: maskApiKey(instance.apiKey),
+    apiKeyMasked: maskApiKey(decryptToken(instance.apiKey)),
     instanceName: instance.instanceName,
     status: instance.status,
     lastCheckedAt: instance.lastCheckedAt,
@@ -47,7 +48,7 @@ export async function saveWhatsappInstanceConfig(
   const existing = await prisma.whatsappInstance.findUnique({ where: { clinicId } });
   // A API Key nunca volta inteira pro client (só mascarada) — se o campo vier vazio numa
   // edição, mantém a que já estava salva em vez de forçar reenvio dela toda vez.
-  const apiKey = input.apiKey.trim() || existing?.apiKey || "";
+  const apiKey = input.apiKey.trim() || (existing ? decryptToken(existing.apiKey) : "");
   if (!apiUrl || !apiKey || !instanceName) {
     throw new Error("Preencha URL, API Key e nome da instância.");
   }
@@ -56,8 +57,9 @@ export async function saveWhatsappInstanceConfig(
 
   await prisma.whatsappInstance.upsert({
     where: { clinicId },
-    update: { apiUrl, apiKey, instanceName, status: "DISCONNECTED" },
-    create: { clinicId, apiUrl, apiKey, instanceName, status: "DISCONNECTED" },
+    // Chave cifrada em repouso (auditoria 16/11/2026, M6).
+    update: { apiUrl, apiKey: encryptToken(apiKey), instanceName, status: "DISCONNECTED" },
+    create: { clinicId, apiUrl, apiKey: encryptToken(apiKey), instanceName, status: "DISCONNECTED" },
   });
 
   const created = await createEvolutionInstance(config);
@@ -77,7 +79,7 @@ export async function saveWhatsappInstanceConfig(
 async function getInstanceConfigOrThrow(clinicId: string): Promise<EvolutionInstanceConfig> {
   const instance = await prisma.whatsappInstance.findUnique({ where: { clinicId } });
   if (!instance) throw new Error("Nenhuma instância cadastrada para esta clínica.");
-  return { apiUrl: instance.apiUrl, apiKey: instance.apiKey, instanceName: instance.instanceName };
+  return { apiUrl: instance.apiUrl, apiKey: decryptToken(instance.apiKey), instanceName: instance.instanceName };
 }
 
 /** Gera (ou renova) o QR Code atual pra pareamento no celular. */

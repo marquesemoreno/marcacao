@@ -12,6 +12,7 @@
  * (migração 20261002120000) aplicada.
  */
 import { PrismaClient } from "@prisma/client";
+import { decryptToken } from "../src/lib/token-crypto";
 import { deviceOutboundTargetPhone, findPanelTwin } from "../src/lib/device-outbound";
 
 const APPLY = process.argv.includes("--apply");
@@ -50,7 +51,7 @@ const variants = (p: string) =>
     for (let page = 1; ; page++) {
       const res = await fetch(`${inst.apiUrl.replace(/\/$/, "")}/chat/findMessages/${encodeURIComponent(inst.instanceName)}`, {
         method: "POST",
-        headers: { apikey: inst.apiKey, "Content-Type": "application/json" },
+        headers: { apikey: decryptToken(inst.apiKey), "Content-Type": "application/json" },
         body: JSON.stringify({ where: { key: { fromMe: true }, messageTimestamp: { gte: from, lte: to } }, page, offset: 200 }),
         signal: AbortSignal.timeout(60000),
       });

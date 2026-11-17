@@ -1,5 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
+import { decryptToken } from "@/lib/token-crypto";
 import { uploadWhatsAppMedia } from "@/lib/whatsapp-media";
 
 /** Instagram API com Instagram Login (graph.instagram.com) — não exige página do
@@ -36,7 +37,7 @@ export async function sendInstagramMessage(
   try {
     const res = await fetch(`${GRAPH_BASE}/me/messages`, {
       method: "POST",
-      headers: { Authorization: `Bearer ${account.accessToken}`, "Content-Type": "application/json" },
+      headers: { Authorization: `Bearer ${decryptToken(account.accessToken)}`, "Content-Type": "application/json" },
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(15000),
     });

@@ -1,6 +1,7 @@
 import { createCipheriv, createDecipheriv, randomBytes } from "crypto";
 
-/** Criptografia em repouso dos tokens da API oficial do WhatsApp (AES-256-GCM). Chave em
+/** Criptografia em repouso dos tokens da API oficial do WhatsApp e, desde 17/11/2026 (M6),
+ * das chaves da Evolution, das pontes Firebird e do Instagram (AES-256-GCM). Chave em
  * WHATSAPP_TOKEN_ENCRYPTION_KEY (32 bytes em base64: `openssl rand -base64 32`). Formato
  * "enc:v1:<iv>:<tag>:<dados>" (base64). Valor sem o prefixo = token antigo em texto puro,
  * devolvido como está (a próxima reconexão grava criptografado). */

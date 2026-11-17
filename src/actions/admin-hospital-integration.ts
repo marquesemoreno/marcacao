@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
+import { decryptToken, encryptToken } from "@/lib/token-crypto";
 import { requireAdminSession } from "@/lib/session";
 
 function maskApiToken(apiToken: string): string {
@@ -16,7 +17,7 @@ export async function getHospitalIntegration(clinicId: string) {
   if (!integration) return null;
   return {
     apiUrl: integration.apiUrl,
-    apiTokenMasked: maskApiToken(integration.apiToken),
+    apiTokenMasked: maskApiToken(decryptToken(integration.apiToken)),
     active: integration.active,
     skipWeekendReminders: integration.skipWeekendReminders,
     lastCheckedAt: integration.lastCheckedAt,
@@ -32,15 +33,16 @@ export async function saveHospitalIntegrationConfig(clinicId: string, input: { a
   const existing = await prisma.hospitalIntegration.findUnique({ where: { clinicId } });
   // O token nunca volta inteiro pro client (só mascarado) — se o campo vier vazio numa
   // edição, mantém o que já estava salvo em vez de forçar reenvio dele toda vez.
-  const apiToken = input.apiToken.trim() || existing?.apiToken || "";
+  const apiToken = input.apiToken.trim() || (existing ? decryptToken(existing.apiToken) : "");
   if (!apiUrl || !apiToken) {
     throw new Error("Preencha a URL e o token da integração.");
   }
 
   await prisma.hospitalIntegration.upsert({
     where: { clinicId },
-    update: { apiUrl, apiToken },
-    create: { clinicId, apiUrl, apiToken },
+    // Token cifrado em repouso (auditoria 16/11/2026, M6).
+    update: { apiUrl, apiToken: encryptToken(apiToken) },
+    create: { clinicId, apiUrl, apiToken: encryptToken(apiToken) },
   });
 
   revalidatePath("/admin/clinicas");
@@ -74,7 +76,7 @@ export async function testHospitalIntegrationConnection(clinicId: string) {
   // Testa direto contra a URL/token salvos, sem depender de `active` — o admin pode
   // querer testar antes de reativar uma integração que estava desligada.
   const ok = await fetch(`${integration.apiUrl.replace(/\/$/, "")}/api/procedimentos`, {
-    headers: { "x-api-token": integration.apiToken },
+    headers: { "x-api-token": decryptToken(integration.apiToken) },
     signal: AbortSignal.timeout(10000),
     cache: "no-store",
   })

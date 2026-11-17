@@ -2,6 +2,7 @@
 
 import type { WhatsappInstanceStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { decryptToken } from "@/lib/token-crypto";
 import { requireClinicManager } from "@/lib/session";
 import {
   getEvolutionConnectionState,
@@ -18,7 +19,7 @@ async function clinicInstance(): Promise<{ clinicId: string; config: EvolutionIn
   const { clinicId } = await requireClinicManager();
   const i = await prisma.whatsappInstance.findUnique({ where: { clinicId } });
   if (!i) return null;
-  return { clinicId, config: { apiUrl: i.apiUrl, apiKey: i.apiKey, instanceName: i.instanceName } };
+  return { clinicId, config: { apiUrl: i.apiUrl, apiKey: decryptToken(i.apiKey), instanceName: i.instanceName } };
 }
 
 function toStatus(state: string | undefined): WhatsappInstanceStatus {
