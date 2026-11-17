@@ -28,14 +28,15 @@ const DEFAULT_POLL_INTERVAL_MS = 30000;
  *    refaz a busca pela mesma Server Action de sempre. Quando o sinal
  *    chega, chama `onUpdate` imediatamente ao invés de esperar o próximo poll.
  *
- * `clinicId`: passa o da própria clínica (scope="clinic") pra só ouvir
+ * `topic`: nome do canal calculado no servidor (getInboxRealtimeChannelName, HMAC — auditoria
+ * B5); sem ele, só o recarregamento periódico. Antes era `clinicId`: passa o da própria clínica (scope="clinic") pra só ouvir
  * mudanças dela — sem isso (scope="admin", que enxerga todas as clínicas
  * juntas), ouve o canal geral do admin. Antes disso era um único canal global
  * pra todo mundo: toda mensagem de qualquer clínica acordava toda aba aberta de
  * toda outra clínica, ampliando o mesmo padrão de polling que já tinha estourado
  * o Egress do Supabase.
  */
-export function useInboxRealtime(onUpdate: () => void, clinicId?: string, pollIntervalMs = DEFAULT_POLL_INTERVAL_MS) {
+export function useInboxRealtime(onUpdate: () => void, topic?: string | null, pollIntervalMs = DEFAULT_POLL_INTERVAL_MS) {
   const onUpdateRef = useRef(onUpdate);
   onUpdateRef.current = onUpdate;
 
@@ -43,13 +44,12 @@ export function useInboxRealtime(onUpdate: () => void, clinicId?: string, pollIn
     const interval = setInterval(() => onUpdateRef.current(), pollIntervalMs);
 
     const supabase = getSupabaseClient();
-    if (!supabase) {
+    if (!supabase || !topic) {
       return () => clearInterval(interval);
     }
 
-    const channelName = clinicId ? `inbox-changes:${clinicId}` : "inbox-changes:admin";
     const channel = supabase
-      .channel(channelName)
+      .channel(topic)
       .on("broadcast", { event: "changed" }, () => onUpdateRef.current())
       .subscribe();
 
@@ -57,5 +57,5 @@ export function useInboxRealtime(onUpdate: () => void, clinicId?: string, pollIn
       clearInterval(interval);
       supabase.removeChannel(channel);
     };
-  }, [pollIntervalMs, clinicId]);
+  }, [pollIntervalMs, topic]);
 }

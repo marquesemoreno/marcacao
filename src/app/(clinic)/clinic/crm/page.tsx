@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import { ChatCrmApp } from "@/components/chat/chat-crm-app";
+import { getInboxRealtimeChannelName } from "@/lib/supabase-server";
 import { requireClinicSession } from "@/lib/session";
 
 export const metadata = { title: "CRM" };
@@ -12,7 +13,7 @@ export default async function ClinicCrmPage() {
   return (
     <div className="h-full min-h-0">
       <Suspense fallback={null}>
-        <ChatCrmApp scope="clinic" basePath="/clinic" view="crm" clinicId={clinicId} />
+        <ChatCrmApp scope="clinic" basePath="/clinic" view="crm" clinicId={clinicId} realtimeTopic={getInboxRealtimeChannelName(clinicId)} />
       </Suspense>
     </div>
   );

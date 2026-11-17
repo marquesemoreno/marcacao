@@ -1,5 +1,6 @@
 import "server-only";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { inboxTopic } from "@/lib/realtime-topic";
 
 let cachedClient: SupabaseClient | null | undefined;
 
@@ -37,8 +38,11 @@ export const WHATSAPP_MEDIA_BUCKET = "whatsapp-media";
  * refetch em si já é escopado pela Server Action), mas é tráfego jogado fora
  * que cresce com o número de clínicas — mesma raiz do estouro de Egress do
  * Supabase já visto nesta sessão. */
-export function getInboxRealtimeChannelName(clinicId?: string): string {
-  return clinicId ? `inbox-changes:${clinicId}` : "inbox-changes:admin";
+/** Nome por HMAC (auditoria B5): o navegador recebe pronto da página, não monta. null =
+ * sem NEXTAUTH_SECRET (o Chat fica só no recarregamento de 30 s). */
+export function getInboxRealtimeChannelName(clinicId?: string): string | null {
+  const secret = process.env.NEXTAUTH_SECRET;
+  return secret ? inboxTopic(clinicId ?? null, secret) : null;
 }
 
 /**
@@ -64,9 +68,10 @@ export async function notifyInboxRealtime(clinicId?: string) {
   const supabase = getSupabaseServerClient();
   if (!supabase) return;
 
-  const channelNames = clinicId
+  const channelNames = (clinicId
     ? [getInboxRealtimeChannelName(clinicId), getInboxRealtimeChannelName()]
-    : [getInboxRealtimeChannelName()];
+    : [getInboxRealtimeChannelName()]
+  ).filter((n): n is string => !!n);
 
   await Promise.all(
     channelNames.map(
