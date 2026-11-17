@@ -2,6 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { AppointmentType, Prisma, ProcedureCategory } from "@prisma/client";
+import { toPublicClinic } from "@/lib/public-clinic";
 
 /** Remove acentos para casar "clinico"/"clínico", "cardiologista"/"Cardiologista" etc. */
 function stripAccents(value: string) {
@@ -89,7 +90,8 @@ export async function searchClinicProcedures(filters: SearchFilters) {
     ...(query ? buildQueryConditions(query) : {}),
   };
 
-  return prisma.clinicProcedure.findMany({
+  // Sem login: da clínica só sai o que é público (ver toPublicClinic).
+  const rows = await prisma.clinicProcedure.findMany({
     where,
     include: { clinic: true, procedure: { include: { specialty: true } } },
     orderBy:
@@ -99,13 +101,17 @@ export async function searchClinicProcedures(filters: SearchFilters) {
           ? { price: "desc" }
           : { clinic: { rating: "desc" } },
   });
+  return rows.map((row) => ({ ...row, clinic: toPublicClinic(row.clinic) }));
 }
 
 export async function getClinicProcedureDetail(id: string) {
-  return prisma.clinicProcedure.findUnique({
+  const row = await prisma.clinicProcedure.findUnique({
     where: { id },
     include: { clinic: true, procedure: { include: { specialty: true } } },
   });
+  // Só clínica ativa e listada; da clínica só sai o que é público.
+  if (!row || !row.clinic.active || !row.clinic.listedInMarketplace) return null;
+  return { ...row, clinic: toPublicClinic(row.clinic) };
 }
 
 /** Número de clínicas credenciadas disponíveis por especialidade e por procedimento. */

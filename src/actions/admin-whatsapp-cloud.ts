@@ -7,7 +7,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { isClinicManager } from "@/lib/session";
+import { isClinicManager, isLive } from "@/lib/session";
 import { decryptToken, encryptToken } from "@/lib/token-crypto";
 import { t, type Lang } from "@/lib/i18n-review";
 import {
@@ -46,7 +46,9 @@ export type CloudAccountRow = {
  * Com `clinicId`, recusa clínica alheia. */
 async function requireCloudAccess(clinicId?: string): Promise<{ scope: string | null }> {
   const session = await getServerSession(authOptions);
-  if (session?.user.role === "ADMIN") return { scope: null };
+  // Sessão revogada (usuário desativado, senha trocada, "sair dos outros aparelhos") não passa.
+  if (!session || !(await isLive(session))) throw new Error("Não autorizado");
+  if (session.user.role === "ADMIN") return { scope: null };
   if (session?.user.role === "CLINIC" && session.user.clinicId && (await isClinicManager(session.user.id))) {
     if (clinicId && clinicId !== session.user.clinicId) throw new Error("Não autorizado");
     return { scope: session.user.clinicId };

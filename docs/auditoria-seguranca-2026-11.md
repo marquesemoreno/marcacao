@@ -100,6 +100,8 @@ O que está bem feito e vale registrar: as server actions do painel filtram por 
 - **Teto por rodada:** não achei forma de burlar. O intervalo é único por clínica (`broadcast.ts:68-71`), várias campanhas não somam. Opt-out ("9") vale em todos os caminhos.
 
 #### M5 — Ações da API oficial não conferem se a sessão foi revogada
+
+> **Corrigido em 17/11/2026 (falta push/deploy).** `requireCloudAccess` agora recusa sessão revogada (`isLive`).
 - **Onde:** `src/actions/admin-whatsapp-cloud.ts:47-55` (`requireCloudAccess` usa `getServerSession` sem `isLive`).
 - **Exploração:** usuário desativado, ou com senha trocada, mantém por até 12 h o poder de conectar número, enviar mensagem de teste e criar modelo.
 - **Correção:** reutilizar `requireAdminSession` / `requireClinicManager` dentro do helper.
@@ -112,6 +114,8 @@ O que está bem feito e vale registrar: as server actions do painel filtram por 
 - **Esforço:** 3 h + script de recifragem.
 
 #### M7 — Nenhum cabeçalho de segurança
+
+> **Corrigido em 17/11/2026 (falta push/deploy).** `next.config.mjs` envia `frame-ancestors 'none'`, `X-Frame-Options`, `nosniff`, `Referrer-Policy`, `Permissions-Policy` e HSTS em todas as respostas. Falta a CSP completa (scripts e conexões), que pede ajuste em modo Report-Only.
 - **Onde:** `next.config.mjs` (sem `headers()`), `src/middleware.ts`, `vercel.json`.
 - **Falta:** `Content-Security-Policy` (ao menos `frame-ancestors 'none'`), `X-Frame-Options`, `X-Content-Type-Options: nosniff`, `Referrer-Policy`, `Permissions-Policy`.
 - **Exploração:** o painel pode ser aberto dentro de um iframe de outro site (clickjacking: um clique "inocente" inicia campanha ou transfere conversa).
@@ -154,6 +158,8 @@ O que está bem feito e vale registrar: as server actions do painel filtram por 
 - **Esforço:** 3 h.
 
 #### M12 — Busca pública devolve o registro inteiro da clínica
+
+> **Corrigido em 17/11/2026 (falta push/deploy).** `searchClinicProcedures` e `getClinicProcedureDetail` passam a clínica por `toPublicClinic` (`src/lib/public-clinic.ts`): só nome, endereço, telefone, nota e horário saem; o resto vai vazio. A página do procedimento também deixa de abrir para clínica inativa ou fora do marketplace. As páginas de guia/comprovante (M11) ainda devolvem a clínica inteira.
 - **Onde:** `src/actions/search.ts:93,107` (`include: { clinic: true }`), também `getFeaturedClinics`/`getAllClinics`.
 - **Vaza:** `id` (insumo do C1), CNPJ, `commissionRate`, `defaultTicket`, `campaignExcludedPatientIds` (ids de pacientes no Firebird), ponto geográfico da cerca, textos automáticos.
 - **Correção:** `select` só com nome, bairro, cidade, nota e telefone público.
