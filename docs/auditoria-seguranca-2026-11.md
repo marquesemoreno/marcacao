@@ -204,6 +204,15 @@ O que está bem feito e vale registrar: as server actions do painel filtram por 
 | B15 | Planilha do Google Ads com usuário e senha fixos, sem limite de tentativas | `src/app/api/conversions/google-ads/route.ts:19-30` | força bruta lenta; conteúdo é só `gclid` + hora | limite por IP | 30 min |
 | B16 | `shadcn` (ferramenta de linha de comando) está em `dependencies` e traz 20+ pacotes com aviso, incluindo o crítico `proxy-addr` | `package.json` | nenhum em tempo de execução; polui o `npm audit` e a imagem | mover para `devDependencies` | 10 min |
 
+> **Corrigidos em 17/11/2026 (falta push/deploy):**
+> - **B1** (`a54a54f`): teto no banco, 1000 cliques em 10 min, que vale entre instâncias. O `Allow-Credentials` foi **mantido** de propósito: o `sendBeacon` manda credenciais e, se o `track.js` enviar como JSON, a pré-verificação exige esse cabeçalho.
+> - **B2** (`98ceb32`): o log de falha do webhook do Instagram guarda só tipo, `mid` e `errorSummary`.
+> - **B3** (`4dd8d68`): o login só aceita código de passo mais novo que o último usado; 10 códigos de reserva (SHA-256, um uso cada). **Migration `20261117120000_totp_replay_recovery` antes do deploy.**
+> - **B4**: junto com o M10 (`f3d0ea9`).
+> - **B5** (`9d0619f`): o canal do Chat passou a ter nome por HMAC, calculado no servidor.
+> - **B14, B15, B16** (commit seguinte): cookie `?ref=` com `httpOnly`/`secure`; planilha do Google Ads com 30 pedidos a cada 15 min por origem; `shadcn` em `devDependencies` (o `npm audit --omit=dev` ficou em 27 moderados + 6 altos, sem críticos).
+> - Continuam abertos: B6–B13.
+
 Observações fora do repositório (não abri os arquivos): há `.env` com credenciais do Firebird e do token da ponte em `CLIENTES/SANTA CLARA/` e `CLIENTES/UROLASER/`, e um arquivo chamado `API Key OpenAI.txt` solto em `Documents/TIVDC/`. Vale guardar num cofre de senhas e apagar do disco.
 
 ---

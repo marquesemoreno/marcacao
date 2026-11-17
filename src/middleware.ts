@@ -48,6 +48,9 @@ export default withAuth(
         maxAge: AFFILIATE_REF_COOKIE_MAX_AGE,
         path: "/",
         sameSite: "lax",
+        // Só o servidor lê (createAppointment) — auditoria B14.
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
       });
     }
 
