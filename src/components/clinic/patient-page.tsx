@@ -490,7 +490,7 @@ export function PatientPage({ profile, autoSchedule = false }: { profile: Patien
               }
             }
             if (!sent) {
-              const guide = isBridge ? "" : `\n\n📎 Guia com QR Code enviada ao paciente pelo WhatsApp: ${window.location.origin}/comprovante/${data.appointmentId}`;
+              const guide = isBridge || !data.guideId ? "" : `\n\n📎 Guia com QR Code enviada ao paciente pelo WhatsApp: ${window.location.origin}/comprovante/${data.guideId}`;
               const doctor = data.doctorName || data.doctor;
               await sendMessage(
                 p.conversationId,

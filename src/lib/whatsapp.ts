@@ -4,6 +4,7 @@ import type { AppointmentStatus, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { decryptToken } from "@/lib/token-crypto";
 import { getBaseUrl } from "@/lib/format";
+import { guideLinkId } from "@/lib/guide-link";
 
 type SendAttemptResult = {
   success: boolean;
@@ -704,7 +705,7 @@ export async function sendAppointmentConfirmation(appointment: AppointmentWithRe
   const preparation =
     appointment.clinicProcedure.procedure.preparationInstructions?.trim() ||
     "Comparecer 15 minutos antes com documento oficial com foto e cartão do SUS ou CPF.";
-  const comprovanteUrl = `${getBaseUrl()}/comprovante/${appointment.id}`;
+  const comprovanteUrl = `${getBaseUrl()}/comprovante/${guideLinkId(appointment.id)}`;
 
   const messageText = `Olá ${patientName}! 👋 Seu agendamento para ${procedureName} na ${clinicName} foi registrado para ${dateFormatted}${timeFormatted}.
 

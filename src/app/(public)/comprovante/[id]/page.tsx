@@ -1,11 +1,13 @@
-import { notFound } from "next/navigation";
-import { getAppointmentById } from "@/lib/appointment-read";
+import type { Metadata } from "next";
+import { getAppointmentByGuideLink } from "@/lib/appointment-read";
 import { VoucherCard } from "@/components/public/voucher-card";
+import { GuideLinkUnavailable } from "@/components/public/guide-link-unavailable";
 import { toPlainAppointment } from "@/lib/serialize";
 import { getBaseUrl } from "@/lib/format";
 
-export const metadata = {
+export const metadata: Metadata = {
   title: "Validar guia | Conecta Saúde",
+  robots: { index: false, follow: false },
 };
 
 type ComprovantePageProps = {
@@ -14,11 +16,8 @@ type ComprovantePageProps = {
 
 export default async function ComprovantePage({ params }: ComprovantePageProps) {
   const { id } = await params;
-  const appointment = await getAppointmentById(id);
-
-  if (!appointment) {
-    notFound();
-  }
+  const res = await getAppointmentByGuideLink(id);
+  if (res.state !== "OK") return <GuideLinkUnavailable expired={res.state === "EXPIRED"} />;
 
   return (
     <main className="mx-auto flex max-w-2xl flex-col gap-4 px-4 py-8">
@@ -29,8 +28,8 @@ export default async function ComprovantePage({ params }: ComprovantePageProps) 
         </p>
       </div>
       <VoucherCard
-        appointment={toPlainAppointment(appointment)}
-        comprovanteUrl={`${getBaseUrl()}/comprovante/${appointment.id}`}
+        appointment={toPlainAppointment(res.appointment)}
+        comprovanteUrl={`${getBaseUrl()}/comprovante/${id}`}
         variant="validation"
       />
     </main>

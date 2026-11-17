@@ -1,5 +1,6 @@
 import type { AppointmentStatus } from "@prisma/client";
 import { formatDate, getBaseUrl } from "@/lib/format";
+import { guideLinkId } from "@/lib/guide-link";
 
 export type AppointmentNotificationData = {
   id: string;
@@ -31,7 +32,7 @@ function summaryLines(data: AppointmentNotificationData) {
 }
 
 function trackingLine(data: AppointmentNotificationData) {
-  return `Acompanhe pelo link: ${getBaseUrl()}/acompanhar/${data.id}`;
+  return `Acompanhe pelo link: ${getBaseUrl()}/acompanhar/${guideLinkId(data.id)}`;
 }
 
 function newAppointmentMessage(data: AppointmentNotificationData) {

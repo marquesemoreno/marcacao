@@ -1068,6 +1068,7 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
 
   async function handleScheduleConfirmed(data: {
     appointmentId: string;
+    guideId?: string | null;
     specialty: string;
     doctor: string;
     date: string;
@@ -1103,9 +1104,9 @@ export function ChatCrmApp({ scope, basePath, view, clinicId }: ChatCrmAppProps)
       }
     }
     if (!sentToPatient) {
-      const guideLine = isBridgeAppointment
+      const guideLine = isBridgeAppointment || !data.guideId
         ? ""
-        : `\n\n📎 Guia com QR Code enviada ao paciente pelo WhatsApp: ${window.location.origin}/comprovante/${data.appointmentId}`;
+        : `\n\n📎 Guia com QR Code enviada ao paciente pelo WhatsApp: ${window.location.origin}/comprovante/${data.guideId}`;
       const doctor = data.doctorName || data.doctor;
       await actions.sendMessage(
         selectedContactId,

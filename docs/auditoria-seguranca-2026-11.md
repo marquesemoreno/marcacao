@@ -168,6 +168,8 @@ O que está bem feito e vale registrar: as server actions do painel filtram por 
 - **Esforço:** 3–4 h.
 
 #### M11 — Guia e comprovante públicos pelo id do agendamento, sem validade
+
+> **Corrigido em 17/11/2026 (falta push/deploy).** O link passa a ser `<id>.<assinatura>` (HMAC do id com `NEXTAUTH_SECRET`, `src/lib/guide-link.ts`), sem tabela nova. Vale até 7 dias depois da consulta; depois mostra "Este link expirou". As duas páginas têm `noindex` e entregam a clínica só com os campos públicos (fecha a sobra do M12; o agendamento pelo site também deixou de devolver a clínica inteira). **Efeito colateral:** links já enviados com o id puro deixam de abrir e mostram "Link inválido". Só agendamentos do catálogo têm guia; os da ponte nunca tiveram.
 - **Onde:** `src/app/(public)/acompanhar/[id]/page.tsx:13`, `comprovante/[id]/page.tsx:45`, `src/components/public/voucher-card.tsx:79-80`.
 - **O que é:** o "link secreto" é o `cuid` do agendamento (não foi feito para ser segredo, nunca expira, não tem `noindex`). Mostra nome completo, CPF mascarado, procedimento e clínica.
 - **Correção:** trocar por token aleatório com hash (o mesmo `patient-token` já usado em `/p/[token]`), validade até alguns dias após a consulta, `robots: noindex`.

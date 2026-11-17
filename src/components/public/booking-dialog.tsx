@@ -37,7 +37,7 @@ const timeSlots = Array.from({ length: 21 }, (_, index) => {
 
 export function BookingDialog({ clinicProcedure }: { clinicProcedure: PlainClinicProcedure }) {
   const [open, setOpen] = useState(false);
-  const [confirmed, setConfirmed] = useState<PlainAppointment | null>(null);
+  const [confirmed, setConfirmed] = useState<(PlainAppointment & { guideId: string }) | null>(null);
   const isScheduled = clinicProcedure.appointmentType === "SCHEDULED";
   const today = new Date().toISOString().slice(0, 10);
 
@@ -88,13 +88,13 @@ export function BookingDialog({ clinicProcedure }: { clinicProcedure: PlainClini
               appointment={confirmed}
               comprovanteUrl={
                 typeof window !== "undefined"
-                  ? `${window.location.origin}/comprovante/${confirmed.id}`
-                  : `/comprovante/${confirmed.id}`
+                  ? `${window.location.origin}/comprovante/${confirmed.guideId}`
+                  : `/comprovante/${confirmed.guideId}`
               }
             />
             <div className="flex w-full flex-col gap-2 pt-2">
               <Button
-                render={<Link href={`/acompanhar/${confirmed.id}`} />}
+                render={<Link href={`/acompanhar/${confirmed.guideId}`} />}
                 nativeButton={false}
                 size="lg"
                 className="h-12"

@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { buildAppointmentMessage, type AppointmentNotificationData } from "./whatsapp-templates";
 
+process.env.NEXTAUTH_SECRET ??= "segredo-de-teste"; // assina o link da guia (M11)
+
 const data: AppointmentNotificationData = {
   id: "apt1",
   patientName: "Maria da Silva",

@@ -1,6 +1,7 @@
 import { CalendarDays, TrendingUp, Clock3, QrCode, CalendarX2 } from "lucide-react";
 import { WhatsAppIcon } from "@/components/icons/whatsapp-icon";
 import { getClinicOverview, listClinicAppointments } from "@/actions/clinic";
+import { guideLinkId } from "@/lib/guide-link";
 import { AppointmentActions } from "@/components/clinic/appointment-actions";
 import { AvatarBadge } from "@/components/chat/avatar-badge";
 import { buildWhatsAppLink } from "@/lib/format";
@@ -143,7 +144,7 @@ export default async function ClinicDashboardPage() {
                               WhatsApp
                             </a>
                             <a
-                              href={`/comprovante/${appointment.id}`}
+                              href={`/comprovante/${guideLinkId(appointment.id)}`}
                               target="_blank"
                               rel="noopener noreferrer"
                               title="Ver Guia com QR Code"

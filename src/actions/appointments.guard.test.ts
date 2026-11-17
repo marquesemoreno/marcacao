@@ -13,6 +13,7 @@ const bridge = vi.hoisted(() => ({ createBridgeAppointment: vi.fn() }));
 const whatsapp = vi.hoisted(() => ({ sendAppointmentConfirmation: vi.fn() }));
 const ip = vi.hoisted(() => ({ value: "203.0.113.1" }));
 
+process.env.NEXTAUTH_SECRET ??= "segredo-de-teste";
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/prisma", () => ({ prisma: db }));
 vi.mock("@/lib/session", () => session);
@@ -38,7 +39,7 @@ beforeEach(() => {
   for (const model of Object.values(db)) for (const fn of Object.values(model)) fn.mockReset();
   for (const fn of [...Object.values(session), ...Object.values(bridge), ...Object.values(whatsapp)]) fn.mockReset();
   db.appointment.count.mockResolvedValue(0);
-  db.appointment.create.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => ({ id: "a1", ...data }));
+  db.appointment.create.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => ({ id: "a1", ...data, clinicProcedure: { clinic: { name: "C", cnpj: "segredo" }, procedure: {} } }));
   db.clinicProcedure.findUnique.mockResolvedValue(listed);
   session.getClinicSessionOrNull.mockResolvedValue({ clinicId: "clinic-a", userId: "u1" });
   bridge.createBridgeAppointment.mockResolvedValue({ id: "bridge-appt" });
@@ -68,6 +69,9 @@ describe("createAppointment (público, sem login)", () => {
     expect(a.id).toBe("a1");
     expect(db.appointment.create.mock.calls[0][0].data).toMatchObject({ clinicProcedureId: "cp1", patientPhone: "77999990000", notes: "manhã" });
     expect(whatsapp.sendAppointmentConfirmation).toHaveBeenCalledTimes(1);
+    // O visitante recebe o link assinado da guia (M11) e a clínica sem os campos internos (M12).
+    expect(a.guideId).toMatch(/^a1\.[A-Za-z0-9_-]{22}$/);
+    expect(a.clinicProcedure.clinic).toMatchObject({ name: "C", cnpj: "" });
   });
 
   it("recusa nome ou observação longos demais (texto vai na mensagem de WhatsApp)", async () => {

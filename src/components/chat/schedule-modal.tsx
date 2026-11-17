@@ -53,6 +53,8 @@ interface ScheduleModalProps {
   initialDoctorName?: string;
   onConfirmSchedule: (scheduleData: {
     appointmentId: string;
+    /** Link assinado da guia (só agendamento do catálogo; ponte não tem guia). */
+    guideId?: string | null;
     specialty: string;
     doctor: string;
     date: string;
@@ -352,6 +354,7 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
       setTimeout(() => {
         onConfirmSchedule({
           appointmentId: appointment.id,
+          guideId: (appointment as { guideId?: string }).guideId ?? null,
           specialty: selectedProcedure.procedure.name,
           doctor: doctors.find((d) => String(d.id) === String(doctorId))?.nome ?? '',
           date,

@@ -4,6 +4,8 @@ import { prisma } from "@/lib/prisma";
 import { createAppointmentSchema, type CreateAppointmentInput } from "@/lib/schemas/appointment";
 import { sendAppointmentConfirmation } from "@/lib/whatsapp";
 import { toPlainAppointment } from "@/lib/serialize";
+import { toPublicClinic } from "@/lib/public-clinic";
+import { guideLinkId } from "@/lib/guide-link";
 import { AFFILIATE_COMMISSION_FLAT } from "@/lib/affiliate";
 import { isBridgeId, getBridgeClinicId, createBridgeAppointment } from "@/lib/hospital-bridge";
 
@@ -58,8 +60,14 @@ export async function createCatalogAppointment(data: AppointmentData, affiliateC
     console.error("Falha ao notificar novo agendamento via WhatsApp:", errorSummary(error));
   }
 
-  // Serializado (Decimal -> number): o retorno cruza a fronteira Server->Client.
-  return toPlainAppointment(appointment);
+  // Serializado (Decimal -> number): o retorno cruza a fronteira Server->Client — e chega
+  // ao visitante do site, então a clínica vai só com os campos públicos (M12). `guideId` =
+  // link assinado da guia (M11): o navegador não tem como montá-lo sozinho.
+  const publicAppointment = {
+    ...appointment,
+    clinicProcedure: { ...appointment.clinicProcedure, clinic: toPublicClinic(appointment.clinicProcedure.clinic) },
+  };
+  return { ...toPlainAppointment(publicAppointment), guideId: guideLinkId(appointment.id) };
 }
 
 /** Agendamento feito por alguém da clínica `clinicId` (painel ou atendente virtual): ponte
