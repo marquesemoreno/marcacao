@@ -69,6 +69,8 @@ O que está bem feito e vale registrar: as server actions do painel filtram por 
 ### Médio
 
 #### M1 — Senha pelo QR/totem revela se um telefone tem consulta hoje e marca chegada
+
+> **Corrigido em 17/11/2026 (falta push/deploy).** O QR do celular não procura mais a agenda pelo CPF/telefone digitado: só dá a senha, sem nome, horário nem chegada (a tela nem pede o número; chegada pelo celular é só pelo "Cheguei" do link pessoal). Limite de 5 senhas a cada 10 min por QR + IP, em memória por instância (`src/lib/memory-rate-limit.ts`). O totem físico da recepção continua casando CPF/telefone com a agenda, sem limite. A trava de localização segue vindo do navegador.
 - **Onde:** `src/actions/queue-ticket.ts:43-68` → `src/lib/queue-ticket-server.ts:70-125`.
 - **O que é:** `takeTicket` aceita um "identificador" livre; com 10+ dígitos casa com a agenda do dia, marca o paciente como chegado e devolve nome de exibição e horário da consulta. A trava de localização do QR vem do navegador (`input.location`) e pode ser inventada. Sem limite de taxa.
 - **Exploração:** quem fotografou o cartaz do QR testa telefones de casa e descobre quem tem consulta naquele dia, além de bagunçar a fila com senhas e chegadas falsas.

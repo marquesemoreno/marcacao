@@ -16,8 +16,9 @@ const fmtTime = new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-dig
 
 /** Totem: escolhe Normal/Preferencial → CPF ou telefone (ou pula) → senha impressa com QR Code.
  * Impressão silenciosa: Chrome com --kiosk-printing e a térmica como impressora padrão. */
-/** `mobile` = aberto pelo QR Code da recepção no celular do paciente: depois da senha vai
- * direto pra página de acompanhamento da fila. */
+/** `mobile` = aberto pelo QR Code da recepção no celular do paciente: não pede CPF/telefone
+ * (o servidor não procura a agenda pelo QR — auditoria M1) e depois da senha vai direto pra
+ * página de acompanhamento da fila. */
 export function TotemKiosk({
   token,
   clinicName,
@@ -138,18 +139,21 @@ export function TotemKiosk({
                 {service && services.length > 1 ? service.name : mobile ? "Chegou? Pegue sua senha" : "Retire sua senha"}
               </h1>
               {mobile && needsLocation && services.length <= 1 && <p className="-mt-2 text-center text-base text-slate-500">Vamos pedir sua localização só para confirmar que você está na clínica.</p>}
-              {mobile && <p className="-mt-4 text-center text-lg text-slate-600">Com consulta marcada, digite seu CPF ou telefone no próximo passo e a recepção já fica sabendo.</p>}
+              {mobile && <p className="-mt-4 text-center text-lg text-slate-600">Com consulta marcada, avise que chegou pelo botão “Cheguei” do link que você recebeu no WhatsApp.</p>}
+              {mobile && error && <p role="alert" className="text-center text-xl font-medium text-rose-700">{error}</p>}
               <div className="grid w-full max-w-5xl gap-[3vw] md:grid-cols-2">
                 <button
                   type="button"
-                  onClick={() => setStep({ kind: "id", type: "N" })}
+                  disabled={pending}
+                  onClick={() => (mobile ? issue("N", null) : setStep({ kind: "id", type: "N" }))}
                   className="flex min-h-[28vh] flex-col items-center justify-center rounded-3xl bg-emerald-700 p-8 text-white shadow-lg active:scale-[0.98] active:bg-emerald-800"
                 >
                   <span className="text-[clamp(2.5rem,5vw,4.5rem)] font-bold">Normal</span>
                 </button>
                 <button
                   type="button"
-                  onClick={() => setStep({ kind: "id", type: "P" })}
+                  disabled={pending}
+                  onClick={() => (mobile ? issue("P", null) : setStep({ kind: "id", type: "P" }))}
                   className="flex min-h-[28vh] flex-col items-center justify-center rounded-3xl bg-sky-800 p-8 text-white shadow-lg active:scale-[0.98] active:bg-sky-900"
                 >
                   <span className="text-[clamp(2.5rem,5vw,4.5rem)] font-bold">Preferencial</span>

@@ -19,6 +19,20 @@ import {
 import { normalizeServiceInput, type TicketType } from "@/lib/queue-ticket";
 import { isInsideFence } from "@/lib/geo-fence";
 import { requireClinicManager } from "@/lib/session";
+import { headers } from "next/headers";
+import { createMemoryRateLimit } from "@/lib/memory-rate-limit";
+
+/** QR da recepção: 5 senhas a cada 10 min por celular (token + IP). O totem físico fica fora. */
+const qrLimit = createMemoryRateLimit(5, 10 * 60_000);
+
+async function visitorIp(): Promise<string | null> {
+  try {
+    const h = await headers();
+    return h.get("x-forwarded-for")?.split(",")[0]?.trim() || h.get("x-real-ip") || null;
+  } catch {
+    return null;
+  }
+}
 
 // ── Totem (sem login, só o token do link do totem) ─────────────────────────────
 
@@ -49,6 +63,9 @@ export async function takeTicket(
   if (!clinicId) return { ok: false, error: kind === "QR" ? "Este QR Code foi desligado. Retire a senha no balcão." : "Totem desligado. Procure a recepção." };
   if (input.type !== "N" && input.type !== "P") return { ok: false, error: "Tipo de senha inválido." };
   if (kind === "QR") {
+    if (qrLimit.limited(`${token}:${(await visitorIp()) ?? "?"}`)) {
+      return { ok: false, error: "Muitas senhas em pouco tempo neste celular. Aguarde alguns minutos ou retire a senha no balcão." };
+    }
     const c = await prisma.clinic.findUnique({ where: { id: clinicId }, select: { arrivalLat: true, arrivalLng: true, arrivalRadiusM: true } });
     if (c?.arrivalLat != null && c.arrivalLng != null) {
       if (!input.location) return { ok: false, error: "Precisamos da sua localização para confirmar que você está na clínica." };
@@ -58,7 +75,11 @@ export async function takeTicket(
     }
   }
   try {
-    return { ok: true, ticket: await issueQueueTicket(clinicId, { type: input.type, identifier: input.identifier?.slice(0, 20), serviceId: input.serviceId ?? null }) };
+    // QR (celular, fora do nosso controle): CPF/telefone digitado não é procurado na agenda —
+    // senão o cartaz vira consulta de "quem tem consulta hoje" e marca chegada falsa
+    // (auditoria 16/11/2026, M1). Chegada pelo celular é só pelo "Cheguei" do link pessoal.
+    const identifier = kind === "QR" ? null : input.identifier?.slice(0, 20);
+    return { ok: true, ticket: await issueQueueTicket(clinicId, { type: input.type, identifier, serviceId: input.serviceId ?? null }) };
   } catch (e) {
     console.error("[totem] falha ao gerar senha", errorSummary(e));
     return { ok: false, error: "Não deu pra gerar a senha. Tente de novo ou procure a recepção." };
