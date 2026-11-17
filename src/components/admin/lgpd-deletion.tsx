@@ -37,7 +37,8 @@ export function LgpdDeletion({ records }: { records: Rec[] }) {
         return;
       }
       toast.success(
-        `${r.messagesDeleted} mensagem(ns) apagada(s).` +
+        `${r.messagesDeleted} mensagem(ns) apagada(s), mais ${Object.values(r.related).reduce((a, b) => a + b, 0)} registro(s) ligados ao paciente (tarefas, ficha, senhas, lista de espera).` +
+          (r.backupFailed ? " ATENÇÃO: não foi possível apagar as mídias no backup externo — avise o suporte." : "") +
           (r.contactAnonymized
             ? " Nome e telefone anonimizados."
             : ` O paciente ainda conversa com ${r.otherConversations} outra(s) clínica(s): nome e telefone continuam lá.`),
@@ -65,9 +66,9 @@ export function LgpdDeletion({ records }: { records: Rec[] }) {
 
         <section className="rounded-2xl bg-white dark:bg-slate-900 shadow-xs p-4 space-y-3">
           <label className="block text-xs font-medium text-slate-600 dark:text-slate-400">
-            Telefone do titular (com DDD)
+            Telefone do titular (com DDD) ou @usuario do Instagram
             <span className="mt-1 flex gap-2">
-              <input value={phone} onChange={(e) => setPhone(e.target.value)} inputMode="tel" placeholder="77999998888" className={`${input} w-56`} />
+              <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="77999998888 ou @usuario" className={`${input} w-56`} />
               <button
                 type="button"
                 onClick={search}

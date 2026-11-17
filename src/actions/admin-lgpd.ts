@@ -4,15 +4,19 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireAdminSession } from "@/lib/session";
 import { formatToWhatsAppNumber } from "@/lib/whatsapp";
-import { getSupabaseServerClient, WHATSAPP_MEDIA_BUCKET } from "@/lib/supabase-server";
+import { getSupabaseServerClient } from "@/lib/supabase-server";
+import { errorSummary } from "@/lib/safe-error";
+import { deletePatientRelatedData, removeConversationBackup, removeConversationMedia } from "@/lib/lgpd-server";
 import { ANONYMIZED_NAME, maskPhone } from "@/lib/lgpd";
 
-/** Conversas de um telefone em todas as clínicas — pra atender um pedido de exclusão. */
+/** Conversas de um telefone em todas as clínicas — pra atender um pedido de exclusão.
+ * Paciente que só fala pelo Instagram não tem telefone: busque pelo @usuario. */
 export async function findPatientForDeletion(phone: string) {
   await requireAdminSession();
-  const full = formatToWhatsAppNumber(phone);
-  const contact = await prisma.contact.findUnique({
-    where: { phone: full },
+  const handle = phone.trim().startsWith("@") ? phone.trim().slice(1) : null;
+  const full = handle ? null : formatToWhatsAppNumber(phone);
+  const contact = await prisma.contact.findFirst({
+    where: handle ? { instagramUsername: { equals: handle, mode: "insensitive" } } : { phone: full },
     select: {
       id: true,
       name: true,
@@ -50,12 +54,9 @@ export async function anonymizePatientAdmin(input: { conversationId: string; rea
   if (!conversation) return { success: false as const, error: "Conversa não encontrada." };
   const otherConversations = conversation.contact._count.conversations - 1;
 
-  // Mídias no storage (pasta = id da conversa).
+  // Mídias no storage (pasta = id da conversa), todas as páginas.
   const supabase = getSupabaseServerClient();
-  if (supabase) {
-    const { data: files } = await supabase.storage.from(WHATSAPP_MEDIA_BUCKET).list(conversation.id, { limit: 1000 });
-    if (files?.length) await supabase.storage.from(WHATSAPP_MEDIA_BUCKET).remove(files.map((f) => `${conversation.id}/${f.name}`));
-  }
+  if (supabase) await removeConversationMedia(supabase, conversation.id);
 
   const cid = conversation.id;
   const result = await prisma.$transaction(async (tx) => {
@@ -67,6 +68,13 @@ export async function anonymizePatientAdmin(input: { conversationId: string; rea
     await tx.patientDataSuggestion.deleteMany({ where: { conversationId: cid } });
     await tx.aiActionLog.deleteMany({ where: { conversationId: cid } });
     await tx.contactClinicProfile.deleteMany({ where: { contactId: conversation.contactId, clinicId: conversation.clinicId } });
+    // Tarefas, automações, ficha prévia, senhas, NPS, lista de espera, campanhas…
+    const related = await deletePatientRelatedData(tx, {
+      clinicId: conversation.clinicId,
+      conversationId: cid,
+      contactId: conversation.contactId,
+      phone: conversation.contact.phone,
+    });
     await tx.conversation.update({
       where: { id: cid },
       data: {
@@ -112,11 +120,21 @@ export async function anonymizePatientAdmin(input: { conversationId: string; rea
         performedByUserId: userId,
       },
     });
-    return { messagesDeleted: deleted.count, contactAnonymized: otherConversations === 0, otherConversations };
+    return { messagesDeleted: deleted.count, contactAnonymized: otherConversations === 0, otherConversations, related };
   });
+  // Cópias das mídias no backup externo (B2). Depois do banco: se o backup falhar, a
+  // exclusão principal já valeu e a tela avisa para repetir.
+  let backupRemoved: number | null = null;
+  let backupFailed = false;
+  try {
+    backupRemoved = await removeConversationBackup(cid);
+  } catch (error) {
+    backupFailed = true;
+    console.error("[lgpd] falha ao apagar mídias no backup:", errorSummary(error));
+  }
 
   revalidatePath("/admin/lgpd");
-  return { success: true as const, ...result };
+  return { success: true as const, ...result, backupRemoved, backupFailed };
 }
 
 export async function listDeletionRecords() {

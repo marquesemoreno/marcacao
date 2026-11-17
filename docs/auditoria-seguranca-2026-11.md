@@ -125,6 +125,8 @@ O que está bem feito e vale registrar: as server actions do painel filtram por 
 - **Esforço:** 1–2 h (CSP completa: +1 dia de ajuste).
 
 #### M8 — Exclusão do titular (LGPD) deixa dados para trás
+
+> **Corrigido em 17/11/2026 (falta push/deploy).** A exclusão agora apaga Tarefas, inscrições de automação, pedidos de marcação, ficha prévia, aceite do termo, links do paciente, NPS, senhas e lista de espera; tira o telefone de marcações da agenda, lembretes, vagas oferecidas e destinatários de campanha (o relatório agregado continua); apaga todas as páginas de mídia no Storage e as cópias no bucket de backup; e aceita busca por `@usuario` do Instagram (`src/lib/lgpd-server.ts`, `src/actions/admin-lgpd.ts`). Continuam de fora, de propósito: agendamentos (guarda obrigatória), registro de acessos (prova de quem viu), quem pediu para sair do SMS (lista de bloqueio) e `webhook_logs` (somem sozinhos em 60 dias). No Backblaze B2, a versão antiga do arquivo só some de vez com a regra de ciclo de vida "manter só a última versão" ligada no painel.
 - **Onde:** `src/actions/admin-lgpd.ts:41-118`.
 - **Apaga hoje:** mensagens, mídias da pasta da conversa, perfil na clínica, triagem, logs de IA, sugestões, auditoria de qualidade.
 - **Não apaga (confirmado, não há chamada):**
