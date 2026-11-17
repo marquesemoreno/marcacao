@@ -5,7 +5,8 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { hashResetToken, newResetToken, passwordProblem, resetTokenStatus } from "@/lib/auth-security";
-import { generateTotpSecret, totpUri, verifyTotp } from "@/lib/totp";
+import { generateTotpSecret, matchTotpStep, totpUri } from "@/lib/totp";
+import { generateRecoveryCodes } from "@/lib/recovery-codes";
 import { decryptToken, encryptToken } from "@/lib/token-crypto";
 import { sendEmailViaResend } from "@/lib/resend";
 
@@ -44,7 +45,7 @@ export async function getMySecurity() {
     take: 10,
     select: { createdAt: true, success: true, reason: true, ip: true, userAgent: true },
   });
-  return { twoFactor: !!user.totpEnabledAt, email: user.email, logins };
+  return { twoFactor: !!user.totpEnabledAt, recoveryCodesLeft: user.totpRecoveryCodes.length, email: user.email, logins };
 }
 
 /** Começa a ativação do 2FA: gera o segredo (guardado criptografado, ainda sem valer). */
@@ -52,23 +53,37 @@ export async function startTwoFactorSetup() {
   const user = await me();
   if (user.totpEnabledAt) throw new Error("A verificação em duas etapas já está ativa.");
   const secret = generateTotpSecret();
-  await prisma.user.update({ where: { id: user.id }, data: { totpSecret: encryptToken(secret), totpEnabledAt: null } });
+  await prisma.user.update({ where: { id: user.id }, data: { totpSecret: encryptToken(secret), totpEnabledAt: null, totpRecoveryCodes: [] } });
   return { secret, uri: totpUri(secret, user.email) };
 }
 
-/** Confirma com o 1º código do app — só então o 2FA passa a ser pedido no login. */
+/** Confirma com o 1º código do app — só então o 2FA passa a ser pedido no login. Devolve os
+ * códigos de reserva, que a tela mostra uma única vez (no banco fica só o hash — B3). */
 export async function confirmTwoFactorSetup(code: string) {
   const user = await me();
   if (!user.totpSecret) throw new Error("Comece a ativação de novo.");
-  if (!verifyTotp(decryptToken(user.totpSecret), code)) throw new Error("Código não confere. Veja o horário do celular e tente o código atual.");
-  await prisma.user.update({ where: { id: user.id }, data: { totpEnabledAt: new Date() } });
-  return { success: true as const };
+  const step = matchTotpStep(decryptToken(user.totpSecret), code);
+  if (step === null) throw new Error("Código não confere. Veja o horário do celular e tente o código atual.");
+  const { codes, hashes } = generateRecoveryCodes();
+  // O código usado para ativar já conta como gasto: não serve para entrar logo em seguida.
+  await prisma.user.update({ where: { id: user.id }, data: { totpEnabledAt: new Date(), totpLastStep: step, totpRecoveryCodes: hashes } });
+  return { success: true as const, recoveryCodes: codes };
+}
+
+/** Novos códigos de reserva (os antigos deixam de valer). Pede a senha. */
+export async function regenerateRecoveryCodes(password: string) {
+  const user = await me();
+  if (!user.totpEnabledAt) throw new Error("Ative a verificação em duas etapas primeiro.");
+  if (!(await bcrypt.compare(password, user.passwordHash))) throw new Error("Senha incorreta.");
+  const { codes, hashes } = generateRecoveryCodes();
+  await prisma.user.update({ where: { id: user.id }, data: { totpRecoveryCodes: hashes } });
+  return { success: true as const, recoveryCodes: codes };
 }
 
 export async function disableTwoFactor(password: string) {
   const user = await me();
   if (!(await bcrypt.compare(password, user.passwordHash))) throw new Error("Senha incorreta.");
-  await prisma.user.update({ where: { id: user.id }, data: { totpSecret: null, totpEnabledAt: null } });
+  await prisma.user.update({ where: { id: user.id }, data: { totpSecret: null, totpEnabledAt: null, totpLastStep: null, totpRecoveryCodes: [] } });
   return { success: true as const };
 }
 

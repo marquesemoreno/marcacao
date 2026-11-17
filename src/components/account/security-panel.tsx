@@ -10,6 +10,7 @@ import {
   disableTwoFactor,
   endMyOtherSessions,
   getMySecurity,
+  regenerateRecoveryCodes,
   startTwoFactorSetup,
 } from "@/actions/account";
 
@@ -38,6 +39,8 @@ export function SecurityPanel() {
   const [setup, setSetup] = useState<{ secret: string; uri: string } | null>(null);
   const [code, setCode] = useState("");
   const [pw, setPw] = useState("");
+  /** Códigos de reserva recém-gerados: aparecem só agora (no banco fica o hash). */
+  const [codes, setCodes] = useState<string[] | null>(null);
   const [busy, setBusy] = useState(false);
 
   const load = () => getMySecurity().then(setData).catch(() => null);
@@ -72,6 +75,33 @@ export function SecurityPanel() {
         {data.twoFactor ? (
           <>
             <p className="text-xs text-slate-500">Ativa. Ao entrar, o sistema pede o código do app autenticador.</p>
+            {codes ? (
+              <div className="space-y-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-100">
+                <p className="text-xs font-semibold">Códigos de reserva — guarde agora (não aparecem de novo)</p>
+                <p className="text-xs">Se perder o celular, entre com um destes no lugar do código do app. Cada um vale uma vez.</p>
+                <ul className="grid grid-cols-2 gap-1 font-mono text-sm">
+                  {codes.map((c) => (
+                    <li key={c}>{c}</li>
+                  ))}
+                </ul>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => navigator.clipboard.writeText(codes.join("\n")).then(() => toast.success("Códigos copiados."))}
+                    className="h-8 rounded-full bg-white px-3 text-xs font-semibold text-amber-900 hover:bg-amber-100 dark:bg-amber-900/40 dark:text-amber-100"
+                  >
+                    Copiar
+                  </button>
+                  <button type="button" onClick={() => setCodes(null)} className="h-8 rounded-full px-3 text-xs font-semibold hover:bg-amber-100 dark:hover:bg-amber-900/40">
+                    Já guardei
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <p className="text-xs text-slate-500">
+                Códigos de reserva restantes: <strong>{data.recoveryCodesLeft}</strong>. Para gerar novos (os antigos deixam de valer), digite a senha e toque em “Novos códigos”.
+              </p>
+            )}
             <div className="flex gap-2">
               <input
                 type="password"
@@ -87,6 +117,20 @@ export function SecurityPanel() {
                 className="h-9 rounded-full bg-slate-100 px-4 text-xs font-semibold hover:bg-slate-200 disabled:opacity-50 dark:bg-slate-800"
               >
                 Desligar
+              </button>
+              <button
+                type="button"
+                disabled={busy || !pw}
+                onClick={() =>
+                  run(async () => {
+                    const res = await regenerateRecoveryCodes(pw);
+                    setCodes(res.recoveryCodes);
+                    setPw("");
+                  }, "Novos códigos de reserva gerados.")
+                }
+                className="h-9 rounded-full bg-slate-100 px-4 text-xs font-semibold hover:bg-slate-200 disabled:opacity-50 dark:bg-slate-800"
+              >
+                Novos códigos
               </button>
             </div>
           </>
@@ -113,7 +157,8 @@ export function SecurityPanel() {
                 disabled={busy || code.replace(/\D/g, "").length !== 6}
                 onClick={() =>
                   run(async () => {
-                    await confirmTwoFactorSetup(code);
+                    const res = await confirmTwoFactorSetup(code);
+                    setCodes(res.recoveryCodes);
                     setSetup(null);
                     setCode("");
                   }, "Verificação em duas etapas ativada.")

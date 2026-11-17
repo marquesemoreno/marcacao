@@ -53,11 +53,21 @@ export function totpAt(secret: string, timeMs: number): string {
   return String(code).padStart(6, "0");
 }
 
-/** Aceita um passo antes e um depois (relógio do celular levemente fora). */
-export function verifyTotp(secret: string, input: string, nowMs: number = Date.now()): boolean {
+/** Passo (contador de 30 s) do código digitado, ou null se não confere. Aceita um passo antes
+ * e um depois (relógio do celular levemente fora). O login guarda o passo e só aceita um mais
+ * novo — o mesmo código não vale duas vezes (auditoria B3). */
+export function matchTotpStep(secret: string, input: string, nowMs: number = Date.now()): number | null {
   const code = String(input ?? "").replace(/\s/g, "");
-  if (!/^\d{6}$/.test(code)) return false;
-  return [-1, 0, 1].some((w) => timingSafeEqual(Buffer.from(totpAt(secret, nowMs + w * STEP_MS)), Buffer.from(code)));
+  if (!/^\d{6}$/.test(code)) return null;
+  const now = Math.floor(nowMs / STEP_MS);
+  for (const step of [now - 1, now, now + 1]) {
+    if (timingSafeEqual(Buffer.from(totpAt(secret, step * STEP_MS)), Buffer.from(code))) return step;
+  }
+  return null;
+}
+
+export function verifyTotp(secret: string, input: string, nowMs: number = Date.now()): boolean {
+  return matchTotpStep(secret, input, nowMs) !== null;
 }
 
 export function totpUri(secret: string, account: string): string {

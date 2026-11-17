@@ -174,6 +174,10 @@ model User {
   /// Segredo TOTP (verificação em duas etapas), criptografado (token-crypto). Vale só com totpEnabledAt.
   totpSecret         String?  @map("totp_secret")
   totpEnabledAt      DateTime? @map("totp_enabled_at")
+  /// Último passo de 30 s aceito no login — o mesmo código não vale duas vezes (auditoria B3).
+  totpLastStep       Int?     @map("totp_last_step")
+  /// Códigos de reserva do 2FA (SHA-256); cada um vale uma vez.
+  totpRecoveryCodes  String[] @default([]) @map("totp_recovery_codes")
   createdAt          DateTime @default(now()) @map("created_at")
   updatedAt          DateTime @updatedAt @map("updated_at")
 

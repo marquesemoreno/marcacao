@@ -131,16 +131,16 @@ function LoginForm() {
             </label>
             <input
               id="code"
-              inputMode="numeric"
               autoComplete="one-time-code"
+              autoCapitalize="none"
               autoFocus
-              maxLength={7}
+              maxLength={9}
               value={code}
               onChange={(e) => setCode(e.target.value)}
               className="h-12 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-center text-lg tracking-[0.4em] tabular-nums text-slate-900 focus:border-teal-600 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-500/20"
               placeholder="000000"
             />
-            <p className="text-xs text-slate-500">Abra o Google Authenticator (ou outro app) e digite os 6 números do Conecta Saúde.</p>
+            <p className="text-xs text-slate-500">Abra o Google Authenticator (ou outro app) e digite os 6 números do Conecta Saúde. Sem o celular? Use um dos códigos de reserva (abcd-efgh).</p>
           </div>
         )}
 

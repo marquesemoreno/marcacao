@@ -4,8 +4,7 @@ import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { isIpLocked, isLoginLocked, LOGIN_WINDOW_MIN, SESSION_MAX_AGE_SEC } from "@/lib/login-guard";
 import { requiresTwoFactor, TWO_FACTOR_INVALID, TWO_FACTOR_REQUIRED } from "@/lib/auth-security";
-import { verifyTotp } from "@/lib/totp";
-import { decryptToken } from "@/lib/token-crypto";
+import { consumeSecondFactor } from "@/lib/second-factor";
 
 type ReqLike = { headers?: Record<string, string | string[] | undefined> } | undefined;
 const header = (req: ReqLike, name: string) => {
@@ -100,7 +99,8 @@ export const authOptions: AuthOptions = {
         if (requiresTwoFactor(user)) {
           const code = credentials.code?.trim();
           if (!code) throw new Error(TWO_FACTOR_REQUIRED);
-          if (!verifyTotp(decryptToken(user.totpSecret!), code)) {
+          // Código do app (só passo mais novo que o último) ou código de reserva (uma vez) — B3.
+          if (!(await consumeSecondFactor(user, code))) {
             await prisma.loginFailure.create({ data: { email } }).catch(() => {});
             await logLogin(req, { email, success: false, reason: "CODIGO_2FA", userId: user.id, clinicId: user.clinicId });
             throw new Error(TWO_FACTOR_INVALID);
