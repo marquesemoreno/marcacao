@@ -4,6 +4,7 @@ import { finalizedTake } from "@/lib/finalized-page";
 import { errorSummary } from "@/lib/safe-error";
 import { applyAutoFunnelStage } from "@/lib/auto-funnel-stage-server";
 import { recordBulkAccess, recordPatientAccess } from "@/lib/access-log-server";
+import { phoneCheckResult, sharedPhoneChangeProblem } from "@/lib/shared-contact";
 import { CONTACT_WITH_PROFILES, profileOf, profileWhere, upsertProfile } from "@/lib/contact-profile";
 import { sortPatientList, type PatientSort } from "@/lib/patient-list";
 import { CHAT_LIMIT_ENABLED } from "@/lib/chat-limit";
@@ -113,8 +114,8 @@ export async function checkContactPhone(phone: string) {
     where: { phone: fullPhone },
     select: { name: true, conversations: { where: { clinicId }, select: { id: true }, take: 1 } },
   });
-  if (!contact) return null;
-  return { name: contact.name, conversationId: contact.conversations[0]?.id ?? null };
+  // Só avisa (com nome) se o paciente já é DESTA clínica; de outra, responde como livre.
+  return phoneCheckResult(contact);
 }
 
 /** Uma linha por contato já cadastrado nesta clínica (cada um tem no máximo uma
@@ -1768,7 +1769,7 @@ export async function updateContactInfo(
 
   const conversation = await prisma.conversation.findUnique({
     where: { id: conversationId },
-    select: { clinicId: true, contactId: true },
+    select: { clinicId: true, contactId: true, contact: { select: { phone: true } } },
   });
   if (!conversation || conversation.clinicId !== clinicId) {
     return { success: false as const, error: "Conversa não encontrada" };
@@ -1780,6 +1781,12 @@ export async function updateContactInfo(
     fullPhone = formatToWhatsAppNumber(data.phone);
     if (!isValidWhatsAppNumber(fullPhone)) {
       return { success: false as const, error: "Telefone inválido. Informe com DDD e 9 dígitos (ex: 77999998888)." };
+    }
+    // Cadastro compartilhado: trocar o número aqui mudaria para onde a OUTRA clínica escreve.
+    if (fullPhone !== conversation.contact.phone) {
+      const otherClinicConversations = await prisma.conversation.count({ where: { contactId: conversation.contactId, clinicId: { not: clinicId } } });
+      const problem = sharedPhoneChangeProblem({ currentPhone: conversation.contact.phone, newPhone: fullPhone, otherClinicConversations });
+      if (problem) return { success: false as const, error: problem };
     }
   }
 

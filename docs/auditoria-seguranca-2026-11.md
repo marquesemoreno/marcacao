@@ -76,6 +76,8 @@ O que está bem feito e vale registrar: as server actions do painel filtram por 
 - **Esforço:** 2 h.
 
 #### M2 — Cadastro de contato é global: uma clínica vê e altera dado de outra
+
+> **Corrigido em parte em 17/11/2026 (falta push/deploy).** (a) `checkContactPhone` só devolve o nome quando o paciente já tem conversa nesta clínica; para paciente de outra clínica responde como número livre. (b) `updateContactInfo` recusa trocar o telefone de um contato que também tem conversa em outra clínica (`src/lib/shared-contact.ts`). **Continua aberto:** o nome ainda é um só para todas as clínicas — ao cadastrar um número que já é de outra unidade, a conversa nova mostra o nome gravado lá, e uma clínica ainda consegue renomear um contato compartilhado. A correção de verdade é o nome por clínica em `ContactClinicProfile` (migration + cerca de 60 leituras de `contact.name` em 28 arquivos, além do webhook que grava o nome do WhatsApp). O painel admin continua podendo trocar o telefone, por desenho.
 - **Onde:** `src/actions/inbox.ts:109-118` (`checkContactPhone`) e `:1781-1785` (`updateContactInfo`).
 - **O que é:** (a) digitar qualquer telefone devolve o nome gravado por outra clínica; (b) editar o cadastro troca `name` e `phone` do `Contact`, que é compartilhado.
 - **Exploração:** atendente da clínica A confirma que alguém é paciente da plataforma e vê o nome; ou troca o telefone de um contato comum e as mensagens da clínica B passam a ir para outro número.
