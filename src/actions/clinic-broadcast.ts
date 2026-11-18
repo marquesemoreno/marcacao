@@ -564,6 +564,8 @@ export async function getClinicNumberHealth(campaignPending?: number) {
  * assim que a mensagem sai (ver RESCHEDULE_PENDING_TAG). */
 export async function createRescheduleBroadcast(doctorName: string, date: Date, messageTemplate: string) {
   const { clinicId, userId } = await requireClinicPermission("disparos");
+  // Demo: o aviso nasceria já enviando para números fictícios (falhas na lista) — não cria.
+  if (await isDemoClinic(clinicId)) throw new Error("Clínica de demonstração: o aviso de remarcação não é enviado.");
 
   // Sai sem aceite de marketing: o texto tem que ser mesmo um aviso de remarcação.
   const trimmedTemplate = messageTemplate.trim();
