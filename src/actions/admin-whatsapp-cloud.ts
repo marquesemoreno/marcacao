@@ -10,6 +10,8 @@ import { authOptions } from "@/lib/auth";
 import { isClinicManager, isLive } from "@/lib/session";
 import { decryptToken, encryptToken } from "@/lib/token-crypto";
 import { t, type Lang } from "@/lib/i18n-review";
+import { isDemoClinicCnpj } from "@/lib/demo-clinic";
+import { DEMO_CLOUD_BLOCKED, demoCloudAccount, demoCloudTemplates } from "@/lib/demo-cloud";
 import {
   createCloudTemplate,
   exchangeEmbeddedSignupCode,
@@ -62,6 +64,23 @@ function revalidateCloud() {
 }
 
 /** Conta da clínica com o token já aberto (só no servidor — nunca sai daqui nem vai pra log). */
+/** Clínica demo (vídeos): a API oficial aparece conectada com o número da TIVDC, sem enviar nada. */
+async function isDemoClinic(clinicId: string | null): Promise<boolean> {
+  if (!clinicId) return false;
+  const c = await prisma.clinic.findUnique({ where: { id: clinicId }, select: { cnpj: true } });
+  return isDemoClinicCnpj(c?.cnpj);
+}
+
+/** Número exibido na demo: o da TIVDC (ou da Clínica Teste, se o número estiver lá). Só leitura. */
+async function demoSource() {
+  const select = { displayPhoneNumber: true, wabaId: true, phoneNumberId: true } as const;
+  for (const name of ["TIVDC", "Clínica Teste"]) {
+    const a = await prisma.whatsappCloudAccount.findFirst({ where: { clinic: { tradeName: { contains: name, mode: "insensitive" } } }, select });
+    if (a) return a;
+  }
+  return null;
+}
+
 async function accountFor(clinicId: string) {
   const account = await prisma.whatsappCloudAccount.findUnique({ where: { clinicId } });
   if (!account) return null;
@@ -82,6 +101,10 @@ export async function listCloudAccounts(): Promise<CloudAccountRow[]> {
       },
     },
   });
+  if (scope && (await isDemoClinic(scope))) {
+    const account = demoCloudAccount(await demoSource());
+    return clinics.map((c) => ({ clinicId: c.id, clinicName: c.tradeName, account }));
+  }
   return clinics.map((c) => ({
     clinicId: c.id,
     clinicName: c.tradeName,
@@ -115,6 +138,7 @@ export async function connectWhatsappCloud(input: {
   lang?: Lang;
 }): Promise<{ success: true; displayPhoneNumber: string | null; warnings: string[] } | { success: false; error: string }> {
   await requireCloudAccess(input.clinicId);
+  if (await isDemoClinic(input.clinicId)) return { success: false, error: DEMO_CLOUD_BLOCKED };
   const lang = input.lang ?? "pt";
   if (!input.code || !input.wabaId) return { success: false, error: t(lang, "err.missingIds") };
   if (!input.phoneNumberId) return { success: false, error: t(lang, "err.onlyWaba") };
@@ -174,6 +198,7 @@ export async function connectWhatsappCloud(input: {
  * mensagem chega duas vezes. */
 export async function setCloudAccountActive(clinicId: string, active: boolean) {
   await requireCloudAccess(clinicId);
+  if (await isDemoClinic(clinicId)) return { success: true as const };
   await prisma.whatsappCloudAccount.update({ where: { clinicId }, data: { active } });
   revalidateCloud();
   return { success: true as const };
@@ -182,6 +207,7 @@ export async function setCloudAccountActive(clinicId: string, active: boolean) {
 /** Modelo aprovado do lembrete D-1 ({{1}} nome, {{2}} data, {{3}} horário, {{4}} médico). */
 export async function setCloudReminderTemplate(clinicId: string, name: string, language: string) {
   await requireCloudAccess(clinicId);
+  if (await isDemoClinic(clinicId)) return { success: true as const };
   const n = name.trim();
   await prisma.whatsappCloudAccount.update({
     where: { clinicId },
@@ -194,6 +220,7 @@ export async function setCloudReminderTemplate(clinicId: string, name: string, l
 /** Teste rápido da conexão: modelo "hello_world" (existe em toda conta nova da Meta). */
 export async function sendCloudTestMessage(clinicId: string, to: string, lang: Lang = "pt"): Promise<{ success: boolean; error?: string }> {
   await requireCloudAccess(clinicId);
+  if (await isDemoClinic(clinicId)) return { success: false, error: DEMO_CLOUD_BLOCKED };
   const r = await sendTemplateLogged(clinicId, to, { name: "hello_world", language: "en_US", bodyParams: [] }, "Hello World");
   if (r.success) return { success: true };
   // Erros nossos vêm em pt — traduz os conhecidos; os da Meta já vêm em inglês.
@@ -208,6 +235,7 @@ export async function sendCloudTestMessage(clinicId: string, to: string, lang: L
  * desconecta no app: Configurações > Conta > Plataforma Business. */
 export async function disconnectWhatsappCloud(clinicId: string): Promise<{ success: boolean }> {
   await requireCloudAccess(clinicId);
+  if (await isDemoClinic(clinicId)) return { success: false };
   await prisma.whatsappCloudAccount.deleteMany({ where: { clinicId } });
   revalidateCloud();
   return { success: true };
@@ -229,6 +257,17 @@ export type CloudAssets = {
 /** Contas conectadas com a WABA e os números dela (seletor visível na tela de envio). */
 export async function listCloudAssets(): Promise<CloudAssets[]> {
   const { scope } = await requireCloudAccess();
+  if (scope && (await isDemoClinic(scope))) {
+    const clinic = await prisma.clinic.findUnique({ where: { id: scope }, select: { tradeName: true } });
+    const a = demoCloudAccount(await demoSource());
+    return [{
+      clinicId: scope,
+      clinicName: clinic?.tradeName ?? "Clínica Vida",
+      wabaId: a.wabaId,
+      defaultPhoneNumberId: a.phoneNumberId,
+      phoneNumbers: [{ id: a.phoneNumberId, display_phone_number: a.displayPhoneNumber, verified_name: a.verifiedName, quality_rating: "GREEN" }],
+    }];
+  }
   const accounts = await prisma.whatsappCloudAccount.findMany({ where: scope ? { clinicId: scope } : undefined, include: { clinic: { select: { tradeName: true } } } });
   return Promise.all(
     accounts.map(async (a) => {
@@ -300,6 +339,7 @@ async function sendTemplateLogged(
 /** Envio de texto livre pela tela "Send message" (vale na janela de 24 h do destinatário). */
 export async function sendCloudTestText(input: { clinicId: string; phoneNumberId: string; to: string; text: string }) {
   await requireCloudAccess(input.clinicId);
+  if (await isDemoClinic(input.clinicId)) return { success: false as const, error: DEMO_CLOUD_BLOCKED };
   const digits = onlyDigits(input.to);
   if (!digits) return { success: false as const, error: "Informe o número com DDI e DDD (ex: 5577999998888)." };
   if (!input.text.trim()) return { success: false as const, error: "Escreva a mensagem." };
@@ -319,6 +359,7 @@ export async function sendCloudTestTemplate(input: {
   params: string[];
 }) {
   await requireCloudAccess(input.clinicId);
+  if (await isDemoClinic(input.clinicId)) return { success: false as const, error: DEMO_CLOUD_BLOCKED };
   const preview = input.bodyText.replace(/\{\{(\d+)\}\}/g, (_, n: string) => input.params[Number(n) - 1] ?? `{{${n}}}`);
   return sendTemplateLogged(input.clinicId, input.to, { name: input.name, language: input.language, bodyParams: input.params }, preview, input.phoneNumberId);
 }
@@ -350,6 +391,7 @@ export async function listCloudInbound(phoneNumberId: string) {
 /** Apaga o histórico de envios de teste da clínica (pra regravar a tela limpa). */
 export async function clearCloudTestMessages(clinicId: string) {
   await requireCloudAccess(clinicId);
+  if (await isDemoClinic(clinicId)) return { success: true as const, count: 0 };
   const r = await prisma.cloudTestMessage.deleteMany({ where: { clinicId } });
   return { success: true as const, count: r.count };
 }
@@ -375,6 +417,7 @@ export type TemplateRow = CloudTemplate & { bodyText: string; variableCount: num
 /** Modelos da WABA (nome, categoria, idioma, status) com o texto do corpo. */
 export async function listClinicCloudTemplates(clinicId: string): Promise<{ success: true; templates: TemplateRow[] } | { success: false; error: string }> {
   await requireCloudAccess(clinicId);
+  if (await isDemoClinic(clinicId)) return { success: true, templates: demoCloudTemplates() };
   const account = await accountFor(clinicId);
   if (!account) return { success: false, error: "Clínica sem conta da API oficial." };
   const r = await listCloudTemplates(account.wabaId, account.token);
@@ -398,6 +441,7 @@ export async function createClinicCloudTemplate(input: {
   examples: string[];
 }) {
   await requireCloudAccess(input.clinicId);
+  if (await isDemoClinic(input.clinicId)) return { success: false as const, error: DEMO_CLOUD_BLOCKED };
   const account = await accountFor(input.clinicId);
   if (!account) return { success: false as const, error: "Clínica sem conta da API oficial." };
   const name = input.name.trim().toLowerCase().replace(/[^a-z0-9_]+/g, "_").replace(/^_|_$/g, "");
