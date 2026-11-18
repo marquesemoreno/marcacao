@@ -192,6 +192,9 @@ model User {
 
 model Clinic {
   id                         String   @id @default(cuid())
+  /// Conversa atribuída sem resposta há X minutos úteis volta para a fila (Não Atribuídas)
+  /// — src/lib/queue-return.ts. Null = desligado.
+  unansweredReturnMinutes    Int?     @map("unanswered_return_minutes")
   name                       String
   tradeName                  String   @map("trade_name")
   cnpj                       String   @unique
@@ -630,6 +633,9 @@ model Conversation {
   /// do admin) — dispara selo/notificação até ele abrir a conversa. Preenchido na hora
   /// quando o próprio atendente se atribui (já está olhando). Ver src/lib/conversation-assignment.ts.
   assignmentSeenAt        DateTime?               @map("assignment_seen_at")
+  /// Quando a conversa ganhou o dono atual — base do prazo de "volta para a fila"
+  /// (src/lib/queue-return.ts). Null em atribuições antigas.
+  assignedAt              DateTime?               @map("assigned_at")
   /// Estado do consentimento LGPD pra atendimento automatizado por IA (ver
   /// src/lib/ai-attendant.ts). Por conversa, não por Contact — o mesmo paciente pode
   /// falar com clínicas diferentes e o consentimento é específico daquele atendimento.

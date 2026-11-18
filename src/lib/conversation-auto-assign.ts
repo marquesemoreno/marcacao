@@ -63,7 +63,7 @@ export async function pickLeastBusyAttendant(tx: Prisma.TransactionClient, clini
 export async function autoAssignNewConversation(
   tx: Prisma.TransactionClient,
   clinicId: string
-): Promise<{ assignedUserId: string; assignmentSeenAt: null } | Record<string, never>> {
+): Promise<{ assignedUserId: string; assignedAt: Date; assignmentSeenAt: null } | Record<string, never>> {
   if (!AUTO_ASSIGN_ENABLED) return {};
   const autoAssignClinicId = await getAutoAssignClinicId(tx);
   if (!autoAssignClinicId || clinicId !== autoAssignClinicId) return {};
@@ -71,5 +71,5 @@ export async function autoAssignNewConversation(
   const userId = await pickLeastBusyAttendant(tx, clinicId);
   if (!userId) return {};
 
-  return { assignedUserId: userId, assignmentSeenAt: null };
+  return { assignedUserId: userId, assignedAt: new Date(), assignmentSeenAt: null };
 }

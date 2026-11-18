@@ -13,7 +13,7 @@ import {
   BarChart3,
   Megaphone,
   Sparkles,
-  type LucideIcon, ListTodo, Ticket } from "lucide-react";
+  type LucideIcon, ListTodo, Ticket, Hourglass } from "lucide-react";
 import { isSettingsRoute } from "@/components/clinic/settings-sections";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { useTaskCount, useUnreadCount } from "@/lib/use-unread-count";
@@ -30,6 +30,7 @@ const NAV_GROUPS: NavGroup[] = [
     label: "Operação",
     items: [
       { href: "/clinic/inbox", label: "Chat", icon: MessageCircle, badge: "unread" },
+      { href: "/clinic/esperando", label: "Esperando", icon: Hourglass },
       { href: "/clinic/crm", label: "CRM", icon: KanbanSquare },
       { href: "/clinic/agenda", label: "Agenda", icon: CalendarDays },
       { href: "/clinic/tarefas", label: "Tarefas", icon: ListTodo, badge: "tasks" },

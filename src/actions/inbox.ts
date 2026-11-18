@@ -1433,6 +1433,7 @@ export async function claimConversation(conversationId: string) {
     where: { id: conversationId },
     data: {
       assignedUserId: userId,
+      assignedAt: new Date(),
       status: "OPEN",
       assignmentSeenAt: assignmentSeenAtFor(userId, userId),
     },
@@ -1550,6 +1551,7 @@ export async function transferConversation(
     where: { id: conversationId },
     data: {
       assignedUserId: isTeamQueue ? null : targetUserId,
+      assignedAt: isTeamQueue ? null : new Date(),
       assignmentSeenAt: isTeamQueue ? null : assignmentSeenAtFor(targetUserId, userId),
       ...(department ? { department: departmentToDb[department] } : {}),
     },
@@ -2166,7 +2168,7 @@ export async function assignConversationToUser(conversationId: string, targetUse
 
   await prisma.conversation.update({
     where: { id: conversationId },
-    data: { assignedUserId: targetUserId },
+    data: { assignedUserId: targetUserId, assignedAt: new Date() },
   });
   revalidatePath("/clinic/inbox");
 }

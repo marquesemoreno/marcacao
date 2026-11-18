@@ -17,8 +17,8 @@ export function assignOnReply(
   conversation: { assignedUserId: string | null },
   userId: string,
   options?: { internalNote?: boolean }
-): { assignedUserId: string; assignmentSeenAt: Date } | Record<string, never> {
+): { assignedUserId: string; assignedAt: Date; assignmentSeenAt: Date } | Record<string, never> {
   if (conversation.assignedUserId === userId) return {};
   if (options?.internalNote && conversation.assignedUserId) return {};
-  return { assignedUserId: userId, assignmentSeenAt: new Date() };
+  return { assignedUserId: userId, assignedAt: new Date(), assignmentSeenAt: new Date() };
 }

@@ -1293,6 +1293,7 @@ export async function assignConversationToUserAdmin(conversationId: string, targ
     where: { id: conversationId },
     data: {
       assignedUserId: targetUserId,
+      assignedAt: targetUserId ? new Date() : null,
       status: "OPEN",
       assignmentSeenAt: targetUserId ? assignmentSeenAtFor(targetUserId, userId) : null,
     },
@@ -1317,7 +1318,7 @@ export async function claimConversationAdmin(conversationId: string) {
 
   await prisma.conversation.update({
     where: { id: conversationId },
-    data: { assignedUserId: userId, status: "OPEN", assignmentSeenAt: assignmentSeenAtFor(userId, userId) },
+    data: { assignedUserId: userId, assignedAt: new Date(), status: "OPEN", assignmentSeenAt: assignmentSeenAtFor(userId, userId) },
   });
 
   revalidatePath("/admin/inbox");
@@ -1376,6 +1377,7 @@ export async function transferConversationAdmin(conversationId: string, targetUs
     where: { id: conversationId },
     data: {
       assignedUserId: isTeamQueue ? null : targetUserId,
+      assignedAt: isTeamQueue ? null : new Date(),
       status: "OPEN",
       assignmentSeenAt: isTeamQueue ? null : assignmentSeenAtFor(targetUserId, userId),
     },
