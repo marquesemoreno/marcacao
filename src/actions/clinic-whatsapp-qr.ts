@@ -10,16 +10,19 @@ import {
   restartEvolutionInstance,
   type EvolutionInstanceConfig,
 } from "@/lib/evolution-admin";
+import { isDemoClinicCnpj } from "@/lib/demo-clinic";
 
 /** Conexão por QR (Evolution, API não oficial) vista pela gestão da própria clínica, na tela
  * Configurações › WhatsApp, ao lado da API oficial (16/11/2026). Só status, QR e reiniciar:
  * URL, chave e nome da instância continuam só no /admin. */
 
-async function clinicInstance(): Promise<{ clinicId: string; config: EvolutionInstanceConfig } | null> {
+async function clinicInstance(): Promise<{ clinicId: string; demo: boolean; config: EvolutionInstanceConfig } | null> {
   const { clinicId } = await requireClinicManager();
-  const i = await prisma.whatsappInstance.findUnique({ where: { clinicId } });
+  const i = await prisma.whatsappInstance.findUnique({ where: { clinicId }, include: { clinic: { select: { cnpj: true } } } });
   if (!i) return null;
-  return { clinicId, config: { apiUrl: i.apiUrl, apiKey: decryptToken(i.apiKey), instanceName: i.instanceName } };
+  // Clínica demo (vídeos): instância falsa (demo.invalid) — mostra "Conectado" e nunca chama a Evolution.
+  if (isDemoClinicCnpj(i.clinic.cnpj)) return { clinicId, demo: true, config: { apiUrl: i.apiUrl, apiKey: "", instanceName: i.instanceName } };
+  return { clinicId, demo: false, config: { apiUrl: i.apiUrl, apiKey: decryptToken(i.apiKey), instanceName: i.instanceName } };
 }
 
 function toStatus(state: string | undefined): WhatsappInstanceStatus {
@@ -33,6 +36,7 @@ export async function getClinicQrStatus(): Promise<
 > {
   const inst = await clinicInstance();
   if (!inst) return { configured: false };
+  if (inst.demo) return { configured: true, status: "CONNECTED" };
   const result = await getEvolutionConnectionState(inst.config);
   if (!result.success) {
     const saved = await prisma.whatsappInstance.findUnique({ where: { clinicId: inst.clinicId }, select: { status: true } });
@@ -46,6 +50,7 @@ export async function getClinicQrStatus(): Promise<
 export async function getClinicQrCode(): Promise<{ success: true; base64: string } | { success: false; error: string }> {
   const inst = await clinicInstance();
   if (!inst) return { success: false, error: "Esta clínica não tem conexão por QR própria. Fale com o suporte." };
+  if (inst.demo) return { success: false, error: "Clínica de demonstração: o WhatsApp já aparece conectado." };
   const result = await getEvolutionQrCode(inst.config);
   if (!result.success) return { success: false, error: "Não foi possível gerar o QR agora. Tente reiniciar a conexão." };
   if (!result.data.base64) return { success: false, error: "O número parece já estar conectado, ou o QR não veio. Tente reiniciar a conexão." };
@@ -56,6 +61,7 @@ export async function getClinicQrCode(): Promise<{ success: true; base64: string
 export async function restartClinicQrConnection(): Promise<{ success: boolean; error?: string }> {
   const inst = await clinicInstance();
   if (!inst) return { success: false, error: "Esta clínica não tem conexão por QR própria. Fale com o suporte." };
+  if (inst.demo) return { success: true };
   const result = await restartEvolutionInstance(inst.config);
   if (!result.success) return { success: false, error: "Não foi possível reiniciar a conexão agora." };
   await prisma.whatsappInstance.update({ where: { clinicId: inst.clinicId }, data: { status: "CONNECTING" } });
