@@ -38,6 +38,7 @@ describe("computeCampaignStats", () => {
       replied: 2,
       replyRate: 67,
       scheduled: 1,
+      byVariant: null,
     });
   });
 
@@ -57,5 +58,36 @@ describe("sem consentimento separado de 'pediram para sair'", () => {
     );
     expect(stats.noConsent).toBe(1);
     expect(stats.optedOut).toBe(1);
+  });
+});
+
+describe("computeCampaignStats por modelo/variação", () => {
+  const at = d("2026-11-20T13:00:00Z");
+  const recipients = [
+    { phone: "5577911110001", status: "SENT" as const, sentAt: at, variantIndex: 0 },
+    { phone: "5577911110002", status: "SENT" as const, sentAt: at, variantIndex: 1 },
+    { phone: "5577911110003", status: "SENT" as const, sentAt: at, variantIndex: 1 },
+    { phone: "5577911110004", status: "SENT" as const, sentAt: at, variantIndex: 2 },
+    { phone: "5577911110005", status: "SENT" as const, sentAt: at, variantIndex: null },
+    { phone: "5577911110006", status: "PENDING" as const, sentAt: null, variantIndex: null },
+  ];
+  const contacts = [
+    { phone: "5577911110002", inboundAt: [d("2026-11-20T14:00:00Z")], optedOutAt: null, scheduled: true },
+    { phone: "5577911110003", inboundAt: [d("2026-11-20T14:00:00Z")], optedOutAt: d("2026-11-20T14:00:00Z"), scheduled: false },
+    { phone: "5577911110004", inboundAt: [d("2026-11-21T14:00:00Z")], optedOutAt: null, scheduled: false },
+  ];
+
+  it("separa enviadas, respostas, saídas e agendados por variação (sem índice = principal)", () => {
+    const s = computeCampaignStats(recipients, contacts, 3);
+    expect(s.byVariant).toEqual([
+      { sent: 2, replied: 0, replyRate: 0, optedOut: 0, scheduled: 0 },
+      { sent: 2, replied: 2, replyRate: 100, optedOut: 1, scheduled: 1 },
+      { sent: 1, replied: 1, replyRate: 100, optedOut: 0, scheduled: 0 },
+    ]);
+    expect(s.replied).toBe(3);
+  });
+
+  it("campanha com um texto só não traz a divisão", () => {
+    expect(computeCampaignStats(recipients, contacts).byVariant).toBeNull();
   });
 });

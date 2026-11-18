@@ -18,7 +18,12 @@ export type CampaignRecipientRow = {
   sentAt: Date | null;
   /** Motivo do pulo — NO_CONSENT_MESSAGE = sem consentimento (não pediu para sair). */
   errorMessage?: string | null;
+  /** Texto/modelo que o destinatário recebeu (0 = principal; null = principal). */
+  variantIndex?: number | null;
 };
+
+/** Retorno de cada texto/modelo sorteado na campanha (teste A/B/C). */
+export type CampaignVariantStats = { sent: number; replied: number; replyRate: number; optedOut: number; scheduled: number };
 
 export type CampaignContactRow = {
   phone: string;
@@ -43,11 +48,15 @@ export type CampaignStats = {
   replyRate: number;
   /** Entre as que responderam, quantas estão em "Agendado" no CRM. */
   scheduled: number;
+  /** Por variação (índice 0 = principal) — só quando a campanha tem mais de um texto/modelo. */
+  byVariant: CampaignVariantStats[] | null;
 };
 
-export function computeCampaignStats(recipients: CampaignRecipientRow[], contacts: CampaignContactRow[]): CampaignStats {
+export function computeCampaignStats(recipients: CampaignRecipientRow[], contacts: CampaignContactRow[], variantCount = 1): CampaignStats {
   const byKey = new Map(contacts.map((c) => [phoneKey(c.phone), c]));
-  const stats: CampaignStats = { total: recipients.length, sent: 0, pending: 0, failed: 0, optedOut: 0, noConsent: 0, replied: 0, replyRate: 0, scheduled: 0 };
+  const byVariant: CampaignVariantStats[] | null =
+    variantCount > 1 ? Array.from({ length: variantCount }, () => ({ sent: 0, replied: 0, replyRate: 0, optedOut: 0, scheduled: 0 })) : null;
+  const stats: CampaignStats = { total: recipients.length, sent: 0, pending: 0, failed: 0, optedOut: 0, noConsent: 0, replied: 0, replyRate: 0, scheduled: 0, byVariant };
 
   for (const r of recipients) {
     if (r.status === "PENDING") stats.pending++;
@@ -58,16 +67,26 @@ export function computeCampaignStats(recipients: CampaignRecipientRow[], contact
     }
     if (r.status !== "SENT" || !r.sentAt) continue;
     stats.sent++;
+    const v = byVariant?.[r.variantIndex ?? 0] ?? null;
+    if (v) v.sent++;
     const contact = byKey.get(phoneKey(r.phone));
     if (!contact) continue;
     const sentMs = r.sentAt.getTime();
-    if (contact.optedOutAt && contact.optedOutAt.getTime() >= sentMs) stats.optedOut++;
+    if (contact.optedOutAt && contact.optedOutAt.getTime() >= sentMs) {
+      stats.optedOut++;
+      if (v) v.optedOut++;
+    }
     const replied = contact.inboundAt.some((at) => at.getTime() > sentMs && at.getTime() <= sentMs + REPLY_WINDOW_MS);
     if (replied) {
       stats.replied++;
-      if (contact.scheduled) stats.scheduled++;
+      if (v) v.replied++;
+      if (contact.scheduled) {
+        stats.scheduled++;
+        if (v) v.scheduled++;
+      }
     }
   }
   stats.replyRate = stats.sent > 0 ? Math.round((stats.replied / stats.sent) * 100) : 0;
+  for (const v of byVariant ?? []) v.replyRate = v.sent > 0 ? Math.round((v.replied / v.sent) * 100) : 0;
   return stats;
 }

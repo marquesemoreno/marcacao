@@ -1008,6 +1008,46 @@ export default async function ClinicReportPage({
                         <dd className="text-xs text-slate-600 dark:text-slate-400">ex.: número sem WhatsApp</dd>
                       </div>
                     </dl>
+                    {s.byVariant && (
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-xs tabular-nums">
+                          <caption className="mb-1 text-left text-xs font-medium text-slate-700 dark:text-slate-300">
+                            Por {c.variantLabels[0]?.startsWith("Texto") ? "texto" : "modelo"} (sorteado entre os pacientes)
+                          </caption>
+                          <thead className="text-slate-600 dark:text-slate-400">
+                            <tr>
+                              <th scope="col" className="py-1 pr-2 text-left font-medium">{c.variantLabels[0]?.startsWith("Texto") ? "Texto" : "Modelo"}</th>
+                              <th scope="col" className="py-1 px-2 text-right font-medium">Enviadas</th>
+                              <th scope="col" className="py-1 px-2 text-right font-medium">Responderam</th>
+                              <th scope="col" className="py-1 px-2 text-right font-medium">Agendados</th>
+                              <th scope="col" className="py-1 pl-2 text-right font-medium">Saíram</th>
+                            </tr>
+                          </thead>
+                          <tbody className="text-slate-800 dark:text-slate-200">
+                            {(() => {
+                              const best = Math.max(...s.byVariant.filter((v) => v.sent >= 30).map((v) => v.replyRate), -1);
+                              return s.byVariant.map((v, i) => (
+                                <tr key={i} className="border-t border-slate-100 dark:border-slate-800">
+                                  <th scope="row" className="py-1 pr-2 text-left font-normal">
+                                    {c.variantLabels[i] ?? `Variação ${i + 1}`}
+                                    {v.sent >= 30 && v.replyRate === best && best > 0 && (
+                                      <span className="ml-1 rounded bg-emerald-100 px-1 text-[11px] font-semibold text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200">mais respostas</span>
+                                    )}
+                                  </th>
+                                  <td className="py-1 px-2 text-right">{v.sent}</td>
+                                  <td className="py-1 px-2 text-right">{v.replied} <span className="text-slate-500 dark:text-slate-400">({pctBR(v.replyRate)})</span></td>
+                                  <td className="py-1 px-2 text-right">{v.scheduled}</td>
+                                  <td className="py-1 pl-2 text-right">{v.optedOut}</td>
+                                </tr>
+                              ));
+                            })()}
+                          </tbody>
+                        </table>
+                        {s.byVariant.some((v) => v.sent < 30) && (
+                          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Com menos de 30 envios por {c.variantLabels[0]?.startsWith("Texto") ? "texto" : "modelo"}, a diferença ainda pode ser acaso.</p>
+                        )}
+                      </div>
+                    )}
                     <p className="text-xs text-slate-600 dark:text-slate-400">
                       Resposta = mensagem da paciente em até 7 dias depois de receber.
                     </p>

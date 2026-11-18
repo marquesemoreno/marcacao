@@ -11,6 +11,7 @@ import { periodWindow, type PeriodKey } from "@/lib/report-period";
 import { computeCampaignReport } from "@/lib/crm-campaigns";
 import { computeOutcomes as computeLeadOutcomes } from "@/lib/lead-outcomes-server";
 import { computeCampaignStats, phoneKey, type CampaignStats } from "@/lib/campaign-report";
+import { parseCloudTemplateVariants } from "@/lib/broadcast-cloud-template";
 import { NON_PATIENT_TAG, RESCHEDULE_PENDING_TAG as CAMPAIGN_RESCHEDULE_TAG } from "@/lib/conversation-tags";
 import {
   updateClinicProcedureSchema,
@@ -691,6 +692,8 @@ export type CampaignReportRow = {
   tag: string | null;
   createdAt: string;
   stats: CampaignStats;
+  /** Nome de cada texto/modelo sorteado (mesma ordem de stats.byVariant). */
+  variantLabels: string[];
 };
 
 /** Campanhas de disparo (marketing) da clínica pro relatório: em andamento/pausadas, ou
@@ -717,7 +720,10 @@ export async function getClinicCampaignReport(period: PeriodKey = "30"): Promise
       status: true,
       tagOnSend: true,
       createdAt: true,
-      recipients: { select: { phone: true, status: true, sentAt: true, errorMessage: true } },
+      messageVariants: true,
+      cloudTemplateName: true,
+      cloudTemplateVariants: true,
+      recipients: { select: { phone: true, status: true, sentAt: true, errorMessage: true, variantIndex: true } },
     },
   });
   if (campaigns.length === 0) return [];
@@ -767,7 +773,10 @@ export async function getClinicCampaignReport(period: PeriodKey = "30"): Promise
     status: c.status as CampaignReportRow["status"],
     tag: c.tagOnSend,
     createdAt: c.createdAt.toISOString(),
-    stats: computeCampaignStats(c.recipients, contactRows),
+    stats: computeCampaignStats(c.recipients, contactRows, 1 + c.messageVariants.length),
+    variantLabels: c.cloudTemplateName
+      ? [c.cloudTemplateName, ...parseCloudTemplateVariants(c.cloudTemplateVariants).map((t) => t.name)].map((n) => n.replace(/_/g, " "))
+      : ["Texto principal", ...c.messageVariants.map((_, i) => `Variação ${i + 2}`)],
   }));
 }
 
