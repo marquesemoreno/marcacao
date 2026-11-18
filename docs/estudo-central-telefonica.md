@@ -107,6 +107,110 @@ Exemplo: clínica com 4 pessoas na recepção que faz 1.500 minutos de saída po
 3. Qual operadora e plano de telefone fixo cada clínica tem hoje, e se há fidelidade.
 4. Posso pedir orçamento de tronco? Os nomes das clínicas só entram quando você autorizar.
 
+## 8. Atendimento telefônico com IA, com máquina local na clínica
+
+Pedido de 18/11/2026: estimar o custo de a IA atender o telefone, com uma máquina **dentro da clínica**, ligada ao PABX, e com plano B se o serviço parar.
+
+### Como fica
+
+```
+operadora ──▶ PABX da clínica ──(ramal ou tronco)──▶ máquina local (Asterisk)
+                   │                                      │
+                   │  transbordo: IA não atendeu           ├──▶ IA de voz (internet)
+                   ▼  em 3 toques → recepção               └──▶ Conecta Saúde (agenda, ficha, tarefa, chamada perdida)
+              ramais da recepção
+```
+
+- **O PABX continua sendo o dono das linhas.** A máquina local é só mais um ramal (ou um tronco) dele. Não precisa de portabilidade nem de operadora nova.
+- **Santa Clara (Leucotron):** se o modelo aceita ramal IP ou tronco SIP, a máquina se liga pelo cabo de rede. Pode exigir **licença de ramal IP** no PABX. Perguntar ao técnico da Leucotron.
+- **Urolaser (Intelbras simples):** a central é analógica, então a máquina precisa de um **gateway**. Ele liga as portas de ramal do PABX à rede (FXO, uma porta por ligação ao mesmo tempo).
+- **Bônus:** a máquina vê **todas** as ligações. Ela vira a fonte da chamada perdida no telefone fixo (PhoneCall com `source` PABX e número **não confiável**, então o texto vai sem nome, como já está na regra).
+
+### Plano B (failover), em camadas
+
+1. **Máquina desligada ou travada:** o PABX não consegue entregar a ligação para o ramal da IA e passa para a recepção no **transbordo** (ramal ocupado ou sem resposta em 3 toques). Isso é configuração do próprio PABX e funciona mesmo com a máquina queimada. **É a camada mais importante.**
+2. **Internet caiu ou a IA não responde:** a máquina toca uma frase gravada ("Um momento, vou transferir para a recepção") e transfere. Se der, troca de motor (um provedor reserva).
+3. **Aviso para nós:** a máquina manda um sinal de vida a cada minuto. Sem sinal por 3 minutos, vai o e-mail de alerta (o mesmo `health-check` de hoje). A ponte do Firebird já roda assim nas clínicas.
+4. **Energia:** nobreak para a máquina, o gateway e o roteador. Sem isso, a queda de luz derruba tudo, menos as linhas analógicas.
+5. **Chave de desligar na hora:** na tela da clínica, "IA no telefone: desligada" faz a máquina recusar a ligação, e o PABX transborda para a recepção na hora.
+
+### Quando a IA atende (recomendação)
+
+**Não começar atendendo tudo.** Começar só com o que hoje vira ligação perdida:
+- **fora do horário** (noite, sábado à tarde, domingo, feriado);
+- **transbordo no horário:** a recepção não atendeu em 20 a 30 segundos.
+
+Assim, o custo cai muito, o risco fica menor, e o ganho é justamente a ligação que hoje se perde.
+
+### O que a IA pode e não pode fazer (CFM e LGPD)
+
+- **Pode:** horário, endereço, convênio aceito (lista da clínica), marcar, remarcar e confirmar consulta (agenda), anotar recado e criar tarefa para retornar.
+- **Não pode:** falar de sintoma, exame, remédio, gravidade ou preço de procedimento. Em qualquer tema clínico, transfere ou deixa recado. Em urgência, transfere e orienta ligar para 192.
+- **Avisa no início** que é um atendimento automático e que pode transferir para uma pessoa.
+- **Sem gravação de áudio.** Guarda só o resumo em texto e o desfecho, com o mesmo prazo das conversas.
+- **Mascarar dados antes de ir para a IA** (o mesmo portão `ai-gateway.ts`), sempre que der.
+
+**Escolha do motor e o risco CFM:**
+- **Voz direta** (OpenAI Realtime, Gemini Live): o modelo ouve e fala sozinho. É a forma mais natural, mas **a nossa trava clínica não consegue barrar a fala antes de sair**.
+- **Em etapas** (ouvir → texto → resposta em texto → **trava clínica** → voz): fica um pouco mais lento, cerca de 1 a 2 segundos por resposta. Em compensação, a resposta passa pelo `clinical-claim-guard.ts` **antes de ser falada**. Para clínica, recomendo este modo, e ele também sai mais barato.
+
+### Custo da IA por minuto (estimativa)
+
+| Motor | Custo por minuto | Fonte |
+|---|---|---|
+| OpenAI Realtime (voz direta) | cerca de US$ 0,11 | Medido pelo DeskVoice contra fatura (1 ligação, 12/11/2026); encarece em ligação longa |
+| Gemini Live (voz direta) | até cerca de US$ 0,023 | Tabela do Google citada pelo DeskVoice (12/11/2026); não medido contra fatura |
+| Em etapas (transcrição + modelo de texto pequeno + voz) | cerca de US$ 0,02 a 0,05 | **Estimativa minha, não conferida**. Depende da voz escolhida, que é a parte mais cara |
+
+Conversão usada abaixo: **US$ 1 = R$ 5,50**, só para ter ordem de grandeza. A cobrança é em dólar e acompanha o câmbio.
+
+### Cenários por clínica (só a IA)
+
+| Cenário | Minutos/mês | Em etapas | Gemini Live | OpenAI Realtime |
+|---|---|---|---|---|
+| **A. Só fora do horário e transbordo** (~10 ligações por dia útil, 2,5 min) | ~650 | R$ 70 a 180 | ~R$ 80 | ~R$ 390 |
+| **B. Metade das ligações** (~30 por dia útil, 3 min) | ~2.300 | R$ 250 a 630 | ~R$ 290 | ~R$ 1.390 |
+| **C. Atende tudo** (~60 por dia útil, 3 min) | ~4.700 | R$ 520 a 1.300 | ~R$ 600 | ~R$ 2.850 |
+
+A telefonia não aumenta: a ligação entra pelas linhas que a clínica já paga, e a transferência para a recepção é interna do PABX.
+
+### Custo de montar, por clínica (uma vez)
+
+| Item | Faixa (estimativa, não conferida em loja) |
+|---|---|
+| Mini PC (processador econômico, 8–16 GB, SSD) | R$ 1.200 a 2.000 |
+| Nobreak pequeno | R$ 500 a 900 |
+| Gateway para PABX analógico (só Intelbras simples): 1 porta / 4 portas | R$ 500 a 700 / R$ 1.500 a 2.500 |
+| Licença de ramal IP ou tronco SIP no PABX (só se o modelo pedir) | perguntar ao técnico |
+| Instalação, programação do transbordo e testes | sugestão: entra na implantação (R$ 1.500+) |
+
+**Total por clínica:** cerca de **R$ 1.700 a 2.900** na Santa Clara (sem gateway) e **R$ 2.200 a 5.400** na Urolaser (com gateway), mais a implantação.
+
+### Custo nosso
+
+- **Desenvolvimento:** 6 a 10 semanas, pela minha estimativa, além da central (seção 3). Inclui a máquina local, o modo em etapas com a trava clínica, as ferramentas de agenda, a tela de ligações e o plano B.
+- **Manutenção:** atualização remota da máquina (como a ponte), revisão semanal das ligações que a IA não resolveu e ajuste das instruções.
+- **Teste antes de abrir para paciente:** ligações simuladas com a equipe, sem dado real.
+
+### Sugestão de preço
+
+- **Mensalidade do módulo:** R$ 300 a 500 por clínica, com uma **franquia de minutos** (por exemplo, 1.000 minutos em etapas).
+- **Minuto excedente:** R$ 0,40 a 0,60. Dá margem sobre o custo de cerca de R$ 0,10 a 0,28.
+- **Aparelhos:** a clínica compra, ou nós alugamos e o valor entra na mensalidade.
+
+### Resumo da seção
+
+- É viável e o plano B é simples: **o transbordo do próprio PABX garante que a ligação nunca fica sem destino**.
+- Começando só fora do horário e no transbordo, a IA custa **cerca de R$ 70 a 180 por mês por clínica** no modo em etapas. Montar custa **R$ 1.700 a 5.400 uma vez**, conforme o PABX.
+- Antes de qualquer ligação de paciente, precisa estar pronto: modo em etapas com trava clínica, aviso de atendimento automático, gravação desligada e parecer do advogado sobre CFM e LGPD.
+
+### Perguntas novas
+
+1. Modelo do Leucotron da Santa Clara: aceita ramal IP? Há licença sobrando?
+2. Quantas linhas e quantos ramais livres tem o Intelbras da Urolaser?
+3. A clínica topa a IA atender só fora do horário e no transbordo, no começo?
+4. Quantas ligações por dia cada clínica recebe? Ajusta a tabela de cenários.
+
 ## Fontes (consultadas em 18/11/2026)
 
 - Planos de tronco e minutos: [Directcall](https://directcall.com.br/produto/planos-ilimitados/), [FiberTel](https://fibertel.com.br/numero-fixo-virtual-brasileiro/), [Alvoko](https://alvoko.com/precos/), [Diskfree](https://www.diskfree.com.br/produtos/plano-de-minutos-para-telefonia-voip-empresarial), [Virtual-Call](https://www.virtual-call.com/br/precos/sip-trunk).
