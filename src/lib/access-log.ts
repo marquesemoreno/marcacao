@@ -8,6 +8,7 @@ export type AccessAction =
   | "EDITOU_CADASTRO"
   | "VIU_FICHA_PREVIA"
   | "VIU_RESUMO_AGENDA"
+  | "EXPORTOU_DADOS"
   | "SUPORTE_ABRIU_CONVERSA"
   | "SUPORTE_EDITOU_CADASTRO";
 
@@ -18,6 +19,7 @@ export const BULK_ACCESS_ENTITY = "patient_bulk_access";
 
 const LABELS: Record<AccessAction | BulkAccessAction, string> = {
   VIU_RESUMO_AGENDA: "Viu o resumo do paciente na Agenda",
+  EXPORTOU_DADOS: "Gerou o arquivo dos dados do titular (LGPD)",
   SUPORTE_ABRIU_CONVERSA: "Suporte (TIVDC) abriu a conversa",
   SUPORTE_EDITOU_CADASTRO: "Suporte (TIVDC) editou o cadastro",
   LISTOU_PACIENTES: "Abriu a lista de pacientes",
@@ -37,6 +39,6 @@ export function accessActionLabel(action: string): string {
 /** Leitura (abrir conversa/ficha) do mesmo usuário na mesma conversa conta 1× por hora —
  * o chat recarrega mensagens toda hora e encheria o registro. Edição sempre conta. */
 export function shouldRecordAccess(action: AccessAction, lastSameAt: Date | null, now: Date = new Date()): boolean {
-  if (action === "EDITOU_CADASTRO" || action === "SUPORTE_EDITOU_CADASTRO") return true;
+  if (action === "EDITOU_CADASTRO" || action === "SUPORTE_EDITOU_CADASTRO" || action === "EXPORTOU_DADOS") return true;
   return !lastSameAt || now.getTime() - lastSameAt.getTime() >= READ_DEDUPE_MIN * 60_000;
 }

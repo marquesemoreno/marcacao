@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { requireAdminSession } from "@/lib/session";
 import { formatToWhatsAppNumber } from "@/lib/whatsapp";
@@ -8,6 +9,7 @@ import { getSupabaseServerClient } from "@/lib/supabase-server";
 import { errorSummary } from "@/lib/safe-error";
 import { deletePatientRelatedData, removeConversationBackup, removeConversationMedia } from "@/lib/lgpd-server";
 import { ANONYMIZED_NAME, maskPhone } from "@/lib/lgpd";
+import { issueCertificate } from "@/lib/lgpd-certificate-server";
 
 /** Conversas de um telefone em todas as clínicas — pra atender um pedido de exclusão.
  * Paciente que só fala pelo Instagram não tem telefone: busque pelo @usuario. */
@@ -53,6 +55,9 @@ export async function anonymizePatientAdmin(input: { conversationId: string; rea
   });
   if (!conversation) return { success: false as const, error: "Conversa não encontrada." };
   const otherConversations = conversation.contact._count.conversations - 1;
+  // IP de quem executou: vai no atestado de anonimização.
+  const h = await headers();
+  const performedFromIp = h.get("x-forwarded-for")?.split(",")[0]?.trim() || h.get("x-real-ip") || null;
 
   // Mídias no storage (pasta = id da conversa), todas as páginas.
   const supabase = getSupabaseServerClient();
@@ -109,7 +114,7 @@ export async function anonymizePatientAdmin(input: { conversationId: string; rea
         },
       });
     }
-    await tx.dataDeletionRecord.create({
+    const record = await tx.dataDeletionRecord.create({
       data: {
         clinicId: conversation.clinicId,
         conversationId: cid,
@@ -118,9 +123,10 @@ export async function anonymizePatientAdmin(input: { conversationId: string; rea
         messagesDeleted: deleted.count,
         contactAnonymized: otherConversations === 0,
         performedByUserId: userId,
+        performedFromIp,
       },
     });
-    return { messagesDeleted: deleted.count, contactAnonymized: otherConversations === 0, otherConversations, related };
+    return { recordId: record.id, messagesDeleted: deleted.count, contactAnonymized: otherConversations === 0, otherConversations, related };
   });
   // Cópias das mídias no backup externo (B2). Depois do banco: se o backup falhar, a
   // exclusão principal já valeu e a tela avisa para repetir.
@@ -133,8 +139,16 @@ export async function anonymizePatientAdmin(input: { conversationId: string; rea
     console.error("[lgpd] falha ao apagar mídias no backup:", errorSummary(error));
   }
 
+  // Atestado: o código de autenticidade sai depois do banco (depende do id e da data).
+  let certificateIssued = false;
+  try {
+    certificateIssued = !!(await issueCertificate(result.recordId));
+  } catch (error) {
+    console.error("[lgpd] falha ao emitir o atestado:", errorSummary(error));
+  }
+
   revalidatePath("/admin/lgpd");
-  return { success: true as const, ...result, backupRemoved, backupFailed };
+  return { success: true as const, ...result, backupRemoved, backupFailed, certificateIssued };
 }
 
 export async function listDeletionRecords() {

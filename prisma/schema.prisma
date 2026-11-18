@@ -1504,6 +1504,10 @@ model DataDeletionRecord {
   messagesDeleted   Int      @map("messages_deleted")
   contactAnonymized Boolean  @map("contact_anonymized")
   performedByUserId String   @map("performed_by_user_id")
+  /// IP de quem executou (vai no atestado).
+  performedFromIp   String?  @map("performed_from_ip")
+  /// Código de autenticidade do atestado (HMAC, ver lgpd-certificate.ts).
+  certificateCode   String?  @unique @map("certificate_code")
   createdAt         DateTime @default(now()) @map("created_at")
 
   @@map("data_deletion_records")

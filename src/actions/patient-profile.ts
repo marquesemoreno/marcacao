@@ -3,7 +3,8 @@
 import { recordPatientAccess } from "@/lib/access-log-server";
 import { profileInclude, profileOf } from "@/lib/contact-profile";
 import { prisma } from "@/lib/prisma";
-import { requireClinicSession } from "@/lib/session";
+import { getClinicRole, requireClinicSession } from "@/lib/session";
+import { can } from "@/lib/clinic-permissions";
 import { attachSignedUrls } from "@/lib/whatsapp-media";
 import { toggleNinthDigit } from "@/lib/whatsapp";
 import { buildPatientTimeline } from "@/lib/patient-timeline";
@@ -94,9 +95,12 @@ export async function getPatientProfile(conversationId: string) {
   const withUrls = await attachSignedUrls(messages);
   const c = conversation.contact;
   const pf = profileOf(c, clinicId);
+  const canExportData = can(await getClinicRole(userId), "config");
   return {
     conversationId: conversation.id,
     clinicName: conversation.clinic.tradeName,
+    /** Gestão gera o arquivo dos dados do titular (LGPD). */
+    canExportData,
     hasClinicSystem: Boolean(conversation.clinic.hospitalIntegration?.active),
     contact: {
       name: c.name,

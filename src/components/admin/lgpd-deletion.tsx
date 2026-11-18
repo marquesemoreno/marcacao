@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import Link from "next/link";
 import { toast } from "sonner";
 import { Search, Trash2 } from "lucide-react";
 import { anonymizePatientAdmin, findPatientForDeletion, type listDeletionRecords } from "@/actions/admin-lgpd";
@@ -144,6 +145,9 @@ export function LgpdDeletion({ records }: { records: Rec[] }) {
                   <span className="tabular-nums text-slate-500">{fmt.format(new Date(r.createdAt))}</span> · {r.clinic} · {r.maskedPhone ?? "sem telefone"} ·{" "}
                   {r.messagesDeleted} mensagens{r.contactAnonymized ? " · contato anonimizado" : ""}
                   <span className="block text-xs text-slate-500">{r.reason}</span>
+                  <Link href={`/admin/lgpd/atestado/${r.id}`} prefetch={false} className="text-xs font-medium text-emerald-700 underline underline-offset-2 dark:text-emerald-400">
+                    Atestado de anonimização
+                  </Link>
                 </li>
               ))}
             </ul>

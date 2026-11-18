@@ -17,6 +17,7 @@ import { ScheduleModal } from "@/components/chat/schedule-modal";
 import { displayName } from "@/lib/contact-display";
 import { formatCpf, formatPhone } from "@/lib/format";
 import type { PatientProfile } from "@/actions/patient-profile";
+import { exportPatientData } from "@/actions/patient-export";
 import {
   getClinicDoctorAgenda, listClinicConveniosForAppointment, listClinicDoctorsForAppointment, listClinicPatientsForAppointment,
   listClinicProceduresForAppointment, sendMessage, updateContactInfo, updateConversationFunnelStage,
@@ -504,7 +505,53 @@ export function PatientPage({ profile, autoSchedule = false }: { profile: Patien
           }}
         />
       )}
+      {p.canExportData && <SubjectDataExport conversationId={p.conversationId} />}
     </div>
+  );
+}
+
+/** LGPD art. 18: o paciente pede uma cópia dos dados dele. Só a gestão gera; fica em Acessos. */
+function SubjectDataExport({ conversationId }: { conversationId: string }) {
+  const [busy, setBusy] = useState(false);
+  async function download() {
+    setBusy(true);
+    try {
+      const r = await exportPatientData(conversationId);
+      if (!r.success) {
+        toast.error(r.error);
+        return;
+      }
+      const url = URL.createObjectURL(new Blob([r.json], { type: "application/json" }));
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = r.fileName;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success("Arquivo gerado. Entregue só ao próprio paciente, depois de conferir a identidade.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível gerar o arquivo.");
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <section aria-labelledby="lgpd-export-title" className="rounded-xl border border-slate-200 dark:border-slate-800 p-4 text-sm">
+      <h2 id="lgpd-export-title" className="flex items-center gap-1.5 font-semibold text-slate-900 dark:text-slate-100">
+        <ShieldCheck className="h-4 w-4 text-emerald-700 dark:text-emerald-400" aria-hidden /> Dados do paciente (LGPD)
+      </h2>
+      <p className="mt-1 text-slate-600 dark:text-slate-400">
+        Quando o paciente pede uma cópia dos dados dele: cadastro, consentimentos, agendamentos e mensagens trocadas. Notas internas da equipe não entram. Fica
+        registrado em Acessos.
+      </p>
+      <button
+        type="button"
+        onClick={download}
+        disabled={busy}
+        className="mt-3 inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-200 dark:border-slate-700 px-3 font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-60"
+      >
+        <Download className="h-4 w-4" aria-hidden /> {busy ? "Gerando…" : "Baixar arquivo dos dados"}
+      </button>
+    </section>
   );
 }
 

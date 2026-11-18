@@ -7,7 +7,7 @@ import { BULK_ACCESS_ENTITY, READ_DEDUPE_MIN, shouldRecordAccess, type AccessAct
 export async function recordPatientAccess(input: { clinicId: string; userId: string; conversationId: string; action: AccessAction }) {
   try {
     const last =
-      input.action === "EDITOU_CADASTRO" || input.action === "SUPORTE_EDITOU_CADASTRO"
+      input.action === "EDITOU_CADASTRO" || input.action === "SUPORTE_EDITOU_CADASTRO" || input.action === "EXPORTOU_DADOS"
         ? null
         : await prisma.patientAccessLog.findFirst({
             where: {
