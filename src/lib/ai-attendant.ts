@@ -6,6 +6,7 @@ import { privacyForConversation } from "@/lib/ai-privacy-context";
 import { prisma } from "@/lib/prisma";
 import { getAiToolDefinitions, executeAiTool } from "@/lib/ai-tools";
 import { buildClinicKnowledgeContext } from "@/lib/clinic-knowledge";
+import { enforceClinicalGuard, type ClinicalClaimReason } from "@/lib/clinical-claim-guard";
 
 /**
  * Regras fixas de LGPD/compliance que valem pra toda clínica, somadas às instruções
@@ -85,12 +86,57 @@ export async function getAiAttendantConfig(clinicId: string) {
  * 1 rodada de tool calls (chama as tools pedidas, manda o resultado de volta, pega a
  * resposta final em texto); não é um loop de agente de verdade, é o suficiente pro
  * caso comum ("que horário tem?" -> 1 consulta -> resposta). */
+export type AiReplyResult = {
+  /** Texto pronto para o paciente; null = não enviar nada e passar para a equipe. */
+  text: string | null;
+  /** A 1ª resposta foi barrada pela trava clínica (clinical-claim-guard.ts) e reescrita. */
+  firstBlock: ClinicalClaimReason | null;
+  /** A reescrita também foi barrada — text é null por causa da trava, não de falha da IA. */
+  finalBlock: ClinicalClaimReason | null;
+};
+
 export async function generateAiReply(
   conversationId: string,
   clinicName: string,
   instructions: string,
   clinicId: string
-): Promise<string | null> {
+): Promise<AiReplyResult> {
+  const raw = await generateRawAiReply(conversationId, clinicName, instructions, clinicId);
+  if (!raw) return { text: null, firstBlock: null, finalBlock: null };
+  // Trava de afirmação clínica (CFM): confere o texto antes de sair. A reescrita vai SEM
+  // tools, pra não repetir efeito colateral da 1ª rodada (ex.: pré-agendamento).
+  return enforceClinicalGuard(raw.text, async (instruction) => {
+    try {
+      const retry = await aiChat(raw.privacy, {
+        model: process.env.OPENAI_MODEL || "gpt-4o-mini",
+        messages: [
+          ...raw.conversationMessages,
+          { role: "assistant", content: raw.text },
+          { role: "system", content: instruction },
+        ],
+        max_tokens: 400,
+        temperature: 0.2,
+      });
+      return retry.choices[0]?.message?.content?.trim() || null;
+    } catch (error) {
+      console.error("Falha ao reescrever resposta barrada pela trava clínica:", errorSummary(error));
+      return null;
+    }
+  });
+}
+
+type RawAiReply = {
+  text: string;
+  privacy: Parameters<typeof aiChat>[0];
+  conversationMessages: OpenAI.Chat.Completions.ChatCompletionMessageParam[];
+};
+
+async function generateRawAiReply(
+  conversationId: string,
+  clinicName: string,
+  instructions: string,
+  clinicId: string
+): Promise<RawAiReply | null> {
   if (!isAiConfigured()) return null;
   const privacy = { ...(await privacyForConversation(conversationId)), clinicId, feature: "atendente" as const };
 
@@ -131,7 +177,8 @@ export async function generateAiReply(
     const firstMessage = first.choices[0]?.message;
     const toolCalls = firstMessage?.tool_calls;
     if (!toolCalls || toolCalls.length === 0) {
-      return firstMessage?.content?.trim() || null;
+      const text = firstMessage?.content?.trim();
+      return text ? { text, privacy, conversationMessages } : null;
     }
 
     // Só usamos "function tools" (ver getAiToolDefinitions) — a SDK também permite
@@ -161,7 +208,8 @@ export async function generateAiReply(
       max_tokens: 400,
       temperature: 0.4,
     });
-    return second.choices[0]?.message?.content?.trim() || null;
+    const text = second.choices[0]?.message?.content?.trim();
+    return text ? { text, privacy, conversationMessages } : null;
   } catch (error) {
     console.error("Falha ao gerar resposta do atendente de IA:", errorSummary(error));
     return null;

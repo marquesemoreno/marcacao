@@ -55,6 +55,7 @@ import {
   matchEscalationTrigger,
   generateAiReply,
 } from "@/lib/ai-attendant";
+import { CLINICAL_CLAIM_LABELS } from "@/lib/clinical-claim-guard";
 
 type IncomingMedia =
   | { kind: "image" | "document"; mimeType: string; fileName: string; sizeBytes: number; key: Record<string, unknown> }
@@ -1232,27 +1233,32 @@ async function processWhatsappWebhook(body: Prisma.InputJsonValue, forcedClinicI
           await logAiAction({ clinicId: conversation.clinicId, conversationId: conversation.id, kind: "AI_ESCALATED", summary: escalationReason });
         } else {
           const reply = await generateAiReply(conversation.id, clinicName, aiConfig.instructions, conversation.clinicId);
-          if (reply) {
-            const result = await sendWhatsAppMessage(incoming.phone, reply, "ai_attendant.replied", resolvedClinicId);
+          if (reply.text) {
+            const result = await sendWhatsAppMessage(incoming.phone, reply.text, "ai_attendant.replied", resolvedClinicId);
             await prisma.message.create({
-              data: { conversationId: conversation.id, direction: "OUTBOUND", content: reply, status: result.success ? "DELIVERED" : "FAILED" },
+              data: { conversationId: conversation.id, direction: "OUTBOUND", content: reply.text, status: result.success ? "DELIVERED" : "FAILED" },
             });
             await prisma.aiInteractionLog.create({
-              data: { conversationId: conversation.id, userMessage: incoming.text, aiResponse: reply },
+              data: { conversationId: conversation.id, userMessage: incoming.text, aiResponse: reply.text },
             });
-            await logAiAction({ clinicId: conversation.clinicId, conversationId: conversation.id, kind: "AI_REPLIED", summary: incoming.text });
+            const rewritten = reply.firstBlock ? ` (reescrita: a 1ª resposta tinha ${CLINICAL_CLAIM_LABELS[reply.firstBlock]})` : "";
+            await logAiAction({ clinicId: conversation.clinicId, conversationId: conversation.id, kind: "AI_REPLIED", summary: `${incoming.text}${rewritten}` });
           } else {
-            // Falha ao gerar resposta (sem API key, erro da OpenAI etc): escala pra
-            // humano em vez de deixar o paciente sem nenhuma resposta.
+            // Falha ao gerar resposta (sem API key, erro da OpenAI etc) ou resposta barrada
+            // pela trava clínica mesmo depois de reescrita: escala pra humano em vez de
+            // deixar o paciente sem nenhuma resposta.
+            const failReason = reply.finalBlock
+              ? `Resposta da IA barrada: ${CLINICAL_CLAIM_LABELS[reply.finalBlock]}`
+              : "Falha ao gerar resposta da IA";
             await prisma.conversation.update({ where: { id: conversation.id }, data: { aiEnabled: false } });
             const result = await sendWhatsAppMessage(incoming.phone, AI_HANDOFF_MESSAGE, "ai_attendant.failed_escalated", resolvedClinicId);
             await prisma.message.create({
               data: { conversationId: conversation.id, direction: "OUTBOUND", content: AI_HANDOFF_MESSAGE, status: result.success ? "DELIVERED" : "FAILED" },
             });
             await prisma.aiInteractionLog.create({
-              data: { conversationId: conversation.id, userMessage: incoming.text, escalated: true, escalationReason: "Falha ao gerar resposta da IA" },
+              data: { conversationId: conversation.id, userMessage: incoming.text, escalated: true, escalationReason: failReason },
             });
-            await logAiAction({ clinicId: conversation.clinicId, conversationId: conversation.id, kind: "AI_ESCALATED", summary: "Falha ao gerar resposta da IA" });
+            await logAiAction({ clinicId: conversation.clinicId, conversationId: conversation.id, kind: "AI_ESCALATED", summary: failReason });
           }
         }
         aiHandled = true;

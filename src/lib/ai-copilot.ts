@@ -5,6 +5,7 @@ import { aiChat, isAiConfigured } from "@/lib/ai-gateway";
 import { privacyForConversation } from "@/lib/ai-privacy-context";
 import { prisma } from "@/lib/prisma";
 import { buildClinicKnowledgeContext } from "@/lib/clinic-knowledge";
+import { checkClinicalClaim } from "@/lib/clinical-claim-guard";
 
 const DEFAULT_INSTRUCTIONS =
   "Responda dúvidas gerais sobre agendamento, horários e procedimentos com cordialidade e objetividade.";
@@ -87,6 +88,9 @@ Responda em JSON, exatamente neste formato: {"suggestions": ["sugestão 1", "sug
     return suggestions
       .filter((s: unknown): s is string => typeof s === "string" && s.trim().length > 0)
       .map((s: string) => s.trim())
+      // Trava clínica (clinical-claim-guard.ts): não sugere à recepção texto com
+      // diagnóstico, remédio/dose, promessa, gravidade ou leitura de exame.
+      .filter((s: string) => !checkClinicalClaim(s).blocked)
       .slice(0, 3);
   } catch (error) {
     console.error("Falha ao gerar sugestões do copilot:", errorSummary(error));
