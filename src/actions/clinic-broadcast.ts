@@ -28,6 +28,14 @@ import { attachmentKindOf, checkBroadcastAttachment } from "@/lib/broadcast-atta
 import { numberHealth } from "@/lib/number-health";
 import { reminderPauseUntil, remindersPausedNow } from "@/lib/reminder-pause";
 import { getWhatsappChannelStatus } from "@/actions/inbox";
+import { isDemoClinicCnpj } from "@/lib/demo-clinic";
+import { demoCloudTemplates } from "@/lib/demo-cloud";
+
+/** Clínica demo (vídeos): Disparos como se estivesse na API oficial, sem enviar nada. */
+async function isDemoClinic(clinicId: string): Promise<boolean> {
+  const c = await prisma.clinic.findUnique({ where: { id: clinicId }, select: { cnpj: true } });
+  return isDemoClinicCnpj(c?.cnpj);
+}
 
 /** Mirror de listBroadcastCampaigns (admin-broadcast.ts) — clinicId vem da sessão,
  * não é parâmetro (a clínica só pode ver as próprias campanhas). */
@@ -451,6 +459,9 @@ async function assertClinicOwnsCampaign(campaignId: string, clinicId: string) {
 export async function startClinicBroadcastCampaign(campaignId: string) {
   const { clinicId } = await requireClinicPermission("disparos");
   await assertClinicOwnsCampaign(campaignId, clinicId);
+  if (await isDemoClinic(clinicId)) {
+    return { success: false as const, error: "Clínica de demonstração: a campanha fica pronta, mas nada é enviado." };
+  }
   // CFM: campanha de marketing sem responsável técnico (nome + CRM) não inicia.
   const c = await prisma.broadcastCampaign.findUnique({
     where: { id: campaignId },
@@ -530,9 +541,10 @@ export async function getClinicNumberHealth(campaignPending?: number) {
     prisma.bridgeReminderLog.count({ where: { clinicId, sentAt: { gte: weekStart } } }),
   ]);
   const lastDown = downLogs.find((l) => (l.payload as { key?: string } | null)?.key === `whatsapp:${clinicId}`);
+  const demo = await isDemoClinic(clinicId);
   const input = {
-    connection,
-    onCloud: Boolean(cloud),
+    connection: demo ? ("open" as const) : connection,
+    onCloud: demo || Boolean(cloud),
     lastDownAt: lastDown?.createdAt ?? null,
     automatedToday: campaignToday + remindersToday,
     automated7d: campaign7d + reminders7d,
@@ -540,7 +552,7 @@ export async function getClinicNumberHealth(campaignPending?: number) {
     campaignPending,
     now,
   };
-  return { ...numberHealth(input), connection, onCloud: input.onCloud, automatedToday: input.automatedToday, automated7d: input.automated7d };
+  return { ...numberHealth(input), connection: input.connection, onCloud: input.onCloud, automatedToday: input.automatedToday, automated7d: input.automated7d };
 }
 
 /** Aviso de remarcação em massa — médico desmarcou a agenda de um dia, avisa todos os
@@ -735,6 +747,12 @@ export type ClinicCloudTemplate = { name: string; language: string; category: st
 /** API oficial ativa? Se sim, os modelos APROVADOS da clínica (só eles podem ser disparados). */
 export async function getClinicCloudBroadcastSetup(): Promise<{ active: boolean; templates: ClinicCloudTemplate[]; error?: string }> {
   const { clinicId } = await requireClinicSession();
+  if (await isDemoClinic(clinicId)) {
+    return {
+      active: true,
+      templates: demoCloudTemplates().map((t) => ({ name: t.name, language: t.language, category: t.category, bodyText: t.bodyText, variableCount: t.variableCount })),
+    };
+  }
   const account = await prisma.whatsappCloudAccount.findUnique({ where: { clinicId }, select: { active: true, wabaId: true, accessToken: true } });
   if (!account?.active) return { active: false, templates: [] };
   let token: string;
