@@ -149,3 +149,14 @@ Se uma clínica um dia usar o DeskVoice, ou qualquer PABX em nuvem, como central
 ## Próximo passo
 
 Quando você escolher, os três itens acima entram como regras da recuperação de chamada perdida (1º do Top 3 da análise de ligações), feitos com TDD.
+
+## Decisões do usuário (18/11/2026)
+
+- PABX: Santa Clara usa Leucotron; Urolaser usa um Intelbras simples. Impacto em [estudo-central-telefonica.md](estudo-central-telefonica.md).
+- Coexistência da Urolaser: o usuário vai verificar.
+- O texto **convida a responder**.
+- Pode desligar a recusa de ligações do WhatsApp (`rejectCall`) por enquanto.
+- Tetos: **3 por hora e 20 por dia** por clínica.
+- No telefone fixo, o texto vai **sem nome**.
+- O nome da clínica pode aparecer no texto por enquanto.
+- Antes de implementar: estudo da central telefônica própria e do custo.
