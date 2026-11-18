@@ -107,6 +107,7 @@ export async function dispatchNextBatch(): Promise<{ processed: number }> {
         consentAt: contact?.clinicProfiles[0]?.marketingConsentAt ?? null,
         isMarcador,
         isTransactional: skipsMarketingConsent(campaign.tagOnSend),
+        consentOverride: Boolean(campaign.consentOverrideAt),
       });
       if (decision !== "ENVIAR") {
         await prisma.broadcastRecipient.update({

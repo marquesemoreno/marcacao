@@ -1023,6 +1023,10 @@ model BroadcastCampaign {
   lowPriority           Boolean                 @default(false) @map("low_priority")
   /// Campanha criada pela régua automática (AutomationRule.id); null = campanha manual.
   automationRuleId      String?                 @map("automation_rule_id")
+  /// Gestão liberou o envio também para quem NÃO deu consentimento de marketing (decisão da
+  /// clínica, com aviso de risco LGPD/Meta). Opt-out ("sair") continua valendo. Null = só com consentimento.
+  consentOverrideAt     DateTime?               @map("consent_override_at")
+  consentOverrideByUserId String?               @map("consent_override_by_user_id")
   createdByUserId       String                  @map("created_by_user_id")
   createdAt             DateTime                @default(now()) @map("created_at")
   updatedAt             DateTime                @updatedAt @map("updated_at")

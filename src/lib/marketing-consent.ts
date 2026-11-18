@@ -8,9 +8,12 @@ export function marketingSendDecision(input: {
   consentAt: Date | null;
   isMarcador: boolean;
   isTransactional: boolean;
+  /** Gestão liberou esta campanha para quem não deu consentimento (BroadcastCampaign.consentOverrideAt).
+   * Decisão e risco da clínica (LGPD/Meta); opt-out continua valendo. */
+  consentOverride?: boolean;
 }): MarketingDecision {
   if (input.optedOut) return "SAIU";
-  if (input.isTransactional || input.isMarcador) return "ENVIAR";
+  if (input.isTransactional || input.isMarcador || input.consentOverride) return "ENVIAR";
   return input.consentAt ? "ENVIAR" : "SEM_CONSENTIMENTO";
 }
 

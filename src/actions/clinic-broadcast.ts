@@ -9,13 +9,14 @@ import { decryptToken } from "@/lib/token-crypto";
 import { revalidatePath } from "next/cache";
 import { rescheduleTextProblem } from "@/lib/reschedule-text";
 import { prisma } from "@/lib/prisma";
-import { requireClinicManager, requireClinicSession, requireClinicPermission } from "@/lib/session";
+import { isClinicManager, requireClinicManager, requireClinicSession, requireClinicPermission } from "@/lib/session";
 import { formatToWhatsAppNumber } from "@/lib/whatsapp";
 import { uploadWhatsAppMedia } from "@/lib/whatsapp-media";
 import { technicalDirectorLine, buildBroadcastMessage, type ParsedBroadcastRecipient } from "@/lib/broadcast-csv";
 import { campaignSituation, estimateCampaignFinish, patientsNeedingCall, startOfBrazilDay, unfilledPlaceholders, unknownTemplateVariables, urgentSendTimes } from "@/lib/broadcast-schedule";
 import { RESCHEDULE_PENDING_TAG } from "@/lib/conversation-tags";
-import { requiresTechnicalDirector } from "@/lib/campaign-kind";
+import { requiresTechnicalDirector, skipsMarketingConsent } from "@/lib/campaign-kind";
+import { toggleNinthDigit } from "@/lib/whatsapp";
 import { formatDate, getBaseUrl } from "@/lib/format";
 import { fetchBridgeCampaignPatients, fetchBridgeDoctors } from "@/lib/hospital-bridge";
 import { lastAutomatedSend } from "@/lib/automated-pacing-server";
@@ -194,11 +195,11 @@ export async function getClinicNextAutomatedSend(): Promise<{ lastAt: string | n
 /** Prévia antes de iniciar: quantos vão receber, a mensagem como o 1º destinatário
  * recebe (variáveis preenchidas + rodapé de saída) e a previsão de término. */
 export async function getClinicCampaignStartPreview(campaignId: string) {
-  const { clinicId } = await requireClinicSession();
+  const { clinicId, userId } = await requireClinicSession();
   await assertClinicOwnsCampaign(campaignId, clinicId);
   const campaign = await prisma.broadcastCampaign.findUnique({
     where: { id: campaignId },
-    select: { messageTemplate: true, messageVariants: true, imagePath: true, imageMimeType: true, attachmentName: true, lowPriority: true, tagOnSend: true, channel: true, subject: true, cloudTemplateName: true, cloudTemplateBody: true, cloudTemplateParams: true, clinic: { select: { technicalDirectorName: true, technicalDirectorCrm: true } } },
+    select: { messageTemplate: true, messageVariants: true, imagePath: true, imageMimeType: true, attachmentName: true, lowPriority: true, tagOnSend: true, channel: true, subject: true, cloudTemplateName: true, cloudTemplateBody: true, cloudTemplateParams: true, consentOverrideAt: true, clinic: { select: { technicalDirectorName: true, technicalDirectorCrm: true } } },
   });
   const isReschedule = campaign?.tagOnSend === RESCHEDULE_PENDING_TAG;
   const rt = isReschedule ? null : technicalDirectorLine(campaign?.clinic.technicalDirectorName, campaign?.clinic.technicalDirectorCrm);
@@ -253,10 +254,29 @@ export async function getClinicCampaignStartPreview(campaignId: string) {
     const built = buildTemplateParams(campaign.cloudTemplateParams, vars);
     variantMessages = [built.ok ? renderTemplatePreview(campaign.cloudTemplateBody ?? "", built.params) : `⚠ ${built.error}`];
   }
+  // WhatsApp marketing: quantos dos pendentes NÃO têm consentimento (seriam pulados) — a gestão
+  // pode liberar o envio para eles na confirmação (consentOverrideAt).
+  let withoutConsentWhatsapp = 0;
+  if (campaign && channel === "WHATSAPP" && !skipsMarketingConsent(campaign.tagOnSend)) {
+    const phones = (await prisma.broadcastRecipient.findMany({ where: { campaignId, status: "PENDING" }, select: { phone: true } })).map((r) => r.phone);
+    const variants = [...new Set(phones.flatMap((p) => [p, toggleNinthDigit(p)].filter((x): x is string => !!x)))];
+    const consented = new Set(
+      (
+        await prisma.contactClinicProfile.findMany({
+          where: { clinicId, marketingConsentAt: { not: null }, contact: { phone: { in: variants } } },
+          select: { contact: { select: { phone: true } } },
+        })
+      ).map((p) => p.contact.phone)
+    );
+    withoutConsentWhatsapp = phones.filter((p) => !consented.has(p) && !consented.has(toggleNinthDigit(p) ?? "")).length;
+  }
   return {
     pending,
     channel,
     withConsent,
+    withoutConsentWhatsapp,
+    consentOverride: Boolean(campaign?.consentOverrideAt),
+    canOverrideConsent: await isClinicManager(userId),
     smsCredits,
     samplePhone: first?.phone ?? null,
     sampleMessage: variantMessages[0] ?? "",
@@ -456,8 +476,8 @@ async function assertClinicOwnsCampaign(campaignId: string, clinicId: string) {
   }
 }
 
-export async function startClinicBroadcastCampaign(campaignId: string) {
-  const { clinicId } = await requireClinicPermission("disparos");
+export async function startClinicBroadcastCampaign(campaignId: string, opts?: { sendWithoutConsent?: boolean }) {
+  const { clinicId, userId } = await requireClinicPermission("disparos");
   await assertClinicOwnsCampaign(campaignId, clinicId);
   if (await isDemoClinic(clinicId)) {
     return { success: false as const, error: "Clínica de demonstração: a campanha fica pronta, mas nada é enviado." };
@@ -480,6 +500,18 @@ export async function startClinicBroadcastCampaign(campaignId: string) {
     if (missing.length > 0) {
       return { success: false as const, error: `O envio por ${c.channel === "SMS" ? "SMS" : "e-mail"} ainda não está configurado no servidor (faltam: ${missing.join(", ")}). Peça ao administrador.` };
     }
+  }
+  // Envio sem consentimento: só gestão libera (decisão e risco LGPD/Meta da clínica); fica
+  // registrado quem e quando. Quem já tinha sido pulado por falta de consentimento volta à fila.
+  if (opts?.sendWithoutConsent) {
+    if (!(await isClinicManager(userId))) return { success: false as const, error: "Só a gestão pode liberar o envio sem consentimento." };
+    await prisma.$transaction([
+      prisma.broadcastCampaign.update({ where: { id: campaignId }, data: { consentOverrideAt: new Date(), consentOverrideByUserId: userId } }),
+      prisma.broadcastRecipient.updateMany({
+        where: { campaignId, status: "SKIPPED_OPT_OUT", errorMessage: NO_CONSENT_MESSAGE },
+        data: { status: "PENDING", errorMessage: null },
+      }),
+    ]);
   }
   await prisma.broadcastCampaign.update({ where: { id: campaignId }, data: { status: "RUNNING" } });
   revalidatePath("/clinic/disparos");

@@ -14,6 +14,10 @@ describe("marketingSendDecision", () => {
     expect(marketingSendDecision({ ...base, isTransactional: true })).toBe("ENVIAR");
     expect(marketingSendDecision({ ...base, isMarcador: true })).toBe("ENVIAR");
   });
+  it("gestão liberou a campanha sem consentimento: envia, mas quem pediu para sair continua de fora", () => {
+    expect(marketingSendDecision({ ...base, consentOverride: true })).toBe("ENVIAR");
+    expect(marketingSendDecision({ ...base, consentOverride: true, optedOut: true })).toBe("SAIU");
+  });
 });
 
 describe("isMarketingOptInReply", () => {

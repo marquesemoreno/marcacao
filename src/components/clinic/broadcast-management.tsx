@@ -189,6 +189,8 @@ export function BroadcastManagement() {
   // Saúde do número (crítica 02/11): conexão, volume automático de hoje, queda recente.
   const [health, setHealth] = useState<NumberHealthView | null>(null);
   const [riskAck, setRiskAck] = useState(false);
+  /** Gestão marcou "enviar também para quem não deu consentimento" (risco LGPD/Meta). */
+  const [noConsentAck, setNoConsentAck] = useState(false);
   const [configOpen, setConfigOpen] = useState(false);
   const [switchingPriority, setSwitchingPriority] = useState(false);
   const [startHealth, setStartHealth] = useState<NumberHealthView | null>(null);
@@ -407,6 +409,7 @@ export function BroadcastManagement() {
   async function askStart(campaign: Campaign) {
     setConfirming({ campaign, preview: null });
     setRiskAck(false);
+    setNoConsentAck(false);
     setStartHealth(null);
     try {
       const preview = await getClinicCampaignStartPreview(campaign.id);
@@ -437,7 +440,7 @@ export function BroadcastManagement() {
     const { campaign } = confirming;
     setBusyId(campaign.id);
     try {
-      const started = await startClinicBroadcastCampaign(campaign.id);
+      const started = await startClinicBroadcastCampaign(campaign.id, { sendWithoutConsent: noConsentAck });
       if (!started.success) {
         toast.error(started.error);
         return;
@@ -1557,6 +1560,37 @@ export function BroadcastManagement() {
                     Duplicar e corrigir o texto
                   </button>
                 </div>
+              )}
+              {confirming.preview.channel === "WHATSAPP" && !confirming.preview.isReschedule && confirming.preview.withoutConsentWhatsapp > 0 && !confirming.preview.consentOverride && (
+                <div className="rounded-xl border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 p-3 text-sm text-amber-900 dark:text-amber-200 space-y-2">
+                  <p>
+                    <strong>{plural(confirming.preview.withoutConsentWhatsapp, "pessoa", "pessoas")}</strong> de {confirming.preview.pending} não{" "}
+                    {confirming.preview.withoutConsentWhatsapp === 1 ? "deu" : "deram"} consentimento para campanhas e{" "}
+                    {confirming.preview.withoutConsentWhatsapp === 1 ? "será pulada" : "serão puladas"}.
+                  </p>
+                  {confirming.preview.canOverrideConsent ? (
+                    <label className="flex items-start gap-2">
+                      <input
+                        type="checkbox"
+                        checked={noConsentAck}
+                        onChange={(e) => setNoConsentAck(e.target.checked)}
+                        className="mt-0.5 h-4 w-4 accent-amber-600"
+                      />
+                      <span>
+                        Enviar também para quem não deu consentimento. Entendo que a clínica assume o risco: a LGPD pede
+                        consentimento para marketing com dados de saúde, e denúncias de spam podem baixar a qualidade ou
+                        bloquear o número na Meta. Quem pediu para sair continua de fora. Fica registrado no meu nome.
+                      </span>
+                    </label>
+                  ) : (
+                    <p className="text-xs">Só a gestão pode liberar o envio para quem não deu consentimento.</p>
+                  )}
+                </div>
+              )}
+              {confirming.preview.consentOverride && (
+                <p className="rounded-xl border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 p-2 text-sm text-amber-900 dark:text-amber-200">
+                  A gestão liberou esta campanha também para quem não deu consentimento.
+                </p>
               )}
               {confirming.preview.missingTechnicalDirector && (
                 <div role="alert" className="rounded-xl border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 p-3 text-sm text-amber-900 dark:text-amber-200">
