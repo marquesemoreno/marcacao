@@ -23,6 +23,7 @@ const MODELS = [
   "agendaMark",
   "bridgeReminderLog",
   "slotOffer",
+  "phoneCall",
   "broadcastRecipient",
 ] as const;
 
@@ -73,7 +74,7 @@ describe("deletePatientRelatedData", () => {
   it("tira o telefone do que alimenta relatório, sem apagar a linha", async () => {
     await deletePatientRelatedData(tx as never, target);
     const phones = phoneVariants(target.phone);
-    for (const m of ["agendaMark", "bridgeReminderLog", "slotOffer"] as const) {
+    for (const m of ["agendaMark", "bridgeReminderLog", "slotOffer", "phoneCall"] as const) {
       expect(tx[m].updateMany).toHaveBeenCalledWith({ where: { clinicId: "clinic-a", phone: { in: phones } }, data: { phone: null } });
       expect(tx[m].deleteMany).not.toHaveBeenCalled();
     }

@@ -1,4 +1,5 @@
 import { errorSummary } from "@/lib/safe-error";
+import { recordCallEvent } from "@/lib/missed-call-server";
 import { applyAutoFunnelStage } from "@/lib/auto-funnel-stage-server";
 import { isMarketingOptInReply, MARKETING_OPT_IN_REPLY } from "@/lib/marketing-consent";
 import { matchClinicalUrgency } from "@/lib/clinical-urgency";
@@ -646,6 +647,14 @@ async function processWhatsappWebhook(body: Prisma.InputJsonValue, forcedClinicI
   if (bodyRec.event === "messages.delete" && dataPayload) {
     await handleMessageDelete(dataPayload);
     return NextResponse.json({ ok: true, status: "message_deleted" }, { status: 200 });
+  }
+
+  // Ligação pelo WhatsApp (evento CALL): só grava. Quem decide se manda a mensagem de
+  // ligação perdida, ou cria a tarefa, é o cron missed-call-recovery (src/lib/missed-call.ts).
+  if (bodyRec.event === "call") {
+    if (!resolvedClinicId) return NextResponse.json({ ok: true, status: "call_ignored_no_clinic" }, { status: 200 });
+    const status = await recordCallEvent(resolvedClinicId, bodyRec.data);
+    return NextResponse.json({ ok: true, status: `call_${status}` }, { status: 200 });
   }
 
   // FASE DE CAPTURA (não processa ainda) — sincronização de histórico

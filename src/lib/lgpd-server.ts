@@ -50,7 +50,8 @@ export async function deletePatientRelatedData(tx: Prisma.TransactionClient, t: 
     waitlist = (await tx.waitlistEntry.deleteMany({ where: byPhone })).count;
     await tx.channelConsent.deleteMany({ where: { clinicId: t.clinicId, channel: "SMS", address: { in: phones }, revokedAt: null } });
 
-    for (const model of [tx.agendaMark, tx.bridgeReminderLog, tx.slotOffer] as const) {
+    // Ligações (missed-call.ts) entram aqui também: a contagem fica, o número sai.
+    for (const model of [tx.agendaMark, tx.bridgeReminderLog, tx.slotOffer, tx.phoneCall] as const) {
       await (model as typeof tx.agendaMark).updateMany({ where: byPhone, data: { phone: null } });
     }
 

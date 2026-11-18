@@ -195,6 +195,9 @@ model Clinic {
   /// Conversa atribuída sem resposta há X minutos úteis volta para a fila (Não Atribuídas)
   /// — src/lib/queue-return.ts. Null = desligado.
   unansweredReturnMinutes    Int?     @map("unanswered_return_minutes")
+  /// Ligação perdida pelo WhatsApp recebe mensagem convidando a escrever, ou vira tarefa
+  /// da recepção (src/lib/missed-call.ts). Desligado de fábrica.
+  missedCallRecoveryEnabled  Boolean  @default(false) @map("missed_call_recovery_enabled")
   name                       String
   tradeName                  String   @map("trade_name")
   cnpj                       String   @unique
@@ -254,6 +257,7 @@ model Clinic {
   automationRules      AutomationRule[]
   tagAutomations       TagAutomation[]
   receptionTasks       ReceptionTask[]
+  phoneCalls           PhoneCall[]
   insuranceSettings    ClinicInsuranceSettings?
   channelConsents      ChannelConsent[]
   bridgeReminderLogs   BridgeReminderLog[]
@@ -1914,4 +1918,39 @@ model AdConversion {
 
   @@unique([adClickId, kind])
   @@map("ad_conversions")
+}
+
+/// Ligação recebida pelo WhatsApp (evento CALL da Evolution) e o que fizemos com ela
+/// (src/lib/missed-call.ts). Sem gravação nem conteúdo: só número, horas e desfecho.
+/// Segue o prazo de guarda das conversas e sai no apagamento do titular.
+model PhoneCall {
+  id             String    @id @default(cuid())
+  clinicId       String    @map("clinic_id")
+  /// WHATSAPP (Evolution). Telefone fixo entra depois (ponte ou PABX em nuvem).
+  source         String    @default("WHATSAPP")
+  callId         String    @map("call_id")
+  /// Null quando o WhatsApp escondeu o número (@lid) e o telefone real não veio.
+  phone          String?
+  /// Número vindo do próprio WhatsApp = confiável; telefone comum pode ser forjado.
+  trustedNumber  Boolean   @default(true) @map("trusted_number")
+  isVideo        Boolean   @default(false) @map("is_video")
+  /// Avisos recebidos, em ordem: [{ status, at }].
+  events         Json      @default("[]")
+  startedAt      DateTime  @map("started_at")
+  /// PENDING | MISSED | ANSWERED | UNKNOWN
+  outcome        String    @default("PENDING")
+  /// PENDING | SENT | TASK | SKIPPED
+  recoveryStatus String    @default("PENDING") @map("recovery_status")
+  recoveryReason String?   @map("recovery_reason")
+  recoveredAt    DateTime? @map("recovered_at")
+  taskId         String?   @map("task_id")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  clinic Clinic @relation(fields: [clinicId], references: [id])
+
+  @@unique([clinicId, callId])
+  @@index([recoveryStatus, startedAt])
+  @@index([clinicId, phone, recoveredAt])
+  @@map("phone_calls")
 }

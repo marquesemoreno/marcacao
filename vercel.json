@@ -16,6 +16,10 @@
       "schedule": "* * * * *"
     },
     {
+      "path": "/api/cron/missed-call-recovery",
+      "schedule": "* * * * *"
+    },
+    {
       "path": "/api/cron/lead-outreach",
       "schedule": "*/5 * * * *"
     },

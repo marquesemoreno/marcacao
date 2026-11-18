@@ -100,7 +100,8 @@ export async function setEvolutionWebhook(config: EvolutionInstanceConfig) {
         url: webhookUrl,
         enabled: true,
         webhookByEvents: false,
-        events: ["MESSAGES_UPSERT", "MESSAGES_UPDATE", "MESSAGES_SET", "MESSAGES_DELETE"],
+        // CALL alimenta a recuperação de ligação perdida (src/lib/missed-call.ts).
+        events: ["MESSAGES_UPSERT", "MESSAGES_UPDATE", "MESSAGES_SET", "MESSAGES_DELETE", "CALL"],
         ...(secret ? { headers: { "x-webhook-token": secret } } : {}),
       },
     }),

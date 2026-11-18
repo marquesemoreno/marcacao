@@ -39,7 +39,10 @@ export async function GET(request: Request) {
   // janela de importação do Google Ads. As conversões caem junto (cascade); a origem da
   // conversa (canal/campanha) fica.
   const adClicks = await prisma.adClick.deleteMany({ where: { createdAt: { lt: new Date(Date.now() - 90 * 86_400_000) } } });
+  // Ligações pelo WhatsApp (missed-call.ts): 1 ano, como a ficha prévia. Só número e horas.
+  const phoneCalls = await prisma.phoneCall.deleteMany({ where: { createdAt: { lt: new Date(Date.now() - 365 * 86_400_000) } } });
   return NextResponse.json({
+    phoneCalls: phoneCalls.count,
     adClicks: adClicks.count,
     webhookLogs,
     loginFailures: loginFailures.count,
