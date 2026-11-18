@@ -6,7 +6,7 @@ import { getSignedMediaUrl } from "@/lib/whatsapp-media";
 import { technicalDirectorLine, buildBroadcastMessage } from "@/lib/broadcast-csv";
 import { pickBroadcastVariant } from "@/lib/broadcast-variants";
 import { broadcastMediaFile } from "@/lib/broadcast-attachment";
-import { buildTemplateParams, cloudBroadcastMode } from "@/lib/broadcast-cloud-template";
+import { buildTemplateParams, cloudBroadcastMode, parseCloudTemplateVariants, pickCloudTemplate } from "@/lib/broadcast-cloud-template";
 import { activeCloudAccount, cloudSendTemplate } from "@/lib/whatsapp-cloud-send";
 import { RESCHEDULE_PENDING_TAG } from "@/lib/conversation-tags";
 import { skipsMarketingConsent, tagToApplyOnSend } from "@/lib/campaign-kind";
@@ -131,11 +131,19 @@ export async function dispatchNextBatch(): Promise<{ processed: number }> {
       });
 
       let result: { success: boolean; skipped: boolean };
+      let templateIndex = 0;
       let failureReason = "Falha ao enviar via WhatsApp";
 
       if (mode === "TEMPLATE" && cloudAccount) {
         // Modelo aprovado: texto fixo da Meta, sem variações nem imagem; só os {{n}} variam.
         const built = buildTemplateParams(campaign.cloudTemplateParams, variables);
+        // Teste A/B/C: até 3 modelos aprovados, um por destinatário (fixo).
+        const templatePick = pickCloudTemplate(
+          { name: campaign.cloudTemplateName!, language: campaign.cloudTemplateLanguage || "pt_BR", body: campaign.cloudTemplateBody ?? "" },
+          parseCloudTemplateVariants(campaign.cloudTemplateVariants),
+          recipient.id
+        );
+        templateIndex = templatePick.index;
         if (!built.ok) {
           result = { success: false, skipped: false };
           failureReason = built.error;
@@ -143,7 +151,7 @@ export async function dispatchNextBatch(): Promise<{ processed: number }> {
           result = await cloudSendTemplate(
             cloudAccount,
             recipient.phone,
-            { name: campaign.cloudTemplateName!, language: campaign.cloudTemplateLanguage || "pt_BR", bodyParams: built.params },
+            { name: templatePick.template.name, language: templatePick.template.language, bodyParams: built.params },
             "broadcast.sent"
           );
           if (!result.success) failureReason = "Falha ao enviar o modelo pela API oficial";
@@ -174,7 +182,7 @@ export async function dispatchNextBatch(): Promise<{ processed: number }> {
         where: { id: recipient.id },
         data:
           result.success || result.skipped
-            ? { status: "SENT", sentAt: new Date(), variantIndex: mode === "TEMPLATE" ? 0 : variant.index }
+            ? { status: "SENT", sentAt: new Date(), variantIndex: mode === "TEMPLATE" ? templateIndex : variant.index }
             : { status: "FAILED", errorMessage: failureReason },
       });
 

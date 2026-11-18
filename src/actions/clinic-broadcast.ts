@@ -3,7 +3,7 @@
 import { normalizeBroadcastVariants, previewBroadcastVariants, countSentByVariant } from "@/lib/broadcast-variants";
 
 import { NO_CONSENT_MESSAGE } from "@/lib/marketing-consent";
-import { buildTemplateParams, checkTemplateParamSources, renderTemplatePreview } from "@/lib/broadcast-cloud-template";
+import { buildTemplateParams, checkCloudTemplateVariants, checkTemplateParamSources, parseCloudTemplateVariants, renderTemplatePreview } from "@/lib/broadcast-cloud-template";
 import { listCloudTemplates } from "@/lib/whatsapp-cloud";
 import { decryptToken } from "@/lib/token-crypto";
 import { revalidatePath } from "next/cache";
@@ -199,7 +199,7 @@ export async function getClinicCampaignStartPreview(campaignId: string) {
   await assertClinicOwnsCampaign(campaignId, clinicId);
   const campaign = await prisma.broadcastCampaign.findUnique({
     where: { id: campaignId },
-    select: { messageTemplate: true, messageVariants: true, imagePath: true, imageMimeType: true, attachmentName: true, lowPriority: true, tagOnSend: true, channel: true, subject: true, cloudTemplateName: true, cloudTemplateBody: true, cloudTemplateParams: true, consentOverrideAt: true, clinic: { select: { technicalDirectorName: true, technicalDirectorCrm: true } } },
+    select: { messageTemplate: true, messageVariants: true, imagePath: true, imageMimeType: true, attachmentName: true, lowPriority: true, tagOnSend: true, channel: true, subject: true, cloudTemplateName: true, cloudTemplateBody: true, cloudTemplateParams: true, cloudTemplateVariants: true, consentOverrideAt: true, clinic: { select: { technicalDirectorName: true, technicalDirectorCrm: true } } },
   });
   const isReschedule = campaign?.tagOnSend === RESCHEDULE_PENDING_TAG;
   const rt = isReschedule ? null : technicalDirectorLine(campaign?.clinic.technicalDirectorName, campaign?.clinic.technicalDirectorCrm);
@@ -252,7 +252,8 @@ export async function getClinicCampaignStartPreview(campaignId: string) {
   const usesTemplate = Boolean(campaign?.cloudTemplateName);
   if (campaign?.cloudTemplateName) {
     const built = buildTemplateParams(campaign.cloudTemplateParams, vars);
-    variantMessages = [built.ok ? renderTemplatePreview(campaign.cloudTemplateBody ?? "", built.params) : `⚠ ${built.error}`];
+    const bodies = [campaign.cloudTemplateBody ?? "", ...parseCloudTemplateVariants(campaign.cloudTemplateVariants).map((t) => t.body)];
+    variantMessages = bodies.map((b) => (built.ok ? renderTemplatePreview(b, built.params) : `⚠ ${built.error}`));
   }
   // WhatsApp marketing: quantos dos pendentes NÃO têm consentimento (seriam pulados) — a gestão
   // pode liberar o envio para eles na confirmação (consentOverrideAt).
@@ -343,7 +344,7 @@ export async function getClinicCampaignForDuplicate(campaignId: string) {
   await assertClinicOwnsCampaign(campaignId, clinicId);
   const c = await prisma.broadcastCampaign.findUnique({
     where: { id: campaignId },
-    select: { name: true, messageTemplate: true, messageVariants: true, cloudTemplateName: true, cloudTemplateParams: true, recipients: { select: { phone: true, variables: true } } },
+    select: { name: true, messageTemplate: true, messageVariants: true, cloudTemplateName: true, cloudTemplateParams: true, cloudTemplateVariants: true, recipients: { select: { phone: true, variables: true } } },
   });
   if (!c) throw new Error("Campanha não encontrada");
   return {
@@ -352,6 +353,7 @@ export async function getClinicCampaignForDuplicate(campaignId: string) {
     variants: c.messageVariants,
     cloudTemplateName: c.cloudTemplateName,
     cloudTemplateParams: c.cloudTemplateParams,
+    cloudTemplateExtraNames: parseCloudTemplateVariants(c.cloudTemplateVariants).map((t) => t.name),
     recipients: c.recipients.map((r) => ({ phone: r.phone, variables: (r.variables ?? {}) as Record<string, string> })),
   };
 }
@@ -376,11 +378,11 @@ export async function createClinicBroadcastCampaign(
   /** Até 2 variações além da mensagem principal (sorteadas por destinatário). */
   extraVariants: string[] = [],
   /** API oficial: modelo aprovado + o que vai em cada {{n}}. */
-  cloudTemplate?: { name: string; params: string[] }
+  cloudTemplate?: { name: string; params: string[]; /** Até 2 modelos a mais, sorteados (teste A/B/C). */ extraNames?: string[] }
 ) {
   const { clinicId, userId } = await requireClinicPermission("disparos");
   const cloud = await getClinicCloudBroadcastSetup();
-  let templateData: { cloudTemplateName: string; cloudTemplateLanguage: string; cloudTemplateBody: string; cloudTemplateParams: string[] } | null = null;
+  let templateData: { cloudTemplateName: string; cloudTemplateLanguage: string; cloudTemplateBody: string; cloudTemplateParams: string[]; cloudTemplateVariants: { name: string; language: string; body: string }[] } | null = null;
   if (cloud.active) {
     // Fora da janela de 24 h a Meta só aceita modelo aprovado.
     const tpl = cloud.templates.find((t) => t.name === cloudTemplate?.name);
@@ -388,10 +390,25 @@ export async function createClinicBroadcastCampaign(
     const params = (cloudTemplate?.params ?? []).slice(0, tpl.variableCount).map((p) => p.trim());
     const problem = checkTemplateParamSources(tpl.variableCount, params, Object.keys(recipients[0]?.variables ?? {}));
     if (problem) throw new Error(problem);
-    templateData = { cloudTemplateName: tpl.name, cloudTemplateLanguage: tpl.language, cloudTemplateBody: tpl.bodyText, cloudTemplateParams: params };
-    // O texto da campanha vira o do modelo (lista, relatório e duplicar mostram isso).
+    const extraNames = [...new Set((cloudTemplate?.extraNames ?? []).map((n) => n.trim()).filter(Boolean))];
+    const extras = extraNames.map((n) => {
+      const t = cloud.templates.find((x) => x.name === n);
+      if (!t) throw new Error(`O modelo “${n}” não está aprovado — escolha outro.`);
+      return t;
+    });
+    const variantProblem = checkCloudTemplateVariants(tpl, extras);
+    if (variantProblem) throw new Error(variantProblem);
+    templateData = {
+      cloudTemplateName: tpl.name,
+      cloudTemplateLanguage: tpl.language,
+      cloudTemplateBody: tpl.bodyText,
+      cloudTemplateParams: params,
+      cloudTemplateVariants: extras.map((t) => ({ name: t.name, language: t.language, body: t.bodyText })),
+    };
+    // O texto da campanha vira o do modelo (lista, relatório e duplicar mostram isso); o corpo
+    // dos modelos sorteados vai nas variações, para a contagem por variação do relatório.
     messageTemplate = tpl.bodyText;
-    extraVariants = [];
+    extraVariants = extras.map((t) => t.bodyText);
     imageFormData = undefined;
   }
 

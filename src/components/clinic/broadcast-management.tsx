@@ -166,6 +166,8 @@ export function BroadcastManagement() {
   // API oficial: só modelo aprovado pela Meta; cada {{n}} recebe variável e/ou texto fixo.
   const [cloud, setCloud] = useState<{ active: boolean; templates: ClinicCloudTemplate[]; error?: string } | null>(null);
   const [cloudTemplateName, setCloudTemplateName] = useState("");
+  /** Até 2 modelos a mais, sorteados entre os destinatários (teste A/B/C). */
+  const [cloudExtraNames, setCloudExtraNames] = useState<string[]>([]);
   const [cloudParams, setCloudParams] = useState<string[]>([]);
   const [csvText, setCsvText] = useState("");
   const [recipients, setRecipients] = useState<ParsedBroadcastRecipient[]>([]);
@@ -343,6 +345,7 @@ export function BroadcastManagement() {
     setTemplate("");
     setExtraVariants(["", ""]);
     setCloudTemplateName("");
+    setCloudExtraNames([]);
     setCloudParams([]);
     setCsvText("");
     setCsvError(null);
@@ -393,7 +396,7 @@ export function BroadcastManagement() {
         recipients,
         cloudMode ? undefined : imageFormData,
         cloudMode ? [] : extraVariants,
-        cloudMode ? { name: cloudTemplateName, params: cloudParams } : undefined
+        cloudMode ? { name: cloudTemplateName, params: cloudParams, extraNames: cloudExtraNames.filter(Boolean) } : undefined
       );
       toast.success("Campanha criada como rascunho. Confira e clique em Iniciar quando estiver pronto.");
       resetForm();
@@ -492,6 +495,7 @@ export function BroadcastManagement() {
       setTemplate(copy.template);
       setExtraVariants([copy.variants[0] ?? "", copy.variants[1] ?? ""]);
       setCloudTemplateName(copy.cloudTemplateName ?? "");
+      setCloudExtraNames(copy.cloudTemplateExtraNames ?? []);
       setCloudParams(copy.cloudTemplateParams ?? []);
       setAudienceSource("csv");
       setRecipients(copy.recipients);
@@ -1073,6 +1077,7 @@ export function BroadcastManagement() {
                   value={cloudTemplateName}
                   onChange={(e) => {
                     setCloudTemplateName(e.target.value);
+                    setCloudExtraNames([]);
                     const t = cloud?.templates.find((x) => x.name === e.target.value);
                     setCloudParams(Array.from({ length: t?.variableCount ?? 0 }, (_, i) => (i === 0 && columns.includes("nome") ? "{{nome}}" : "")));
                   }}
@@ -1118,6 +1123,51 @@ export function BroadcastManagement() {
                     </div>
                     </div>
                   </>
+                )}
+                {selectedTemplate && (
+                  <div className="space-y-2">
+                    <p className={labelClass}>Testar outros modelos (opcional)</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      Cada paciente recebe um dos modelos, sorteado. O relatório da campanha mostra quantos receberam cada um. Só aparecem modelos com os mesmos campos do principal, que usam o que você preencheu acima.
+                    </p>
+                    {[0, 1].map((slot) => {
+                      const options = (cloud?.templates ?? []).filter(
+                        (t) => t.name !== cloudTemplateName && t.variableCount === selectedTemplate.variableCount && !cloudExtraNames.some((n, j) => j !== slot && n === t.name),
+                      );
+                      if (slot === 1 && !cloudExtraNames[0]) return null;
+                      return (
+                        <select
+                          key={slot}
+                          aria-label={`Modelo ${slot + 2} do sorteio`}
+                          value={cloudExtraNames[slot] ?? ""}
+                          onChange={(e) =>
+                            setCloudExtraNames((prev) => {
+                              const next = [prev[0] ?? "", prev[1] ?? ""];
+                              next[slot] = e.target.value;
+                              return (next[0] ? next : [next[1]]).filter(Boolean);
+                            })
+                          }
+                          className={inputClass}
+                        >
+                          <option value="">{options.length ? `Modelo ${slot + 2}: nenhum` : "Nenhum outro modelo com os mesmos campos"}</option>
+                          {options.map((t) => (
+                            <option key={`${t.name}-${t.language}`} value={t.name}>
+                              {templateLabel(t)}
+                            </option>
+                          ))}
+                        </select>
+                      );
+                    })}
+                    {cloudExtraNames.map((n) => {
+                      const t = cloud?.templates.find((x) => x.name === n);
+                      if (!t) return null;
+                      return (
+                        <BroadcastPreview key={n} label={`Prévia: ${templateLabel(t)}`}>
+                          {builtCloud?.ok ? renderTemplatePreview(t.bodyText, builtCloud.params) : t.bodyText}
+                        </BroadcastPreview>
+                      );
+                    })}
+                  </div>
                 )}
                 {recipients.length > 0 && templateProblem && (
                   <p aria-live="polite" className="text-sm text-red-600 dark:text-red-400">

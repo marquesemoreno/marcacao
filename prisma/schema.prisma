@@ -998,6 +998,9 @@ model BroadcastCampaign {
   cloudTemplateBody     String?                 @map("cloud_template_body")
   /// O que vai em cada {{n}}: variável da planilha ({{nome}}) e/ou texto fixo.
   cloudTemplateParams   String[]                @default([]) @map("cloud_template_params")
+  /// Até 2 modelos aprovados a mais, sorteados por destinatário (teste A/B/C): [{name, language, body}].
+  /// Usam os mesmos cloudTemplateParams; o corpo de cada um também vai em messageVariants (lista/relatório).
+  cloudTemplateVariants Json                    @default("[]") @map("cloud_template_variants")
   /// Canal de envio. WHATSAPP é o fluxo original (src/lib/broadcast.ts); SMS e EMAIL são
   /// despachados por src/lib/channel-broadcast.ts e, nesses dois, BroadcastRecipient.phone
   /// guarda o ENDEREÇO do destinatário (número com DDI 55 no SMS, e-mail no EMAIL).
