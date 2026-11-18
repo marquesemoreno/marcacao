@@ -20,6 +20,7 @@ export async function getHospitalIntegration(clinicId: string) {
     apiTokenMasked: maskApiToken(decryptToken(integration.apiToken)),
     active: integration.active,
     skipWeekendReminders: integration.skipWeekendReminders,
+    secondReminderHours: integration.secondReminderHours,
     lastCheckedAt: integration.lastCheckedAt,
     lastCheckOk: integration.lastCheckOk,
   };
@@ -63,6 +64,18 @@ export async function toggleHospitalIntegrationActive(clinicId: string, active: 
 export async function toggleSkipWeekendReminders(clinicId: string, skipWeekendReminders: boolean) {
   await requireAdminSession();
   await prisma.hospitalIntegration.update({ where: { clinicId }, data: { skipWeekendReminders } });
+  revalidatePath("/admin/clinicas");
+  return { success: true as const };
+}
+
+/** 2º lembrete no dia da consulta, X horas antes, só para quem não respondeu ao D-1
+ * (second-reminder.ts). null = desligado. */
+export async function setSecondReminderHours(clinicId: string, hours: number | null) {
+  await requireAdminSession();
+  if (hours !== null && (!Number.isInteger(hours) || hours < 1 || hours > 6)) {
+    throw new Error("Escolha de 1 a 6 horas antes, ou desligado.");
+  }
+  await prisma.hospitalIntegration.update({ where: { clinicId }, data: { secondReminderHours: hours } });
   revalidatePath("/admin/clinicas");
   return { success: true as const };
 }

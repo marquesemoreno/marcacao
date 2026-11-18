@@ -9,6 +9,7 @@ import {
   saveHospitalIntegrationConfig,
   toggleHospitalIntegrationActive,
   toggleSkipWeekendReminders,
+  setSecondReminderHours,
   testHospitalIntegrationConnection,
 } from "@/actions/admin-hospital-integration";
 
@@ -17,6 +18,7 @@ type IntegrationState = {
   apiTokenMasked: string;
   active: boolean;
   skipWeekendReminders: boolean;
+  secondReminderHours: number | null;
   lastCheckedAt: Date | string | null;
   lastCheckOk: boolean | null;
 };
@@ -28,6 +30,7 @@ export function HospitalIntegrationModal({ clinicId, clinicName }: { clinicId: s
   const [testing, setTesting] = useState(false);
   const [toggling, setToggling] = useState(false);
   const [togglingWeekend, setTogglingWeekend] = useState(false);
+  const [savingSecond, setSavingSecond] = useState(false);
   const [integration, setIntegration] = useState<IntegrationState | null>(null);
   const [apiUrl, setApiUrl] = useState("");
   const [apiToken, setApiToken] = useState("");
@@ -118,6 +121,21 @@ export function HospitalIntegrationModal({ clinicId, clinicName }: { clinicId: s
       toast.error(error instanceof Error ? error.message : "Erro ao atualizar integração.");
     } finally {
       setTogglingWeekend(false);
+    }
+  }
+
+  async function handleSecondReminderChange(value: string) {
+    if (!integration) return;
+    const hours = value ? Number(value) : null;
+    setSavingSecond(true);
+    try {
+      await setSecondReminderHours(clinicId, hours);
+      toast.success(hours ? `2º lembrete: ${hours} h antes, só para quem não respondeu.` : "2º lembrete desligado.");
+      await loadIntegration();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Erro ao atualizar integração.");
+    } finally {
+      setSavingSecond(false);
     }
   }
 
@@ -212,6 +230,29 @@ export function HospitalIntegrationModal({ clinicId, clinicName }: { clinicId: s
                   onChange={handleToggleSkipWeekend}
                   className="w-4 h-4 shrink-0 accent-cyan-600"
                 />
+              </label>
+            )}
+
+            {integration && (
+              <label className="flex items-center justify-between gap-2 rounded-xl border border-slate-200 dark:border-slate-800 p-3">
+                <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  2º lembrete no dia
+                  <span className="block text-[11px] font-normal text-slate-500 dark:text-slate-400 mt-0.5">
+                    Só para quem não respondeu ao lembrete da véspera.
+                  </span>
+                </span>
+                <select
+                  aria-label="2º lembrete no dia"
+                  value={integration.secondReminderHours ?? ""}
+                  disabled={savingSecond}
+                  onChange={(e) => handleSecondReminderChange(e.target.value)}
+                  className="shrink-0 px-2 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100"
+                >
+                  <option value="">Desligado</option>
+                  <option value="2">2 h antes</option>
+                  <option value="3">3 h antes</option>
+                  <option value="4">4 h antes</option>
+                </select>
               </label>
             )}
 

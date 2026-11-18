@@ -350,7 +350,10 @@ model HospitalIntegration {
   skipWeekendReminders Boolean   @default(false) @map("skip_weekend_reminders")
   /// Lembretes D-1 suspensos até esta data (ex: número restrito pela Meta em 06/10/2026).
   remindersPausedUntil DateTime? @map("reminders_paused_until")
-  lastCheckedAt        DateTime? @map("last_checked_at")
+  /// 2º lembrete no dia da consulta, X horas antes, só para quem não respondeu ao D-1
+  /// (src/lib/second-reminder.ts). Null = desligado.
+  secondReminderHours  Int?      @map("second_reminder_hours")
+  lastCheckedAt       DateTime? @map("last_checked_at")
   lastCheckOk          Boolean?  @map("last_check_ok")
   createdAt            DateTime  @default(now()) @map("created_at")
   updatedAt            DateTime  @updatedAt @map("updated_at")
@@ -377,6 +380,9 @@ model BridgeReminderLog {
   phone        String?
   response     String?
   respondedAt  DateTime? @map("responded_at")
+  /// Quando saiu o 2º lembrete do dia (só para quem não respondeu ao D-1 — ver
+  /// second-reminder.ts). Null = não saiu. A resposta a ele cai no mesmo `response`.
+  secondSentAt DateTime? @map("second_sent_at")
 
   clinic Clinic @relation(fields: [clinicId], references: [id])
 

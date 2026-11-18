@@ -13,6 +13,7 @@ import { formLinkForReminder } from "@/lib/patient-form-server";
 import { isWithinReminderWindow, shouldSendReminder } from "@/lib/automated-pacing";
 import { isMarketingGapElapsed } from "@/lib/broadcast-schedule";
 import { lastAutomatedSend, marketingCampaignReady } from "@/lib/automated-pacing-server";
+import { buildSecondReminderMessage, secondReminderDue } from "@/lib/second-reminder";
 
 /** Imagem da "Lara" (mascote/atendente virtual da Urolaser, ver buildUrolaserLaraReminderMessage)
  * servida como asset estático — permanente e sem custo de Storage, ao contrário de um
@@ -252,8 +253,135 @@ export async function dispatchReminderTick(): Promise<{ sent: number }> {
       campaignReady: last.kind === "reminder" ? await marketingCampaignReady(clinic.id, now) : false,
     });
     if (!ok) continue;
+    // O 2º lembrete do dia vem primeiro: tem janela curta (X horas antes da consulta),
+    // o D-1 pode esperar alguns minutos.
+    const second = await dispatchSecondReminders({ clinicId: clinic.id, max: 1, now });
+    if (second.sent + second.failed > 0) {
+      sent += second.sent;
+      continue;
+    }
     const result = await dispatchBridgeReminders({ clinicId: clinic.id, max: 1 });
     sent += result.sent;
   }
   return { sent };
+}
+
+/** "Hoje" no fuso de Brasília: ISO (AAAA-MM-DD) e DD/MM/AAAA. */
+function todayInBrazil(now: Date): { iso: string; formatted: string } {
+  const iso = new Date(now.getTime() - 3 * 3_600_000).toISOString().slice(0, 10);
+  return { iso, formatted: formatIsoDateToBr(iso) };
+}
+
+/** 2º lembrete no dia da consulta, só para quem não respondeu ao D-1 (second-reminder.ts).
+ * Só clínicas com HospitalIntegration.secondReminderHours preenchido. Vai para o MESMO
+ * telefone que recebeu o D-1 (já é o do responsável, no caso de menor). Uma tentativa por
+ * agendamento: marca secondSentAt antes de enviar (dois crons ao mesmo tempo não duplicam)
+ * e não tenta de novo se falhar — a recepção vê "Falha ao enviar" no Chat. */
+export async function dispatchSecondReminders(options: { clinicId: string; max?: number; now?: Date }) {
+  const now = options.now ?? new Date();
+  let sent = 0;
+  let failed = 0;
+  const clinic = await prisma.clinic.findFirst({
+    where: {
+      id: options.clinicId,
+      hospitalIntegration: {
+        active: true,
+        secondReminderHours: { gt: 0 },
+        OR: [{ remindersPausedUntil: null }, { remindersPausedUntil: { lt: now } }],
+      },
+    },
+    select: { id: true, tradeName: true, name: true, hospitalIntegration: { select: { secondReminderHours: true } } },
+  });
+  if (!clinic) return { sent, failed };
+  const hoursBefore = clinic.hospitalIntegration?.secondReminderHours ?? null;
+  const today = todayInBrazil(now);
+
+  const pendingLogs = await prisma.bridgeReminderLog.findMany({
+    where: { clinicId: clinic.id, response: null, secondSentAt: null, phone: { not: null }, sentAt: { gte: new Date(now.getTime() - 4 * 86_400_000) } },
+    select: { id: true, bridgeNumero: true, phone: true },
+  });
+  if (pendingLogs.length === 0) return { sent, failed };
+  const logByNumero = new Map(pendingLogs.map((l) => [l.bridgeNumero, l]));
+
+  const agenda = await fetchBridgeDailyAgenda(clinic.id, today.iso);
+  const clinicName = clinic.tradeName || clinic.name;
+  for (const item of agenda) {
+    if (options.max !== undefined && sent + failed >= options.max) break;
+    const log = logByNumero.get(item.numero);
+    if (!log?.phone) continue;
+    if (
+      !secondReminderDue({
+        now,
+        appointmentDateIso: today.iso,
+        appointmentTime: item.hora,
+        hoursBefore,
+        d1Response: null,
+        secondSentAt: null,
+      })
+    ) {
+      continue;
+    }
+    const phone = log.phone;
+    const conversation = await prisma.conversation.findFirst({
+      where: { clinicId: clinic.id, contact: { phone } },
+      select: { id: true, tags: true },
+    });
+    if (conversation?.tags.includes(WRONG_NUMBER_TAG)) continue;
+
+    // Reserva antes de enviar: se outro cron já pegou este agendamento, count = 0.
+    const claimed = await prisma.bridgeReminderLog.updateMany({
+      where: { id: log.id, secondSentAt: null, response: null },
+      data: { secondSentAt: now },
+    });
+    if (claimed.count === 0) continue;
+
+    const patientPhone = formatToWhatsAppNumber(item.telefone);
+    const profile =
+      patientPhone !== phone
+        ? await prisma.contactClinicProfile.findFirst({
+            where: { clinicId: clinic.id, contact: { phone: patientPhone } },
+            select: { birthDate: true, guardianName: true, guardianPhone: true },
+          })
+        : null;
+    const recipient = profile
+      ? reminderRecipient({ patientPhone, birthDate: profile.birthDate, guardianName: profile.guardianName, guardianPhone: profile.guardianPhone })
+      : null;
+    const patientName = item.paciente || "Paciente";
+    const time = item.hora ?? "";
+    const messageText = buildSecondReminderMessage({
+      patientName,
+      clinicName,
+      time,
+      guardianFirstName: recipient?.toGuardian ? recipient.guardianFirstName ?? "tudo bem" : null,
+    });
+
+    const cloudSetup = await cloudReminderSetup(clinic.id);
+    if (cloudSetup === "missing") {
+      // Conta oficial sem modelo: devolve a reserva (não consome o paciente).
+      await prisma.bridgeReminderLog.update({ where: { id: log.id }, data: { secondSentAt: null } });
+      continue;
+    }
+    const result = cloudSetup
+      ? await cloudSendTemplate(
+          cloudSetup.account,
+          phone,
+          {
+            name: cloudSetup.name,
+            language: cloudSetup.language,
+            bodyParams: reminderTemplateParams({ patientName, dateFormatted: today.formatted, time, doctorName: item.medico }),
+          },
+          "appointment.bridge_reminder_same_day"
+        )
+      : await sendWhatsAppMessage(phone, messageText, "appointment.bridge_reminder_same_day", clinic.id);
+
+    if (conversation) {
+      await prisma.message.create({
+        data: { conversationId: conversation.id, direction: "OUTBOUND", type: "TEXT", content: messageText, status: result.success ? "SENT" : "FAILED" },
+      });
+      await prisma.conversation.update({ where: { id: conversation.id }, data: { lastMessageAt: new Date(), status: "OPEN" } });
+    }
+    if (result.success) sent++;
+    else failed++;
+  }
+  return { sent, failed };
 }
