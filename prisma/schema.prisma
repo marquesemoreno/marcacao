@@ -1099,6 +1099,8 @@ model TagAutomation {
   cloudTemplateBody     String?  @map("cloud_template_body")
   cloudTemplateParams   String[] @default([]) @map("cloud_template_params")
   active                Boolean  @default(false)
+  /// Modelo pronto de onde veio (AutomationTemplateKey em clinic-automation-templates.ts).
+  templateKey           String?  @map("template_key")
   createdAt             DateTime @default(now()) @map("created_at")
   updatedAt             DateTime @updatedAt @map("updated_at")
 

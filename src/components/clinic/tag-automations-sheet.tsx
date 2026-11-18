@@ -1,11 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useId, useState } from "react";
-import { Loader2, Pencil, Plus, Trash2 } from "lucide-react";
+import { Copy, LayoutTemplate, Loader2, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { getAutomationCloudSetup } from "@/actions/automation-rules";
-import { deleteTagAutomation, listTagAutomations, saveTagAutomation, type TagAutomationView } from "@/actions/tag-automations";
+import { deleteTagAutomation, installAutomationTemplate, listTagAutomations, saveTagAutomation, type TagAutomationView } from "@/actions/tag-automations";
+import { AUTOMATION_TEMPLATES, templateSuggestions, type AutomationTemplateKey, type TemplateSuggestion } from "@/lib/clinic-automation-templates";
 import type { ClinicCloudTemplate } from "@/actions/clinic-broadcast";
 import { renderTemplatePreview, templateLabel } from "@/lib/broadcast-cloud-template";
 import { isServiceTemplate } from "@/lib/campaign-kind";
@@ -88,7 +89,22 @@ const ACTION_OPTIONS: [TagAutomationAction, string, string][] = [
 ];
 
 /** Ação de um passo e os campos que ela pede (modelo, lembrete). */
-function StepFields({ uid, step, onChange, cloud, legend }: { uid: string; step: StepValue; onChange: (patch: Partial<StepValue>) => void; cloud: Cloud; legend: string }) {
+function StepFields({
+  uid,
+  step,
+  onChange,
+  cloud,
+  legend,
+  suggestion,
+}: {
+  uid: string;
+  step: StepValue;
+  onChange: (patch: Partial<StepValue>) => void;
+  cloud: Cloud;
+  legend: string;
+  /** Texto do modelo pronto, para pedir o modelo à Meta (some quando um modelo é escolhido). */
+  suggestion?: TemplateSuggestion | null;
+}) {
   const tpl = cloud.templates.find((t) => t.name === step.cloudTemplateName);
   return (
     <>
@@ -146,6 +162,7 @@ function StepFields({ uid, step, onChange, cloud, legend }: { uid: string; step:
               ))}
             </select>
           </div>
+          {!step.cloudTemplateName && suggestion && <SuggestionBox suggestion={suggestion} />}
           {tpl &&
             Array.from({ length: tpl.variableCount }, (_, i) => (
               <label key={i} className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
@@ -176,6 +193,30 @@ function StepFields({ uid, step, onChange, cloud, legend }: { uid: string; step:
   );
 }
 
+/** Texto sugerido do modelo pronto: a clínica pede à Meta (pelo suporte) e depois escolhe acima. */
+function SuggestionBox({ suggestion }: { suggestion: TemplateSuggestion }) {
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(suggestion.body);
+      toast.success("Texto copiado.");
+    } catch {
+      toast.error("Não foi possível copiar. Selecione o texto e copie.");
+    }
+  }
+  return (
+    <div className="rounded-lg border border-dashed border-emerald-300 dark:border-emerald-800 p-3 text-sm text-slate-700 dark:text-slate-300">
+      <p className="text-xs font-medium text-slate-600 dark:text-slate-400">
+        Texto sugerido para o modelo da Meta ({suggestion.category === "UTILITY" ? "Utilidade" : "Marketing"}, nome {suggestion.name}). {"{{1}}"} é o primeiro nome
+        do paciente. Peça o cadastro ao suporte e, quando a Meta aprovar, escolha o modelo acima.
+      </p>
+      <p className="mt-2 whitespace-pre-wrap">{suggestion.body}</p>
+      <button type="button" onClick={copy} className={`${secondaryBtn} mt-2`}>
+        <Copy className="h-4 w-4" aria-hidden /> Copiar texto
+      </button>
+    </div>
+  );
+}
+
 const NEW_STEP: ExtraStepInput = { delayHours: 72, action: "REMINDER", reminderText: "", cloudTemplateName: null, cloudTemplateParams: [] };
 const FOLLOWING_DELAYS = DELAY_OPTIONS.filter((o) => o.hours > 0);
 
@@ -185,9 +226,12 @@ function Editor({
   cloud,
   tags,
   onDone,
+  suggestions = [],
 }: {
   initial: TagAutomationInput;
   id?: string;
+  /** Textos do modelo pronto, um por passo (ver templateSuggestions). */
+  suggestions?: (TemplateSuggestion | null)[];
   cloud: Cloud;
   tags: string[];
   onDone: (saved: boolean) => void;
@@ -337,7 +381,7 @@ function Editor({
         </label>
       </fieldset>
 
-      <StepFields uid={`${uid}-s0`} step={form} onChange={(patch) => setForm((f) => ({ ...f, ...patch }))} cloud={cloud} legend="E então" />
+      <StepFields uid={`${uid}-s0`} step={form} onChange={(patch) => setForm((f) => ({ ...f, ...patch }))} cloud={cloud} legend="E então" suggestion={suggestions[0]} />
 
       {form.extraSteps.map((step, i) => (
         <div key={i} className="space-y-3 rounded-lg border border-slate-200 dark:border-slate-700 p-3">
@@ -363,7 +407,7 @@ function Editor({
               ))}
             </select>
           </div>
-          <StepFields uid={`${uid}-s${i + 1}`} step={step} onChange={(patch) => setExtra(i, patch)} cloud={cloud} legend="E então" />
+          <StepFields uid={`${uid}-s${i + 1}`} step={step} onChange={(patch) => setExtra(i, patch)} cloud={cloud} legend="E então" suggestion={suggestions[i + 1]} />
         </div>
       ))}
 
@@ -613,10 +657,19 @@ export function TagAutomationsSheet({ open, onOpenChange }: { open: boolean; onO
               )}
               {data.automations.map((a) =>
                 editing === a.id ? (
-                  <Editor key={a.id} id={a.id} initial={toInput(a)} cloud={cloud} tags={data.tags} onDone={done} />
+                  <Editor key={a.id} id={a.id} initial={toInput(a)} cloud={cloud} tags={data.tags} onDone={done} suggestions={templateSuggestions(a.templateKey)} />
                 ) : (
                   <Card key={a.id} automation={a} onEdit={() => setEditing(a.id)} onChanged={load} />
                 ),
+              )}
+              {editing === null && (
+                <TemplatePicker
+                  installed={data.automations.map((a) => a.templateKey)}
+                  onInstalled={(id) => {
+                    load();
+                    setEditing(id);
+                  }}
+                />
               )}
               {editing === "new" ? (
                 <Editor initial={EMPTY} cloud={cloud} tags={data.tags} onDone={done} />
@@ -630,5 +683,52 @@ export function TagAutomationsSheet({ open, onOpenChange }: { open: boolean; onO
         </div>
       </SheetContent>
     </Sheet>
+  );
+}
+
+/** "Começar de um modelo": os modelos prontos que a clínica ainda não instalou. */
+function TemplatePicker({ installed, onInstalled }: { installed: (string | null)[]; onInstalled: (id: string) => void }) {
+  const [busy, setBusy] = useState<AutomationTemplateKey | null>(null);
+  const available = AUTOMATION_TEMPLATES.filter((t) => !installed.includes(t.key));
+  if (available.length === 0) return null;
+
+  async function install(key: AutomationTemplateKey) {
+    setBusy(key);
+    try {
+      const r = await installAutomationTemplate(key);
+      if (r.success) {
+        toast.success("Modelo criado desligado. Escolha os modelos da Meta e ligue quando estiver pronto.");
+        onInstalled(r.id);
+      } else toast.error(r.error);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Não foi possível criar.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <section aria-labelledby="automation-templates-title" className="space-y-2">
+      <h3 id="automation-templates-title" className="flex items-center gap-1.5 text-sm font-semibold text-slate-900 dark:text-slate-100">
+        <LayoutTemplate className="h-4 w-4 text-emerald-700 dark:text-emerald-400" aria-hidden /> Começar de um modelo
+      </h3>
+      <p className="text-xs text-slate-600 dark:text-slate-400">
+        Nasce desligado: nada vai para o paciente até você escolher os modelos da Meta e ligar. Os textos não citam doença, exame nem procedimento, e qualquer
+        resposta do paciente para a sequência.
+      </p>
+      <ul className="grid gap-2">
+        {available.map((t) => (
+          <li key={t.key} className="flex items-start justify-between gap-3 rounded-lg border border-slate-200 dark:border-slate-700 p-3">
+            <span className="min-w-0 text-sm">
+              <span className="block font-semibold text-slate-900 dark:text-slate-100">{t.title}</span>
+              <span className="block text-xs text-slate-600 dark:text-slate-400">{t.description}</span>
+            </span>
+            <button type="button" onClick={() => install(t.key)} disabled={busy !== null} className={`${secondaryBtn} shrink-0`}>
+              {busy === t.key ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Plus className="h-4 w-4" aria-hidden />} Usar
+            </button>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }

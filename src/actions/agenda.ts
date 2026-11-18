@@ -13,7 +13,9 @@ import { todayInBahia } from "@/lib/agenda-ui";
 import { loadAgenda, type AgendaResult } from "@/lib/agenda-server";
 import { agendaTopicFor, notifyAgenda } from "@/lib/realtime-server";
 import { recordAudit } from "@/lib/audit-server";
-import { toggleNinthDigit } from "@/lib/whatsapp";
+import { formatToWhatsAppNumber, toggleNinthDigit } from "@/lib/whatsapp";
+import { missedTagUpdate } from "@/lib/clinic-automation-templates";
+import { errorSummary } from "@/lib/safe-error";
 import {
   MANUAL_AGENDA_STATUSES,
   type AgendaItem,
@@ -75,6 +77,11 @@ async function applyAgendaStatus(
       before: before ? { status: before.status } : null,
       after: to ? { status: to } : null,
     });
+  // Marcou ou desfez "Faltou": a tag da conversa acompanha (dispara o modelo "Paciente faltou").
+  if (input.status === "NO_SHOW" || before?.status === "NO_SHOW") {
+    const status = input.status;
+    after(() => syncMissedTag(clinicId, input.phone ?? null, status));
+  }
   if (input.status === "AUTO") {
     await prisma.agendaMark.deleteMany({ where: { clinicId, source: input.source, externalId: input.externalId } });
     await audit(null);
@@ -99,6 +106,26 @@ async function applyAgendaStatus(
   }
   revalidatePath("/clinic/agenda");
   return { success: true };
+}
+
+/** Põe ou tira a tag de falta na conversa de WhatsApp mais recente do paciente nesta clínica.
+ * Nunca derruba a mudança de status. */
+async function syncMissedTag(clinicId: string, phone: string | null, status: string) {
+  try {
+    if (!phone || phone.replace(/D/g, "").length < 10) return;
+    const full = formatToWhatsAppNumber(phone);
+    const phones = [full, toggleNinthDigit(full)].filter((p): p is string => !!p);
+    const conversation = await prisma.conversation.findFirst({
+      where: { clinicId, channel: "WHATSAPP", contact: { phone: { in: phones } } },
+      orderBy: { lastMessageAt: "desc" },
+      select: { id: true, tags: true },
+    });
+    if (!conversation) return;
+    const tags = missedTagUpdate(conversation.tags, status);
+    if (tags) await prisma.conversation.update({ where: { id: conversation.id }, data: { tags } });
+  } catch (error) {
+    console.error("Falha ao atualizar a tag de falta:", errorSummary(error));
+  }
 }
 
 /** Tópico do aviso "a Agenda mudou" desta clínica (Realtime). */

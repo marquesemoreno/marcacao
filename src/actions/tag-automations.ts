@@ -22,6 +22,7 @@ import {
 } from "@/lib/tag-automations";
 import { resetBaseline } from "@/lib/tag-automations-run";
 import { WRONG_NUMBER_TAG } from "@/lib/conversation-tags";
+import { AUTOMATION_TEMPLATES, isAutomationTemplateKey, templateInput, type AutomationTemplateKey } from "@/lib/clinic-automation-templates";
 
 export type TagAutomationView = {
   id: string;
@@ -40,6 +41,8 @@ export type TagAutomationView = {
   cloudTemplateParams: string[];
   extraSteps: ExtraStepInput[];
   active: boolean;
+  /** Modelo pronto de onde veio (mostra os textos sugeridos para pedir à Meta). */
+  templateKey: string | null;
   /** Conversas com a tag esperando a hora de disparar. */
   pending: number;
   /** Conversas que viraram campanha ou lembrete nos últimos 30 dias. */
@@ -83,6 +86,7 @@ export async function listTagAutomations(): Promise<{ automations: TagAutomation
           cloudTemplateParams: x.cloudTemplateParams,
         })),
         active: r.active,
+        templateKey: r.templateKey,
         pending,
         done30d,
       };
@@ -189,4 +193,45 @@ export async function deleteTagAutomation(id: string) {
   if (count === 0) return { success: false as const, error: "Automação não encontrada." };
   revalidatePath("/clinic/disparos");
   return { success: true as const };
+}
+
+/** "Começar de um modelo": cria a automação DESLIGADA e em revisão. Nada vai para o paciente
+ * até a gestão escolher os modelos aprovados pela Meta e ligar. */
+export async function installAutomationTemplate(key: AutomationTemplateKey) {
+  const { clinicId } = await requireClinicPermission("disparos");
+  if (!isAutomationTemplateKey(key)) return { success: false as const, error: "Modelo desconhecido." };
+  const title = AUTOMATION_TEMPLATES.find((t) => t.key === key)!.title;
+  if (await prisma.tagAutomation.findFirst({ where: { clinicId, templateKey: key }, select: { id: true } })) {
+    return { success: false as const, error: `O modelo “${title}” já está na lista de automações.` };
+  }
+  if ((await prisma.tagAutomation.count({ where: { clinicId } })) >= MAX_TAG_AUTOMATIONS) {
+    return { success: false as const, error: `O limite é de ${MAX_TAG_AUTOMATIONS} automações por clínica.` };
+  }
+  const input = templateInput(key);
+  const invalid = validateTagAutomation(input);
+  if (invalid) return { success: false as const, error: invalid };
+  const extraSteps: StoredStep[] = input.extraSteps.map((s) => ({ ...s, cloudTemplateLanguage: null, cloudTemplateBody: null }));
+  const saved = await prisma.tagAutomation.create({
+    data: {
+      clinicId,
+      templateKey: key,
+      name: input.name,
+      triggerKind: input.triggerKind,
+      tag: input.tag,
+      stage: input.stage,
+      delayHours: input.delayHours,
+      waitFrom: input.waitFrom,
+      stopOnReply: input.stopOnReply,
+      serviceNotice: input.serviceNotice,
+      action: input.action,
+      mode: input.mode,
+      reminderText: input.action === "REMINDER" ? input.reminderText : null,
+      cloudTemplateName: null,
+      cloudTemplateParams: [],
+      extraSteps,
+      active: false,
+    },
+  });
+  revalidatePath("/clinic/disparos");
+  return { success: true as const, id: saved.id };
 }

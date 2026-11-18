@@ -12,7 +12,7 @@ vi.mock("@/actions/automation-rules", () => ({ getAutomationCloudSetup: mocks.ge
 vi.mock("@/lib/tag-automations-run", () => ({ resetBaseline: mocks.resetBaseline }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 
-import { deleteTagAutomation, saveTagAutomation } from "./tag-automations";
+import { deleteTagAutomation, installAutomationTemplate, saveTagAutomation } from "./tag-automations";
 import type { TagAutomationInput } from "@/lib/tag-automations";
 
 const input: TagAutomationInput = {
@@ -169,5 +169,39 @@ describe("deleteTagAutomation", () => {
     db.tagAutomation.deleteMany.mockResolvedValue({ count: 0 });
     expect(await deleteTagAutomation("de-outra")).toEqual({ success: false, error: "Automação não encontrada." });
     expect(db.tagAutomation.deleteMany).toHaveBeenCalledWith({ where: { id: "de-outra", clinicId: "clinic-a" } });
+  });
+});
+
+describe("installAutomationTemplate", () => {
+  it("cria o modelo desligado, em revisão, na clínica da sessão, guardando de qual modelo veio", async () => {
+    db.tagAutomation.findFirst.mockResolvedValue(null);
+    const r = await installAutomationTemplate("FALTOU");
+    expect(mocks.requireClinicPermission).toHaveBeenCalledWith("disparos");
+    const data = db.tagAutomation.create.mock.calls[0][0].data;
+    expect(data).toMatchObject({ clinicId: "clinic-a", templateKey: "FALTOU", active: false, mode: "REVIEW", stopOnReply: true, cloudTemplateName: null });
+    expect(data.extraSteps.length).toBeGreaterThan(0);
+    // Desligado: ninguém entra como BASELINE agora (isso acontece ao ligar).
+    expect(mocks.resetBaseline).not.toHaveBeenCalled();
+    expect(r).toEqual({ success: true, id: "a1" });
+  });
+
+  it("não instala duas vezes o mesmo modelo na clínica", async () => {
+    db.tagAutomation.findFirst.mockResolvedValue({ id: "ja" });
+    const r = await installAutomationTemplate("FALTOU");
+    expect(db.tagAutomation.findFirst).toHaveBeenCalledWith({ where: { clinicId: "clinic-a", templateKey: "FALTOU" }, select: { id: true } });
+    expect(r.success).toBe(false);
+    expect(db.tagAutomation.create).not.toHaveBeenCalled();
+  });
+
+  it("recusa modelo desconhecido", async () => {
+    const r = await installAutomationTemplate("QUALQUER" as never);
+    expect(r.success).toBe(false);
+    expect(db.tagAutomation.create).not.toHaveBeenCalled();
+  });
+
+  it("respeita o limite de automações por clínica", async () => {
+    db.tagAutomation.findFirst.mockResolvedValue(null);
+    db.tagAutomation.count.mockResolvedValue(30);
+    expect((await installAutomationTemplate("FALTOU")).success).toBe(false);
   });
 });
