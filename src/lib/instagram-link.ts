@@ -15,6 +15,21 @@ export function instagramRedirectUri(origin?: string): string {
   return `${origin || getBaseUrl()}/api/instagram/callback`;
 }
 
+/** Foto e nome atuais da conta conectada (GET /me). O link da foto da Meta expira, por isso é
+ * buscado na hora em que a tela abre, e não guardado. null se a Meta não responder. */
+export async function fetchInstagramProfile(clinicId: string): Promise<{ name: string | null; pictureUrl: string | null } | null> {
+  const account = await prisma.instagramAccount.findUnique({ where: { clinicId }, select: { accessToken: true } });
+  if (!account) return null;
+  const res = await fetch(`${GRAPH_BASE}/me?fields=name,username,profile_picture_url`, {
+    headers: { Authorization: `Bearer ${decryptToken(account.accessToken)}` },
+    signal: AbortSignal.timeout(5000),
+    cache: "no-store",
+  }).catch(() => null);
+  const me = (await res?.json().catch(() => null)) as { name?: string; profile_picture_url?: string } | null;
+  if (!res?.ok || !me) return null;
+  return { name: me.name ?? null, pictureUrl: me.profile_picture_url?.startsWith("https://") ? me.profile_picture_url : null };
+}
+
 /** Troca o código do login pelo token de longa duração (60 dias; o cron renova). `redirectUri`
  * tem que ser o mesmo usado na autorização. */
 export async function exchangeInstagramCode(code: string, redirectUri: string): Promise<{ accessToken: string; expiresAt: Date | null; permissions: string[] }> {

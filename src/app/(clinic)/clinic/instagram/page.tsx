@@ -5,6 +5,7 @@ import { getClinicSessionOrNull } from "@/lib/session";
 import { ManagerOnly, currentUserIsManager } from "@/components/clinic/manager-only";
 import { InstagramActiveToggle } from "@/components/clinic/instagram-active-toggle";
 import { langFrom, type Lang } from "@/lib/i18n-review";
+import { fetchInstagramProfile } from "@/lib/instagram-link";
 
 export const metadata = { title: "Instagram" };
 export const dynamic = "force-dynamic";
@@ -54,6 +55,7 @@ export default async function ClinicInstagramPage({ searchParams }: { searchPara
   const account = session
     ? await prisma.instagramAccount.findUnique({ where: { clinicId: session.clinicId }, select: { username: true, active: true, tokenExpiresAt: true } })
     : null;
+  const profile = account && session ? await fetchInstagramProfile(session.clinicId) : null;
 
   const banner =
     params.ig === "ok"
@@ -97,12 +99,19 @@ export default async function ClinicInstagramPage({ searchParams }: { searchPara
           {account ? (
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-3">
-                <span className="grid h-11 w-11 place-items-center rounded-2xl bg-pink-600/10 text-pink-700 dark:bg-pink-400/10 dark:text-pink-300">
-                  <Camera className="h-5 w-5" aria-hidden />
-                </span>
+                {profile?.pictureUrl ? (
+                  // Link assinado da Meta (expira): <img> simples, sem otimização do Next.
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={profile.pictureUrl} alt="" referrerPolicy="no-referrer" className="h-12 w-12 rounded-full object-cover ring-2 ring-pink-500/40" />
+                ) : (
+                  <span className="grid h-12 w-12 place-items-center rounded-full bg-pink-600/10 text-pink-700 dark:bg-pink-400/10 dark:text-pink-300">
+                    <Camera className="h-5 w-5" aria-hidden />
+                  </span>
+                )}
                 <div>
                   <p className="text-xs text-slate-600 dark:text-slate-400">{tt(lang, "account")}</p>
                   <p className="text-base font-semibold text-slate-900 dark:text-slate-100">@{account.username ?? "—"}</p>
+                  {profile?.name && <p className="text-xs text-slate-600 dark:text-slate-400">{profile.name}</p>}
                 </div>
                 <span
                   className={`rounded-full px-2.5 py-1 text-xs font-medium ${
