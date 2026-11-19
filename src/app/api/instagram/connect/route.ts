@@ -26,7 +26,7 @@ export async function GET(request: Request) {
 
   const nonce = randomBytes(16).toString("base64url");
   const state = signOAuthState({ clinicId: session.clinicId, userId: session.userId, nonce, issuedAt: Date.now() }, secret);
-  const res = NextResponse.redirect(buildInstagramAuthorizeUrl({ appId, redirectUri: instagramRedirectUri(), state }));
+  const res = NextResponse.redirect(buildInstagramAuthorizeUrl({ appId, redirectUri: instagramRedirectUri(new URL(request.url).origin), state }));
   res.cookies.set(OAUTH_NONCE_COOKIE, nonce, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",

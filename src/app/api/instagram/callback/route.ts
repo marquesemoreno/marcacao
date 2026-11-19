@@ -3,7 +3,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { getClinicSessionOrNull, isClinicManager } from "@/lib/session";
 import { cleanAuthCode, INSTAGRAM_SCOPES, OAUTH_NONCE_COOKIE, verifyOAuthState } from "@/lib/instagram-oauth";
-import { exchangeInstagramCode, linkInstagramAccount } from "@/lib/instagram-link";
+import { exchangeInstagramCode, instagramRedirectUri, linkInstagramAccount } from "@/lib/instagram-link";
 import { errorSummary } from "@/lib/safe-error";
 
 export const dynamic = "force-dynamic";
@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
   if (!code) return back("ig=erro&motivo=codigo");
 
   try {
-    const token = await exchangeInstagramCode(code);
+    const token = await exchangeInstagramCode(code, instagramRedirectUri(request.nextUrl.origin));
     const missing = INSTAGRAM_SCOPES.filter((s) => !token.permissions.includes(s));
     if (token.permissions.length && missing.length) return back("ig=erro&motivo=permissoes");
     await linkInstagramAccount(state.clinicId, token.accessToken, token.expiresAt);

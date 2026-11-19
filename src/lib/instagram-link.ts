@@ -6,19 +6,23 @@ import { parseShortTokenResponse } from "@/lib/instagram-oauth";
 
 const GRAPH_BASE = "https://graph.instagram.com/v23.0";
 
-/** Endereço de volta do login do Instagram — tem que ser idêntico ao cadastrado no painel da Meta
- * (Instagram › API com login do Instagram › Configurar login comercial). */
-export function instagramRedirectUri(): string {
-  return process.env.INSTAGRAM_REDIRECT_URI || `${getBaseUrl()}/api/instagram/callback`;
+/** Endereço de volta do login do Instagram — tem que ser idêntico a um dos cadastrados no painel
+ * da Meta (Instagram › API com login do Instagram › Configurar login comercial). Usa o mesmo
+ * domínio em que a pessoa está (com ou sem www): a sessão do painel e o cookie do nonce não
+ * passam de um domínio para o outro. */
+export function instagramRedirectUri(origin?: string): string {
+  if (process.env.INSTAGRAM_REDIRECT_URI) return process.env.INSTAGRAM_REDIRECT_URI;
+  return `${origin || getBaseUrl()}/api/instagram/callback`;
 }
 
-/** Troca o código do login pelo token de longa duração (60 dias; o cron renova). */
-export async function exchangeInstagramCode(code: string): Promise<{ accessToken: string; expiresAt: Date | null; permissions: string[] }> {
+/** Troca o código do login pelo token de longa duração (60 dias; o cron renova). `redirectUri`
+ * tem que ser o mesmo usado na autorização. */
+export async function exchangeInstagramCode(code: string, redirectUri: string): Promise<{ accessToken: string; expiresAt: Date | null; permissions: string[] }> {
   const appId = process.env.INSTAGRAM_APP_ID;
   const secret = process.env.INSTAGRAM_APP_SECRET;
   if (!appId || !secret) throw new Error("Login do Instagram não configurado (INSTAGRAM_APP_ID / INSTAGRAM_APP_SECRET).");
 
-  const form = new URLSearchParams({ client_id: appId, client_secret: secret, grant_type: "authorization_code", redirect_uri: instagramRedirectUri(), code });
+  const form = new URLSearchParams({ client_id: appId, client_secret: secret, grant_type: "authorization_code", redirect_uri: redirectUri, code });
   const shortRes = await fetch("https://api.instagram.com/oauth/access_token", { method: "POST", body: form, signal: AbortSignal.timeout(10000) }).catch(() => null);
   const shortJson = (await shortRes?.json().catch(() => null)) as { error_message?: string } | null;
   const short = parseShortTokenResponse(shortJson);
