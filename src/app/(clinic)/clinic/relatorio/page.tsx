@@ -44,6 +44,7 @@ import { BillingTab } from "@/components/clinic/bi/billing-tab";
 import { FinanceTab } from "@/components/clinic/bi/finance-tab";
 import { StockTab } from "@/components/clinic/bi/stock-tab";
 import { MarcadoresTab } from "@/components/clinic/bi/marcadores-tab";
+import { OccupancyTab, parseOccupancyPeriod } from "@/components/clinic/bi/occupancy-tab";
 import { ReguaReturnCard } from "@/components/clinic/regua-return-card";
 import { getReguaReturnReport } from "@/actions/regua-return";
 import { SlotRecoveryCard } from "@/components/clinic/slot-recovery-card";
@@ -180,6 +181,19 @@ export default async function ClinicReportPage({
         <ReportTabs active="marcadores" isManager={isManager} />
         <Suspense key={`marcadores-${params.periodo ?? params.days ?? ""}`} fallback={<p className="text-sm text-slate-500">Carregando…</p>}>
           <MarcadoresTab periodo={params.periodo} days={params.days} />
+        </Suspense>
+      </ReportCanvas>
+    );
+  }
+  if (params.aba === "ocupacao") {
+    if (!isManager) return <ManagerOnly />;
+    const occPeriod = parseOccupancyPeriod(params.periodo);
+    return (
+      <ReportCanvas gap="space-y-6">
+        <PageHeader title="Relatórios" subtitle="Ocupação dos consultórios e salas, pela agenda. Só a gestão vê esta aba." />
+        <ReportTabs active="ocupacao" isManager />
+        <Suspense key={`ocupacao-${occPeriod}`} fallback={<p className="text-sm text-slate-500">Lendo a agenda…</p>}>
+          <OccupancyTab period={occPeriod} />
         </Suspense>
       </ReportCanvas>
     );

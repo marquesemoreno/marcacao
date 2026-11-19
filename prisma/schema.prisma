@@ -1721,6 +1721,26 @@ model DoctorRoom {
   @@map("doctor_rooms")
 }
 
+/// Consultório ou sala de exames para o Relatório › Ocupação (src/lib/room-occupancy.ts).
+/// A clínica não tem grade de horário no sistema dela: horário e duração padrão ficam aqui.
+model ClinicRoom {
+  id                String   @id @default(cuid())
+  clinicId          String   @map("clinic_id")
+  name              String
+  /// "CONSULTORIO" | "PROCEDIMENTO"
+  kind              String   @default("CONSULTORIO")
+  /// [{weekday 0–6, start "HH:MM", end "HH:MM"}]
+  hours             Json     @default("[]")
+  /// Sala de procedimento: marcações cujo procedimento contém uma destas palavras vêm para cá.
+  procedureKeywords String[] @default([]) @map("procedure_keywords")
+  slotMinutes       Int      @default(10) @map("slot_minutes")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  @@index([clinicId])
+  @@map("clinic_rooms")
+}
+
 /// Chamadas feitas (histórico do rodapé da TV). Só nome curto/falado, sem telefone;
 /// apagadas depois de 24 h.
 model PatientCall {

@@ -6,6 +6,7 @@ const TABS = [
   { key: "faturamento", label: "Faturamento", href: "/clinic/relatorio?aba=faturamento", managerOnly: true },
   { key: "financeiro", label: "Financeiro", href: "/clinic/relatorio?aba=financeiro", managerOnly: true },
   { key: "estoque", label: "Estoque", href: "/clinic/relatorio?aba=estoque", managerOnly: true },
+  { key: "ocupacao", label: "Ocupação", href: "/clinic/relatorio?aba=ocupacao", managerOnly: true },
 ] as const;
 
 /** Abas do Relatório. Faturamento, Financeiro e Estoque (e as próximas do BI) só aparecem para a gestão. */
