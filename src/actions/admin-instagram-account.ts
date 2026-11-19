@@ -2,10 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { decryptToken, encryptToken } from "@/lib/token-crypto";
+import { decryptToken } from "@/lib/token-crypto";
 import { requireAdminSession } from "@/lib/session";
-
-const GRAPH_BASE = "https://graph.instagram.com/v23.0";
+import { linkInstagramAccount } from "@/lib/instagram-link";
 
 /** Conta de Instagram da clínica (ou null) — token sempre mascarado pro client. */
 export async function getInstagramAccount(clinicId: string) {
@@ -31,44 +30,10 @@ export async function saveInstagramAccount(clinicId: string, input: { accessToke
   const accessToken = input.accessToken.trim() || previous;
   if (!accessToken) throw new Error("Cole o token de acesso da conta do Instagram.");
 
-  const meRes = await fetch(`${GRAPH_BASE}/me?fields=user_id,username`, {
-    headers: { Authorization: `Bearer ${accessToken}` },
-    signal: AbortSignal.timeout(10000),
-  }).catch(() => null);
-  const me = (await meRes?.json().catch(() => null)) as { user_id?: string | number; username?: string; error?: { message?: string } } | null;
-  if (!meRes?.ok || !me?.user_id) {
-    throw new Error(`Token recusado pela Meta: ${me?.error?.message ?? "sem resposta"}`);
-  }
-
-  const subRes = await fetch(`${GRAPH_BASE}/me/subscribed_apps?subscribed_fields=messages,messaging_seen`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${accessToken}` },
-    signal: AbortSignal.timeout(10000),
-  }).catch(() => null);
-  if (!subRes?.ok) {
-    const err = (await subRes?.json().catch(() => null)) as { error?: { message?: string } } | null;
-    throw new Error(`Token válido, mas a inscrição no webhook falhou: ${err?.error?.message ?? "sem resposta"}`);
-  }
-
-  const igUserId = String(me.user_id);
-  const other = await prisma.instagramAccount.findUnique({ where: { igUserId } });
-  if (other && other.clinicId !== clinicId) throw new Error("Essa conta do Instagram já está vinculada a outra clínica.");
-
-  await prisma.instagramAccount.upsert({
-    where: { clinicId },
-    // Token cifrado em repouso (auditoria 16/11/2026, M6).
-    update: {
-      accessToken: encryptToken(accessToken),
-      igUserId,
-      username: me.username ?? null,
-      active: true,
-      // Token novo colado: validade desconhecida até o cron de renovação rodar.
-      ...(accessToken !== previous ? { tokenExpiresAt: null } : {}),
-    },
-    create: { clinicId, accessToken: encryptToken(accessToken), igUserId, username: me.username ?? null },
-  });
+  // Token colado: validade desconhecida até o cron de renovação rodar.
+  const { username } = await linkInstagramAccount(clinicId, accessToken, null);
   revalidatePath("/admin/clinicas");
-  return { success: true as const, username: me.username ?? null };
+  return { success: true as const, username };
 }
 
 export async function toggleInstagramAccountActive(clinicId: string, active: boolean) {

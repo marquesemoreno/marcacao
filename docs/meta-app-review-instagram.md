@@ -20,18 +20,26 @@ Permissões a pedir (caso de uso **Instagram › API com login do Instagram**):
 - Webhook do Instagram (`/api/webhooks/instagram`) assinando o campo **messages**.
 - Teste ponta a ponta com @ti.vdc em 30/10 (receber e responder pelo Chat).
 
-## 2. O que falta antes de pedir — botão "Conectar Instagram" (código, eu faço)
+## 2. Botão "Conectar Instagram" (feito 19/11) — falta configurar (você)
 
-Hoje a conta é ligada colando um token gerado no painel da Meta (Admin › Clínicas › botão rosa). A Meta
-reprova revisão que não mostra o **login do Instagram dentro do nosso app** (foi o mesmo motivo da 1ª
-reprovação do WhatsApp), e uma clínica de verdade não consegue gerar token sem ser testadora do app.
+A Meta reprova revisão que não mostra o **login do Instagram dentro do nosso app** (mesmo motivo da 1ª
+reprovação do WhatsApp). Agora existe **Configurações › Instagram** (`/clinic/instagram`, só gestão):
+botão **Conectar Instagram** → login do Instagram → volta com a conta ligada (token de 60 dias, webhook
+assinado, renovação automática). `?lang=en` deixa a tela em inglês para a gravação. O cadastro manual do
+Admin (botão rosa) continua funcionando.
 
-Falta: botão **Conectar Instagram** em Configurações › Instagram (gestão) → tela de login/autorização do
-Instagram → volta para o painel com a conta ligada (troca o código por token de longa duração, assina o
-webhook, grava a conta da clínica). A renovação automática do token já existe.
+Para o botão funcionar:
 
-Depois disso, no painel da Meta: **Instagram › API com login do Instagram › Configurar login comercial do
-Instagram** → URL de redirecionamento `https://www.conectasaudevc.com.br/api/instagram/callback`.
+1. Painel da Meta › app Conecta Saúde › **Instagram › API com login do Instagram** › **3. Configurar o
+   login comercial do Instagram** → em **URLs de redirecionamento** colar
+   `https://www.conectasaudevc.com.br/api/instagram/callback` e salvar.
+2. Na mesma tela, copiar o **ID do app do Instagram** (é diferente do ID do app do Facebook).
+3. Vercel › Settings › Environment Variables (Production): criar **`INSTAGRAM_APP_ID`** com esse ID.
+   `INSTAGRAM_APP_SECRET` já existe. Fazer **Redeploy**.
+4. Testar: entrar como gestão da **TIVDC Tecnologia** › Configurações › Instagram › Conectar Instagram com
+   a @ti.vdc (que é testadora do app) → deve voltar com "Instagram conectado". Mandar uma DM de teste.
+
+Se der erro, a tela mostra o motivo; o detalhe técnico fica em webhook_logs (evento `instagram.oauth`).
 
 ## 3. Pedir o acesso (você faz, no painel da Meta)
 
@@ -54,7 +62,10 @@ Instagram** → URL de redirecionamento `https://www.conectasaudevc.com.br/api/i
 > (3) a Direct message sent from the native Instagram app arriving in our inbox; and (4) a reply sent from our
 > inbox delivered in the native Instagram app.
 
-## 4. Vídeo da revisão (você grava, depois do botão pronto)
+## 4. Vídeo da revisão (você grava, depois do teste da seção 2)
+
+Abrir a tela com `https://www.conectasaudevc.com.br/clinic/instagram?lang=en`. Antes de gravar, se a
+@ti.vdc já estiver conectada, tudo bem: o botão vira "Reconnect" e o fluxo é o mesmo.
 
 Mesmo jeito do vídeo do WhatsApp: tela do navegador + celular espelhado ao lado, sem áudio, legendas em inglês.
 Usar a clínica **TIVDC Tecnologia** e a conta **@ti.vdc**; o "paciente" é seu Instagram pessoal.

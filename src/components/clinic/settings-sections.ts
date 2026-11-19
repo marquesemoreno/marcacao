@@ -1,4 +1,4 @@
-import { BookOpen, ClipboardList, MonitorPlay, Repeat, ShieldCheck, SlidersHorizontal, Smartphone, type LucideIcon } from "lucide-react";
+import { BookOpen, Camera, ClipboardList, MonitorPlay, Repeat, ShieldCheck, SlidersHorizontal, Smartphone, type LucideIcon } from "lucide-react";
 import type { ClinicPermission } from "@/lib/clinic-permissions";
 
 /** Telas reunidas no hub /clinic/configuracoes (16/11/2026: saíram do menu lateral para
@@ -7,6 +7,7 @@ export type SettingsSection = { href: string; label: string; description: string
 
 export const SETTINGS_SECTIONS: SettingsSection[] = [
   { href: "/clinic/whatsapp", label: "WhatsApp", description: "Conexão do número da clínica e QR do aparelho", icon: Smartphone, perm: "config" },
+  { href: "/clinic/instagram", label: "Instagram", description: "Conectar o Instagram da clínica para responder o Direct no Chat", icon: Camera, perm: "config" },
   { href: "/clinic/precos", label: "Preços e horários", description: "Procedimentos, horário de atendimento, ticket médio, responsável técnico e links", icon: SlidersHorizontal, perm: "config" },
   { href: "/clinic/retorno", label: "Retorno", description: "Em quantos dias cada paciente deve voltar", icon: Repeat, perm: "config" },
   { href: "/clinic/ficha", label: "Ficha prévia", description: "Formulário que o paciente responde pelo celular antes da consulta", icon: ClipboardList, perm: "config" },
