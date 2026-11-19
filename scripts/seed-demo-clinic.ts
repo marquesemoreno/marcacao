@@ -24,6 +24,7 @@ import { encryptToken } from "../src/lib/token-crypto";
 import { seriesFor, ticketCode } from "../src/lib/queue-ticket";
 import { doctorKey } from "../src/lib/tv-call";
 import { DEMO_CLOUD_TEMPLATES } from "../src/lib/demo-regua";
+import { NO_CONSENT_MESSAGE } from "../src/lib/marketing-consent";
 import type { StoredStep } from "../src/lib/tag-automations";
 
 const prisma = new PrismaClient();
@@ -428,6 +429,29 @@ async function main() {
       },
     });
   }
+  // Agenda cheia das últimas 2 semanas (aba Ocupação): cada médico com 8–13 marcações por dia útil,
+  // 1 em cada 3 é exame (vai para a Sala de exames). Algumas faltas e cancelamentos.
+  const SLOTS = ["08:00", "08:30", "09:00", "09:30", "10:00", "10:30", "11:00", "11:30", "13:30", "14:00", "14:30", "15:00", "15:30", "16:00", "16:30"];
+  const busy: Prisma.AppointmentCreateManyInput[] = [];
+  for (let d = 1; d <= 14; d++) {
+    const date = dateOf(-d);
+    if (date.getUTCDay() === 0 || date.getUTCDay() === 6) continue;
+    for (let doc = 0; doc < DOCTORS.length; doc++) {
+      const n = [10, 8, 12][doc] + (d % 3) - 1;
+      for (let k = 0; k < n; k++) {
+        const idx = d * 31 + doc * 13 + k;
+        const status = idx % 11 === 4 ? "NO_SHOW" : idx % 17 === 6 ? "CANCELLED" : "COMPLETED";
+        busy.push({
+          patientName: pick(PATIENTS, idx), patientPhone: phone(idx % PATIENTS.length), patientCpf: "00000000000",
+          clinicProcedureId: procs[k % 3 === 2 ? pick([1, 3], idx) : pick([0, 2, 4], idx)].id,
+          date, timeSlot: SLOTS[(k * 2 + doc) % SLOTS.length], doctorName: DOCTORS[doc], status,
+          reminderSentAt: new Date(date.getTime() - 86_400_000), reminderStatus: status === "CANCELLED" ? "CANCELLED" : "CONFIRMED",
+          createdAt: new Date(date.getTime() - 6 * 86_400_000),
+        });
+      }
+    }
+  }
+  await prisma.appointment.createMany({ data: busy });
   // Indicados por marcador que agendaram: consulta marcada depois da indicação; os mais antigos já foram atendidos.
   for (const r of resolved.filter((x) => x.marcador && x.reason === "AGENDAMENTO_CONCLUIDO")) {
     const date = new Date(Date.UTC(r.start.getFullYear(), r.start.getMonth(), r.start.getDate() + 3));
@@ -445,6 +469,14 @@ async function main() {
 
   // ---------- Recepção: salas, senhas, chamadas na TV ----------
   for (const [i, doc] of DOCTORS.entries()) await prisma.doctorRoom.create({ data: { clinicId: clinic.id, doctorKey: doctorKey(doc), doctor: doc, room: ROOMS[i] } });
+  // Salas da aba Ocupação (Relatório): os 3 consultórios (mesmos nomes da TV) + sala de exames.
+  const weekdays = (start: string, end: string) => [1, 2, 3, 4, 5].map((weekday) => ({ weekday, start, end }));
+  await prisma.clinicRoom.createMany({
+    data: [
+      ...ROOMS.map((name) => ({ clinicId: clinic.id, name, kind: "CONSULTORIO", hours: weekdays("08:00", "17:00"), procedureKeywords: [], slotMinutes: 30 })),
+      { clinicId: clinic.id, name: "Sala de exames", kind: "PROCEDIMENTO", hours: weekdays("08:00", "17:00"), procedureKeywords: ["ultrassom", "check-up"], slotMinutes: 40 },
+    ],
+  });
   const services = await Promise.all(
     [
       { name: "Consulta", letter: "C" },
@@ -519,6 +551,59 @@ async function main() {
     await prisma.broadcastRecipient.create({
       data: { campaignId: campaign.id, phone: phone(i), variables: { nome: first(PATIENTS[i]) }, status: i === 31 ? "FAILED" : "SENT", sentAt: daysAgo(11, 9 + (i % 8), (i * 5) % 60) },
     });
+  }
+  // Campanha com sorteio entre 3 modelos (Relatório › respostas por modelo). Só quem deu
+  // consentimento recebe; os outros aparecem como "Sem consentimento". Quem respondeu ganha uma
+  // conversa resolvida a partir da mensagem da campanha.
+  const CHECKUP = ["checkup_novembro", "checkup_novembro_curto", "checkup_novembro_pergunta"].map((n) => DEMO_CLOUD_TEMPLATES.find((t) => t.name === n)!);
+  const sentAtDay = 6;
+  const checkup = await prisma.broadcastCampaign.create({
+    data: {
+      clinicId: clinic.id, name: "Check-up de novembro", status: "COMPLETED", createdByUserId: manager.id, createdAt: daysAgo(sentAtDay + 1, 16),
+      messageTemplate: CHECKUP[0].bodyText, messageVariants: CHECKUP.slice(1).map((t) => t.bodyText),
+      cloudTemplateName: CHECKUP[0].name, cloudTemplateLanguage: CHECKUP[0].language, cloudTemplateBody: CHECKUP[0].bodyText, cloudTemplateParams: ["{{nome}}"],
+      cloudTemplateVariants: CHECKUP.slice(1).map((t) => ({ name: t.name, language: t.language, body: t.bodyText })),
+    },
+  });
+  // Respostas por modelo (índice do destinatário dentro do modelo): o 2º modelo responde mais.
+  const REPLIES: Record<number, { text: string; scheduled: boolean }[]> = {
+    0: [{ text: "Quero sim, pode ser de manhã", scheduled: true }, { text: "Quanto custa?", scheduled: false }],
+    1: [{ text: "Quero agendar", scheduled: true }, { text: "Sim! Tem quinta?", scheduled: true }, { text: "Pode ser semana que vem?", scheduled: true }, { text: "Aceita Unimed?", scheduled: false }],
+    2: [{ text: "Faz uns dois anos, quero marcar", scheduled: true }],
+  };
+  const perVariant = [0, 0, 0];
+  let sentCount = 0;
+  for (let i = 0; i < PATIENTS.length; i++) {
+    const consent = i % 3 !== 2; // mesma regra do consentimento dos pacientes, acima
+    const v = consent ? sentCount++ % 3 : 0;
+    const sentAt = daysAgo(sentAtDay, 9 + (i % 8), (i * 7) % 60);
+    await prisma.broadcastRecipient.create({
+      data: consent
+        ? { campaignId: checkup.id, phone: phone(i), variables: { nome: first(PATIENTS[i]) }, status: "SENT", sentAt, variantIndex: v }
+        : { campaignId: checkup.id, phone: phone(i), variables: { nome: first(PATIENTS[i]) }, status: "SKIPPED_OPT_OUT", errorMessage: NO_CONSENT_MESSAGE },
+    });
+    if (!consent) continue;
+    const reply = REPLIES[v][perVariant[v]++];
+    if (!reply) continue;
+    const t0 = sentAt.getTime();
+    const conv = await prisma.conversation.create({
+      data: {
+        clinicId: clinic.id, contactId: contacts[i].id, status: "RESOLVED", funnelStage: reply.scheduled ? "AGENDADO" : "TRIAGEM",
+        resolutionReason: reply.scheduled ? "AGENDAMENTO_CONCLUIDO" : "DUVIDA_ESCLARECIDA", resolvedAt: new Date(t0 + minutes(90)),
+        resolvedByUserId: attendants[0].id, assignedUserId: attendants[0].id, acquisitionChannel: "Campanha", createdAt: new Date(t0), lastMessageAt: new Date(t0 + minutes(60)),
+      },
+    });
+    const body = CHECKUP[v].bodyText.replace("{{1}}", first(PATIENTS[i]));
+    const msgs: [string, string, number][] = [
+      ["OUTBOUND", body, 0],
+      ["INBOUND", reply.text, 35],
+      ["OUTBOUND", reply.scheduled ? "Perfeito! Agendei seu check-up. Você recebe o lembrete um dia antes." : "Respondi suas dúvidas por aqui; quando quiser agendar é só chamar.", 50],
+    ];
+    for (const [direction, content, after] of msgs) {
+      await prisma.message.create({
+        data: { conversationId: conv.id, direction: direction as "INBOUND" | "OUTBOUND", content, status: "READ", senderUserId: direction === "OUTBOUND" && after > 0 ? attendants[0].id : null, createdAt: new Date(t0 + minutes(after)) },
+      });
+    }
   }
   for (const step of DEFAULT_RULE_STEPS) {
     await prisma.automationRule.create({ data: { clinicId: clinic.id, kind: step.kind, name: step.name, daysAfter: step.daysAfter, requireNoFuture: step.requireNoFuture, messageTemplate: step.messageTemplate, active: false } });

@@ -1,6 +1,6 @@
 # Roteiro dos vídeos de apresentação — Conecta Saúde
 
-> Versão 1 — 09/11/2026. Para gravar com a **Clínica Vida (demo)** (`scripts/seed-demo-clinic.ts`): só dados fictícios,
+> Versão 2 — 19/11/2026 (v1 09/11). Para gravar com a **Clínica Vida (demo)** (`scripts/seed-demo-clinic.ts`): só dados fictícios,
 > telefones com DDD 00, nenhum envio sai de verdade.
 
 ## Para quem e em que ordem
@@ -16,7 +16,34 @@
 | 6 | Relatórios e BI | 3 min | dono | venda para quem decide |
 | 7 | Segurança e LGPD | 90 s | dono, jurídico | quando perguntarem "e os dados?" |
 
-Gravar nesta ordem: **0 por último** (é recorte dos outros, já com as melhores cenas).
+Gravar nesta ordem (decidido 19/11): **2 → 1 → 3 → 6 → 5 → 4 → 7 → 0** — começa pelo que mais vende (falta), vitrine
+por último (é recorte dos outros, já com as melhores cenas).
+
+## Voz (decidido 19/11: voz do Lucas clonada por IA)
+
+1. **Gravar a amostra** (texto abaixo, ~2 min) uma vez só, com calma:
+   - cômodo pequeno e "fofo" (quarto com cortina/guarda-roupa aberto), janela fechada, ventilador e ar desligados;
+   - celular a um palmo da boca, um pouco de lado (evita o "p" estourado), gravador de voz do celular em qualidade alta;
+   - voz de conversa, no mesmo ritmo que vai querer nos vídeos; pausa curta entre frases; se errar, para 2 s e repete a frase.
+2. **Criar a voz:** ElevenLabs → Voices → *Instant Voice Clone* → enviar o arquivo (precisa de plano pago; confira o
+   preço na hora). Modelo *Multilingual v2* para português.
+3. **Gerar a narração** cena por cena com o texto da coluna "Fala"; baixar em MP3 e montar no CapCut por cima da gravação de tela.
+4. Ouvir tudo antes de publicar: nomes (Conecta Saúde, Jev, Unimed) e números às vezes saem errados — corrigir escrevendo
+   por extenso ("quinze minutos").
+
+**Texto da amostra:**
+
+> Oi, eu sou o Lucas, da TIVDC. A Conecta Saúde junta o WhatsApp e o Instagram da clínica num lugar só.
+> Quando o paciente manda mensagem, a recepção vê na hora, com o histórico, o convênio e a próxima consulta.
+> Um dia antes, o paciente recebe o lembrete. Se ele responde "confirmo", a agenda atualiza sozinha.
+> Se pede para remarcar, a conversa vai direto para a recepção. Simples assim.
+> E o dono da clínica? Ele abre o relatório e vê quantos pacientes procuraram, quantos agendaram,
+> quanto tempo a equipe levou para responder e onde a clínica está perdendo paciente.
+> Tudo dentro da LGPD: cada acesso fica registrado, e marketing só vai para quem autorizou.
+> Segunda, terça, quarta, quinta, sexta. Oito e meia, dez horas, quinze minutos, trinta por cento.
+> Dermatologia, ginecologia, ultrassom, check-up, retorno. Unimed, Bradesco Saúde, Cassi, particular.
+> Será que funciona? Funciona! Quer ver? Então vem comigo que eu te mostro.
+> Conecta Saúde: sua recepção, sem paciente esquecido.
 
 ## Regras de gravação
 
@@ -65,6 +92,8 @@ uma com áudio, uma "Aguardando você". Copiloto com crédito da OpenAI.
 | 6 (1:35) | Áudio recebido + enviar foto/PDF (pedido de exame) | "Áudio, foto do pedido médico, PDF — tudo chega e sai pelo Chat." |
 | 7 (1:50) | Copiloto da Recepção: "tem horário pra dermato quinta?" → resposta com disponibilidade | "E o Copiloto: a recepcionista pergunta em português e ele consulta a agenda, sugere horário e até prepara um cancelamento — sempre pedindo confirmação antes de fazer." |
 | 8 (2:20) | Finalizar conversa com motivo (Agendou / Preço / Convênio) | "Ao terminar, a atendente marca o desfecho. É isso que alimenta o relatório de onde a clínica perde paciente." |
+| 8b (2:30) | Conversa perguntando "aceita SulAmérica?" → resposta da IA com os convênios cadastrados (IA › Convênios aceitos) | "A IA também responde quais convênios a clínica aceita, com a lista que a própria clínica cadastrou." |
+| 8c (2:35) | Tela Esperando (paciente sem resposta volta para Não atribuídas) | "Se a atendente não responde a tempo, a conversa volta para a fila e aparece em 'Esperando' — ninguém fica esquecido." |
 | 9 (2:40) | Conversa encerrada sozinha (aviso de fechamento) | "Conversa esquecida não fica aberta pra sempre: depois de 4 horas úteis sem resposta do paciente, ela encerra com uma mensagem educada — e reabre se ele voltar." |
 | 10 (2:55) | Encerramento | "Nenhum paciente sem resposta. Esse é o Chat." |
 
@@ -84,6 +113,7 @@ outra com "preciso remarcar", outra com "número errado".
 | 5 (1:15) | Resposta "número errado" → etiqueta 📵 | "Número errado? Fica marcado, e a clínica corrige o cadastro." |
 | 6 (1:30) | Vaga liberada → oferta automática para a lista de espera (se ligada) | "Se alguém cancela, a vaga pode ser oferecida automaticamente para quem estava na lista de espera." |
 | 7 (1:45) | Relatório › confirmações | "E no relatório você vê quantos confirmaram, cancelaram e não responderam." |
+| 8 (1:55) | IA › 2º lembrete do dia (só mostrar o interruptor, não ligar) | "Quem não respondeu ao lembrete pode receber uma segunda mensagem no mesmo dia — a clínica decide." |
 
 ---
 
@@ -116,7 +146,9 @@ ficha prévia ligada, QR de chegada impresso/na tela, TV aberta numa segunda jan
 | 4 (1:00) | Pacientes → ficha do paciente (dados por clínica, responsável de menor) | "Cada paciente tem uma ficha com o histórico de conversas e consultas. Se for menor de idade, o lembrete vai para o responsável." |
 | 5 (1:25) | Marcadores: cadastro + copiar link | "Trabalha com marcadores e parceiros que indicam pacientes? Cada um ganha um link de WhatsApp próprio." |
 | 6 (1:45) | Relatórios › Marcadores | "E você vê quantos pacientes cada parceiro indicou, quantos agendaram e quantos foram atendidos." |
-| 7 (2:10) | Encerramento | "Você sabe exatamente de onde vem cada paciente." |
+| 6b (1:55) | Disparos › Automações: "Orçamento parado" e "Aguardando retorno" (já ligadas na demo) | "E o que antes dependia de memória vira automação: orçamento parado há 3 dias gera uma tarefa, paciente que sumiu recebe uma mensagem." |
+| 6c (2:05) | Tarefas (/clinic/tarefas): atrasada, de hoje, criada pela automação | "As tarefas da recepção ficam numa lista só, com prazo e responsável." |
+| 7 (2:20) | Encerramento | "Você sabe exatamente de onde vem cada paciente." |
 
 ---
 
@@ -131,7 +163,9 @@ Não disparar nada de verdade.
 | 2 (0:20) | Nova campanha (2 etapas): público + modelo aprovado pela Meta | "No WhatsApp oficial, toda campanha usa um modelo aprovado pela Meta. Você escolhe o público e o modelo, e o sistema preenche o nome de cada paciente." |
 | 3 (0:50) | Aviso "Sem consentimento" na prévia | "Campanha de marketing só vai para quem autorizou receber. Os outros aparecem como 'sem consentimento' — é a LGPD funcionando sem a clínica precisar lembrar." |
 | 4 (1:10) | Ritmo de envio (sem focar no selo do número — na demo ele aparece "Conexão não verificada") | "O envio é espaçado e só em horário comercial, para a clínica não ter o número bloqueado." |
+| 4b (1:20) | Nova campanha › "Testar outros modelos": escolher 2 modelos extras (checkup_novembro_curto / _pergunta) e ver as prévias | "Na dúvida sobre qual texto funciona melhor? Escolha até três modelos: cada paciente recebe um, sorteado." |
 | 5 (1:30) | Resultado: enviadas, responderam, agendaram | "Depois, você vê quem respondeu e quantos agendaram por causa da campanha." |
+| 5b (1:40) | Relatório › campanha "Check-up de novembro": tabela por modelo | "E o relatório mostra qual modelo teve mais respostas e mais agendamentos — com o aviso quando a amostra ainda é pequena." |
 | 6 (1:50) | Régua automática (Disparos › Configurar): escolher um modelo, mudar os dias e ver a prévia "Amanhã às 8h: ~N", ligar o interruptor | "E tem a régua automática: agradecimento depois da consulta, lembrete de retorno, convite para quem sumiu há meses e mensagem de aniversário. Liga uma vez e funciona sozinho." |
 | 7 (2:30) | Pesquisa de satisfação (NPS) no relatório | "A pesquisa de satisfação também vai sozinha — e a nota aparece no relatório." |
 | 8 (2:50) | Encerramento | "Paciente que volta é o paciente mais barato que existe." |
@@ -154,7 +188,8 @@ Clara ou da Urolaser.**
 | 6 (1:45) | Resumo da IA | "Sem tempo para ler tudo? A IA escreve o resumo do período em poucas linhas." |
 | 7 (2:00) | Aba Faturamento | "Com o sistema da clínica conectado, o dono vê o faturamento, comparado por dia útil — para um mês curto não parecer queda — com o que entra em cada número explicado." |
 | 8 (2:30) | Valores fora do padrão / Financeiro / Estoque | "Ele avisa quando algo está fora do padrão e mostra contas a receber, a pagar e o estoque. Só a gestão vê." |
-| 9 (2:50) | Encerramento | "Decisão com número, não com impressão." |
+| 8b (2:40) | Aba Ocupação: cartões dos consultórios e da sala de exames + mapa por dia/hora | "E a ocupação de cada consultório e da sala de exames: quanto do horário está marcado, quanto se perdeu com falta e em que horários sobra espaço." |
+| 9 (2:55) | Encerramento | "Decisão com número, não com impressão." |
 
 ---
 
@@ -179,6 +214,8 @@ preenchidas, amanhã com lembretes (confirmou, pediu para remarcar, cancelou, se
 correspondentes, semana seguinte, 4 marcadores com indicados/agendados/atendidos, consentimento de marketing em ~2/3 dos
 pacientes, um menor com responsável, um aniversariante do dia, régua (desligada), NPS com comentários, orçamentos de 3/8/16
 dias, lista de espera, senhas do dia, chamadas na TV, salas dos médicos, conversa do Instagram (só visual) e campanha concluída.
+Desde 19/11 também: salas da aba Ocupação (3 consultórios de 30 min + sala de exames de 40 min, seg–sex 08–17) com agenda
+cheia nas últimas 2 semanas, e a campanha "Check-up de novembro" com sorteio entre 3 modelos (respostas por modelo no Relatório).
 
 **Faturamento, Financeiro e Estoque na demo** usam o modo demo da ponte (src/lib/bi/demo-bridge.ts): números fictícios,
 sempre os mesmos para o mesmo dia. A linha "Fonte" mostra "DEMONSTRAÇÃO — números fictícios" — deixar aparecer.

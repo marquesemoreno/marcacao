@@ -17,7 +17,11 @@ export const DEMO_CLOUD_TEMPLATES: ClinicCloudTemplate[] = [
   tpl("retorno_lembrete", "MARKETING", "{{1}}! Já faz um tempo desde a sua última consulta na Clínica Vida. Que tal agendar o seu retorno? Responda esta mensagem que a gente encontra um horário."),
   tpl("reativacao", "MARKETING", "{{1}}! Sentimos sua falta na Clínica Vida. Quer marcar um check-up? Responda esta mensagem e a recepção te ajuda."),
   tpl("pesquisa_nps", "UTILITY", "Olá, {{1}}! De 0 a 10, quanto você recomendaria a Clínica Vida? Leva 10 segundos: {{2}}"),
-  tpl("aniversario", "MARKETING", "Feliz aniversário, {{1}}! 🎉 A equipe da Clínica Vida deseja um ano de muita saúde."),
+  // Três versões da mesma campanha (sorteio entre modelos em Disparos).
+  tpl("checkup_novembro", "MARKETING", "{{1}}, novembro é mês de cuidar da saúde! A Clínica Vida está com horários para check-up. Quer que a recepção encontre um horário para você?"),
+  tpl("checkup_novembro_curto", "MARKETING", "{{1}}, que tal fazer seu check-up este mês? Responda esta mensagem e a Clínica Vida agenda para você."),
+  tpl("checkup_novembro_pergunta", "MARKETING", "{{1}}, quando foi seu último check-up? Se já faz mais de um ano, a Clínica Vida tem horários esta semana. Responda para agendar."),
+  tpl("aniversario","MARKETING", "Feliz aniversário, {{1}}! 🎉 A equipe da Clínica Vida deseja um ano de muita saúde."),
 ];
 
 const BASE: Record<AutomationRuleKind, number> = { POS_CONSULTA: 14, RETORNO: 22, REATIVACAO: 30, NPS: 12, ANIVERSARIO: 3 };
