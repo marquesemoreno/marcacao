@@ -120,20 +120,16 @@ export function listCloudTemplates(wabaId: string, token: string) {
   return graph<{ data: CloudTemplate[] }>(`${wabaId}/message_templates`, { token, query: { fields: "id,name,status,category,language,components", limit: "100" } });
 }
 
-/** Cria modelo (vai pra análise da Meta). `body` com {{1}}, {{2}}…; `example` = valores de exemplo. */
+/** Cria modelo (vai pra análise da Meta). `components` vem de buildTemplateComponents
+ * (texto com exemplos, rodapé e botões de resposta rápida, já conferidos). */
 export function createCloudTemplate(
   wabaId: string,
   token: string,
-  t: { name: string; category: "UTILITY" | "MARKETING"; language: string; body: string; example?: string[] }
+  t: { name: string; category: "UTILITY" | "MARKETING"; language: string; components: unknown[] }
 ) {
   return graph<{ id: string; status: string; category: string }>(`${wabaId}/message_templates`, {
     token,
-    body: {
-      name: t.name,
-      category: t.category,
-      language: t.language,
-      components: [{ type: "BODY", text: t.body, ...(t.example?.length ? { example: { body_text: [t.example] } } : {}) }],
-    },
+    body: { name: t.name, category: t.category, language: t.language, components: t.components },
   });
 }
 

@@ -1,5 +1,6 @@
 "use server";
 
+import { buildTemplateComponents } from "@/lib/cloud-template-components";
 import { normalizeTestRecipient } from "@/lib/test-recipient";
 import { parseCloudWebhook } from "@/lib/whatsapp-cloud-webhook";
 import { randomInt } from "crypto";
@@ -439,6 +440,8 @@ export async function createClinicCloudTemplate(input: {
   language: string;
   body: string;
   examples: string[];
+  footer?: string;
+  buttons?: string[];
 }) {
   await requireCloudAccess(input.clinicId);
   if (await isDemoClinic(input.clinicId)) return { success: false as const, error: DEMO_CLOUD_BLOCKED };
@@ -446,16 +449,13 @@ export async function createClinicCloudTemplate(input: {
   if (!account) return { success: false as const, error: "Clínica sem conta da API oficial." };
   const name = input.name.trim().toLowerCase().replace(/[^a-z0-9_]+/g, "_").replace(/^_|_$/g, "");
   if (!name) return { success: false as const, error: "Dê um nome ao modelo (letras minúsculas, números e _)." };
-  const vars = new Set(input.body.match(/\{\{\d+\}\}/g) ?? []).size;
-  if (vars > 0 && input.examples.filter((e) => e.trim()).length < vars) {
-    return { success: false as const, error: `Preencha um exemplo para cada variável ({{1}} até {{${vars}}}).` };
-  }
+  const built = buildTemplateComponents({ body: input.body, examples: input.examples, footer: input.footer, buttons: input.buttons });
+  if (!built.ok) return { success: false as const, error: built.error };
   const r = await createCloudTemplate(account.wabaId, account.token, {
     name,
     category: input.category,
     language: input.language,
-    body: input.body,
-    example: vars ? input.examples.slice(0, vars) : undefined,
+    components: built.components,
   });
   return r.success ? { success: true as const, id: r.data.id, status: r.data.status, name } : { success: false as const, error: r.error };
 }

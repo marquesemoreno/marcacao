@@ -13,6 +13,7 @@ import {
 } from "@/actions/admin-whatsapp-cloud";
 import { t, type I18nKey, type Lang } from "@/lib/i18n-review";
 import { CloudTabs } from "@/components/admin/cloud-tabs";
+import { TEMPLATE_BUTTON_MAX, TEMPLATE_FOOTER_MAX } from "@/lib/cloud-template-components";
 
 const STATUS_CLASS: Record<string, string> = {
   APPROVED: "border-emerald-300 text-emerald-800 dark:border-emerald-700 dark:text-emerald-300",
@@ -38,6 +39,8 @@ export function CloudTemplates({ assets, lang, base = "/admin/whatsapp" }: { ass
   const [language, setLanguage] = useState("en_US");
   const [body, setBody] = useState("Hello {{1}}, this is a reminder of your appointment on {{2}}. Reply here if you need to reschedule.");
   const [examples, setExamples] = useState<string[]>(["Maria", "Oct 20 at 2:00 PM"]);
+  const [footer, setFooter] = useState("");
+  const [buttons, setButtons] = useState<string[]>(["", "", ""]);
   const [creating, setCreating] = useState(false);
 
   const [sendFor, setSendFor] = useState<TemplateRow | null>(null);
@@ -73,7 +76,7 @@ export function CloudTemplates({ assets, lang, base = "/admin/whatsapp" }: { ass
   async function create() {
     setCreating(true);
     try {
-      const r = await createClinicCloudTemplate({ clinicId, name, category, language, body, examples });
+      const r = await createClinicCloudTemplate({ clinicId, name, category, language, body, examples, footer, buttons });
       if (r.success) {
         toast.success(`${tt("tpl.created")} (${r.name} · ${r.status})`);
         refresh();
@@ -268,6 +271,26 @@ export function CloudTemplates({ assets, lang, base = "/admin/whatsapp" }: { ass
                 <input value={examples[i] ?? ""} onChange={(e) => setExamples((prev) => { const n = [...prev]; n[i] = e.target.value; return n; })} className={input} />
               </label>
             ))}
+            <label className="block text-xs font-medium text-slate-600 dark:text-slate-400">
+              {tt("tpl.footer")}
+              <input value={footer} onChange={(e) => setFooter(e.target.value)} maxLength={TEMPLATE_FOOTER_MAX} className={input} />
+            </label>
+            <fieldset className="space-y-1.5">
+              <legend className="text-xs font-medium text-slate-600 dark:text-slate-400">{tt("tpl.buttons")}</legend>
+              <div className="grid gap-2 sm:grid-cols-3">
+                {buttons.map((b, i) => (
+                  <input
+                    key={i}
+                    value={b}
+                    aria-label={`${tt("tpl.button")} ${i + 1}`}
+                    placeholder={`${tt("tpl.button")} ${i + 1}`}
+                    maxLength={TEMPLATE_BUTTON_MAX}
+                    onChange={(e) => setButtons((prev) => prev.map((x, j) => (j === i ? e.target.value : x)))}
+                    className={input}
+                  />
+                ))}
+              </div>
+            </fieldset>
             <button type="button" disabled={creating || !name.trim() || !body.trim()} onClick={create} title={tt("tpl.createTip")} className="inline-flex h-9 items-center gap-1.5 rounded-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 px-4 text-sm font-semibold text-white">
               {creating ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden /> : <Plus className="w-4 h-4" aria-hidden />} {tt("tpl.create")}
             </button>
