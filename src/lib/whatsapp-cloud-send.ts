@@ -59,7 +59,7 @@ export async function cloudSendMedia(
 export async function cloudSendTemplate(
   account: { phoneNumberId: string; token: string },
   to: string,
-  template: { name: string; language: string; bodyParams: string[] },
+  template: { name: string; language: string; bodyParams: string[]; headerImageLink?: string | null },
   event: string
 ) {
   const r = await sendCloudTemplate(account.phoneNumberId, account.token, to, template);

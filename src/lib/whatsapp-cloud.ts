@@ -5,7 +5,8 @@ import "server-only";
  * pelos testes da análise do app. Env: META_APP_ID, META_APP_SECRET (troca do código do
  * Embedded Signup e assinatura do webhook). */
 
-import { META_GRAPH_VERSION } from "@/lib/meta-config";
+import { META_APP_ID, META_GRAPH_VERSION } from "@/lib/meta-config";
+import { templateSendComponents } from "@/lib/cloud-template-components";
 
 const GRAPH = `https://graph.facebook.com/${META_GRAPH_VERSION}`;
 
@@ -95,23 +96,46 @@ export function sendCloudTemplate(
   phoneNumberId: string,
   token: string,
   to: string,
-  template: { name: string; language: string; bodyParams?: string[] }
+  template: { name: string; language: string; bodyParams?: string[]; /** Modelo com foto no cabeçalho: link da imagem. */ headerImageLink?: string | null }
 ) {
+  const components = templateSendComponents(template.bodyParams ?? [], template.headerImageLink);
   return graph<{ messages?: { id: string }[] }>(`${phoneNumberId}/messages`, {
     token,
     body: {
       messaging_product: "whatsapp",
       to,
       type: "template",
-      template: {
-        name: template.name,
-        language: { code: template.language },
-        ...(template.bodyParams?.length
-          ? { components: [{ type: "body", parameters: template.bodyParams.map((text) => ({ type: "text", text })) }] }
-          : {}),
-      },
+      template: { name: template.name, language: { code: template.language }, ...(components.length ? { components } : {}) },
     },
   });
+}
+
+/** Sobe a foto de exemplo de um modelo novo (Resumable Upload da Meta): abre a sessão no app e
+ * envia os bytes; devolve o handle que vai em HEADER.example.header_handle. */
+export async function uploadTemplateHeaderImage(
+  token: string,
+  file: { bytes: Buffer; mimeType: string; fileName: string }
+): Promise<CloudResult<{ handle: string }>> {
+  const session = await graph<{ id?: string }>(`${META_APP_ID}/uploads`, {
+    method: "POST",
+    token,
+    query: { file_name: file.fileName, file_length: String(file.bytes.length), file_type: file.mimeType },
+  });
+  if (!session.success) return session;
+  if (!session.data.id) return { success: false, error: "A Meta não abriu a sessão de upload da foto." };
+  try {
+    const res = await fetch(`${GRAPH}/${session.data.id}`, {
+      method: "POST",
+      headers: { Authorization: `OAuth ${token}`, file_offset: "0", "Content-Type": file.mimeType },
+      body: new Uint8Array(file.bytes),
+      signal: AbortSignal.timeout(30000),
+    });
+    const json = (await res.json().catch(() => ({}))) as { h?: string; error?: { message?: string; code?: number } };
+    if (!res.ok || !json.h) return { success: false, error: json.error?.message ?? `HTTP ${res.status} no upload da foto`, code: json.error?.code };
+    return { success: true, data: { handle: json.h } };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : String(error) };
+  }
 }
 
 export type CloudTemplate = { id: string; name: string; status: string; category: string; language: string };

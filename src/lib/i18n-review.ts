@@ -122,6 +122,8 @@ const DICT = {
   "tpl.footer": ["Rodapé (opcional, até 60 caracteres, sem variável)", "Footer (optional, up to 60 characters, no variables)"],
   "tpl.buttons": ["Botões de resposta rápida (opcional, até 25 caracteres cada)", "Quick reply buttons (optional, up to 25 characters each)"],
   "tpl.button": ["Botão", "Button"],
+  "tpl.headerImage": ["Foto no cabeçalho (opcional, JPG ou PNG até 5 MB)", "Header image (optional, JPG or PNG up to 5 MB)"],
+  "tpl.headerImageTooBig": ["A foto passa de 5 MB.", "The image is larger than 5 MB."],
   "tpl.created": ["Modelo enviado para análise da Meta.", "Template submitted for Meta review."],
   "tpl.send": ["Enviar este modelo", "Send this template"],
   "tpl.sendTip": ["Envia o modelo aprovado preenchendo as variáveis.", "Sends the approved template filling in its variables."],

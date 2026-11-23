@@ -41,6 +41,7 @@ export function CloudTemplates({ assets, lang, base = "/admin/whatsapp" }: { ass
   const [examples, setExamples] = useState<string[]>(["Maria", "Oct 20 at 2:00 PM"]);
   const [footer, setFooter] = useState("");
   const [buttons, setButtons] = useState<string[]>(["", "", ""]);
+  const [headerImage, setHeaderImage] = useState<File | null>(null);
   const [creating, setCreating] = useState(false);
 
   const [sendFor, setSendFor] = useState<TemplateRow | null>(null);
@@ -76,7 +77,11 @@ export function CloudTemplates({ assets, lang, base = "/admin/whatsapp" }: { ass
   async function create() {
     setCreating(true);
     try {
-      const r = await createClinicCloudTemplate({ clinicId, name, category, language, body, examples, footer, buttons });
+      // Foto do cabeçalho vai em base64 (até 5 MB; limite das server actions é 20 MB).
+      const image = headerImage
+        ? { base64: btoa(Array.from(new Uint8Array(await headerImage.arrayBuffer()), (b) => String.fromCharCode(b)).join("")), mimeType: headerImage.type, fileName: headerImage.name }
+        : undefined;
+      const r = await createClinicCloudTemplate({ clinicId, name, category, language, body, examples, footer, buttons, headerImage: image });
       if (r.success) {
         toast.success(`${tt("tpl.created")} (${r.name} · ${r.status})`);
         refresh();
@@ -260,6 +265,23 @@ export function CloudTemplates({ assets, lang, base = "/admin/whatsapp" }: { ass
                 </select>
               </label>
             </div>
+            <label className="block text-xs font-medium text-slate-600 dark:text-slate-400">
+              {tt("tpl.headerImage")}
+              <input
+                type="file"
+                accept="image/jpeg,image/png"
+                onChange={(e) => {
+                  const f = e.target.files?.[0] ?? null;
+                  if (f && f.size > 5 * 1024 * 1024) {
+                    toast.error(tt("tpl.headerImageTooBig"));
+                    e.target.value = "";
+                    return;
+                  }
+                  setHeaderImage(f);
+                }}
+                className="mt-1 block w-full text-sm file:mr-3 file:rounded-full file:border-0 file:bg-slate-100 file:px-3 file:py-1.5 file:text-sm dark:file:bg-slate-800"
+              />
+            </label>
             <label className="block text-xs font-medium text-slate-600 dark:text-slate-400">
               {tt("tpl.body")}
               <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={3} className="mt-1 w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 p-3 text-sm" />

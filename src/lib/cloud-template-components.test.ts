@@ -75,3 +75,29 @@ describe("buildTemplateComponents", () => {
     expect(r.ok).toBe(false);
   });
 });
+
+import { templateSendComponents } from "./cloud-template-components";
+
+describe("foto no cabeçalho", () => {
+  it("criação: cabeçalho IMAGE com o handle do upload vem antes do texto", () => {
+    const r = buildTemplateComponents({ body: "Oi, {{1}}", examples: ["Carlos"], headerImageHandle: "4::aW1n", buttons: ["Parar"] });
+    expect(r).toEqual({
+      ok: true,
+      components: [
+        { type: "HEADER", format: "IMAGE", example: { header_handle: ["4::aW1n"] } },
+        { type: "BODY", text: "Oi, {{1}}", example: { body_text: [["Carlos"]] } },
+        { type: "BUTTONS", buttons: [{ type: "QUICK_REPLY", text: "Parar" }] },
+      ],
+    });
+  });
+
+  it("envio: parâmetros do texto e, se houver, a foto do cabeçalho por link", () => {
+    expect(templateSendComponents(["Carlos"])).toEqual([{ type: "body", parameters: [{ type: "text", text: "Carlos" }] }]);
+    expect(templateSendComponents([], "https://x/lara.jpg")).toEqual([{ type: "header", parameters: [{ type: "image", image: { link: "https://x/lara.jpg" } }] }]);
+    expect(templateSendComponents(["Carlos"], "https://x/lara.jpg")).toEqual([
+      { type: "header", parameters: [{ type: "image", image: { link: "https://x/lara.jpg" } }] },
+      { type: "body", parameters: [{ type: "text", text: "Carlos" }] },
+    ]);
+    expect(templateSendComponents([])).toEqual([]);
+  });
+});

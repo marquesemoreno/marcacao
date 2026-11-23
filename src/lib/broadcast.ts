@@ -144,14 +144,20 @@ export async function dispatchNextBatch(): Promise<{ processed: number }> {
           recipient.id
         );
         templateIndex = templatePick.index;
+        // Modelo com foto no cabeçalho: a imagem anexada à campanha vai em cada envio (link
+        // assinado de 1 h — a Meta baixa na hora).
+        const headerImageLink = campaign.imagePath ? await getSignedMediaUrl(campaign.imagePath) : null;
         if (!built.ok) {
           result = { success: false, skipped: false };
           failureReason = built.error;
+        } else if (campaign.imagePath && !headerImageLink) {
+          result = { success: false, skipped: false };
+          failureReason = "Falha ao gerar URL da foto do modelo";
         } else {
           result = await cloudSendTemplate(
             cloudAccount,
             recipient.phone,
-            { name: templatePick.template.name, language: templatePick.template.language, bodyParams: built.params },
+            { name: templatePick.template.name, language: templatePick.template.language, bodyParams: built.params, headerImageLink },
             "broadcast.sent"
           );
           if (!result.success) failureReason = "Falha ao enviar o modelo pela API oficial";

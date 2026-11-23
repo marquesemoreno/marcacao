@@ -24,6 +24,7 @@ import {
   sendCloudTemplate,
   sendCloudText,
   subscribeAppToWaba,
+  uploadTemplateHeaderImage,
   type CloudPhoneNumber,
   type CloudTemplate,
 } from "@/lib/whatsapp-cloud";
@@ -442,6 +443,8 @@ export async function createClinicCloudTemplate(input: {
   examples: string[];
   footer?: string;
   buttons?: string[];
+  /** Foto do cabeçalho (JPG/PNG, até 5 MB) em base64. */
+  headerImage?: { base64: string; mimeType: string; fileName: string };
 }) {
   await requireCloudAccess(input.clinicId);
   if (await isDemoClinic(input.clinicId)) return { success: false as const, error: DEMO_CLOUD_BLOCKED };
@@ -449,7 +452,20 @@ export async function createClinicCloudTemplate(input: {
   if (!account) return { success: false as const, error: "Clínica sem conta da API oficial." };
   const name = input.name.trim().toLowerCase().replace(/[^a-z0-9_]+/g, "_").replace(/^_|_$/g, "");
   if (!name) return { success: false as const, error: "Dê um nome ao modelo (letras minúsculas, números e _)." };
-  const built = buildTemplateComponents({ body: input.body, examples: input.examples, footer: input.footer, buttons: input.buttons });
+  // Confere o texto antes de subir a foto (não deixa upload órfão na Meta por erro de digitação).
+  const precheck = buildTemplateComponents({ body: input.body, examples: input.examples, footer: input.footer, buttons: input.buttons });
+  if (!precheck.ok) return { success: false as const, error: precheck.error };
+  let headerImageHandle: string | undefined;
+  if (input.headerImage) {
+    const { mimeType, fileName } = input.headerImage;
+    if (mimeType !== "image/jpeg" && mimeType !== "image/png") return { success: false as const, error: "A foto precisa ser JPG ou PNG." };
+    const bytes = Buffer.from(input.headerImage.base64, "base64");
+    if (!bytes.length || bytes.length > 5 * 1024 * 1024) return { success: false as const, error: "A foto precisa ter até 5 MB." };
+    const up = await uploadTemplateHeaderImage(account.token, { bytes, mimeType, fileName: fileName || "cabecalho.jpg" });
+    if (!up.success) return { success: false as const, error: `Não foi possível enviar a foto para a Meta: ${up.error}` };
+    headerImageHandle = up.data.handle;
+  }
+  const built = buildTemplateComponents({ body: input.body, examples: input.examples, footer: input.footer, buttons: input.buttons, headerImageHandle });
   if (!built.ok) return { success: false as const, error: built.error };
   const r = await createCloudTemplate(account.wabaId, account.token, {
     name,

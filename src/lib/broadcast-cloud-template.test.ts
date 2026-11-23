@@ -85,3 +85,33 @@ describe("sorteio entre modelos aprovados", () => {
     expect(checkCloudTemplateVariants(m, [{ name: "b", variableCount: 2 }])).toMatch(/campos/);
   });
 });
+
+import { templateHasImageHeader, checkTemplateHeaderImage } from "./broadcast-cloud-template";
+
+describe("modelo com foto no cabeçalho", () => {
+  it("detecta cabeçalho IMAGE nos components da Meta", () => {
+    expect(templateHasImageHeader([{ type: "HEADER", format: "IMAGE" }, { type: "BODY", text: "Oi" }])).toBe(true);
+    expect(templateHasImageHeader([{ type: "HEADER", format: "TEXT", text: "Oi" }, { type: "BODY", text: "Oi" }])).toBe(false);
+    expect(templateHasImageHeader([{ type: "BODY", text: "Oi" }])).toBe(false);
+    expect(templateHasImageHeader(undefined)).toBe(false);
+  });
+
+  it("modelo com foto exige imagem JPG ou PNG anexada", () => {
+    expect(checkTemplateHeaderImage(true, null)).toMatch(/foto/i);
+    expect(checkTemplateHeaderImage(true, "application/pdf")).toMatch(/JPG ou PNG/);
+    expect(checkTemplateHeaderImage(true, "image/webp")).toMatch(/JPG ou PNG/);
+    expect(checkTemplateHeaderImage(true, "image/jpeg")).toBeNull();
+    expect(checkTemplateHeaderImage(true, "image/png")).toBeNull();
+  });
+
+  it("modelo sem foto não aceita anexo (a Meta recusaria)", () => {
+    expect(checkTemplateHeaderImage(false, null)).toBeNull();
+    expect(checkTemplateHeaderImage(false, "image/jpeg")).toMatch(/não tem foto/i);
+  });
+
+  it("no sorteio, todos os modelos precisam ter (ou não ter) foto", () => {
+    const main = { name: "a", variableCount: 1, headerImage: true };
+    expect(checkCloudTemplateVariants(main, [{ name: "b", variableCount: 1, headerImage: true }])).toBeNull();
+    expect(checkCloudTemplateVariants(main, [{ name: "b", variableCount: 1, headerImage: false }])).toMatch(/foto/i);
+  });
+});

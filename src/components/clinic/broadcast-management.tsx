@@ -394,7 +394,7 @@ export function BroadcastManagement() {
         name,
         cloudMode ? selectedTemplate?.bodyText ?? "" : template,
         recipients,
-        cloudMode ? undefined : imageFormData,
+        cloudMode && !templateNeedsImage ? undefined : imageFormData,
         cloudMode ? [] : extraVariants,
         cloudMode ? { name: cloudTemplateName, params: cloudParams, extraNames: cloudExtraNames.filter(Boolean) } : undefined
       );
@@ -560,9 +560,12 @@ export function BroadcastManagement() {
   const variantPreviews = previewBroadcastVariants(allTexts, sampleVars);
   const cloudMode = Boolean(cloud?.active);
   const selectedTemplate = cloud?.templates.find((t) => t.name === cloudTemplateName) ?? null;
+  const templateNeedsImage = cloudMode && Boolean(selectedTemplate?.headerImage);
   const templateProblem = cloudMode
     ? !selectedTemplate
       ? "Escolha o modelo aprovado."
+      : templateNeedsImage && !image
+        ? "Anexe a foto do modelo."
       : recipients.length
         ? checkTemplateParamSources(selectedTemplate.variableCount, cloudParams, columns)
         : null
@@ -1132,7 +1135,11 @@ export function BroadcastManagement() {
                     </p>
                     {[0, 1].map((slot) => {
                       const options = (cloud?.templates ?? []).filter(
-                        (t) => t.name !== cloudTemplateName && t.variableCount === selectedTemplate.variableCount && !cloudExtraNames.some((n, j) => j !== slot && n === t.name),
+                        (t) =>
+                          t.name !== cloudTemplateName &&
+                          t.variableCount === selectedTemplate.variableCount &&
+                          Boolean(t.headerImage) === Boolean(selectedTemplate.headerImage) &&
+                          !cloudExtraNames.some((n, j) => j !== slot && n === t.name),
                       );
                       if (slot === 1 && !cloudExtraNames[0]) return null;
                       return (
@@ -1261,10 +1268,15 @@ export function BroadcastManagement() {
             )}
           </fieldset>
 
-          {/* 3. Anexo: imagem ou documento (texto livre; o modelo da API oficial não leva anexo) */}
-          {!cloudMode && (
+          {/* 3. Anexo: imagem ou documento (texto livre); na API oficial, só a foto do modelo que tem foto no cabeçalho */}
+          {(!cloudMode || templateNeedsImage) && (
           <fieldset className="space-y-2">
-            <legend className="text-sm font-semibold text-slate-800 dark:text-slate-100">Anexo (opcional)</legend>
+            <legend className="text-sm font-semibold text-slate-800 dark:text-slate-100">{templateNeedsImage ? "Foto do modelo" : "Anexo (opcional)"}</legend>
+            {templateNeedsImage && (
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Este modelo tem foto no cabeçalho. Anexe a mesma imagem do modelo (JPG ou PNG): ela vai junto em cada mensagem.
+              </p>
+            )}
             {image ? (
               <div className="flex items-center gap-3">
                 {imagePreviewUrl ? (
@@ -1291,17 +1303,19 @@ export function BroadcastManagement() {
             ) : (
               <div className="space-y-1">
                 <label className="inline-flex items-center gap-1.5 text-sm font-medium text-emerald-700 dark:text-emerald-300 cursor-pointer focus-within:ring-2 focus-within:ring-emerald-500/50 rounded-md px-1">
-                  <Paperclip className="w-4 h-4" aria-hidden /> Anexar imagem ou documento
+                  <Paperclip className="w-4 h-4" aria-hidden /> {templateNeedsImage ? "Anexar a foto" : "Anexar imagem ou documento"}
                   <input
                     type="file"
-                    accept={BROADCAST_ATTACHMENT_ACCEPT}
+                    accept={templateNeedsImage ? "image/jpeg,image/png" : BROADCAST_ATTACHMENT_ACCEPT}
                     className="sr-only"
                     onChange={(e) => e.target.files?.[0] && handleImageSelect(e.target.files[0])}
                   />
                 </label>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Imagem, PDF, Word ou Excel (por exemplo, uma tabela de valores), até 15 MB. A mensagem acima vai junto, como legenda.
-                </p>
+                {!templateNeedsImage && (
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Imagem, PDF, Word ou Excel (por exemplo, uma tabela de valores), até 15 MB. A mensagem acima vai junto, como legenda.
+                  </p>
+                )}
               </div>
             )}
           </fieldset>

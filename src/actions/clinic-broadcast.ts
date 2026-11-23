@@ -3,7 +3,15 @@
 import { normalizeBroadcastVariants, previewBroadcastVariants, countSentByVariant } from "@/lib/broadcast-variants";
 
 import { NO_CONSENT_MESSAGE } from "@/lib/marketing-consent";
-import { buildTemplateParams, checkCloudTemplateVariants, checkTemplateParamSources, parseCloudTemplateVariants, renderTemplatePreview } from "@/lib/broadcast-cloud-template";
+import {
+  buildTemplateParams,
+  checkCloudTemplateVariants,
+  checkTemplateHeaderImage,
+  checkTemplateParamSources,
+  parseCloudTemplateVariants,
+  renderTemplatePreview,
+  templateHasImageHeader,
+} from "@/lib/broadcast-cloud-template";
 import { listCloudTemplates } from "@/lib/whatsapp-cloud";
 import { decryptToken } from "@/lib/token-crypto";
 import { revalidatePath } from "next/cache";
@@ -287,8 +295,8 @@ export async function getClinicCampaignStartPreview(campaignId: string) {
     unknownVariables: usesTemplate ? [] : [...new Set(previews.flatMap((p) => p.unknownVariables))],
     unfilled: usesTemplate ? [] : [...new Set(previews.flatMap((p) => p.unfilled))],
     templateName: campaign?.cloudTemplateName ?? null,
-    hasImage: !usesTemplate && Boolean(campaign?.imagePath),
-    attachmentKind: !usesTemplate && campaign?.imagePath ? attachmentKindOf(campaign.imageMimeType) : null,
+    hasImage: Boolean(campaign?.imagePath),
+    attachmentKind: campaign?.imagePath ? attachmentKindOf(campaign.imageMimeType) : null,
     attachmentName: !usesTemplate ? campaign?.attachmentName ?? null : null,
     lowPriority: Boolean(campaign?.lowPriority),
     ...estimateCampaignFinish({ pending, sentToday, now: new Date(), sharing: campaign?.lowPriority ? 1 : 1 + otherActive }),
@@ -409,7 +417,12 @@ export async function createClinicBroadcastCampaign(
     // dos modelos sorteados vai nas variações, para a contagem por variação do relatório.
     messageTemplate = tpl.bodyText;
     extraVariants = extras.map((t) => t.bodyText);
-    imageFormData = undefined;
+    // Modelo com foto no cabeçalho: a imagem anexada vai em cada envio; sem foto, nada de anexo.
+    const headerFile = imageFormData?.get("attachment") ?? imageFormData?.get("image");
+    const headerMime = headerFile instanceof File && headerFile.size > 0 ? headerFile.type : null;
+    const headerProblem = checkTemplateHeaderImage(Boolean(tpl.headerImage), headerMime);
+    if (headerProblem) throw new Error(headerProblem);
+    if (!tpl.headerImage) imageFormData = undefined;
   }
 
   const trimmedName = name.trim();
@@ -793,7 +806,7 @@ export async function setCampaignExclusions(raw: string) {
   return ids.length;
 }
 
-export type ClinicCloudTemplate = { name: string; language: string; category: string; bodyText: string; variableCount: number };
+export type ClinicCloudTemplate = { name: string; language: string; category: string; bodyText: string; variableCount: number; /** Foto no cabeçalho (a campanha precisa anexar a imagem). */ headerImage?: boolean };
 
 /** API oficial ativa? Se sim, os modelos APROVADOS da clínica (só eles podem ser disparados). */
 export async function getClinicCloudBroadcastSetup(): Promise<{ active: boolean; templates: ClinicCloudTemplate[]; error?: string }> {
@@ -819,8 +832,16 @@ export async function getClinicCloudBroadcastSetup(): Promise<{ active: boolean;
     templates: r.data.data
       .filter((t) => t.status === "APPROVED")
       .map((t) => {
-        const body = (t as typeof t & { components?: { type: string; text?: string }[] }).components?.find((c) => c.type === "BODY")?.text ?? "";
-        return { name: t.name, language: t.language, category: t.category, bodyText: body, variableCount: new Set(body.match(/\{\{\d+\}\}/g) ?? []).size };
+        const components = (t as typeof t & { components?: { type: string; text?: string; format?: string }[] }).components;
+        const body = components?.find((c) => c.type === "BODY")?.text ?? "";
+        return {
+          name: t.name,
+          language: t.language,
+          category: t.category,
+          bodyText: body,
+          variableCount: new Set(body.match(/\{\{\d+\}\}/g) ?? []).size,
+          headerImage: templateHasImageHeader(components),
+        };
       }),
   };
 }

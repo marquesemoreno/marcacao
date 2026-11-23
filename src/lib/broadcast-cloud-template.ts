@@ -85,13 +85,31 @@ export function parseCloudTemplateVariants(raw: unknown): CloudTemplateRef[] {
 
 /** Variações de modelo: no máximo 2 além do principal, sem repetir, e com o mesmo número de
  * campos {{n}} do principal (todas usam o que foi preenchido para o principal). Null = ok. */
-export function checkCloudTemplateVariants(main: { name: string; variableCount: number }, extras: { name: string; variableCount: number }[]): string | null {
+export function checkCloudTemplateVariants(
+  main: { name: string; variableCount: number; headerImage?: boolean },
+  extras: { name: string; variableCount: number; headerImage?: boolean }[]
+): string | null {
   if (extras.length + 1 > MAX_CLOUD_TEMPLATES) return `No máximo ${MAX_CLOUD_TEMPLATES} modelos por campanha.`;
   const seen = new Set([main.name]);
   for (const e of extras) {
     if (seen.has(e.name)) return `O modelo “${e.name}” está repetido.`;
     seen.add(e.name);
     if (e.variableCount !== main.variableCount) return `O modelo “${e.name}” tem ${e.variableCount} campo(s) {{n}} e o principal tem ${main.variableCount}: para sortear, todos precisam ter os mesmos campos.`;
+    if (Boolean(e.headerImage) !== Boolean(main.headerImage)) return `O modelo “${e.name}” ${e.headerImage ? "tem" : "não tem"} foto no cabeçalho e o principal ${main.headerImage ? "tem" : "não tem"}: para sortear, todos precisam ser iguais nisso.`;
   }
+  return null;
+}
+
+/** O modelo tem foto no cabeçalho? (components como a Meta devolve na lista de modelos.) */
+export function templateHasImageHeader(components: { type: string; format?: string; text?: string }[] | undefined): boolean {
+  return Boolean(components?.some((c) => c.type === "HEADER" && c.format === "IMAGE"));
+}
+
+/** Campanha com modelo: modelo com foto exige uma imagem JPG/PNG anexada (vai no cabeçalho de
+ * cada envio); modelo sem foto não aceita anexo. Null = ok. */
+export function checkTemplateHeaderImage(headerImage: boolean, attachmentMime: string | null): string | null {
+  if (!headerImage) return attachmentMime ? "Este modelo não tem foto no cabeçalho — remova o anexo (a Meta recusaria o envio)." : null;
+  if (!attachmentMime) return "Este modelo tem foto no cabeçalho: anexe a imagem (a mesma do modelo).";
+  if (attachmentMime !== "image/jpeg" && attachmentMime !== "image/png") return "A foto do cabeçalho precisa ser JPG ou PNG.";
   return null;
 }
