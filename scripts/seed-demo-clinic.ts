@@ -14,7 +14,8 @@ import "dotenv/config";
 import { Prisma, PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { randomBytes } from "crypto";
-import { appendFileSync } from "fs";
+import { appendFileSync, readFileSync } from "fs";
+import { join } from "path";
 import { DEMO_CLINIC_CNPJ } from "../src/lib/demo-clinic";
 import { DEFAULT_ANAMNESE_TEMPLATE } from "../src/lib/patient-journey";
 import { DEFAULT_RULE_STEPS } from "../src/lib/automation-rules";
@@ -26,6 +27,10 @@ import { doctorKey } from "../src/lib/tv-call";
 import { DEMO_CLOUD_TEMPLATES } from "../src/lib/demo-regua";
 import { NO_CONSENT_MESSAGE } from "../src/lib/marketing-consent";
 import type { StoredStep } from "../src/lib/tag-automations";
+import { formatDuration, uploadWhatsAppMedia } from "../src/lib/whatsapp-media";
+import { getSupabaseServerClient, WHATSAPP_MEDIA_BUCKET } from "../src/lib/supabase-server";
+import { formatFileSize } from "../src/lib/format";
+import { queueReturnNote } from "../src/lib/queue-return";
 
 const prisma = new PrismaClient();
 const CNPJ = DEMO_CLINIC_CNPJ;
@@ -102,6 +107,10 @@ async function wipeDemo(clinicId: string) {
     userId: (await prisma.user.findMany({ where: { clinicId }, select: { id: true } })).map((u) => u.id),
     templateId: (await prisma.formTemplate.findMany({ where: { clinicId }, select: { id: true } })).map((t) => t.id),
   };
+  // Áudios e PDFs da demo (rodada anterior e os enviados na gravação) saem também do Storage.
+  const media = await prisma.message.findMany({ where: { conversationId: { in: ids.conversationId }, mediaPath: { not: null } }, select: { mediaPath: true } });
+  const storage = getSupabaseServerClient();
+  if (storage && media.length) await storage.storage.from(WHATSAPP_MEDIA_BUCKET).remove(media.map((m) => m.mediaPath!));
   const models = Prisma.dmmf.datamodel.models.filter((m) => !["Clinic", "User", "Contact", "Procedure"].includes(m.name));
   const client = prisma as unknown as Record<string, { deleteMany: (a: unknown) => Promise<unknown> }>;
   for (let pass = 0; pass < 6; pass++) {
@@ -147,6 +156,8 @@ async function main() {
       listedInMarketplace: false,
       defaultTicket: 250,
       urgencyTagEnabled: true,
+      // Volta à fila ligada (tela Esperando, vídeo 1). O robô pula a demo: nada muda sozinho.
+      unansweredReturnMinutes: 30,
       technicalDirectorName: "Dra. Lívia Andrade",
       technicalDirectorCrm: "CRM 000000 (demo)",
     },
@@ -310,6 +321,46 @@ async function main() {
       data: { clinicId: clinic.id, contactId: c.id, channel: "INSTAGRAM", status: "OPEN", funnelStage: "NOVOS", acquisitionChannel: "Instagram", createdAt: at, lastMessageAt: at },
     });
     await prisma.message.create({ data: { conversationId: conv.id, direction: "INBOUND", content: "Oi! Vi o post do check-up. Vocês atendem Unimed?", status: "DELIVERED", createdAt: at } });
+  }
+  // Áudio + pedido de exame em PDF recebidos (vídeo 1, cena 6). Arquivos fictícios em
+  // scripts/demo-assets (voz sintética, documento marcado "fictício"), no Storage da conversa.
+  {
+    const p = 36;
+    const at = new Date(now.getTime() - minutes(8));
+    const conv = await prisma.conversation.create({
+      data: { clinicId: clinic.id, contactId: contacts[p].id, status: "OPEN", funnelStage: "NOVOS", acquisitionChannel: "Google", createdAt: at, lastMessageAt: new Date(at.getTime() + minutes(1)) },
+    });
+    const file = (name: string, mimeType: string) => {
+      const buffer = readFileSync(join(process.cwd(), "scripts", "demo-assets", name));
+      return { buffer, mimeType };
+    };
+    const audio = file("audio-paciente.ogg", "audio/ogg; codecs=opus");
+    const pdf = file("pedido-exame.pdf", "application/pdf");
+    const audioUp = await uploadWhatsAppMedia(conv.id, audio.buffer, audio.mimeType);
+    const pdfUp = await uploadWhatsAppMedia(conv.id, pdf.buffer, pdf.mimeType);
+    if (!audioUp || !pdfUp) console.warn("⚠️ Áudio/PDF da demo não subiram para o Storage (falta SUPABASE_SERVICE_ROLE_KEY no .env?).");
+    await prisma.message.create({
+      data: { conversationId: conv.id, direction: "INBOUND", type: "AUDIO", content: "", status: "DELIVERED", mediaPath: audioUp?.path ?? null, mimeType: audio.mimeType, audioDuration: formatDuration(19), createdAt: at },
+    });
+    await prisma.message.create({
+      data: { conversationId: conv.id, direction: "INBOUND", type: "ATTACHMENT", content: "", status: "DELIVERED", mediaPath: pdfUp?.path ?? null, mimeType: pdf.mimeType, attachmentName: "pedido-ultrassom.pdf", attachmentSize: formatFileSize(pdf.buffer.byteLength), createdAt: new Date(at.getTime() + minutes(1)) },
+    });
+  }
+  // Conversa que voltou para a fila: o Bruno não respondeu a tempo (tela Esperando, vídeo 1).
+  {
+    const p = 38;
+    const asked = new Date(now.getTime() - minutes(42));
+    const conv = await prisma.conversation.create({
+      data: { clinicId: clinic.id, contactId: contacts[p].id, status: "OPEN", funnelStage: "TRIAGEM", acquisitionChannel: "Indicação", createdAt: new Date(asked.getTime() - minutes(20)), lastMessageAt: new Date(asked.getTime() + minutes(31)) },
+    });
+    await prisma.message.createMany({
+      data: [
+        { conversationId: conv.id, direction: "INBOUND", content: "Bom dia! Fiz exame de sangue aí semana passada", status: "READ", createdAt: new Date(asked.getTime() - minutes(20)) },
+        { conversationId: conv.id, direction: "OUTBOUND", content: "Bom dia! Vou verificar para você, um instante.", status: "READ", senderUserId: attendants[1].id, createdAt: new Date(asked.getTime() - minutes(18)) },
+        { conversationId: conv.id, direction: "INBOUND", content: "O resultado já saiu? Preciso levar na consulta amanhã", status: "DELIVERED", createdAt: asked },
+        { conversationId: conv.id, direction: "OUTBOUND", type: "INTERNAL_NOTE", content: queueReturnNote(attendants[1].name, 31), status: "SENT", createdAt: new Date(asked.getTime() + minutes(31)) },
+      ],
+    });
   }
   // Orçamentos esperando retorno (fila de cobrança 3/7/15 dias).
   for (const [k, d] of [3, 8, 16].entries()) {

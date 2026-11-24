@@ -1,5 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
+import { DEMO_CLINIC_CNPJ } from "@/lib/demo-clinic";
 import { notifyInboxRealtime } from "@/lib/supabase-server";
 import { decideQueueReturn, queueReturnNote } from "@/lib/queue-return";
 
@@ -12,7 +13,8 @@ const MESSAGES_PER_CONVERSATION = 30;
  * interna dizendo quem não respondeu. */
 export async function runQueueReturns(now = new Date()): Promise<{ returned: number }> {
   const clinics = await prisma.clinic.findMany({
-    where: { unansweredReturnMinutes: { gt: 0 } },
+    // A clínica demo mostra a tela ligada nos vídeos, mas nada muda sozinho durante a gravação.
+    where: { unansweredReturnMinutes: { gt: 0 }, cnpj: { not: DEMO_CLINIC_CNPJ } },
     select: { id: true, unansweredReturnMinutes: true },
   });
   let returned = 0;

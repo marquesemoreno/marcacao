@@ -1,6 +1,6 @@
 # Roteiro dos vídeos de apresentação — Conecta Saúde
 
-> Versão 2 — 19/11/2026 (v1 09/11). Para gravar com a **Clínica Vida (demo)** (`scripts/seed-demo-clinic.ts`): só dados fictícios,
+> Versão 2.1 — 24/11/2026 (v2 19/11, v1 09/11). Para gravar com a **Clínica Vida (demo)** (`scripts/seed-demo-clinic.ts`): só dados fictícios,
 > telefones com DDD 00, nenhum envio sai de verdade.
 
 ## Para quem e em que ordem
@@ -81,6 +81,7 @@ por último (é recorte dos outros, já com as melhores cenas).
 
 **Preparação:** login como recepcionista da demo. Ter conversas abertas: uma nova sem resposta, uma do Instagram,
 uma com áudio, uma "Aguardando você". Copiloto com crédito da OpenAI.
+Na demo, o que a atendente envia aparece como enviado (não sai nada: o WhatsApp da demo é de mentira).
 
 | Cena | Tela / ação | Fala |
 |------|-------------|------|
@@ -89,11 +90,11 @@ uma com áudio, uma "Aguardando você". Copiloto com crédito da OpenAI.
 | 3 (0:40) | Abrir conversa nova → pergunta de preço/convênio → botão de sugestão da IA | "Paciente perguntou se atende Unimed e quanto custa. A IA já conhece os preços, convênios e horários cadastrados e sugere a resposta. A atendente confere e envia." |
 | 4 (1:05) | Resposta rápida com variável ({{nome}}) | "Mensagens que se repetem viram respostas rápidas, já com o nome do paciente." |
 | 5 (1:20) | Conversa do Instagram Direct (gravar com a conta de teste @ti.vdc: o Instagram para pacientes ainda depende da revisão da Meta — se não sair até a gravação, cortar esta cena) | "Mensagem do Instagram? Mesmo lugar, mesma equipe, mesmo histórico." |
-| 6 (1:35) | Áudio recebido + enviar foto/PDF (pedido de exame) | "Áudio, foto do pedido médico, PDF — tudo chega e sai pelo Chat." |
+| 6 (1:35) | Conversa da Natália Farias: áudio + pedido de exame em PDF recebidos → tocar o áudio, abrir o PDF; para mostrar o envio, anexar `scripts/demo-assets/pedido-exame.pdf` em outra conversa | "Áudio, foto do pedido médico, PDF — tudo chega e sai pelo Chat." |
 | 7 (1:50) | Copiloto da Recepção: "tem horário pra dermato quinta?" → resposta com disponibilidade | "E o Copiloto: a recepcionista pergunta em português e ele consulta a agenda, sugere horário e até prepara um cancelamento — sempre pedindo confirmação antes de fazer." |
 | 8 (2:20) | Finalizar conversa com motivo (Agendou / Preço / Convênio) | "Ao terminar, a atendente marca o desfecho. É isso que alimenta o relatório de onde a clínica perde paciente." |
 | 8b (2:30) | Conversa perguntando "aceita SulAmérica?" → resposta da IA com os convênios cadastrados (IA › Convênios aceitos) | "A IA também responde quais convênios a clínica aceita, com a lista que a própria clínica cadastrou." |
-| 8c (2:35) | Tela Esperando (paciente sem resposta volta para Não atribuídas) | "Se a atendente não responde a tempo, a conversa volta para a fila e aparece em 'Esperando' — ninguém fica esquecido." |
+| 8c (2:35) | Conversa da Lívia Cunha (nota "Voltou para a fila: Bruno Lima não respondeu…") → tela Esperando, com a volta à fila ligada em 30 min | "Se a atendente não responde a tempo, a conversa volta para a fila e aparece em 'Esperando' — ninguém fica esquecido." |
 | 9 (2:40) | Conversa encerrada sozinha (aviso de fechamento) | "Conversa esquecida não fica aberta pra sempre: depois de 4 horas úteis sem resposta do paciente, ela encerra com uma mensagem educada — e reabre se ele voltar." |
 | 10 (2:55) | Encerramento | "Nenhum paciente sem resposta. Esse é o Chat." |
 
@@ -213,7 +214,8 @@ todos os estados (atendido, faltou, em atendimento, aguardando com chegada, conf
 preenchidas, amanhã com lembretes (confirmou, pediu para remarcar, cancelou, sem resposta, número errado) e as conversas
 correspondentes, semana seguinte, 4 marcadores com indicados/agendados/atendidos, consentimento de marketing em ~2/3 dos
 pacientes, um menor com responsável, um aniversariante do dia, régua (desligada), NPS com comentários, orçamentos de 3/8/16
-dias, lista de espera, senhas do dia, chamadas na TV, salas dos médicos, conversa do Instagram (só visual) e campanha concluída.
+dias, lista de espera, senhas do dia, conversa com áudio + PDF recebidos, conversa que voltou para a fila (volta à fila ligada,
+mas o robô pula a demo), chamadas na TV, salas dos médicos, conversa do Instagram (só visual) e campanha concluída.
 Desde 19/11 também: salas da aba Ocupação (3 consultórios de 30 min + sala de exames de 40 min, seg–sex 08–17) com agenda
 cheia nas últimas 2 semanas, e a campanha "Check-up de novembro" com sorteio entre 3 modelos (respostas por modelo no Relatório).
 
@@ -234,7 +236,8 @@ No fim ele imprime os links da TV, do totem e do QR de chegada da demo (novos a 
 **Checklist do dia da gravação**
 - [ ] Rodar o seed na manhã da gravação (datas são relativas a "hoje").
 - [ ] Senha da demo no `.env` local (DEMO_PASSWORD) — não aparece no vídeo.
-- [ ] Crédito da OpenAI ok (Copiloto e sugestões).
+- [ ] Crédito da OpenAI ok (Copiloto, sugestões e o botão Transcrever do áudio).
+- [ ] O seed avisa se o áudio/PDF não subiram (precisa de SUPABASE_SERVICE_ROLE_KEY no .env).
 - [ ] Segunda tela/TV com o link de TV que o seed imprimiu.
 - [ ] Celular com a câmera para o QR de chegada (gravar a tela do celular separado).
 - [ ] Navegador limpo, zoom certo, Não perturbe ligado.

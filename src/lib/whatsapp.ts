@@ -129,6 +129,20 @@ export async function getEvolutionConfig(clinicId?: string) {
   return getGlobalEvolutionConfig();
 }
 
+/** WhatsApp falso da clínica demo (scripts/seed-demo-clinic.ts aponta a instância para
+ * demo.invalid — o domínio .invalid é reservado e nunca existe). Os envios da demo fingem
+ * que deram certo, sem rede, para a gravação dos vídeos não mostrar "Falha ao enviar". */
+export function isDemoEvolutionUrl(apiUrl: string | null | undefined): boolean {
+  if (!apiUrl) return false;
+  try {
+    return new URL(apiUrl).hostname.endsWith(".invalid");
+  } catch {
+    return false;
+  }
+}
+
+const DEMO_SEND_RESULT = { success: true, skipped: false } as const;
+
 export function isWhatsAppConfigured(): boolean {
   const { apiUrl, apiKey, instanceName } = getGlobalEvolutionConfig();
   return Boolean(apiUrl && apiKey && instanceName);
@@ -143,6 +157,7 @@ export function isWhatsAppConfigured(): boolean {
  */
 export async function fetchWhatsAppProfilePicture(phone: string, clinicId?: string): Promise<string | null> {
   const { apiUrl, apiKey, instanceName } = await getEvolutionConfig(clinicId);
+  if (isDemoEvolutionUrl(apiUrl)) return null;
   if (!apiUrl || !apiKey || !instanceName) return null;
 
   const target = formatToWhatsAppNumber(phone);
@@ -182,6 +197,7 @@ export async function sendWhatsAppMessage(
   const cloud = await cloudSend.activeCloudAccount(clinicId);
   if (cloud) return cloudSend.cloudSendText(cloud, formatToWhatsAppNumber(to), text, event);
   const { apiUrl, apiKey, instanceName } = await getEvolutionConfig(clinicId);
+  if (isDemoEvolutionUrl(apiUrl)) return DEMO_SEND_RESULT;
   const target = formatToWhatsAppNumber(to);
 
   if (!apiUrl || !apiKey || !instanceName) {
@@ -298,6 +314,7 @@ export async function editWhatsAppMessage(
   clinicId?: string
 ): Promise<{ success: boolean; skipped: boolean; responseCode?: number | null }> {
   const { apiUrl, apiKey, instanceName } = await getEvolutionConfig(clinicId);
+  if (isDemoEvolutionUrl(apiUrl)) return DEMO_SEND_RESULT;
   const target = formatToWhatsAppNumber(to);
 
   if (!apiUrl || !apiKey || !instanceName) {
@@ -363,6 +380,7 @@ export async function sendWhatsAppMedia(
   const cloud = await cloudSend.activeCloudAccount(clinicId);
   if (cloud) return cloudSend.cloudSendMedia(cloud, formatToWhatsAppNumber(to), { link: mediaUrl, mimeType, caption, fileName }, event);
   const { apiUrl, apiKey, instanceName } = await getEvolutionConfig(clinicId);
+  if (isDemoEvolutionUrl(apiUrl)) return DEMO_SEND_RESULT;
   const target = formatToWhatsAppNumber(to);
 
   if (!apiUrl || !apiKey || !instanceName) {
@@ -470,6 +488,7 @@ export async function sendWhatsAppAudio(
     return cloudSend.cloudSendMedia(cloud, formatToWhatsAppNumber(to), { link: mediaUrl, mimeType: "audio/ogg" }, event);
   }
   const { apiUrl, apiKey, instanceName } = await getEvolutionConfig(clinicId);
+  if (isDemoEvolutionUrl(apiUrl)) return DEMO_SEND_RESULT;
   const target = formatToWhatsAppNumber(to);
 
   if (!apiUrl || !apiKey || !instanceName) {
@@ -560,6 +579,7 @@ export async function sendWhatsAppContact(
   const cloud = await cloudSend.activeCloudAccount(clinicId);
   if (cloud) return cloudSend.cloudSendContact(cloud, formatToWhatsAppNumber(to), { name: contactName, phone: formatToWhatsAppNumber(contactPhone) }, event);
   const { apiUrl, apiKey, instanceName } = await getEvolutionConfig(clinicId);
+  if (isDemoEvolutionUrl(apiUrl)) return DEMO_SEND_RESULT;
   const target = formatToWhatsAppNumber(to);
   const contactWuid = formatToWhatsAppNumber(contactPhone);
 
@@ -627,6 +647,7 @@ export async function sendWhatsAppReaction(
   const cloud = await cloudSend.activeCloudAccount(clinicId);
   if (cloud) return cloudSend.cloudSendReaction(cloud, formatToWhatsAppNumber(target.remoteJid), target.keyId, emoji, event);
   const { apiUrl, apiKey, instanceName } = await getEvolutionConfig(clinicId);
+  if (isDemoEvolutionUrl(apiUrl)) return DEMO_SEND_RESULT;
 
   if (!apiUrl || !apiKey || !instanceName) {
     await prisma.webhookLog.create({

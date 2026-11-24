@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { isValidWhatsAppNumber, formatToWhatsAppNumber } from "./whatsapp";
+import { isValidWhatsAppNumber, formatToWhatsAppNumber, isDemoEvolutionUrl } from "./whatsapp";
 
 describe("isValidWhatsAppNumber", () => {
   it("aceita um celular brasileiro completo (DDI + DDD + 9 dígitos)", () => {
@@ -33,5 +33,18 @@ describe("isValidWhatsAppNumber", () => {
     // TODOS os 28 lembretes D-1 de teste falharam no envio por causa disso.
     expect(formatToWhatsAppNumber("077991000524")).toBe("5577991000524");
     expect(isValidWhatsAppNumber("077991000524")).toBe(true);
+  });
+});
+
+describe("isDemoEvolutionUrl (clínica demo dos vídeos)", () => {
+  it("reconhece o WhatsApp falso da demo (domínio .invalid nunca existe)", () => {
+    expect(isDemoEvolutionUrl("https://demo.invalid")).toBe(true);
+    expect(isDemoEvolutionUrl("https://demo.invalid/")).toBe(true);
+  });
+  it("não confunde com uma Evolution de verdade", () => {
+    expect(isDemoEvolutionUrl("https://evolution.tivdc.com.br")).toBe(false);
+    expect(isDemoEvolutionUrl("https://invalid.com.br")).toBe(false);
+    expect(isDemoEvolutionUrl(undefined)).toBe(false);
+    expect(isDemoEvolutionUrl("não é url")).toBe(false);
   });
 });
