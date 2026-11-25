@@ -39,7 +39,7 @@ import { getTagAudience, listTagAudienceOptions } from "@/actions/tag-audience";
 import type { TagAudienceOption } from "@/lib/tag-audience";
 import { SELECTION_BROADCAST_KEY } from "@/components/clinic/patient-list-table";
 import { buildBroadcastMessage, parseBroadcastCsv, BROADCAST_OPT_OUT_FOOTER, type ParsedBroadcastRecipient } from "@/lib/broadcast-csv";
-import { estimateCampaignFinish, MARKETING_DAILY_CAP, unfilledPlaceholders, unknownTemplateVariables } from "@/lib/broadcast-schedule";
+import { CLOUD_DAILY_CAP, CLOUD_PER_MINUTE, estimateCampaignFinish, MARKETING_DAILY_CAP, unfilledPlaceholders, unknownTemplateVariables } from "@/lib/broadcast-schedule";
 import { smsCostRange } from "@/lib/broadcast-channel";
 import { RescheduleBroadcastModal } from "@/components/clinic/reschedule-broadcast-modal";
 import { BroadcastPreview } from "@/components/clinic/broadcast-preview";
@@ -588,7 +588,7 @@ export function BroadcastManagement() {
   const variantError = cloudMode ? templateProblem : variantCheck && !variantCheck.ok ? variantCheck.error : null;
   const hasMessage = cloudMode ? Boolean(selectedTemplate) : Boolean(template.trim());
   const livePreview = variantPreviews[0]?.text ?? "";
-  const formEstimate = recipients.length ? estimateCampaignFinish({ pending: recipients.length, sentToday: 0, now: new Date() }) : null;
+  const formEstimate = recipients.length ? estimateCampaignFinish({ pending: recipients.length, sentToday: 0, now: new Date(), cloud: cloudMode }) : null;
   const sourceOptions: [Source, string][] = [
     ...(audienceSource === "selecao" ? ([["selecao", `Seleção da lista de pacientes`]] as [Source, string][]) : []),
     ...(hasBridge ? ([["bridge", "Pacientes do sistema da clínica"]] as [Source, string][]) : []),
@@ -1352,7 +1352,7 @@ export function BroadcastManagement() {
                 : !hasMessage
                   ? cloudMode ? "Falta escolher o modelo." : "Falta escrever a mensagem."
                   : formEstimate
-                ? `${plural(recipients.length, "destinatário", "destinatários")} · envio seguro: 1 a cada 4–6 min, seg–sex 9h–17h, até ${MARKETING_DAILY_CAP}/dia — ${estimateText(formEstimate.businessDays, formEstimate.finishIso)} se começar agora.`
+                ? `${plural(recipients.length, "destinatário", "destinatários")} · ${cloudMode ? `API oficial: até ${CLOUD_PER_MINUTE}/min, seg–sex 9h–17h, até ${CLOUD_DAILY_CAP}/dia` : `envio seguro: 1 a cada 4–6 min, seg–sex 9h–17h, até ${MARKETING_DAILY_CAP}/dia`} — ${estimateText(formEstimate.businessDays, formEstimate.finishIso)} se começar agora.`
                 : "Escolha o público para ver a previsão de envio."}
             </p>
             {formStep === 1 ? (
@@ -1588,8 +1588,12 @@ export function BroadcastManagement() {
                 <details className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                   <summary className="cursor-pointer">Como é o ritmo</summary>
                   <p className="mt-1">
-                    Uma mensagem a cada 4–6 min, de segunda a sexta das 9h às 17h, até {MARKETING_DAILY_CAP} por dia.
-                    {confirming.preview.lowPriority
+                    {confirming.preview.viaCloud
+                      ? `API oficial: até ${CLOUD_PER_MINUTE} mensagens por minuto, de segunda a sexta das 9h às 17h, até ${CLOUD_DAILY_CAP} por dia na clínica (nível da Meta).`
+                      : `Uma mensagem a cada 4–6 min, de segunda a sexta das 9h às 17h, até ${MARKETING_DAILY_CAP} por dia.`}
+                    {confirming.preview.viaCloud
+                      ? ""
+                      : confirming.preview.lowPriority
                       ? " Baixa prioridade espera os lembretes e outras campanhas, então pode demorar mais."
                       : confirming.preview.remindersOn
                         ? " Os lembretes de confirmação têm a vez nas manhãs, então pode terminar um pouco depois."

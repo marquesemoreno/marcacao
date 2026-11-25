@@ -21,7 +21,9 @@ export async function lastAutomatedSend(clinicId: string): Promise<{ at: Date | 
         sentAt: { not: null },
         // SMS e e-mail não contam: o intervalo único existe por causa do risco de bloqueio do
         // número de WhatsApp.
-        campaign: { clinicId, channel: "WHATSAPP" },
+        // Modelo da API oficial também não (25/11/2026): o lote por minuto da campanha
+        // travaria os lembretes do número não oficial para sempre.
+        campaign: { clinicId, channel: "WHATSAPP", cloudTemplateName: null },
       },
       orderBy: { sentAt: "desc" },
       select: { sentAt: true },
@@ -52,7 +54,8 @@ export async function marketingCampaignReady(clinicId: string, now: Date): Promi
   if (!isWithinMarketingWindow(now)) return false;
   const campaigns = await prisma.broadcastCampaign.findMany({
     // Campanha de baixa prioridade não disputa a vez com os lembretes (eles vêm antes).
-    where: { clinicId, channel: "WHATSAPP", status: "RUNNING", lowPriority: false, OR: [{ tagOnSend: null }, { tagOnSend: { not: RESCHEDULE_PENDING_TAG } }] },
+    // Campanha pela API oficial (modelo) tem ritmo próprio e não disputa a vez com os lembretes.
+    where: { clinicId, channel: "WHATSAPP", status: "RUNNING", lowPriority: false, cloudTemplateName: null, OR: [{ tagOnSend: null }, { tagOnSend: { not: RESCHEDULE_PENDING_TAG } }] },
     select: { id: true },
   });
   for (const c of campaigns) {
@@ -63,4 +66,12 @@ export async function marketingCampaignReady(clinicId: string, now: Date): Promi
     if (pending > 0 && sentToday < MARKETING_DAILY_CAP) return true;
   }
   return false;
+}
+
+/** Enviadas hoje pela API oficial (campanhas com modelo) na clínica toda — base do teto
+ * diário CLOUD_DAILY_CAP (nível de mensagens da Meta é por número, não por campanha). */
+export async function cloudSentToday(clinicId: string, now: Date): Promise<number> {
+  return prisma.broadcastRecipient.count({
+    where: { status: "SENT", sentAt: { gte: startOfBrazilDay(now) }, campaign: { clinicId, channel: "WHATSAPP", cloudTemplateName: { not: null } } },
+  });
 }

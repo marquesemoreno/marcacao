@@ -27,7 +27,7 @@ import { requiresTechnicalDirector, skipsMarketingConsent } from "@/lib/campaign
 import { toggleNinthDigit } from "@/lib/whatsapp";
 import { formatDate, getBaseUrl } from "@/lib/format";
 import { fetchBridgeCampaignPatients, fetchBridgeDoctors } from "@/lib/hospital-bridge";
-import { lastAutomatedSend } from "@/lib/automated-pacing-server";
+import { cloudSentToday, lastAutomatedSend } from "@/lib/automated-pacing-server";
 import { buildCampaignAudience } from "@/lib/campaign-audience";
 import { missingChannelConfig } from "@/lib/channel-config";
 import { channelSendDecision } from "@/lib/channel-consent";
@@ -72,6 +72,11 @@ export async function listClinicBroadcastCampaigns() {
     c.status === "RUNNING" && c.tagOnSend !== RESCHEDULE_PENDING_TAG && c.recipients.some((r) => r.status === "PENDING");
   const highPriorityActive = campaigns.filter((c) => isActiveMarketing(c) && !c.lowPriority).length;
   const highPriorityPending = highPriorityActive > 0;
+  // API oficial (modelo): teto diário da clínica, dividido entre as campanhas ativas por modelo.
+  const cloudSentTodayClinic = campaigns
+    .filter((c) => c.cloudTemplateName)
+    .reduce((n, c) => n + c.recipients.filter((r) => r.status === "SENT" && r.sentAt && r.sentAt >= dayStart).length, 0);
+  const cloudActive = campaigns.filter((c) => c.cloudTemplateName && isActiveMarketing(c)).length;
 
   return campaigns.map((c) => {
     const sent = c.recipients.filter((r) => r.status === "SENT").length;
@@ -85,11 +90,14 @@ export async function listClinicBroadcastCampaigns() {
     // SMS e e-mail não seguem o ritmo de 4–6 min do WhatsApp: sem previsão baseada nele.
     const isWhatsapp = c.channel === "WHATSAPP";
     // Campanhas normais ativas se revezam no mesmo ritmo da clínica (ver automated-pacing).
-    const sharing = c.lowPriority ? 1 : Math.max(1, highPriorityActive);
-    const estimate = isReschedule || !isWhatsapp ? { businessDays: 0, finishIso: null } : estimateCampaignFinish({ pending, sentToday, now, sharing });
+    const cloud = Boolean(c.cloudTemplateName);
+    const sharing = cloud ? Math.max(1, cloudActive) : c.lowPriority ? 1 : Math.max(1, highPriorityActive);
+    const estimate = isReschedule || !isWhatsapp
+      ? { businessDays: 0, finishIso: null }
+      : estimateCampaignFinish({ pending, sentToday: cloud ? cloudSentTodayClinic : sentToday, now, sharing, cloud });
     // Com lembretes de confirmação ativos, nas manhãs eles têm a vez — o fim real pode
     // cair mais tarde: a tela mostra uma faixa ("entre X e Y") em vez de uma data só.
-    const late = !isReschedule && isWhatsapp && remindersOn && !c.lowPriority
+    const late = !isReschedule && isWhatsapp && remindersOn && !c.lowPriority && !cloud
       ? estimateCampaignFinish({ pending, sentToday, now, sharing: sharing + 1 })
       : null;
     return {
@@ -130,7 +138,7 @@ export async function listClinicBroadcastCampaigns() {
         ? { tone: "ok" as const, text: "Enviando aviso de remarcação — 1 a cada 4–6 min, das 8h às 18h" }
         : !isWhatsapp && c.status === "RUNNING" && pending > 0
           ? { tone: "ok" as const, text: `Enviando por ${c.channel === "SMS" ? "SMS" : "e-mail"} em lotes, de segunda a sexta das 9h às 17h` }
-          : campaignSituation({ status: c.status, pending, sentToday, yielding, now, sharing }),
+          : campaignSituation({ status: c.status, pending, sentToday: cloud ? cloudSentTodayClinic : sentToday, yielding, now, sharing, cloud }),
       isReschedule,
       urgentLastAt: isReschedule && pending > 0 ? urgentSendTimes(pending, now).at(-1)?.toISOString() ?? null : null,
       needsCall: isReschedule ? buildCallList(c.recipients, now) : [],
@@ -300,7 +308,10 @@ export async function getClinicCampaignStartPreview(campaignId: string) {
     attachmentKind: campaign?.imagePath ? attachmentKindOf(campaign.imageMimeType) : null,
     attachmentName: !usesTemplate ? campaign?.attachmentName ?? null : null,
     lowPriority: Boolean(campaign?.lowPriority),
-    ...estimateCampaignFinish({ pending, sentToday, now: new Date(), sharing: campaign?.lowPriority ? 1 : 1 + otherActive }),
+    ...(usesTemplate
+      ? estimateCampaignFinish({ pending, sentToday: await cloudSentToday(clinicId, new Date()), now: new Date(), cloud: true })
+      : estimateCampaignFinish({ pending, sentToday, now: new Date(), sharing: campaign?.lowPriority ? 1 : 1 + otherActive })),
+    viaCloud: usesTemplate,
     remindersOn: await clinicRemindersActive(clinicId, new Date()),
     isReschedule,
     urgentLastAt: isReschedule && pending > 0 ? urgentSendTimes(pending, new Date()).at(-1)?.toISOString() ?? null : null,

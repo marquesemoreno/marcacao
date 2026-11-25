@@ -10,9 +10,9 @@ import { buildTemplateParams, cloudBroadcastMode, parseCloudTemplateVariants, pi
 import { activeCloudAccount, cloudSendTemplate } from "@/lib/whatsapp-cloud-send";
 import { RESCHEDULE_PENDING_TAG } from "@/lib/conversation-tags";
 import { skipsMarketingConsent, tagToApplyOnSend } from "@/lib/campaign-kind";
-import { lastAutomatedSend } from "@/lib/automated-pacing-server";
+import { cloudSentToday, lastAutomatedSend } from "@/lib/automated-pacing-server";
 import { isWithinReminderWindow, lowPriorityMustYield } from "@/lib/automated-pacing";
-import { isMarketingGapElapsed, isWithinMarketingWindow, MARKETING_DAILY_CAP, startOfBrazilDay } from "@/lib/broadcast-schedule";
+import { cloudBatchSize, isMarketingGapElapsed, isWithinMarketingWindow, MARKETING_DAILY_CAP, startOfBrazilDay } from "@/lib/broadcast-schedule";
 
 
 function randomDelayMs(): number {
@@ -39,8 +39,33 @@ export async function dispatchNextBatch(): Promise<{ processed: number }> {
     // seg–sex 09–17h, 1 por vez com 4–6 min sorteados desde a última enviada e no máximo
     // MARKETING_DAILY_CAP por dia.
     const isMarketing = campaign.tagOnSend !== RESCHEDULE_PENDING_TAG;
-    const take = 1;
-    if (!isMarketing) {
+    // API oficial: sem modelo aprovado a campanha fica parada (não queima a fila com falhas).
+    const cloudAccount = await activeCloudAccount(campaign.clinicId);
+    const mode = cloudBroadcastMode({ cloudActive: Boolean(cloudAccount), templateName: campaign.cloudTemplateName });
+    if (mode === "MISSING_TEMPLATE") continue;
+    const viaCloud = mode === "TEMPLATE" && Boolean(cloudAccount);
+    let take = 1;
+    if (isMarketing && viaCloud) {
+      // Modelo aprovado pela API oficial: lote por minuto e teto diário da clínica
+      // (cloudBatchSize em broadcast-schedule.ts) — sem o intervalo de 4–6 min do número
+      // não oficial, que nem conta mais para o ritmo dos lembretes (lastAutomatedSend).
+      if (!isWithinMarketingWindow(now)) continue;
+      if (campaign.lowPriority) {
+        const otherCampaignPending = await prisma.broadcastRecipient.count({
+          where: {
+            status: "PENDING",
+            campaign: { clinicId: campaign.clinicId, channel: "WHATSAPP", status: "RUNNING", lowPriority: false, id: { not: campaign.id } },
+          },
+        });
+        if (otherCampaignPending > 0) continue;
+      }
+      const [clinicSentToday, pending] = await Promise.all([
+        cloudSentToday(campaign.clinicId, now),
+        prisma.broadcastRecipient.count({ where: { campaignId: campaign.id, status: "PENDING" } }),
+      ]);
+      take = cloudBatchSize({ sentToday: clinicSentToday, pending });
+      if (take === 0) continue;
+    } else if (!isMarketing) {
       // Aviso de remarcação: também 1 a cada 4–6 min, no intervalo único da clínica
       // (decisão do usuário em 15/10/2026, pra evitar bloqueio), mas sem esperar o horário
       // das campanhas — sai das 08h às 18h todo dia, como os lembretes, e sem limite diário.
@@ -48,6 +73,8 @@ export async function dispatchNextBatch(): Promise<{ processed: number }> {
       const last = await lastAutomatedSend(campaign.clinicId);
       if (!isMarketingGapElapsed(last.at, now, Math.random())) continue;
     } else {
+      // Marketing pelo número não oficial: só seg–sex 09–17h, 1 por vez com 4–6 min
+      // sorteados desde a última enviada e no máximo MARKETING_DAILY_CAP por dia.
       if (!isWithinMarketingWindow(now)) continue;
       const sentToday = await prisma.broadcastRecipient.count({
         where: { campaignId: campaign.id, status: "SENT", sentAt: { gte: startOfBrazilDay(now) } },
@@ -70,10 +97,6 @@ export async function dispatchNextBatch(): Promise<{ processed: number }> {
       const last = await lastAutomatedSend(campaign.clinicId);
       if (!isMarketingGapElapsed(last.at, now, Math.random())) continue;
     }
-    // API oficial: sem modelo aprovado a campanha fica parada (não queima a fila com falhas).
-    const cloudAccount = await activeCloudAccount(campaign.clinicId);
-    const mode = cloudBroadcastMode({ cloudActive: Boolean(cloudAccount), templateName: campaign.cloudTemplateName });
-    if (mode === "MISSING_TEMPLATE") continue;
 
     const recipients = await prisma.broadcastRecipient.findMany({
       where: { campaignId: campaign.id, status: "PENDING" },
@@ -82,7 +105,8 @@ export async function dispatchNextBatch(): Promise<{ processed: number }> {
     });
 
     for (const recipient of recipients) {
-      if (processed > 0) await sleep(randomDelayMs());
+      // Pausa curta entre envios só no número não oficial; a API oficial aguenta lote.
+      if (processed > 0 && !viaCloud) await sleep(randomDelayMs());
       processed++;
 
       const contact = await prisma.contact.findUnique({
