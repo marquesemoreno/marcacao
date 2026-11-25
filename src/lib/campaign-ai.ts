@@ -43,9 +43,10 @@ export type CampaignAiOutcome = "QUER_AGENDAR" | "SEM_INTERESSE" | "DUVIDA" | "I
 /** Frases fixas (pedido da clínica em 25/11: a IA respondeu "Que bom ver seu sorriso!" a um
  * emoji). A IA só CLASSIFICA a resposta do paciente; o texto é sempre um destes. */
 export const CAMPAIGN_AI_TEXTS = {
-  pergunta: "Você deseja agendar uma consulta ou um exame?",
-  aguardar: "Perfeito! Aguarde só um instante, que nossa equipe já vai falar com você por aqui. 💙",
-  obrigada: "Tudo bem! Obrigada pela atenção. Quando precisar, estamos por aqui. 💙",
+  // Tom da recepção da Urolaser (docs/analise-tom-atendentes-urolaser.md): curto, "nós", sem emoji.
+  pergunta: "Olá, tudo bem? Gostaria de agendar uma consulta ou um exame?",
+  aguardar: "Certinho! Só um instante, que já vamos te atender por aqui.",
+  obrigada: "Certinho! Ficamos à disposição.",
 } as const;
 
 /** O que responder e o que fazer depois. WAIT_ANSWER = perguntou, espera a resposta;

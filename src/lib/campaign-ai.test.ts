@@ -113,10 +113,13 @@ describe("campaignAiReply — sempre as mesmas frases (sem comentar emoji, sem i
   it("indefinido de novo: não insiste, fica com a recepção sem mandar nada", () => {
     expect(campaignAiReply("INDEFINIDO", { alreadyAsked: true })).toEqual({ text: null, next: "HANDOFF" });
   });
+  it("sem emoji, como a recepção", () => {
+    for (const t of Object.values(CAMPAIGN_AI_TEXTS)) expect(t).not.toMatch(/\p{Extended_Pictographic}/u);
+  });
   it("as frases fixas", () => {
-    expect(CAMPAIGN_AI_TEXTS.pergunta).toBe("Você deseja agendar uma consulta ou um exame?");
-    expect(CAMPAIGN_AI_TEXTS.aguardar).toMatch(/aguarde/i);
-    expect(CAMPAIGN_AI_TEXTS.obrigada).toMatch(/obrigad/i);
+    expect(CAMPAIGN_AI_TEXTS.pergunta).toBe("Olá, tudo bem? Gostaria de agendar uma consulta ou um exame?");
+    expect(CAMPAIGN_AI_TEXTS.aguardar).toBe("Certinho! Só um instante, que já vamos te atender por aqui.");
+    expect(CAMPAIGN_AI_TEXTS.obrigada).toBe("Certinho! Ficamos à disposição.");
     for (const t of Object.values(CAMPAIGN_AI_TEXTS)) expect(t).not.toMatch(/sorriso|transferi|hor[aá]rio|dia|turno/i);
   });
 });
