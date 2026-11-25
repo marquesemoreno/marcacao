@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { campaignAiDecision, buildCampaignAiPrompt, parseCampaignAiOutput, CAMPAIGN_AI_MAX_REPLIES, CAMPAIGN_AI_WINDOW_DAYS, CAMPAIGN_AI_TAG } from "./campaign-ai";
+import { campaignAiDecision, buildCampaignAiPrompt, parseCampaignAiOutcome, campaignAiReply, CAMPAIGN_AI_TEXTS, CAMPAIGN_AI_MAX_REPLIES, CAMPAIGN_AI_WINDOW_DAYS, CAMPAIGN_AI_TAG } from "./campaign-ai";
 
 const now = new Date("2026-11-25T13:00:00Z");
 const base = {
@@ -56,41 +56,16 @@ describe("campaignAiDecision", () => {
   });
 });
 
-describe("buildCampaignAiPrompt", () => {
-  const prompt = buildCampaignAiPrompt({ assistantName: "Lara", clinicName: "Urolaser", knowledge: "Convênios: Unimed" });
+describe("buildCampaignAiPrompt (a IA só classifica, não escreve)", () => {
+  const prompt = buildCampaignAiPrompt({ clinicName: "Urolaser" });
 
-  it("fala como a Lara e admite ser assistente virtual se perguntarem", () => {
-    expect(prompt).toContain("Lara");
-    expect(prompt).toMatch(/assistente virtual/i);
+  it("pede só o resultado em JSON", () => {
+    for (const r of ["QUER_AGENDAR", "SEM_INTERESSE", "DUVIDA", "INDEFINIDO"]) expect(prompt).toContain(r);
+    expect(prompt).toMatch(/json/i);
   });
 
-  it("só pergunta se quer agendar consulta ou exame — dia e turno ficam com a atendente", () => {
-    expect(prompt).toMatch(/consulta ou (um )?exame/i);
-    expect(prompt).toMatch(/nunca pergunte (o )?dia/i);
-    expect(prompt).toMatch(/turno/i);
-  });
-
-  it("pede para aguardar quando a pessoa quer agendar", () => {
-    expect(prompt).toMatch(/aguard/i);
-  });
-
-  it("pede a resposta em JSON com o resultado", () => {
-    expect(prompt).toContain("QUER_AGENDAR");
-    expect(prompt).toContain("SEM_INTERESSE");
-    expect(prompt).toContain("PERGUNTANDO");
-  });
-
-  it("é discreta: nunca anuncia transferência e nunca promete horário", () => {
-    expect(prompt).toMatch(/nunca diga que vai transferir/i);
-    expect(prompt).toMatch(/nunca (prometa|confirme) hor[aá]rio/i);
-  });
-
-  it("usa só a base de conhecimento da clínica", () => {
-    expect(prompt).toContain("Convênios: Unimed");
-  });
-
-  it("sem nome cadastrado, usa Lara", () => {
-    expect(buildCampaignAiPrompt({ assistantName: null, clinicName: "X", knowledge: "" })).toContain("Lara");
+  it("emoji, figurinha ou cumprimento sozinho é INDEFINIDO", () => {
+    expect(prompt).toMatch(/emoji/i);
   });
 });
 
@@ -104,17 +79,44 @@ describe("limite curto", () => {
   });
 });
 
-describe("parseCampaignAiOutput", () => {
-  it("lê mensagem e resultado", () => {
-    expect(parseCampaignAiOutput('{"mensagem":"Ótimo! Aguarde um instante.","resultado":"QUER_AGENDAR"}')).toEqual({ text: "Ótimo! Aguarde um instante.", outcome: "QUER_AGENDAR" });
-    expect(parseCampaignAiOutput('{"mensagem":"Tudo bem, obrigada!","resultado":"SEM_INTERESSE"}')).toEqual({ text: "Tudo bem, obrigada!", outcome: "SEM_INTERESSE" });
+describe("parseCampaignAiOutcome", () => {
+  it("lê o resultado", () => {
+    expect(parseCampaignAiOutcome('{"resultado":"QUER_AGENDAR"}')).toBe("QUER_AGENDAR");
+    expect(parseCampaignAiOutcome('{"resultado":"SEM_INTERESSE"}')).toBe("SEM_INTERESSE");
+    expect(parseCampaignAiOutcome('{"resultado":"DUVIDA"}')).toBe("DUVIDA");
+    expect(parseCampaignAiOutcome('{"resultado":"INDEFINIDO"}')).toBe("INDEFINIDO");
   });
-  it("resultado desconhecido vira PERGUNTANDO", () => {
-    expect(parseCampaignAiOutput('{"mensagem":"Oi!","resultado":"XYZ"}')).toEqual({ text: "Oi!", outcome: "PERGUNTANDO" });
+  it("resultado desconhecido vira INDEFINIDO", () => {
+    expect(parseCampaignAiOutcome('{"resultado":"XYZ"}')).toBe("INDEFINIDO");
   });
-  it("sem JSON válido ou sem mensagem: null (fica com a recepção)", () => {
-    expect(parseCampaignAiOutput("Oi, tudo bem?")).toBeNull();
-    expect(parseCampaignAiOutput('{"resultado":"QUER_AGENDAR"}')).toBeNull();
-    expect(parseCampaignAiOutput("")).toBeNull();
+  it("sem JSON: null (fica com a recepção)", () => {
+    expect(parseCampaignAiOutcome("Oi")).toBeNull();
+    expect(parseCampaignAiOutcome("")).toBeNull();
+    expect(parseCampaignAiOutcome(null)).toBeNull();
+  });
+});
+
+describe("campaignAiReply — sempre as mesmas frases (sem comentar emoji, sem improviso)", () => {
+  it("quer agendar: pede para aguardar e passa para a recepção", () => {
+    const r = campaignAiReply("QUER_AGENDAR", { alreadyAsked: false });
+    expect(r).toEqual({ text: CAMPAIGN_AI_TEXTS.aguardar, next: "HANDOFF" });
+  });
+  it("dúvida: também pede para aguardar a recepção", () => {
+    expect(campaignAiReply("DUVIDA", { alreadyAsked: true })).toEqual({ text: CAMPAIGN_AI_TEXTS.aguardar, next: "HANDOFF" });
+  });
+  it("sem interesse: agradece e finaliza", () => {
+    expect(campaignAiReply("SEM_INTERESSE", { alreadyAsked: false })).toEqual({ text: CAMPAIGN_AI_TEXTS.obrigada, next: "CLOSE" });
+  });
+  it("indefinido (ex.: só um 😊): pergunta uma vez", () => {
+    expect(campaignAiReply("INDEFINIDO", { alreadyAsked: false })).toEqual({ text: CAMPAIGN_AI_TEXTS.pergunta, next: "WAIT_ANSWER" });
+  });
+  it("indefinido de novo: não insiste, fica com a recepção sem mandar nada", () => {
+    expect(campaignAiReply("INDEFINIDO", { alreadyAsked: true })).toEqual({ text: null, next: "HANDOFF" });
+  });
+  it("as frases fixas", () => {
+    expect(CAMPAIGN_AI_TEXTS.pergunta).toBe("Você deseja agendar uma consulta ou um exame?");
+    expect(CAMPAIGN_AI_TEXTS.aguardar).toMatch(/aguarde/i);
+    expect(CAMPAIGN_AI_TEXTS.obrigada).toMatch(/obrigad/i);
+    for (const t of Object.values(CAMPAIGN_AI_TEXTS)) expect(t).not.toMatch(/sorriso|transferi|hor[aá]rio|dia|turno/i);
   });
 });

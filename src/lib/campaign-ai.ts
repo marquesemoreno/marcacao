@@ -38,45 +38,45 @@ export function campaignAiDecision(input: {
   return "REPLY";
 }
 
-export type CampaignAiOutcome = "PERGUNTANDO" | "QUER_AGENDAR" | "SEM_INTERESSE";
+export type CampaignAiOutcome = "QUER_AGENDAR" | "SEM_INTERESSE" | "DUVIDA" | "INDEFINIDO";
 
-/** Roteiro curto (pedido do usuário em 25/11): só pergunta se a pessoa quer agendar consulta
- * ou exame. Quer → pede para aguardar a equipe e para. Não quer → agradece e finaliza.
- * Dia, turno, médico, convênio: tudo com a atendente. */
-export function buildCampaignAiPrompt(input: { assistantName: string | null; clinicName: string; knowledge: string }): string {
-  const name = input.assistantName?.trim() || "Lara";
-  return `Você é ${name}, assistente virtual da ${input.clinicName}, continuando pelo WhatsApp a conversa de uma campanha que o paciente acabou de responder (a mensagem da campanha está no histórico).
+/** Frases fixas (pedido da clínica em 25/11: a IA respondeu "Que bom ver seu sorriso!" a um
+ * emoji). A IA só CLASSIFICA a resposta do paciente; o texto é sempre um destes. */
+export const CAMPAIGN_AI_TEXTS = {
+  pergunta: "Você deseja agendar uma consulta ou um exame?",
+  aguardar: "Perfeito! Aguarde só um instante, que nossa equipe já vai falar com você por aqui. 💙",
+  obrigada: "Tudo bem! Obrigada pela atenção. Quando precisar, estamos por aqui. 💙",
+} as const;
 
-Seu único papel: saber se a pessoa deseja agendar uma consulta ou um exame.
-- Se ainda não ficou claro, pergunte só isso, de forma simpática: se deseja agendar uma consulta ou um exame.
-- Se a pessoa quer agendar (ou disse qual: consulta/exame): agradeça e peça para aguardar um instante, que a equipe da recepção já vai falar com ela por aqui. Resultado QUER_AGENDAR.
-- Se a pessoa não quer, agradeça com gentileza e se despeça. Resultado SEM_INTERESSE.
-- Se fizer uma pergunta (preço, convênio, preparo, dúvida de saúde), diga que a equipe da recepção vai responder em instantes e peça para aguardar. Resultado QUER_AGENDAR.
-
-Regras:
-1. Você é uma assistente virtual (IA). Se perguntarem, confirme com naturalidade.
-2. No máximo 2 frases curtas, sem listas, no máximo 1 emoji.
-3. Nunca pergunte o dia, a data, o horário, o turno, o médico ou o convênio — isso é com a atendente.
-4. Nunca prometa horário, vaga ou data, nem confirme nenhum deles.
-5. Nunca dê diagnóstico, interprete exame, indique remédio ou diga se algo é grave.
-6. Nunca diga que vai transferir, encaminhar ou chamar um atendente — apenas peça para aguardar.
-7. Não invente informação da clínica; use só a base de conhecimento abaixo, se precisar.
-
-Responda SOMENTE em JSON: {"mensagem": "<texto para o paciente>", "resultado": "PERGUNTANDO" | "QUER_AGENDAR" | "SEM_INTERESSE"}${input.knowledge ? `
-
-Base de conhecimento da clínica (fonte da verdade):
-${input.knowledge}` : ""}`;
+/** O que responder e o que fazer depois. WAIT_ANSWER = perguntou, espera a resposta;
+ * HANDOFF = sai de cena (conversa na fila da recepção); CLOSE = finaliza a conversa. */
+export function campaignAiReply(
+  outcome: CampaignAiOutcome,
+  ctx: { alreadyAsked: boolean },
+): { text: string | null; next: "WAIT_ANSWER" | "HANDOFF" | "CLOSE" } {
+  if (outcome === "QUER_AGENDAR" || outcome === "DUVIDA") return { text: CAMPAIGN_AI_TEXTS.aguardar, next: "HANDOFF" };
+  if (outcome === "SEM_INTERESSE") return { text: CAMPAIGN_AI_TEXTS.obrigada, next: "CLOSE" };
+  if (!ctx.alreadyAsked) return { text: CAMPAIGN_AI_TEXTS.pergunta, next: "WAIT_ANSWER" };
+  return { text: null, next: "HANDOFF" };
 }
 
-/** Lê a saída JSON da IA. null = inválida (a conversa fica com a recepção, nada é enviado). */
-export function parseCampaignAiOutput(raw: string | null | undefined): { text: string; outcome: CampaignAiOutcome } | null {
+/** Prompt do classificador: lê a conversa desde a campanha e devolve só o resultado. */
+export function buildCampaignAiPrompt(input: { clinicName: string }): string {
+  return `Você classifica a resposta de um paciente a uma campanha de WhatsApp da ${input.clinicName} (a mensagem da campanha está no histórico). Não escreva nada para o paciente.
+
+Responda SOMENTE em JSON: {"resultado": "QUER_AGENDAR" | "SEM_INTERESSE" | "DUVIDA" | "INDEFINIDO"}
+- QUER_AGENDAR: quer marcar, tocou em "Quero agendar", disse sim, consulta, exame, ou pediu horário.
+- SEM_INTERESSE: não quer, agora não, já fez, obrigado/dispensa, ou pediu para não receber.
+- DUVIDA: fez uma pergunta (preço, convênio, endereço, preparo, saúde) ou contou algo que precisa de atendimento.
+- INDEFINIDO: só emoji, figurinha, curtida, cumprimento ("oi", "bom dia") ou algo que não deixa claro se quer agendar.`;
+}
+
+/** Lê o JSON do classificador. null = inválido (fica com a recepção, nada é enviado). */
+export function parseCampaignAiOutcome(raw: string | null | undefined): CampaignAiOutcome | null {
   if (!raw) return null;
   try {
-    const o = JSON.parse(raw) as { mensagem?: unknown; resultado?: unknown };
-    const text = typeof o.mensagem === "string" ? o.mensagem.trim() : "";
-    if (!text) return null;
-    const outcome: CampaignAiOutcome = o.resultado === "QUER_AGENDAR" || o.resultado === "SEM_INTERESSE" ? o.resultado : "PERGUNTANDO";
-    return { text, outcome };
+    const r = (JSON.parse(raw) as { resultado?: unknown }).resultado;
+    return r === "QUER_AGENDAR" || r === "SEM_INTERESSE" || r === "DUVIDA" ? r : "INDEFINIDO";
   } catch {
     return null;
   }

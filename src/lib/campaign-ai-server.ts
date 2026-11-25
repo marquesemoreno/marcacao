@@ -4,13 +4,11 @@ import type OpenAI from "openai";
 import { prisma } from "@/lib/prisma";
 import { aiChat, isAiConfigured } from "@/lib/ai-gateway";
 import { privacyForConversation } from "@/lib/ai-privacy-context";
-import { buildClinicKnowledgeContext } from "@/lib/clinic-knowledge";
-import { enforceClinicalGuard } from "@/lib/clinical-claim-guard";
 import { sendWhatsAppMessage, toggleNinthDigit } from "@/lib/whatsapp";
 import { recordAudit } from "@/lib/audit-server";
 import { logAiAction } from "@/lib/ai-action-log-server";
 import { parseCloudTemplateVariants } from "@/lib/broadcast-cloud-template";
-import { buildCampaignAiPrompt, campaignAiDecision, parseCampaignAiOutput, CAMPAIGN_AI_TAG, CAMPAIGN_AI_WINDOW_DAYS, type CampaignAiOutcome } from "@/lib/campaign-ai";
+import { buildCampaignAiPrompt, campaignAiDecision, campaignAiReply, parseCampaignAiOutcome, CAMPAIGN_AI_TAG, CAMPAIGN_AI_WINDOW_DAYS, type CampaignAiOutcome } from "@/lib/campaign-ai";
 
 const REPLY_ACTION = "campaign_ai.reply";
 const HANDOFF_ACTION = "campaign_ai.handoff";
@@ -75,33 +73,33 @@ export async function replyCampaignAi(input: {
     }
 
     const campaignText = campaignMessageText(recipient.campaign, recipient.variantIndex);
-    const out = await generate(input.conversationId, input.clinicId, sentAt, campaignText);
-    if (!out) {
-      await handOff(input.conversationId, input.clinicId, recipient.campaign.name, "IA sem resposta (falha ou trava clínica)");
+    const outcome = await classify(input.conversationId, input.clinicId, sentAt, campaignText);
+    if (!outcome) {
+      await handOff(input.conversationId, input.clinicId, recipient.campaign.name, "IA não classificou a resposta");
       return false;
     }
-
-    const text = out.text;
-    const result = await sendWhatsAppMessage(input.phone, text, REPLY_ACTION, input.clinicId);
-    await prisma.message.create({
-      data: { conversationId: input.conversationId, direction: "OUTBOUND", content: text, status: result.success ? "DELIVERED" : "FAILED" },
-    });
-    await addTag(input.conversationId);
-    await recordAudit({
-      clinicId: input.clinicId,
-      userId: null,
-      action: REPLY_ACTION,
-      entity: "Conversation",
-      entityId: input.conversationId,
-      before: null,
-      after: { campaignId: recipient.campaign.id },
-    });
-    await logAiAction({ clinicId: input.clinicId, conversationId: input.conversationId, kind: "AI_REPLIED", summary: `Lara (campanha “${recipient.campaign.name}”): ${input.text}` });
-    // Quer agendar: a Lara já pediu para aguardar e sai de cena (conversa segue na fila).
-    // Sem interesse: despediu-se; a conversa é finalizada.
-    if (out.outcome === "QUER_AGENDAR") {
-      await handOff(input.conversationId, input.clinicId, recipient.campaign.name, "paciente quer agendar — com a recepção");
-    } else if (out.outcome === "SEM_INTERESSE") {
+    // Texto sempre fixo (CAMPAIGN_AI_TEXTS) — a IA só classifica.
+    const reply = campaignAiReply(outcome, { alreadyAsked: audits.some((a) => a.action === REPLY_ACTION) });
+    if (reply.text) {
+      const result = await sendWhatsAppMessage(input.phone, reply.text, REPLY_ACTION, input.clinicId);
+      await prisma.message.create({
+        data: { conversationId: input.conversationId, direction: "OUTBOUND", content: reply.text, status: result.success ? "DELIVERED" : "FAILED" },
+      });
+      await addTag(input.conversationId);
+      await recordAudit({
+        clinicId: input.clinicId,
+        userId: null,
+        action: REPLY_ACTION,
+        entity: "Conversation",
+        entityId: input.conversationId,
+        before: null,
+        after: { campaignId: recipient.campaign.id, outcome },
+      });
+      await logAiAction({ clinicId: input.clinicId, conversationId: input.conversationId, kind: "AI_REPLIED", summary: `Lara (campanha “${recipient.campaign.name}”, ${outcome}): ${input.text}` });
+    }
+    if (reply.next === "HANDOFF") {
+      await handOff(input.conversationId, input.clinicId, recipient.campaign.name, `${outcome} — com a recepção`);
+    } else if (reply.next === "CLOSE") {
       await handOff(input.conversationId, input.clinicId, recipient.campaign.name, "paciente sem interesse — conversa finalizada");
       await prisma.conversation.update({
         where: { id: input.conversationId },
@@ -113,6 +111,8 @@ export async function replyCampaignAi(input: {
         },
       });
     }
+    // Sem texto (indefinido pela 2ª vez): não "consumiu" a mensagem — segue o fluxo normal.
+    if (!reply.text) return false;
     return true;
   } catch (error) {
     console.error("[Lara da campanha] falha:", errorSummary(error));
@@ -134,18 +134,12 @@ function campaignMessageText(
   return campaign.messageTemplate;
 }
 
-async function generate(
-  conversationId: string,
-  clinicId: string,
-  sentAt: Date,
-  campaignText: string,
-): Promise<{ text: string; outcome: CampaignAiOutcome } | null> {
+/** A IA só classifica a resposta do paciente (JSON); nunca escreve para ele. */
+async function classify(conversationId: string, clinicId: string, sentAt: Date, campaignText: string): Promise<CampaignAiOutcome | null> {
   if (!isAiConfigured()) return null;
-  const [privacyBase, knowledge, clinic, config, recent] = await Promise.all([
+  const [privacyBase, clinic, recent] = await Promise.all([
     privacyForConversation(conversationId),
-    buildClinicKnowledgeContext(clinicId),
     prisma.clinic.findUnique({ where: { id: clinicId }, select: { tradeName: true } }),
-    prisma.aiAttendantConfig.findUnique({ where: { clinicId }, select: { assistantName: true } }),
     prisma.message.findMany({
       where: { conversationId, type: { not: "INTERNAL_NOTE" }, deletedAt: null, createdAt: { gte: sentAt } },
       orderBy: { createdAt: "desc" },
@@ -155,34 +149,21 @@ async function generate(
   ]);
   const privacy = { ...privacyBase, clinicId, feature: "atendente" as const };
   const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
-    { role: "system", content: buildCampaignAiPrompt({ assistantName: config?.assistantName ?? null, clinicName: clinic?.tradeName ?? "nossa clínica", knowledge }) },
+    { role: "system", content: buildCampaignAiPrompt({ clinicName: clinic?.tradeName ?? "nossa clínica" }) },
     { role: "assistant", content: campaignText },
     ...recent.reverse().map((m) => ({ role: (m.direction === "INBOUND" ? "user" : "assistant") as "user" | "assistant", content: m.content })),
   ];
-  const ask = async (extra?: string) => {
+  try {
     const res = await aiChat(privacy, {
       model: process.env.OPENAI_MODEL || "gpt-4o-mini",
-      messages: extra ? [...messages, { role: "system", content: extra }] : messages,
-      max_tokens: 200,
-      temperature: 0.3,
+      messages,
+      max_tokens: 30,
+      temperature: 0,
       response_format: { type: "json_object" },
     });
-    return parseCampaignAiOutput(res.choices[0]?.message?.content);
-  };
-  try {
-    const first = await ask();
-    if (!first) return null;
-    // Trava clínica no texto; a reescrita devolve JSON de novo (mantém o resultado novo).
-    let rewritten: { text: string; outcome: CampaignAiOutcome } | null = null;
-    const guarded = await enforceClinicalGuard(first.text, async (instruction) => {
-      rewritten = await ask(instruction).catch(() => null);
-      return rewritten?.text ?? null;
-    });
-    if (!guarded.text) return null;
-    const final: { text: string; outcome: CampaignAiOutcome } = rewritten ?? first;
-    return { text: guarded.text, outcome: final.outcome };
+    return parseCampaignAiOutcome(res.choices[0]?.message?.content);
   } catch (error) {
-    console.error("[Lara da campanha] falha ao gerar:", errorSummary(error));
+    console.error("[Lara da campanha] falha ao classificar:", errorSummary(error));
     return null;
   }
 }
