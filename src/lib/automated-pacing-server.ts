@@ -1,7 +1,9 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import { RESCHEDULE_PENDING_TAG } from "@/lib/conversation-tags";
-import { isWithinMarketingWindow, MARKETING_DAILY_CAP, startOfBrazilDay } from "@/lib/broadcast-schedule";
+import { cloudDailyCap, isWithinMarketingWindow, MARKETING_DAILY_CAP, startOfBrazilDay } from "@/lib/broadcast-schedule";
+import { activeCloudAccount } from "@/lib/whatsapp-cloud-send";
+import { getMessagingLimit } from "@/lib/whatsapp-cloud";
 
 /** Última mensagem automática da clínica — lembrete D-1, campanha ou aviso urgente de
  * remarcação (desde 15/10/2026 o aviso também respeita o intervalo). Base do intervalo
@@ -68,10 +70,26 @@ export async function marketingCampaignReady(clinicId: string, now: Date): Promi
   return false;
 }
 
-/** Enviadas hoje pela API oficial (campanhas com modelo) na clínica toda — base do teto
- * diário CLOUD_DAILY_CAP (nível de mensagens da Meta é por número, não por campanha). */
+/** Enviadas pela API oficial (campanhas com modelo) na clínica toda nas ÚLTIMAS 24 h — o
+ * nível de mensagens da Meta é por número e em janela corrida de 24 h, não por dia. */
 export async function cloudSentToday(clinicId: string, now: Date): Promise<number> {
   return prisma.broadcastRecipient.count({
-    where: { status: "SENT", sentAt: { gte: startOfBrazilDay(now) }, campaign: { clinicId, channel: "WHATSAPP", cloudTemplateName: { not: null } } },
+    where: { status: "SENT", sentAt: { gte: new Date(now.getTime() - 86_400_000) }, campaign: { clinicId, channel: "WHATSAPP", cloudTemplateName: { not: null } } },
   });
+}
+
+const tierCache = new Map<string, { tier: string | null; at: number }>();
+/** Teto de campanhas da clínica pelo nível da Meta (cache de 10 min; falha = último conhecido
+ * ou o menor nível). Sem conta da API oficial: o menor nível. */
+export async function cloudCapForClinic(clinicId: string): Promise<number> {
+  const cached = tierCache.get(clinicId);
+  if (cached && Date.now() - cached.at < 10 * 60_000) return cloudDailyCap(cached.tier);
+  const account = await activeCloudAccount(clinicId);
+  let tier: string | null = cached?.tier ?? null;
+  if (account) {
+    const r = await getMessagingLimit(account.phoneNumberId, account.token);
+    if (r.success) tier = r.data.messaging_limit_tier ?? null;
+  }
+  tierCache.set(clinicId, { tier, at: Date.now() });
+  return cloudDailyCap(tier);
 }

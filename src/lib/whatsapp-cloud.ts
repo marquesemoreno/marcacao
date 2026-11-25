@@ -189,6 +189,15 @@ export function getPhoneNumberInfo(phoneNumberId: string, token: string) {
   });
 }
 
+/** Nível de mensagens da Meta (quantas pessoas a clínica pode chamar primeiro em 24 h) e
+ * nota de qualidade. Base do teto das campanhas (cloudDailyCap). */
+export function getMessagingLimit(phoneNumberId: string, token: string) {
+  return graph<{ messaging_limit_tier?: string; quality_rating?: string }>(phoneNumberId, {
+    token,
+    query: { fields: "messaging_limit_tier,quality_rating" },
+  });
+}
+
 /** Coexistência: pede à Meta pra sincronizar contatos e o histórico (últimos 6 meses) do app
  * WhatsApp Business. Precisa ser chamado em até 24 h depois da conexão — senão o número
  * tem que ser desconectado e conectado de novo. Cada tipo só pode rodar uma vez. */

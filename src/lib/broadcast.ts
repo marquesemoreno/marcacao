@@ -10,7 +10,7 @@ import { buildTemplateParams, cloudBroadcastMode, parseCloudTemplateVariants, pi
 import { activeCloudAccount, cloudSendTemplate } from "@/lib/whatsapp-cloud-send";
 import { RESCHEDULE_PENDING_TAG } from "@/lib/conversation-tags";
 import { skipsMarketingConsent, tagToApplyOnSend } from "@/lib/campaign-kind";
-import { cloudSentToday, lastAutomatedSend } from "@/lib/automated-pacing-server";
+import { cloudCapForClinic, cloudSentToday, lastAutomatedSend } from "@/lib/automated-pacing-server";
 import { isWithinReminderWindow, lowPriorityMustYield } from "@/lib/automated-pacing";
 import { cloudBatchSize, isMarketingGapElapsed, isWithinMarketingWindow, MARKETING_DAILY_CAP, startOfBrazilDay } from "@/lib/broadcast-schedule";
 
@@ -59,11 +59,12 @@ export async function dispatchNextBatch(): Promise<{ processed: number }> {
         });
         if (otherCampaignPending > 0) continue;
       }
-      const [clinicSentToday, pending] = await Promise.all([
+      const [clinicSentToday, pending, cap] = await Promise.all([
         cloudSentToday(campaign.clinicId, now),
         prisma.broadcastRecipient.count({ where: { campaignId: campaign.id, status: "PENDING" } }),
+        cloudCapForClinic(campaign.clinicId),
       ]);
-      take = cloudBatchSize({ sentToday: clinicSentToday, pending });
+      take = cloudBatchSize({ sentToday: clinicSentToday, pending, cap });
       if (take === 0) continue;
     } else if (!isMarketing) {
       // Aviso de remarcação: também 1 a cada 4–6 min, no intervalo único da clínica

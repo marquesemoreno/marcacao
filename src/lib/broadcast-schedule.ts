@@ -35,14 +35,30 @@ export function isMarketingGapElapsed(lastSentAt: Date | null, now: Date, random
 
 /** API oficial (modelo aprovado pela Meta, 25/11/2026): o intervalo de 4–6 min e o teto de
  * 100/dia existiam pelo risco de bloqueio do número não oficial (Evolution). Na API oficial o
- * limite real é o nível de mensagens da Meta (1.000 conversas novas/24h para número
- * verificado) e a nota de qualidade — então lote por minuto e teto diário POR CLÍNICA. */
+ * limite real é o nível de mensagens da Meta (messaging_limit_tier: quantas pessoas a clínica
+ * pode chamar primeiro em 24 h) — então lote por minuto e teto pelo nível, POR CLÍNICA, com
+ * 10% de folga para as mensagens que a recepção inicia (modelos no Chat, lembretes). */
 export const CLOUD_PER_MINUTE = 20;
-export const CLOUD_DAILY_CAP = 1000;
+const TIER_LIMITS: Record<string, number> = {
+  TIER_250: 250,
+  TIER_1K: 1000,
+  TIER_2K: 2000,
+  TIER_10K: 10000,
+  TIER_100K: 100000,
+  TIER_UNLIMITED: 1_000_000,
+};
+/** Teto de campanhas em 24 h para o nível da Meta; nível desconhecido = o menor (seguro). */
+export function cloudDailyCap(tier: string | null | undefined): number {
+  const limit = (tier && TIER_LIMITS[tier]) || TIER_LIMITS.TIER_250;
+  return Math.floor(limit * 0.9);
+}
+/** Sem saber o nível (tela do formulário): o menor. */
+export const CLOUD_DAILY_CAP = cloudDailyCap(null);
 
-/** Quantas mandar neste minuto (cron a cada minuto). `sentToday` = da clínica, pela API oficial. */
-export function cloudBatchSize(input: { sentToday: number; pending: number }): number {
-  return Math.max(0, Math.min(CLOUD_PER_MINUTE, CLOUD_DAILY_CAP - input.sentToday, input.pending));
+/** Quantas mandar neste minuto (cron a cada minuto). `sentToday` = da clínica pela API oficial
+ * nas últimas 24 h; `cap` = cloudDailyCap(nível da Meta). */
+export function cloudBatchSize(input: { sentToday: number; pending: number; cap: number }): number {
+  return Math.max(0, Math.min(CLOUD_PER_MINUTE, input.cap - input.sentToday, input.pending));
 }
 
 /** Mensagens por dia útil na prática: 8h de janela ÷ ~5 min de intervalo médio = 96,
@@ -66,13 +82,15 @@ export function estimateCampaignFinish(input: {
   now: Date;
   /** Quantos envios dividem o ritmo da clínica (esta campanha + outras ativas). */
   sharing?: number;
-  /** Campanha pela API oficial (modelo aprovado): ritmo CLOUD_*. */
+  /** Campanha pela API oficial (modelo aprovado): ritmo CLOUD_* e teto `cloudCap`. */
   cloud?: boolean;
+  cloudCap?: number;
 }): { businessDays: number; finishIso: string | null } {
   if (input.pending <= 0) return { businessDays: 0, finishIso: null };
   const share = Math.max(1, input.sharing ?? 1);
-  const perDay = input.cloud ? Math.floor(CLOUD_DAILY_CAP / share) : Math.floor(MARKETING_PER_DAY / share);
-  const dailyCap = input.cloud ? CLOUD_DAILY_CAP : MARKETING_DAILY_CAP;
+  const cloudCap = input.cloudCap ?? CLOUD_DAILY_CAP;
+  const perDay = input.cloud ? Math.floor(cloudCap / share) : Math.floor(MARKETING_PER_DAY / share);
+  const dailyCap = input.cloud ? cloudCap : MARKETING_DAILY_CAP;
   const perMinute = input.cloud ? CLOUD_PER_MINUTE / share : 1 / (5 * share);
   const { br, minutes } = brParts(input.now);
   let left = input.pending;
@@ -119,19 +137,23 @@ export function campaignSituation(input: {
   now: Date;
   /** Quantos envios dividem o ritmo agora (esta + outras campanhas ativas da clínica). */
   sharing?: number;
-  /** API oficial: sentToday é da clínica e o teto é CLOUD_DAILY_CAP. */
+  /** API oficial: sentToday é da clínica (últimas 24 h) e o teto é `cloudCap` (nível da Meta). */
   cloud?: boolean;
+  cloudCap?: number;
 }): CampaignSituation {
   if (input.status === "DRAFT") return { tone: "idle", text: "Rascunho — ainda não começou" };
   if (input.status === "PAUSED") return { tone: "idle", text: "Pausada" };
   if (input.status === "COMPLETED" || input.pending === 0) return { tone: "done", text: "Concluída" };
-  const cap = input.cloud ? CLOUD_DAILY_CAP : MARKETING_DAILY_CAP;
+  const cap = input.cloud ? input.cloudCap ?? CLOUD_DAILY_CAP : MARKETING_DAILY_CAP;
+  if (input.cloud && input.sentToday >= cap && input.status === "RUNNING" && input.pending > 0) {
+    return { tone: "wait", text: `Limite da Meta atingido (${cap} em 24 h) — continua sozinha conforme o limite libera` };
+  }
   if (input.sentToday >= cap) {
     return { tone: "wait", text: `Limite de hoje atingido (${cap}/${cap}) — retoma ${nextMarketingWindowLabel(new Date(startOfBrazilDay(input.now).getTime() + 86_400_000 - 60_000))}` };
   }
   if (!isWithinMarketingWindow(input.now)) return { tone: "wait", text: `Fora do horário de envio — retoma ${nextMarketingWindowLabel(input.now)}` };
   if (input.yielding) return { tone: "wait", text: "Aguardando: lembretes ou outra campanha estão na frente" };
-  if (input.cloud) return { tone: "ok", text: `Enviando pela API oficial — até ${CLOUD_PER_MINUTE} por minuto, ${CLOUD_DAILY_CAP} por dia` };
+  if (input.cloud) return { tone: "ok", text: `Enviando pela API oficial — até ${CLOUD_PER_MINUTE} por minuto, ${cap} a cada 24 h (limite da Meta)` };
   const share = Math.max(1, input.sharing ?? 1);
   if (share > 1) {
     return { tone: "ok", text: `Enviando em revezamento com ${share === 2 ? "outro envio" : `mais ${share - 1} envios`} — ~1 mensagem a cada ${share * 5} min` };

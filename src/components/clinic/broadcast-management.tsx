@@ -1352,7 +1352,7 @@ export function BroadcastManagement() {
                 : !hasMessage
                   ? cloudMode ? "Falta escolher o modelo." : "Falta escrever a mensagem."
                   : formEstimate
-                ? `${plural(recipients.length, "destinatário", "destinatários")} · ${cloudMode ? `API oficial: até ${CLOUD_PER_MINUTE}/min, seg–sex 9h–17h, até ${CLOUD_DAILY_CAP}/dia` : `envio seguro: 1 a cada 4–6 min, seg–sex 9h–17h, até ${MARKETING_DAILY_CAP}/dia`} — ${estimateText(formEstimate.businessDays, formEstimate.finishIso)} se começar agora.`
+                ? `${plural(recipients.length, "destinatário", "destinatários")} · ${cloudMode ? `API oficial: até ${CLOUD_PER_MINUTE}/min, seg–sex 9h–17h, no limite diário da Meta` : `envio seguro: 1 a cada 4–6 min, seg–sex 9h–17h, até ${MARKETING_DAILY_CAP}/dia`} — ${estimateText(formEstimate.businessDays, formEstimate.finishIso)} se começar agora.`
                 : "Escolha o público para ver a previsão de envio."}
             </p>
             {formStep === 1 ? (
@@ -1589,7 +1589,7 @@ export function BroadcastManagement() {
                   <summary className="cursor-pointer">Como é o ritmo</summary>
                   <p className="mt-1">
                     {confirming.preview.viaCloud
-                      ? `API oficial: até ${CLOUD_PER_MINUTE} mensagens por minuto, de segunda a sexta das 9h às 17h, até ${CLOUD_DAILY_CAP} por dia na clínica (nível da Meta).`
+                      ? `API oficial: até ${CLOUD_PER_MINUTE} mensagens por minuto, de segunda a sexta das 9h às 17h, até ${confirming.preview.cloudCap ?? CLOUD_DAILY_CAP} pessoas a cada 24 h (limite atual da Meta para este número; sobe sozinho com o uso e a boa qualidade).`
                       : `Uma mensagem a cada 4–6 min, de segunda a sexta das 9h às 17h, até ${MARKETING_DAILY_CAP} por dia.`}
                     {confirming.preview.viaCloud
                       ? ""
