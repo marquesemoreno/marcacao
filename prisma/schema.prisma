@@ -1024,6 +1024,8 @@ model BroadcastCampaign {
   /// Baixa prioridade (campanha longa, ex.: Outubro Rosa): pausa sozinha enquanto houver
   /// lembrete de confirmação ou outra campanha da clínica na fila (lowPriorityMustYield).
   lowPriority           Boolean                 @default(false) @map("low_priority")
+  /// "Lara responde": IA discreta só para quem responder a esta campanha (src/lib/campaign-ai.ts).
+  aiFollowUp            Boolean                 @default(false) @map("ai_follow_up")
   /// Campanha criada pela régua automática (AutomationRule.id); null = campanha manual.
   automationRuleId      String?                 @map("automation_rule_id")
   /// Gestão liberou o envio também para quem NÃO deu consentimento de marketing (decisão da

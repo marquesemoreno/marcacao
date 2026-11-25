@@ -4,7 +4,7 @@ import { normalizeBroadcastVariants, previewBroadcastVariants } from "@/lib/broa
 import { buildTemplateParams, checkTemplateParamSources, renderTemplatePreview, templateLabel } from "@/lib/broadcast-cloud-template";
 import { PageHeader } from "@/components/clinic/page-header";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { BellOff, CalendarClock, Copy, FileText, Mail, MessageCircle, MessageSquareText, ShieldCheck, Image as ImageIcon, Loader2, MoreHorizontal, Paperclip, Pause, Phone, Play, Plus, Repeat, Settings2, Tags, Trash2, Upload, X } from "lucide-react";
+import { BellOff, Bot, CalendarClock, Copy, FileText, Mail, MessageCircle, MessageSquareText, ShieldCheck, Image as ImageIcon, Loader2, MoreHorizontal, Paperclip, Pause, Phone, Play, Plus, Repeat, Settings2, Tags, Trash2, Upload, X } from "lucide-react";
 import { BROADCAST_ATTACHMENT_ACCEPT, checkBroadcastAttachment } from "@/lib/broadcast-attachment";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "sonner";
@@ -15,6 +15,7 @@ import {
   createClinicBroadcastCampaign,
   startClinicBroadcastCampaign,
   setClinicCampaignLowPriority,
+  setClinicCampaignAiFollowUp,
   pauseClinicBroadcastCampaign,
   clinicHasBridgeAudience,
   getClinicCampaignStartPreview,
@@ -530,6 +531,16 @@ export function BroadcastManagement() {
       toast.error("Não foi possível devolver as falhas à fila.");
     } finally {
       setBusyId(null);
+    }
+  }
+
+  async function toggleAiFollowUp(c: Campaign) {
+    try {
+      await setClinicCampaignAiFollowUp(c.id, !c.aiFollowUp);
+      toast.success(!c.aiFollowUp ? `A Lara vai responder quem responder “${c.name}”.` : `A Lara não responde mais “${c.name}”.`);
+      await loadCampaigns(true);
+    } catch {
+      toast.error("Não foi possível salvar. Só a gestão liga ou desliga a Lara.");
     }
   }
 
@@ -1423,6 +1434,7 @@ export function BroadcastManagement() {
                     onDuplicate={() => duplicate(c)}
                     onRetry={() => retryFailures(c)}
                     onToggleLowPriority={() => toggleLowPriority(c)}
+                    onToggleAiFollowUp={() => toggleAiFollowUp(c)}
                   />
                 ))}
               </div>
@@ -1439,6 +1451,7 @@ export function BroadcastManagement() {
                 onDuplicate={() => duplicate(c)}
                 onRetry={() => retryFailures(c)}
                 onToggleLowPriority={() => toggleLowPriority(c)}
+                    onToggleAiFollowUp={() => toggleAiFollowUp(c)}
               />
             ))}
             {done.length > 0 && (
@@ -1458,6 +1471,7 @@ export function BroadcastManagement() {
                       onDuplicate={() => duplicate(c)}
                       onRetry={() => retryFailures(c)}
                       onToggleLowPriority={() => {}}
+                      onToggleAiFollowUp={() => {}}
                     />
                   ))}
                 </div>
@@ -1735,6 +1749,7 @@ function CampaignCard({
   onDuplicate,
   onRetry,
   onToggleLowPriority,
+  onToggleAiFollowUp,
 }: {
   c: Campaign;
   busy: boolean;
@@ -1744,6 +1759,7 @@ function CampaignCard({
   onDuplicate: () => void;
   onRetry: () => void;
   onToggleLowPriority: () => void;
+  onToggleAiFollowUp: () => void;
 }) {
   const [calls, setCalls] = useState(c.needsCall);
   useEffect(() => setCalls(c.needsCall), [c.needsCall]);
@@ -1847,6 +1863,19 @@ function CampaignCard({
                   {c.lowPriority ? "Voltar à prioridade normal" : "Mudar para baixa prioridade"}
                 </button>
               )}
+              {c.channel === "WHATSAPP" && !c.isReschedule && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMoreOpen(false);
+                    onToggleAiFollowUp();
+                  }}
+                  className="w-full flex items-center gap-2 rounded-md px-2 h-9 text-sm text-left text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
+                >
+                  <Bot className="w-4 h-4" aria-hidden />
+                  {c.aiFollowUp ? "Desligar a Lara" : "Lara responde (discreta)"}
+                </button>
+              )}
               {c.status === "DRAFT" && (
                 <button
                   type="button"
@@ -1937,6 +1966,9 @@ function CampaignCard({
         )}
       </div>
 
+      {c.aiFollowUp && (
+        <p className="text-xs text-slate-500 dark:text-slate-400">Lara responde quem responder (até 7 dias, para quando a equipe entra).</p>
+      )}
       {c.status !== "COMPLETED" && c.lowPriority && (
         <p className="text-xs text-slate-500 dark:text-slate-400">Baixa prioridade: espera os lembretes e outras campanhas.</p>
       )}

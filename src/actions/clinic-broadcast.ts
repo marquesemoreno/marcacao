@@ -101,6 +101,7 @@ export async function listClinicBroadcastCampaigns() {
       attachmentKind: c.imagePath ? attachmentKindOf(c.imageMimeType) : null,
       attachmentName: c.attachmentName,
       lowPriority: c.lowPriority,
+      aiFollowUp: c.aiFollowUp,
       total: c._count.recipients,
       sent,
       failed: failedList.length,
@@ -372,6 +373,18 @@ export async function setClinicCampaignLowPriority(campaignId: string, lowPriori
   const { clinicId } = await requireClinicPermission("disparos");
   await assertClinicOwnsCampaign(campaignId, clinicId);
   await prisma.broadcastCampaign.update({ where: { id: campaignId }, data: { lowPriority } });
+  revalidatePath("/clinic/disparos");
+  return { success: true as const };
+}
+
+/** "Lara responde" (src/lib/campaign-ai.ts): IA discreta só para quem responder a esta
+ * campanha. Decisão de gestão. Só WhatsApp. */
+export async function setClinicCampaignAiFollowUp(campaignId: string, aiFollowUp: boolean) {
+  const { clinicId } = await requireClinicManager();
+  await assertClinicOwnsCampaign(campaignId, clinicId);
+  const campaign = await prisma.broadcastCampaign.findUnique({ where: { id: campaignId }, select: { channel: true } });
+  if (campaign?.channel !== "WHATSAPP") throw new Error("A Lara só responde campanhas de WhatsApp.");
+  await prisma.broadcastCampaign.update({ where: { id: campaignId }, data: { aiFollowUp } });
   revalidatePath("/clinic/disparos");
   return { success: true as const };
 }

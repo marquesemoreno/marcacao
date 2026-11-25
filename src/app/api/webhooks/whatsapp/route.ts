@@ -6,6 +6,7 @@ import { matchClinicalUrgency } from "@/lib/clinical-urgency";
 import { NextResponse, after } from "next/server";
 import { handleSlotOfferReply, startSlotOfferForItem } from "@/lib/slot-offer-server";
 import { classifyAndStorePatientIntent } from "@/lib/patient-intent-server";
+import { replyCampaignAi } from "@/lib/campaign-ai-server";
 import type { AppointmentStatus, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { decryptToken } from "@/lib/token-crypto";
@@ -1272,6 +1273,19 @@ async function processWhatsappWebhook(body: Prisma.InputJsonValue, forcedClinicI
         }
         aiHandled = true;
       }
+    }
+
+    // Lara da campanha (src/lib/campaign-ai.ts): IA discreta só para quem respondeu a uma
+    // campanha com "Lara responde" ligado. Não roda junto com o atendente de IA da clínica.
+    if (!aiHandled && clinic && !isMspLeadReply && !isPartnerLeadReply) {
+      aiHandled = await replyCampaignAi({
+        conversationId: conversation.id,
+        clinicId: conversation.clinicId,
+        phone: incoming.phone,
+        text: incoming.text ?? "",
+        aiAttendantActive: !!aiConfig,
+        conversationAiEnabled: conversation.aiEnabled,
+      });
     }
 
     if (!aiHandled) {

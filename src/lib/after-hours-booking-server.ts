@@ -67,6 +67,12 @@ export async function replyAfterHoursBooking(
       select: { id: true },
     });
     if (humanReply) return;
+    // A Lara da campanha (campaign-ai-server.ts) já está conversando: não falar por cima.
+    const campaignAi = await prisma.auditLog.findFirst({
+      where: { action: "campaign_ai.reply", entity: "Conversation", entityId: conversationId, createdAt: { gte: since } },
+      select: { id: true },
+    });
+    if (campaignAi) return;
 
     const previous = await prisma.auditLog.findMany({
       where: { action: ACTION, entity: "Conversation", entityId: conversationId, createdAt: { gte: since } },
