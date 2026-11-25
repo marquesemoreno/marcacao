@@ -1,8 +1,10 @@
-# Roteiro do primeiro atendimento — Sinergia (25/11/2026)
+# Roteiro do primeiro atendimento em conjunto — Sinergia (25/11/2026)
+
+O consultor **já conhece e já atende este cliente**. Hoje não é diagnóstico nem implantação: é a primeira vez que você acompanha um atendimento que já está rodando.
 
 Objetivo duplo de hoje:
-1. **Para o cliente:** sair com o diagnóstico encaminhado e os próximos passos claros.
-2. **Para nós:** registrar como o consultor trabalha, para virar a **Metodologia Sinergia** e mostrar onde a tecnologia ajuda.
+1. **Para o cliente:** o atendimento segue normal, sem atraso nem estranheza. Você entra como parceiro de tecnologia da Sinergia.
+2. **Para nós:** registrar como o consultor trabalha **na prática, com um cliente real**, para virar a **Metodologia Sinergia** e mostrar onde a tecnologia ajuda.
 
 Regra do dia: **o consultor conduz, você observa e anota.** Pergunte pouco na frente do cliente; guarde as dúvidas para a conversa a dois depois.
 
@@ -10,46 +12,34 @@ Regra do dia: **o consultor conduz, você observa e anota.** Pergunte pouco na f
 
 ## 1. Antes da reunião (15 min, só vocês dois)
 
-- [ ] Quem é o cliente: clínica ou profissional? Especialidade, nº de médicos/unidades, faturamento aproximado.
-- [ ] O que foi contratado (BPO, consultoria ou os dois) e o valor mensal.
-- [ ] Qual é a etapa de hoje: primeira conversa, diagnóstico, implantação?
-- [ ] Como você será apresentado (ex.: "parceiro de tecnologia da Sinergia").
+Como ele já conhece o cliente, peça um **briefing rápido** em vez de levantar tudo do zero:
+
+- [ ] Quem é o cliente: clínica ou profissional, especialidade, porte, faturamento aproximado.
+- [ ] Há quanto tempo ele atende e o que está contratado (BPO, consultoria ou os dois), por qual valor mensal.
+- [ ] Em que ponto do ciclo estão agora (fim de novembro: fechamento de outubro? planejamento de dezembro/2027?).
+- [ ] Qual é o assunto de hoje e o que o cliente espera sair sabendo.
+- [ ] Os 2 ou 3 problemas principais desse cliente hoje.
+- [ ] O cliente já sabe da parceria? Como você será apresentado?
 - [ ] Combinar: você pode fazer perguntas ou só no final?
-- [ ] Peça para abrir na tela, durante ou depois, o Nibo e as planilhas que ele vai usar com este cliente.
+- [ ] Peça para ver, antes ou depois, **o Nibo e as planilhas deste cliente** como estão hoje.
 
-## 2. Conhecer o cliente (o consultor pergunta, você anota)
+## 2. Durante a reunião: o que observar
 
-**A empresa**
-- Tempo de mercado, sócios, quem decide sobre dinheiro.
-- Equipe: quem cuida do financeiro hoje (sócio, secretária, contador)?
-- Regime tributário e contador atual.
+Não precisa levantar o histórico do cliente; o consultor já tem. Foque em **como o atendimento acontece**:
 
-**Como entra o dinheiro**
-- Particular x convênio (% de cada). Quais convênios?
-- Formas de recebimento: Pix, cartão (qual maquininha), boleto, dinheiro.
-- Usa sistema de agenda/prontuário? Qual? Emite nota de cada atendimento?
-- Tem repasse para médicos/profissionais? Como é calculado?
+- **Como ele abre e conduz:** pauta, ordem dos assuntos, quanto tempo cada um leva.
+- **O que ele mostra:** quais números, em qual ferramenta (Nibo, planilha, SaaS, PDF), em qual formato.
+- **O que o cliente pergunta:** essas perguntas são o que o app do gestor precisa responder sozinho.
+- **O que ele recomenda:** decisões que saem da reunião e como são registradas.
+- **O que fica pendente:** documentos que o cliente ainda deve, ajustes, tarefas, e por qual canal são cobrados.
+- **O que o cliente não sabe responder na hora** (ex.: quanto recebeu de convênio, quanto deve de repasse): sinal de dado que poderia estar à mão.
 
-**Como sai o dinheiro**
-- Principais despesas fixas (aluguel, folha, sistemas) e variáveis (insumos, repasses, taxas).
-- Quem paga as contas e como aprova?
-- Mistura conta pessoal com a da empresa?
+## 3. Mapear o método (o mais importante para nós)
 
-**Contas e controles**
-- Quantos bancos e contas? Tem acesso ao internet banking?
-- Usa alguma planilha ou sistema hoje? Sabe quanto lucra por mês?
-
-**Dores e objetivo**
-- O que o fez procurar a Sinergia?
-- O que ele quer saber todo mês e hoje não sabe?
-- Como seria um bom resultado daqui a 6 meses?
-
-## 3. Observar o método (o mais importante para nós)
-
-Para **cada etapa** que o consultor fizer ou explicar, preencha um bloco:
+Como o cliente já está em rotina, peça ao consultor (na reunião ou depois) para mostrar **o ciclo completo desse cliente**: o que ele e a equipe fazem por dia, semana e mês. Para **cada etapa**, preencha um bloco:
 
 ```
-Etapa / ciclo: (ex.: diagnóstico, cadastro, rotina diária, fechamento, reunião mensal)
+Etapa / ciclo: (ex.: rotina diária, conciliação, contas a pagar, fechamento, reunião mensal)
 O que é feito:
 Ferramenta: Nibo | planilha (qual?) | SaaS | papel/WhatsApp
 Quem faz: consultor | analista | cliente
@@ -67,23 +57,21 @@ Fique atento a:
 - **Ajustes manuais** de categoria, centro de custo e conciliação.
 - **O que a planilha calcula que o Nibo não calcula** (indicadores de saúde, repasse, margem, convênio).
 - **Como o resultado é apresentado** ao cliente (PDF, planilha, reunião, WhatsApp).
+- **Onde o SaaS do outro consultor entra** neste cliente, se entra.
 
-## 4. O que pedir ao cliente (checklist de entrada)
+## 4. O que conferir que já existe
 
-- [ ] Extratos dos últimos 3 a 6 meses de todas as contas (OFX ou PDF).
-- [ ] Extrato da maquininha / adquirente.
-- [ ] Relação de contas fixas e contratos (aluguel, sistemas, folha).
-- [ ] Relatório de produção/faturamento do sistema de agenda.
-- [ ] Demonstrativos de convênio e glosas (se houver).
-- [ ] Contato do contador.
-- [ ] Acessos: Nibo (convite), banco (perfil só consulta, se o processo prevê).
-- [ ] Contrato assinado e **termo de tratamento de dados (LGPD)**, porque vamos lidar com dados financeiros e, às vezes, de pacientes.
+Em vez de pedir tudo ao cliente, confira com o consultor o que já está implantado:
+
+- [ ] Contas bancárias e maquininhas já ligadas ao Nibo? Conciliação automática ou manual?
+- [ ] Plano de contas e centros de custo usados neste cliente.
+- [ ] Como chegam extratos, notas e boletos hoje (e-mail, WhatsApp, acesso ao banco).
+- [ ] Relatórios que o cliente recebe todo mês, e em que formato.
+- [ ] Contrato e **termo de tratamento de dados (LGPD)** já assinados? Com a parceria, nós também passamos a tratar os dados, então o termo precisa nos incluir.
 
 ## 5. Encerramento com o cliente
 
-- Resumir o que foi entendido em 3 frases.
-- Combinar a lista do que ele envia, com prazo.
-- Marcar a próxima reunião e definir o canal do dia a dia (WhatsApp do BPO).
+Segue o padrão do consultor. Só anote o que foi combinado, os prazos e a data da próxima reunião.
 
 ## 6. Depois da reunião (30 min, só vocês dois)
 
@@ -91,8 +79,9 @@ Fique atento a:
 2. Passar a limpo os blocos da seção 3 e numerar os ciclos em ordem.
 3. Listar as **planilhas usadas**, uma a uma, e pedir os modelos.
 4. Sobre o **SaaS do outro consultor**: o que ele faz neste cliente e se pode ser usado com clientes da parceria.
-5. Pegar as respostas que faltam (valor mensal, divisão de receita na prospecção, tamanho da carteira).
-6. Escolher **uma dor só** para eu atacar primeiro (ex.: puxar dados do Nibo para um painel de indicadores de saúde, ou a caixa de entrada de documentos pelo WhatsApp).
+5. Pegar as respostas que faltam (divisão de receita na prospecção, tamanho da carteira).
+6. Perguntar: **"Se este cliente tivesse um app, o que ele abriria todo dia?"**
+7. Escolher **uma dor só** para eu atacar primeiro (ex.: puxar dados do Nibo para um painel de indicadores de saúde, ou a caixa de entrada de documentos pelo WhatsApp).
 
 ## 7. O que eu faço com as anotações
 
