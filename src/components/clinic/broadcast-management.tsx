@@ -1676,7 +1676,8 @@ export function BroadcastManagement() {
                   <a href="/clinic/precos" className="font-semibold underline underline-offset-2">Configurações › Preços e parâmetros</a>.
                 </div>
               )}
-              <div className="flex justify-end gap-2">
+              {/* Preso no rodapé: em tela baixa o diálogo rola, mas Iniciar fica sempre à vista. */}
+              <div className="sticky -bottom-4 -mx-4 -mb-4 flex justify-end gap-2 border-t border-slate-200 dark:border-slate-800 bg-popover px-4 py-3">
                 <button
                   type="button"
                   onClick={() => setConfirming(null)}
