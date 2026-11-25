@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { campaignAiDecision, buildCampaignAiPrompt, CAMPAIGN_AI_MAX_REPLIES, CAMPAIGN_AI_WINDOW_DAYS, CAMPAIGN_AI_TAG } from "./campaign-ai";
+import { campaignAiDecision, buildCampaignAiPrompt, parseCampaignAiOutput, CAMPAIGN_AI_MAX_REPLIES, CAMPAIGN_AI_WINDOW_DAYS, CAMPAIGN_AI_TAG } from "./campaign-ai";
 
 const now = new Date("2026-11-25T13:00:00Z");
 const base = {
@@ -64,6 +64,22 @@ describe("buildCampaignAiPrompt", () => {
     expect(prompt).toMatch(/assistente virtual/i);
   });
 
+  it("só pergunta se quer agendar consulta ou exame — dia e turno ficam com a atendente", () => {
+    expect(prompt).toMatch(/consulta ou (um )?exame/i);
+    expect(prompt).toMatch(/nunca pergunte (o )?dia/i);
+    expect(prompt).toMatch(/turno/i);
+  });
+
+  it("pede para aguardar quando a pessoa quer agendar", () => {
+    expect(prompt).toMatch(/aguard/i);
+  });
+
+  it("pede a resposta em JSON com o resultado", () => {
+    expect(prompt).toContain("QUER_AGENDAR");
+    expect(prompt).toContain("SEM_INTERESSE");
+    expect(prompt).toContain("PERGUNTANDO");
+  });
+
   it("é discreta: nunca anuncia transferência e nunca promete horário", () => {
     expect(prompt).toMatch(/nunca diga que vai transferir/i);
     expect(prompt).toMatch(/nunca (prometa|confirme) hor[aá]rio/i);
@@ -80,4 +96,25 @@ describe("buildCampaignAiPrompt", () => {
 
 it("tag visível para a recepção", () => {
   expect(CAMPAIGN_AI_TAG).toMatch(/Lara/);
+});
+
+describe("limite curto", () => {
+  it("a Lara fala no máximo 2 vezes", () => {
+    expect(CAMPAIGN_AI_MAX_REPLIES).toBe(2);
+  });
+});
+
+describe("parseCampaignAiOutput", () => {
+  it("lê mensagem e resultado", () => {
+    expect(parseCampaignAiOutput('{"mensagem":"Ótimo! Aguarde um instante.","resultado":"QUER_AGENDAR"}')).toEqual({ text: "Ótimo! Aguarde um instante.", outcome: "QUER_AGENDAR" });
+    expect(parseCampaignAiOutput('{"mensagem":"Tudo bem, obrigada!","resultado":"SEM_INTERESSE"}')).toEqual({ text: "Tudo bem, obrigada!", outcome: "SEM_INTERESSE" });
+  });
+  it("resultado desconhecido vira PERGUNTANDO", () => {
+    expect(parseCampaignAiOutput('{"mensagem":"Oi!","resultado":"XYZ"}')).toEqual({ text: "Oi!", outcome: "PERGUNTANDO" });
+  });
+  it("sem JSON válido ou sem mensagem: null (fica com a recepção)", () => {
+    expect(parseCampaignAiOutput("Oi, tudo bem?")).toBeNull();
+    expect(parseCampaignAiOutput('{"resultado":"QUER_AGENDAR"}')).toBeNull();
+    expect(parseCampaignAiOutput("")).toBeNull();
+  });
 });
