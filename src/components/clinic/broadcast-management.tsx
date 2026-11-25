@@ -1132,7 +1132,9 @@ export function BroadcastManagement() {
                       </label>
                     ))}
                     {columns.length > 0 && (
-                      <p className="text-xs text-slate-500 dark:text-slate-400">Variáveis deste público: {columns.map((c) => `{{${c}}}`).join(", ")}</p>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">
+                        Variáveis deste público: {columns.map((c) => `{{${c}}}`).join(", ")}. Para quem vier sem nome, use um reserva: {"{{nome|amigo}}"}.
+                      </p>
                     )}
                     </div>
                     </div>

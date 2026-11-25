@@ -19,9 +19,20 @@ export function cloudBroadcastMode(input: { cloudActive: boolean; templateName: 
 
 const VAR = /\{\{\s*([^}]+?)\s*\}\}/g;
 
+/** "{{nome|amigo}}": o que vem depois da barra entra quando a variável está vazia (ex.: número
+ * compartilhado, que vai sem nome — a Meta recusa parâmetro vazio). */
+function splitVar(raw: string): { key: string; fallback: string } {
+  const i = raw.indexOf("|");
+  return i < 0 ? { key: raw.trim(), fallback: "" } : { key: raw.slice(0, i).trim(), fallback: raw.slice(i + 1).trim() };
+}
+
 function fill(source: string, variables: Record<string, string>): string {
   const lower = Object.fromEntries(Object.entries(variables).map(([k, v]) => [k.trim().toLowerCase(), v ?? ""]));
-  return source.replace(VAR, (_, key: string) => lower[key.toLowerCase()] ?? "");
+  return source.replace(VAR, (_, raw: string) => {
+    const { key, fallback } = splitVar(raw);
+    const value = (lower[key.toLowerCase()] ?? "").trim();
+    return value || fallback;
+  });
 }
 
 export function buildTemplateParams(
@@ -46,7 +57,8 @@ export function checkTemplateParamSources(variableCount: number, sources: string
     const source = sources[i]?.trim() ?? "";
     if (!source) return `Preencha o que vai em {{${i + 1}}} do modelo.`;
     for (const m of source.matchAll(VAR)) {
-      if (!known.has(m[1].toLowerCase())) return `A planilha não tem a coluna {{${m[1]}}} (usada em {{${i + 1}}}).`;
+      const key = splitVar(m[1]).key;
+      if (!known.has(key.toLowerCase())) return `A planilha não tem a coluna {{${key}}} (usada em {{${i + 1}}}).`;
     }
   }
   return null;

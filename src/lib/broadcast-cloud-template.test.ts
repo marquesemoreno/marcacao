@@ -33,6 +33,17 @@ describe("buildTemplateParams", () => {
     const r = buildTemplateParams(["{{nome}}"], { nome: "  " });
     expect(r).toEqual({ ok: false, error: "O campo {{1}} do modelo ficou vazio para este paciente." });
   });
+  it("{{nome|amigo}}: usa o reserva quando a variável vem vazia", () => {
+    expect(buildTemplateParams(["{{nome|amigo}}"], { nome: "" })).toEqual({ ok: true, params: ["amigo"] });
+    expect(buildTemplateParams(["{{nome|amigo}}"], {})).toEqual({ ok: true, params: ["amigo"] });
+    expect(buildTemplateParams(["{{nome | amigo}}"], { nome: "  " })).toEqual({ ok: true, params: ["amigo"] });
+  });
+  it("{{nome|amigo}}: com nome, usa o nome", () => {
+    expect(buildTemplateParams(["{{nome|amigo}}"], { nome: "Almir" })).toEqual({ ok: true, params: ["Almir"] });
+  });
+  it("{{nome|...}} é aceito na conferência das colunas", () => {
+    expect(checkTemplateParamSources(1, ["{{nome|amigo}}"], ["nome"])).toBeNull();
+  });
   it("tira quebras de linha e tabs, que a Meta não aceita em parâmetro", () => {
     expect(buildTemplateParams(["{{obs}}"], { obs: "linha1\nlinha2\t fim" })).toEqual({ ok: true, params: ["linha1 linha2 fim"] });
   });
