@@ -149,3 +149,25 @@ describe("anúncio de clique para WhatsApp (referral da API oficial)", () => {
     expect(ev).toMatchObject({ ad: { sourceId: "9", title: "Check-up" } });
   });
 });
+
+describe("parseCloudWebhook — edição, exclusão e reação", () => {
+  const meta = { phone_number_id: "PN1" };
+  it("paciente editou a mensagem", () => {
+    const events = parseCloudWebhook(entry("messages", { metadata: meta, messages: [{ id: "wamid.E", from: "557788", type: "edit", timestamp: "1", edit: { original_message_id: "wamid.O", message: { type: "text", text: { body: "novo" } } } }] }));
+    expect(events).toEqual([{ kind: "edit", phoneNumberId: "PN1", originalKeyId: "wamid.O", text: "novo" }]);
+  });
+  it("paciente apagou a mensagem", () => {
+    const events = parseCloudWebhook(entry("messages", { metadata: meta, messages: [{ id: "wamid.R", from: "557788", type: "revoke", timestamp: "1", revoke: { original_message_id: "wamid.O" } }] }));
+    expect(events).toEqual([{ kind: "revoke", phoneNumberId: "PN1", originalKeyId: "wamid.O" }]);
+  });
+  it("recepção apagou pelo celular (eco)", () => {
+    const events = parseCloudWebhook(entry("smb_message_echoes", { metadata: meta, message_echoes: [{ id: "wamid.R2", to: "557788", type: "revoke", timestamp: "1", revoke: { original_message_id: "wamid.O" } }] }));
+    expect(events).toEqual([{ kind: "revoke", phoneNumberId: "PN1", originalKeyId: "wamid.O" }]);
+  });
+  it("reação do paciente e da recepção; emoji vazio remove", () => {
+    const a = parseCloudWebhook(entry("messages", { metadata: meta, messages: [{ id: "wamid.X", from: "557788", type: "reaction", timestamp: "1", reaction: { message_id: "wamid.O", emoji: "👍" } }] }));
+    expect(a).toEqual([{ kind: "reaction", phoneNumberId: "PN1", originalKeyId: "wamid.O", emoji: "👍", fromClinic: false }]);
+    const b = parseCloudWebhook(entry("smb_message_echoes", { metadata: meta, message_echoes: [{ id: "wamid.Y", to: "557788", type: "reaction", timestamp: "1", reaction: { message_id: "wamid.O" } }] }));
+    expect(b).toEqual([{ kind: "reaction", phoneNumberId: "PN1", originalKeyId: "wamid.O", emoji: null, fromClinic: true }]);
+  });
+});

@@ -11,7 +11,26 @@ export type CloudAd = { sourceId: string | null; sourceUrl: string | null; title
 export type CloudEvent =
   | ({ kind: "inbound"; phoneNumberId: string; from: string; name?: string; keyId: string; text: string; type: string; at: Date; ad?: CloudAd } & MediaFields)
   | ({ kind: "device_outbound"; phoneNumberId: string; to: string; keyId: string; text: string; type: string; at: Date } & MediaFields)
-  | { kind: "status"; phoneNumberId: string; keyId: string; status: string; at: Date; error?: string };
+  | { kind: "status"; phoneNumberId: string; keyId: string; status: string; at: Date; error?: string }
+  /** Mensagem editada / apagada / reação — do paciente ou da recepção pelo celular. Mexe na
+   * mensagem original (originalKeyId); nunca vira balão novo no Chat. */
+  | { kind: "edit"; phoneNumberId: string; originalKeyId: string; text: string }
+  | { kind: "revoke"; phoneNumberId: string; originalKeyId: string }
+  | { kind: "reaction"; phoneNumberId: string; originalKeyId: string; emoji: string | null; fromClinic: boolean };
+
+/** edit / revoke / reaction mexem numa mensagem que já existe. */
+function readChange(m: RawMsg, phoneNumberId: string, fromClinic: boolean): CloudEvent | null {
+  if (m.type === "edit" && m.edit?.original_message_id) {
+    const inner = m.edit.message ?? {};
+    const text = inner.text?.body ?? inner[inner.type]?.caption ?? "";
+    return { kind: "edit", phoneNumberId, originalKeyId: m.edit.original_message_id, text };
+  }
+  if (m.type === "revoke" && m.revoke?.original_message_id) return { kind: "revoke", phoneNumberId, originalKeyId: m.revoke.original_message_id };
+  if (m.type === "reaction" && m.reaction?.message_id) {
+    return { kind: "reaction", phoneNumberId, originalKeyId: m.reaction.message_id, emoji: m.reaction.emoji || null, fromClinic };
+  }
+  return null;
+}
 
 const MEDIA_LABEL: Record<string, string> = {
   image: "📷 Imagem",
@@ -61,6 +80,11 @@ export function parseCloudWebhook(body: unknown): CloudEvent[] {
       if (change.field === "messages") {
         const names = new Map<string, string>((v.contacts ?? []).map((c: RawMsg) => [c.wa_id, c.profile?.name]));
         for (const m of v.messages ?? []) {
+          const change = readChange(m, phoneNumberId, false);
+          if (change) {
+            events.push(change);
+            continue;
+          }
           const name = names.get(m.from);
           events.push({
             kind: "inbound",
@@ -81,6 +105,11 @@ export function parseCloudWebhook(body: unknown): CloudEvent[] {
         }
       } else if (change.field === "smb_message_echoes") {
         for (const m of v.message_echoes ?? []) {
+          const change = readChange(m, phoneNumberId, true);
+          if (change) {
+            events.push(change);
+            continue;
+          }
           events.push({ kind: "device_outbound", phoneNumberId, to: m.to, keyId: m.id, type: m.type, at: toDate(m.timestamp), ...readContent(m, "enviad") });
         }
       }

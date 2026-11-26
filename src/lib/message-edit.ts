@@ -32,6 +32,10 @@ export function canEditMessage(
   if (!message.whatsappKeyId) {
     return { ok: false, reason: "Mensagem ainda não foi confirmada como enviada." };
   }
+  // API oficial (id "wamid."): a Meta não tem como editar pela API — só pelo celular.
+  if (message.whatsappKeyId.startsWith("wamid.")) {
+    return { ok: false, reason: "Pela API oficial do WhatsApp não dá para editar daqui. Edite pelo celular." };
+  }
   const ageMinutes = (now.getTime() - message.createdAt.getTime()) / 60000;
   if (ageMinutes > EDIT_WINDOW_MINUTES) {
     return { ok: false, reason: `Só é possível editar até ${EDIT_WINDOW_MINUTES} minutos após o envio.` };

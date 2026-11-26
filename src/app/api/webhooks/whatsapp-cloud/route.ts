@@ -58,6 +58,12 @@ async function handle(event: CloudEvent, clinicId: string) {
     if (status) await prisma.message.updateMany({ where: { whatsappKeyId: event.keyId }, data: { status } });
     return;
   }
+  // Editou, apagou ou reagiu (paciente, ou a recepção pelo celular): muda a mensagem
+  // original, como no WhatsApp. Antes viravam balões "[edit]" / "[revoke]" / "[reaction]".
+  if (event.kind === "edit" || event.kind === "revoke" || event.kind === "reaction") {
+    await applyMessageChange(event);
+    return;
+  }
   if (await prisma.message.findUnique({ where: { whatsappKeyId: event.keyId }, select: { id: true } })) return;
 
   const inbound = event.kind === "inbound";
@@ -77,6 +83,17 @@ async function handle(event: CloudEvent, clinicId: string) {
     where: { id: conversation.id },
     data: { lastMessageAt: event.at, ...(inbound ? { status: "OPEN" } : {}) },
   });
+}
+
+async function applyMessageChange(event: Extract<CloudEvent, { kind: "edit" | "revoke" | "reaction" }>) {
+  const where = { whatsappKeyId: event.originalKeyId };
+  if (event.kind === "edit") {
+    if (event.text) await prisma.message.updateMany({ where, data: { content: event.text, editedAt: new Date() } });
+  } else if (event.kind === "revoke") {
+    await prisma.message.updateMany({ where, data: { deletedAt: new Date() } });
+  } else {
+    await prisma.message.updateMany({ where, data: event.fromClinic ? { agentReaction: event.emoji } : { contactReaction: event.emoji } });
+  }
 }
 
 /** Encaminha pro webhook da Evolution (mesmo deploy) com a clínica no cabeçalho e o

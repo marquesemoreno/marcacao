@@ -182,13 +182,19 @@ export async function aiChat(ctx: AiCallContext, params: ChatCompletionCreatePar
  * registrada como `unmaskable.audio`. `null` sem chave ou em falha. */
 export async function aiTranscribe(
   ctx: AiCallContext,
-  input: { buffer: Buffer; filename: string; model: string; language?: string },
+  input: { buffer: Buffer; filename: string; model: string; language?: string; prompt?: string },
 ): Promise<string | null> {
   const openai = getOpenAi();
   if (!openai) return null;
   const file = await toFile(input.buffer, input.filename);
   const started = Date.now();
-  const result = await openai.audio.transcriptions.create({ file, model: input.model, language: input.language });
+  const result = await openai.audio.transcriptions.create({
+    file,
+    model: input.model,
+    language: input.language,
+    ...(input.prompt ? { prompt: input.prompt } : {}),
+    temperature: 0,
+  });
   logCall(ctx, { model: input.model, masked: {}, unmaskable: { audio: 1 }, ms: Date.now() - started });
   return result.text?.trim() || null;
 }

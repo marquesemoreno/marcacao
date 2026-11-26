@@ -32,6 +32,10 @@ describe("canEditMessage", () => {
     expect(canEditMessage({ ...baseMessage, deletedAt: new Date("2026-01-01T10:01:00Z") }, now).ok).toBe(false);
   });
 
+  it("bloqueia mensagem enviada pela API oficial (wamid)", () => {
+    expect(canEditMessage({ ...baseMessage, whatsappKeyId: "wamid.HBg" }, new Date("2026-01-01T10:01:00Z")).ok).toBe(false);
+  });
+
   it("bloqueia mensagem que ainda não confirmou envio (sem whatsappKeyId, ex: falhou)", () => {
     const now = new Date("2026-01-01T10:05:00Z");
     expect(canEditMessage({ ...baseMessage, whatsappKeyId: null }, now).ok).toBe(false);

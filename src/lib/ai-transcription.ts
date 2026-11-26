@@ -18,6 +18,11 @@ function extensionFromMimeType(mimeType: string): string {
   return map[base] ?? "ogg";
 }
 
+/** Contexto para o modelo: português do Brasil, paciente falando com a recepção de uma
+ * clínica. Não inventar: se não der para entender, devolver vazio. */
+const TRANSCRIBE_PROMPT =
+  "Áudio de WhatsApp de um paciente para a recepção de uma clínica médica no Brasil (consulta, exame, agendamento, valor, horário, médico). Transcreva exatamente o que foi dito.";
+
 /** Transcreve um áudio (buffer já baixado do Storage) via API de transcrição
  * da OpenAI. Botão manual (ver transcribeMessageAudio em actions/inbox.ts) —
  * nunca automático, é a atendente quem decide gastar a chamada. Retorna
@@ -34,8 +39,11 @@ export async function transcribeAudio(
       {
         buffer,
         filename: `audio.${extensionFromMimeType(mimeType)}`,
-        model: process.env.OPENAI_TRANSCRIBE_MODEL || "whisper-1",
+        // whisper-1 inventava frases em áudio curto ou com ruído (26/11: 3 s de áudio
+        // viraram uma frase que o paciente nunca disse). gpt-4o-transcribe erra bem menos.
+        model: process.env.OPENAI_TRANSCRIBE_MODEL || "gpt-4o-transcribe",
         language: "pt",
+        prompt: TRANSCRIBE_PROMPT,
       },
     );
   } catch (error) {
