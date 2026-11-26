@@ -1,5 +1,6 @@
 "use client";
 
+import { ImageEditorDialog, isEditableImage } from './image-editor-dialog';
 import { NON_PATIENT_TAG } from "@/lib/conversation-tags";
 import { formatPhone } from "@/lib/format";
 import { ACQUISITION_CHANNELS } from "@/lib/acquisition";
@@ -1132,6 +1133,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
   // Cada arquivo vira uma mensagem própria no WhatsApp (não dá pra agrupar vários
   // anexos numa única mensagem), então ao selecionar/colar mais de um, envia em
   // sequência — evita disparos simultâneos fora de ordem no histórico da conversa.
+  const [editQueue, setEditQueue] = useState<File[]>([]);
   const sendFiles = async (files: File[]) => {
     if (!selectedContact || files.length === 0) return;
 
@@ -1149,13 +1151,29 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
     }
     if (valid.length === 0) return;
 
+    // Foto (JPG/PNG/WEBP) abre o editor antes de enviar, como no WhatsApp Web; PDF e GIF vão direto.
+    const toEdit = valid.filter(isEditableImage);
+    const direct = valid.filter((f) => !isEditableImage(f));
+    if (toEdit.length) setEditQueue((q) => [...q, ...toEdit]);
+    if (direct.length === 0) return;
+
     setIsSendingMedia(true);
     try {
-      for (const file of valid) {
+      for (const file of direct) {
         await onSendMedia(file);
       }
     } finally {
       setIsSendingMedia(false);
+    }
+  };
+
+  const sendEditedImage = async (file: File) => {
+    setIsSendingMedia(true);
+    try {
+      await onSendMedia(file);
+    } finally {
+      setIsSendingMedia(false);
+      setEditQueue((q) => q.slice(1));
     }
   };
 
@@ -1535,7 +1553,16 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
           {/* min-w-0 + rolagem: as abas nunca passam da largura da fila (antes "Não
               Atribuídas" e os ícones invadiam a coluna da conversa). */}
           <div className="flex min-w-0 items-center gap-1.5">
-          <div ref={tabsScrollRef} className="flex-1 min-w-0 flex items-center gap-0.5 p-1 bg-slate-900/5 dark:bg-white/[0.06] rounded-full text-xs font-medium overflow-x-auto [scrollbar-width:none]">
+          {/* 26/11: barra fina visível + roda do mouse rola de lado — antes a rolagem era
+              invisível e as abas da direita ficavam inalcançáveis em tela estreita. */}
+          <div
+            ref={tabsScrollRef}
+            onWheel={(e) => {
+              const box = e.currentTarget;
+              if (box.scrollWidth > box.clientWidth && Math.abs(e.deltaY) > Math.abs(e.deltaX)) box.scrollLeft += e.deltaY;
+            }}
+            className="flex-1 min-w-0 flex items-center gap-0.5 p-1 bg-slate-900/5 dark:bg-white/[0.06] rounded-2xl text-xs font-medium overflow-x-auto [scrollbar-width:thin] [scrollbar-color:rgb(148_163_184/0.6)_transparent] [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-400/60"
+          >
             {ALL_INBOX_TABS.filter((tab) => visibleTabIds.includes(tab.id)).map((tab) => {
               // C3: um único estilo de aba ativa. O alerta de espera sem responsável virou só
               // a cor do contador (vermelho passado o limiar) — antes a aba inteira ficava
@@ -1753,6 +1780,16 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                 className="w-full rounded-full border border-slate-300 dark:border-white/15 py-2 text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-white/80 dark:hover:bg-white/[0.08] disabled:opacity-60"
               >
                 {isLoadingMoreFinalized ? 'Carregando…' : 'Carregar mais finalizadas'}
+              </button>
+            </div>
+          )}
+          {/* "Todas" = conversas abertas. As finalizadas ficam na aba própria — avisa no fim
+              da lista para ninguém procurar um "Carregar mais" que não existe aqui. */}
+          {filterTab === 'todas' && !searchQuery.trim() && (
+            <div className="p-3 text-center text-xs text-slate-500 dark:text-slate-400">
+              Estas são as conversas abertas.{' '}
+              <button type="button" onClick={() => onFilterTabChange('finalizadas')} className="font-semibold text-emerald-700 dark:text-emerald-400 hover:underline">
+                Ver finalizadas
               </button>
             </div>
           )}
@@ -2464,6 +2501,14 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                     <div className="flex min-w-0 items-center gap-1.5 overflow-x-auto [scrollbar-width:none]">
                       {composerMode === 'whatsapp' && selectedContact?.channel !== 'instagram' && (
                         <>
+                          {editQueue[0] && (
+                            <ImageEditorDialog
+                              file={editQueue[0]}
+                              remaining={editQueue.length - 1}
+                              onSend={sendEditedImage}
+                              onCancel={() => setEditQueue((q) => q.slice(1))}
+                            />
+                          )}
                           <input
                             ref={fileInputRef}
                             type="file"
