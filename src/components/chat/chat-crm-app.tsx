@@ -860,7 +860,7 @@ export function ChatCrmApp({ scope, basePath, view, realtimeTopic }: ChatCrmAppP
     }
   }
 
-  async function handleSendMedia(file: File) {
+  async function handleSendMedia(file: File, caption?: string) {
     if (!selectedContactId) return;
 
     const tempId = `temp-${Date.now()}`;
@@ -880,6 +880,7 @@ export function ChatCrmApp({ scope, basePath, view, realtimeTopic }: ChatCrmAppP
       attachmentSize: formatFileSize(file.size),
       mediaUrl: localPreviewUrl,
       mimeType: file.type,
+      ...(caption ? { text: caption } : {}),
     };
 
     setMessages((prev) => [...prev, optimisticMsg]);
@@ -894,6 +895,7 @@ export function ChatCrmApp({ scope, basePath, view, realtimeTopic }: ChatCrmAppP
     try {
       const formData = new FormData();
       formData.append("file", file);
+      if (caption) formData.append("caption", caption);
       await actions.sendMediaMessage(selectedContactId, formData);
       await refreshMessages();
       refreshContacts();

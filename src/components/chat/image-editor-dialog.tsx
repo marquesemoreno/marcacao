@@ -26,7 +26,7 @@ export function ImageEditorDialog({
   file: File;
   /** Quantas fotos ainda esperam depois desta. */
   remaining: number;
-  onSend: (file: File) => Promise<void> | void;
+  onSend: (file: File, caption: string) => Promise<void> | void;
   onCancel: () => void;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -41,6 +41,7 @@ export function ImageEditorDialog({
   const [crop, setCrop] = useState<Rect | null>(null);
   const [sending, setSending] = useState(false);
   const [canUndo, setCanUndo] = useState(false);
+  const [caption, setCaption] = useState('');
 
   // Carrega a foto no canvas (reduz fotos enormes para não travar o navegador).
   useEffect(() => {
@@ -187,17 +188,18 @@ export function ImageEditorDialog({
     if (sending) return;
     setSending(true);
     try {
+      const legend = caption.trim();
       if (useOriginal || !edited) {
-        await onSend(file);
+        await onSend(file, legend);
         return;
       }
       const blob = await new Promise<Blob | null>((resolve) => canvasRef.current!.toBlob(resolve, 'image/jpeg', 0.9));
       if (!blob) {
-        await onSend(file);
+        await onSend(file, legend);
         return;
       }
       const name = file.name.replace(/\.[^.]+$/, '') + '.jpg';
-      await onSend(new File([blob], name, { type: 'image/jpeg' }));
+      await onSend(new File([blob], name, { type: 'image/jpeg' }), legend);
     } finally {
       setSending(false);
     }
@@ -206,7 +208,9 @@ export function ImageEditorDialog({
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onCancel();
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') undo();
+      // Ctrl+Z dentro de um campo de texto (legenda) desfaz o texto, não o desenho.
+      const inField = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement;
+      if (!inField && (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') undo();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -299,8 +303,23 @@ export function ImageEditorDialog({
         </div>
       </div>
 
-      <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-white/10">
-        {remaining > 0 && <span className="mr-auto text-sm text-slate-400">Mais {remaining} foto(s) depois desta</span>}
+      <div className="flex flex-wrap items-center justify-end gap-2 px-4 py-3 border-t border-white/10">
+        <input
+          type="text"
+          value={caption}
+          onChange={(e) => setCaption(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault();
+              send(false);
+            }
+          }}
+          maxLength={1024}
+          placeholder="Adicione uma legenda…"
+          aria-label="Legenda da foto"
+          className="min-w-[12rem] flex-1 h-10 px-4 rounded-full bg-white/10 text-sm text-white placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-emerald-500"
+        />
+        {remaining > 0 && <span className="text-sm text-slate-400">Mais {remaining} foto(s) depois desta</span>}
         {edited && (
           <button type="button" onClick={() => send(true)} disabled={sending} className="h-10 px-4 rounded-full text-sm font-medium text-slate-200 hover:bg-white/10 disabled:opacity-50">
             Enviar original

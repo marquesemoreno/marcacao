@@ -645,6 +645,9 @@ export async function sendMediaMessageAdmin(conversationId: string, formData: Fo
   if (file.size > MAX_MEDIA_SIZE_BYTES) {
     throw new Error("Arquivo muito grande. O limite é 15 MB.");
   }
+  // Legenda da foto (editor do Chat). Só imagem/documento — o WhatsApp limita a 1024 caracteres.
+  const rawCaption = formData.get("caption");
+  const caption = typeof rawCaption === "string" ? rawCaption.trim().slice(0, 1024) : "";
 
   const conversation = await prisma.conversation.findUnique({
     where: { id: conversationId },
@@ -665,7 +668,7 @@ export async function sendMediaMessageAdmin(conversationId: string, formData: Fo
     data: {
       conversationId,
       direction: "OUTBOUND",
-      content: "",
+      content: caption,
       status: "SENT",
       type: "ATTACHMENT",
       mediaPath: uploaded.path,
@@ -685,7 +688,7 @@ export async function sendMediaMessageAdmin(conversationId: string, formData: Fo
   if (signedUrl) {
     // Await por robustez, não fire-and-forget — ver comentário em sendMessageAdmin.
     try {
-      const result = await sendWhatsAppMedia(waPhone, signedUrl, file.type, file.name, "", "chat.outbound_admin.media", conversation.clinicId);
+      const result = await sendWhatsAppMedia(waPhone, signedUrl, file.type, file.name, caption, "chat.outbound_admin.media", conversation.clinicId);
       if (!result.success && !result.skipped) {
         await prisma.message.update({ where: { id: message.id }, data: { status: "FAILED" } });
       } else if (result.keyId) {

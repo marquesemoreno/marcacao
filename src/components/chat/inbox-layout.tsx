@@ -206,7 +206,7 @@ interface InboxLayoutProps {
   onUpdateQuickReply?: (id: string, shortcut: string, content: string) => Promise<void>;
   onDeleteQuickReply?: (id: string) => Promise<void>;
   onSendMessage: (text: string, mode: 'whatsapp' | 'internal_note', replyToMessageId?: string) => Promise<void> | void;
-  onSendMedia: (file: File) => Promise<void> | void;
+  onSendMedia: (file: File, caption?: string) => Promise<void> | void;
   /** Grava um áudio no navegador e envia como voice-note nativo do WhatsApp. */
   onSendAudio?: (file: File, durationSeconds: number) => Promise<void> | void;
   /** Compartilha um cartão de contato (vCard) com o paciente — sem `target`, compartilha
@@ -1167,10 +1167,10 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
     }
   };
 
-  const sendEditedImage = async (file: File) => {
+  const sendEditedImage = async (file: File, caption: string) => {
     setIsSendingMedia(true);
     try {
-      await onSendMedia(file);
+      await onSendMedia(file, caption);
     } finally {
       setIsSendingMedia(false);
       setEditQueue((q) => q.slice(1));
