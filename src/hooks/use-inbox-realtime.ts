@@ -36,26 +36,76 @@ const DEFAULT_POLL_INTERVAL_MS = 30000;
  * toda outra clínica, ampliando o mesmo padrão de polling que já tinha estourado
  * o Egress do Supabase.
  */
-export function useInboxRealtime(onUpdate: () => void, topic?: string | null, pollIntervalMs = DEFAULT_POLL_INTERVAL_MS) {
+/** Intervalo mínimo entre duas atualizações seguidas. Em campanha chegavam ~13 avisos por
+ * minuto (26/11) e cada um disparava a busca inteira na hora — as buscas (Server Actions)
+ * rodam uma de cada vez, formavam fila, e abrir uma conversa esperava atrás delas. */
+const MIN_GAP_MS = 2500;
+
+export function useInboxRealtime(onUpdate: () => unknown, topic?: string | null, pollIntervalMs = DEFAULT_POLL_INTERVAL_MS) {
   const onUpdateRef = useRef(onUpdate);
   onUpdateRef.current = onUpdate;
 
   useEffect(() => {
-    const interval = setInterval(() => onUpdateRef.current(), pollIntervalMs);
+    let running = false;
+    let pending = false;
+    let lastRun = 0;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let disposed = false;
+
+    // Junta avisos: no máximo uma atualização em andamento; os que chegam no meio viram
+    // UMA atualização a mais, depois de MIN_GAP_MS. Com a aba escondida não busca nada —
+    // atualiza uma vez quando a atendente volta pra ela.
+    const trigger = () => {
+      if (disposed) return;
+      if (running || timer || document.hidden) {
+        pending = true;
+        return;
+      }
+      const wait = Math.max(0, lastRun + MIN_GAP_MS - Date.now());
+      if (wait > 0) {
+        pending = true;
+        timer = setTimeout(() => {
+          timer = null;
+          flush();
+        }, wait);
+        return;
+      }
+      run();
+    };
+    const flush = () => {
+      if (!pending) return;
+      pending = false;
+      trigger();
+    };
+    const run = async () => {
+      running = true;
+      lastRun = Date.now();
+      try {
+        await onUpdateRef.current();
+      } catch {
+        // a próxima atualização tenta de novo
+      } finally {
+        running = false;
+        lastRun = Date.now();
+        flush();
+      }
+    };
+    const onVisible = () => {
+      if (!document.hidden) flush();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+
+    const interval = setInterval(trigger, pollIntervalMs);
 
     const supabase = getSupabaseClient();
-    if (!supabase || !topic) {
-      return () => clearInterval(interval);
-    }
-
-    const channel = supabase
-      .channel(topic)
-      .on("broadcast", { event: "changed" }, () => onUpdateRef.current())
-      .subscribe();
+    const channel = supabase && topic ? supabase.channel(topic).on("broadcast", { event: "changed" }, trigger).subscribe() : null;
 
     return () => {
+      disposed = true;
       clearInterval(interval);
-      supabase.removeChannel(channel);
+      if (timer) clearTimeout(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+      if (supabase && channel) supabase.removeChannel(channel);
     };
   }, [pollIntervalMs, topic]);
 }

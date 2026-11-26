@@ -745,10 +745,7 @@ export function ChatCrmApp({ scope, basePath, view, realtimeTopic }: ChatCrmAppP
     }
   }
 
-  useInboxRealtime(() => {
-    refreshContacts();
-    refreshMessages();
-  }, realtimeTopic);
+  useInboxRealtime(() => Promise.all([refreshContacts(), refreshMessages()]), realtimeTopic);
 
   // `contacts` é substituído por inteiro a cada busca (escopada pela aba/busca atual) — sem
   // esse cache, a conversa aberta desaparecia da tela assim que a atendente trocava de aba

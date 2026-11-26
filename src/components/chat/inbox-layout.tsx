@@ -16,7 +16,7 @@ import { displayName } from "@/lib/contact-display";
 import { useRouter } from "next/navigation";
 import { NewContactDialog } from "@/components/chat/new-contact-dialog";
 import type { NewContactExtra } from "@/lib/new-contact-extra";
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Contact,
   Message,
@@ -716,10 +716,10 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
   /** Pré-seleção vinda do DocumentReviewCard (ver handleOpenScheduleWithProcedure) —
    * undefined quando o agendamento é aberto pelo botão normal "Agendar". */
   const [scheduleModalProcedureId, setScheduleModalProcedureId] = useState<string | undefined>(undefined);
-  function handleOpenScheduleWithProcedure(clinicProcedureId?: string) {
+  const handleOpenScheduleWithProcedure = useCallback((clinicProcedureId?: string) => {
     setScheduleModalProcedureId(clinicProcedureId);
     setIsScheduleModalOpen(true);
-  }
+  }, []);
   const [isNewContactModalOpen, setIsNewContactModalOpen] = useState(false);
   const [isQuickReplyOpen, setIsQuickReplyOpen] = useState(false);
   const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
@@ -748,6 +748,36 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
   const displayedMessages = useMemo(
     () => (showOnlyStarred ? messages.filter((m) => m.starred) : messages),
     [messages, showOnlyStarred]
+  );
+  // Balões memorizados: inputText é state deste componente, então cada tecla redesenhava
+  // TODOS os balões da conversa aberta (centenas de nós, imagens, áudio) — a digitação
+  // engasgava (26/11). Agora só redesenham quando mensagens ou ações mudam.
+  const messageBubbles = useMemo(
+    () =>
+      displayedMessages.map((msg) => (
+                    <MessageBubble
+                      key={msg.id}
+                      message={msg}
+                      onRetry={onRetryMessage ? () => onRetryMessage(msg.id) : undefined}
+                      onEditMessage={onEditMessage}
+                      onTranscribeAudio={onTranscribeAudio}
+                      onExtractInvoiceData={onExtractInvoiceData}
+                      onProcessDocument={onProcessDocument}
+                      onOpenScheduleWithProcedure={handleOpenScheduleWithProcedure}
+                      onRequestResend={
+                        msg.mediaDownloadFailed
+                          ? () => onSendMessage('Oi! Não conseguimos baixar o arquivo que você enviou por aqui. Pode tentar enviar novamente, por favor?', 'whatsapp')
+                          : undefined
+                      }
+                      onReply={() => setReplyingTo(msg)}
+                      onReact={onReact ? (emoji) => onReact(msg.id, emoji) : undefined}
+                      onToggleStar={onToggleStar ? () => onToggleStar(msg.id) : undefined}
+                      onForward={onForward ? (targetConversationId) => onForward(msg.id, targetConversationId) : undefined}
+                      onSearchForwardTargets={onSearchForwardTargets}
+                    />
+                  )),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [displayedMessages, onRetryMessage, onEditMessage, onTranscribeAudio, onExtractInvoiceData, onProcessDocument, handleOpenScheduleWithProcedure, onSendMessage, onReact, onToggleStar, onForward, onSearchForwardTargets]
   );
   // Compartilhar contato (vCard) — clínica em 1 clique, ou qualquer contato buscado na lista.
   const [isSharingContact, setIsSharingContact] = useState(false);
@@ -2276,28 +2306,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                       </button>
                     </div>
                   )}
-                  {displayedMessages.map((msg) => (
-                    <MessageBubble
-                      key={msg.id}
-                      message={msg}
-                      onRetry={onRetryMessage ? () => onRetryMessage(msg.id) : undefined}
-                      onEditMessage={onEditMessage}
-                      onTranscribeAudio={onTranscribeAudio}
-                      onExtractInvoiceData={onExtractInvoiceData}
-                      onProcessDocument={onProcessDocument}
-                      onOpenScheduleWithProcedure={handleOpenScheduleWithProcedure}
-                      onRequestResend={
-                        msg.mediaDownloadFailed
-                          ? () => onSendMessage('Oi! Não conseguimos baixar o arquivo que você enviou por aqui. Pode tentar enviar novamente, por favor?', 'whatsapp')
-                          : undefined
-                      }
-                      onReply={() => setReplyingTo(msg)}
-                      onReact={onReact ? (emoji) => onReact(msg.id, emoji) : undefined}
-                      onToggleStar={onToggleStar ? () => onToggleStar(msg.id) : undefined}
-                      onForward={onForward ? (targetConversationId) => onForward(msg.id, targetConversationId) : undefined}
-                      onSearchForwardTargets={onSearchForwardTargets}
-                    />
-                  ))}
+                  {messageBubbles}
                 </>
               )}
             </div>

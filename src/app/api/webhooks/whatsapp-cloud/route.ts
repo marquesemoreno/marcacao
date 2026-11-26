@@ -52,19 +52,23 @@ async function conversationFor(clinicId: string, rawPhone: string, name: string 
   return prisma.conversation.create({ data: { clinicId, contactId: contact.id, status: "OPEN", lastMessageAt: at } });
 }
 
-async function handle(event: CloudEvent, clinicId: string) {
+/** true = mudou algo que aparece no Chat (só então avisa as telas abertas). */
+async function handle(event: CloudEvent, clinicId: string): Promise<boolean> {
   if (event.kind === "status") {
+    // A maior parte dos status é de disparo de campanha, que não tem balão no Chat
+    // (updateMany = 0). Avisar as telas nesses casos fazia cada atendente recarregar
+    // conversas + mensagens centenas de vezes por hora durante a campanha (26/11).
     const status = STATUS_MAP[event.status];
-    if (status) await prisma.message.updateMany({ where: { whatsappKeyId: event.keyId }, data: { status } });
-    return;
+    if (!status) return false;
+    const { count } = await prisma.message.updateMany({ where: { whatsappKeyId: event.keyId }, data: { status } });
+    return count > 0;
   }
   // Editou, apagou ou reagiu (paciente, ou a recepção pelo celular): muda a mensagem
   // original, como no WhatsApp. Antes viravam balões "[edit]" / "[revoke]" / "[reaction]".
   if (event.kind === "edit" || event.kind === "revoke" || event.kind === "reaction") {
-    await applyMessageChange(event);
-    return;
+    return applyMessageChange(event);
   }
-  if (await prisma.message.findUnique({ where: { whatsappKeyId: event.keyId }, select: { id: true } })) return;
+  if (await prisma.message.findUnique({ where: { whatsappKeyId: event.keyId }, select: { id: true } })) return false;
 
   const inbound = event.kind === "inbound";
   const conversation = await conversationFor(clinicId, inbound ? event.from : event.to, inbound ? event.name : undefined, event.at);
@@ -83,17 +87,20 @@ async function handle(event: CloudEvent, clinicId: string) {
     where: { id: conversation.id },
     data: { lastMessageAt: event.at, ...(inbound ? { status: "OPEN" } : {}) },
   });
+  return true;
 }
 
-async function applyMessageChange(event: Extract<CloudEvent, { kind: "edit" | "revoke" | "reaction" }>) {
+async function applyMessageChange(event: Extract<CloudEvent, { kind: "edit" | "revoke" | "reaction" }>): Promise<boolean> {
   const where = { whatsappKeyId: event.originalKeyId };
   if (event.kind === "edit") {
-    if (event.text) await prisma.message.updateMany({ where, data: { content: event.text, editedAt: new Date() } });
-  } else if (event.kind === "revoke") {
-    await prisma.message.updateMany({ where, data: { deletedAt: new Date() } });
-  } else {
-    await prisma.message.updateMany({ where, data: event.fromClinic ? { agentReaction: event.emoji } : { contactReaction: event.emoji } });
+    if (!event.text) return false;
+    return (await prisma.message.updateMany({ where, data: { content: event.text, editedAt: new Date() } })).count > 0;
   }
+  if (event.kind === "revoke") {
+    return (await prisma.message.updateMany({ where, data: { deletedAt: new Date() } })).count > 0;
+  }
+  const data = event.fromClinic ? { agentReaction: event.emoji } : { contactReaction: event.emoji };
+  return (await prisma.message.updateMany({ where, data })).count > 0;
 }
 
 /** Encaminha pro webhook da Evolution (mesmo deploy) com a clínica no cabeçalho e o
@@ -179,8 +186,7 @@ export async function POST(request: Request) {
         touched.add(clinicId);
         continue;
       }
-      await handle(event, clinicId);
-      touched.add(clinicId);
+      if (await handle(event, clinicId)) touched.add(clinicId);
     } catch (error) {
       failed++;
       console.error("Falha ao gravar evento da API oficial do WhatsApp:", errorSummary(error));
