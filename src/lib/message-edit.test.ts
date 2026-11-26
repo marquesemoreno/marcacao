@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { canEditMessage, EDIT_WINDOW_MINUTES } from "./message-edit";
+import { canEditMessage, canDeleteMessage, cloudLockedReason, EDIT_WINDOW_MINUTES } from "./message-edit";
 
 const baseMessage = {
   type: "TEXT" as const,
@@ -51,5 +51,38 @@ describe("canEditMessage", () => {
   it("permite editar bem no limite da janela", () => {
     const now = new Date(baseMessage.createdAt.getTime() + (EDIT_WINDOW_MINUTES - 1) * 60000);
     expect(canEditMessage(baseMessage, now).ok).toBe(true);
+  });
+});
+
+describe("canDeleteMessage", () => {
+  it("permite apagar para todos mensagem nossa (texto, foto ou áudio) em até 48 h", () => {
+    const now = new Date("2026-01-02T09:00:00Z");
+    expect(canDeleteMessage(baseMessage, now)).toEqual({ ok: true });
+    expect(canDeleteMessage({ ...baseMessage, type: "ATTACHMENT" }, now).ok).toBe(true);
+    expect(canDeleteMessage({ ...baseMessage, type: "AUDIO" }, now).ok).toBe(true);
+  });
+
+  it("bloqueia depois de 48 h, do paciente, nota interna, já apagada ou sem confirmação", () => {
+    const now = new Date("2026-01-01T10:05:00Z");
+    expect(canDeleteMessage(baseMessage, new Date("2026-01-03T10:01:00Z")).ok).toBe(false);
+    expect(canDeleteMessage({ ...baseMessage, direction: "INBOUND" }, now).ok).toBe(false);
+    expect(canDeleteMessage({ ...baseMessage, type: "INTERNAL_NOTE" }, now).ok).toBe(false);
+    expect(canDeleteMessage({ ...baseMessage, deletedAt: now }, now).ok).toBe(false);
+    expect(canDeleteMessage({ ...baseMessage, whatsappKeyId: null }, now).ok).toBe(false);
+  });
+
+  it("API oficial (wamid.) não apaga daqui", () => {
+    const now = new Date("2026-01-01T10:05:00Z");
+    expect(canDeleteMessage({ ...baseMessage, whatsappKeyId: "wamid.HBgM" }, now).ok).toBe(false);
+  });
+});
+
+describe("cloudLockedReason", () => {
+  it("explica o limite só em mensagem nossa da API oficial, não apagada", () => {
+    expect(cloudLockedReason({ ...baseMessage, whatsappKeyId: "wamid.HBgM" })).toMatch(/celular/);
+    expect(cloudLockedReason(baseMessage)).toBeUndefined();
+    expect(cloudLockedReason({ ...baseMessage, whatsappKeyId: "wamid.X", direction: "INBOUND" })).toBeUndefined();
+    expect(cloudLockedReason({ ...baseMessage, whatsappKeyId: "wamid.X", type: "INTERNAL_NOTE" })).toBeUndefined();
+    expect(cloudLockedReason({ ...baseMessage, whatsappKeyId: "wamid.X", deletedAt: new Date() })).toBeUndefined();
   });
 });

@@ -361,6 +361,51 @@ export async function editWhatsAppMessage(
 }
 
 /**
+ * "Apagar para todos" via Evolution API v2.
+ * DELETE ${EVOLUTION_API_URL}/chat/deleteMessageForEveryone/${EVOLUTION_INSTANCE_NAME}
+ * Payload: { id, remoteJid, fromMe: true } — mesma reconstrução do remoteJid de
+ * editWhatsAppMessage. A API oficial (Cloud) não tem equivalente (ver canDeleteMessage).
+ */
+export async function deleteWhatsAppMessageForEveryone(
+  to: string,
+  keyId: string,
+  event: string = "whatsapp.delete",
+  clinicId?: string
+): Promise<{ success: boolean; skipped: boolean; responseCode?: number | null }> {
+  const { apiUrl, apiKey, instanceName } = await getEvolutionConfig(clinicId);
+  if (isDemoEvolutionUrl(apiUrl)) return DEMO_SEND_RESULT;
+  const target = formatToWhatsAppNumber(to);
+
+  if (!apiUrl || !apiKey || !instanceName) {
+    await prisma.webhookLog.create({ data: { event, payload: { phone: target, keyId }, status: "SKIPPED", responseCode: null } });
+    return { success: false, skipped: true };
+  }
+
+  let result: SendAttemptResult = { success: false, responseCode: null };
+  try {
+    const response = await fetch(`${apiUrl.replace(/\/$/, "")}/chat/deleteMessageForEveryone/${instanceName}`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json", apikey: apiKey },
+      body: JSON.stringify({ id: keyId, remoteJid: `${target}@s.whatsapp.net`, fromMe: true }),
+      signal: AbortSignal.timeout(8000),
+    });
+    result = { success: response.ok, responseCode: response.status };
+  } catch (error) {
+    result = { success: false, responseCode: null, error: error instanceof Error ? error.message : "Erro na conexão com Evolution API" };
+  }
+
+  await prisma.webhookLog.create({
+    data: {
+      event,
+      payload: { provider: "evolution_v2", phone: target, keyId, error: result.error ?? null },
+      status: result.success ? "SUCCESS" : "FAILED",
+      responseCode: result.responseCode,
+    },
+  });
+  return { success: result.success, skipped: false, responseCode: result.responseCode };
+}
+
+/**
  * Envio de mídia (imagem/documento) via Evolution API v2.
  * POST ${EVOLUTION_API_URL}/message/sendMedia/${EVOLUTION_INSTANCE_NAME}
  * `media` é uma URL (a assinada do Supabase Storage) — a Evolution API busca

@@ -256,6 +256,7 @@ interface InboxLayoutProps {
   onArchiveConversation?: (contactId: string, archived: boolean) => Promise<void> | void;
   onRetryMessage?: (messageId: string) => Promise<void> | void;
   onEditMessage?: (messageId: string, newText: string) => Promise<{ success: boolean; error?: string }>;
+  onDeleteMessage?: (messageId: string) => Promise<void> | void;
   /** Transcreve um áudio recebido sob demanda (botão no balão) — ver transcribeMessageAudio em actions/inbox.ts. */
   onTranscribeAudio?: (messageId: string) => Promise<{ success: boolean; transcription?: string; error?: string }>;
   /** Extrai dados de nota fiscal sob demanda (botão no balão) — ver extractMessageInvoiceData em actions/inbox.ts. */
@@ -602,6 +603,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
   onArchiveConversation,
   onRetryMessage,
   onEditMessage,
+  onDeleteMessage,
   onTranscribeAudio,
   onExtractInvoiceData,
   onProcessDocument,
@@ -760,6 +762,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                       message={msg}
                       onRetry={onRetryMessage ? () => onRetryMessage(msg.id) : undefined}
                       onEditMessage={onEditMessage}
+                      onDelete={onDeleteMessage && msg.canDelete ? () => onDeleteMessage(msg.id) : undefined}
                       onTranscribeAudio={onTranscribeAudio}
                       onExtractInvoiceData={onExtractInvoiceData}
                       onProcessDocument={onProcessDocument}
@@ -777,7 +780,7 @@ export const InboxLayout: React.FC<InboxLayoutProps> = ({
                     />
                   )),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [displayedMessages, onRetryMessage, onEditMessage, onTranscribeAudio, onExtractInvoiceData, onProcessDocument, handleOpenScheduleWithProcedure, onSendMessage, onReact, onToggleStar, onForward, onSearchForwardTargets]
+    [displayedMessages, onRetryMessage, onEditMessage, onDeleteMessage, onTranscribeAudio, onExtractInvoiceData, onProcessDocument, handleOpenScheduleWithProcedure, onSendMessage, onReact, onToggleStar, onForward, onSearchForwardTargets]
   );
   // Compartilhar contato (vCard) — clínica em 1 clique, ou qualquer contato buscado na lista.
   const [isSharingContact, setIsSharingContact] = useState(false);

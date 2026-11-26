@@ -58,6 +58,7 @@ import {
   getInboxStats,
   markAssignmentSeen,
   editMessage,
+  deleteMessage,
   transcribeMessageAudio,
   extractMessageInvoiceData,
   processMessageDocument,
@@ -118,6 +119,7 @@ import {
   markAssignmentSeenAdmin,
   getOutboundFromDeviceStatsAdmin,
   editMessageAdmin,
+  deleteMessageAdmin,
   transcribeMessageAudioAdmin,
   extractMessageInvoiceDataAdmin,
   processMessageDocumentAdmin,
@@ -199,6 +201,7 @@ const ACTIONS_BY_SCOPE = {
     getUnseenAssignmentNotifications: () => getUnseenAssignmentNotifications(),
     markAssignmentSeen: (id: string) => markAssignmentSeen(id),
     editMessage: (id: string, text: string) => editMessage(id, text),
+    deleteMessage: (id: string) => deleteMessage(id),
     transcribeMessageAudio: (id: string) => transcribeMessageAudio(id),
     extractMessageInvoiceData: (id: string) => extractMessageInvoiceData(id),
     processMessageDocument: (id: string) => processMessageDocument(id),
@@ -244,6 +247,7 @@ const ACTIONS_BY_SCOPE = {
     getUnseenAssignmentNotifications: () => getUnseenAssignmentNotificationsAdmin(),
     markAssignmentSeen: (id: string) => markAssignmentSeenAdmin(id),
     editMessage: (id: string, text: string) => editMessageAdmin(id, text),
+    deleteMessage: (id: string) => deleteMessageAdmin(id),
     transcribeMessageAudio: (id: string) => transcribeMessageAudioAdmin(id),
     extractMessageInvoiceData: (id: string) => extractMessageInvoiceDataAdmin(id),
     processMessageDocument: (id: string) => processMessageDocumentAdmin(id),
@@ -1229,6 +1233,16 @@ export function ChatCrmApp({ scope, basePath, view, realtimeTopic }: ChatCrmAppP
     return result;
   }
 
+  async function handleDeleteMessage(messageId: string) {
+    const result = await actions.deleteMessage(messageId);
+    if (!result.success) {
+      toast.error(result.error || "Não foi possível apagar a mensagem.");
+      return;
+    }
+    toast.success("Mensagem apagada para todos.");
+    await refreshMessages();
+  }
+
   async function handleTranscribeAudio(messageId: string) {
     return actions.transcribeMessageAudio(messageId);
   }
@@ -1353,6 +1367,7 @@ export function ChatCrmApp({ scope, basePath, view, realtimeTopic }: ChatCrmAppP
           onArchiveConversation={handleArchiveConversation}
           onRetryMessage={handleRetryMessage}
           onEditMessage={handleEditMessage}
+          onDeleteMessage={handleDeleteMessage}
           onTranscribeAudio={handleTranscribeAudio}
           onExtractInvoiceData={handleExtractInvoiceData}
           onProcessDocument={handleProcessDocument}

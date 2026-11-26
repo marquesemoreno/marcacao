@@ -22,9 +22,9 @@ import { whatsappService, formatToWhatsAppNumber, isValidWhatsAppNumber, fetchWh
 import { toPlainClinicProcedureItem } from "@/lib/serialize";
 import { toChatContact, toChatMessage, departmentToDb, funnelStageToDb } from "@/lib/chat-crm-adapters";
 import { attachSignedUrls, uploadWhatsAppMedia, getSignedMediaUrl, downloadWhatsAppMedia, formatDuration } from "@/lib/whatsapp-media";
-import { sendWhatsAppMedia, sendWhatsAppAudio, sendWhatsAppContact, sendWhatsAppReaction, editWhatsAppMessage, getEvolutionConfig } from "@/lib/whatsapp";
+import { sendWhatsAppMedia, sendWhatsAppAudio, sendWhatsAppContact, sendWhatsAppReaction, editWhatsAppMessage, deleteWhatsAppMessageForEveryone, getEvolutionConfig } from "@/lib/whatsapp";
 import { BUDGET_SENT_TAG, SCHEDULED_TAG } from "@/lib/conversation-tags";
-import { canEditMessage } from "@/lib/message-edit";
+import { canEditMessage, canDeleteMessage } from "@/lib/message-edit";
 import { transcribeAudio } from "@/lib/ai-transcription";
 import { generateReplySuggestions } from "@/lib/ai-copilot";
 import { hasHospitalBridgeIntegration, fetchBridgeProcedures, fetchBridgeDoctors, fetchBridgeAgenda, fetchBridgeConvenios, fetchBridgePatients, adaptBridgeProcedureToPlainItem } from "@/lib/hospital-bridge";
@@ -1159,6 +1159,33 @@ export async function editMessage(messageId: string, newText: string) {
   }
 
   await prisma.message.update({ where: { id: messageId }, data: { content: trimmed, editedAt: new Date() } });
+  revalidatePath("/clinic/inbox");
+  notifyInboxRealtime(clinicId).catch(() => {});
+  return { success: true as const };
+}
+
+
+/** "Apagar para todos": apaga no WhatsApp do paciente (Evolution) e marca a mensagem como
+ * apagada no Chat — ver regras em canDeleteMessage. */
+export async function deleteMessage(messageId: string) {
+  const { clinicId } = await requireClinicSession();
+  const message = await prisma.message.findUnique({
+    where: { id: messageId },
+    include: { conversation: { include: { contact: CONTACT_WITH_PROFILES } } },
+  });
+  if (!message || message.conversation.clinicId !== clinicId) {
+    return { success: false as const, error: "Mensagem não encontrada." };
+  }
+  const check = canDeleteMessage(message);
+  if (!check.ok) return { success: false as const, error: check.reason };
+  if (message.conversation.channel === "INSTAGRAM" || !message.conversation.contact.phone) {
+    return { success: false as const, error: "Apagar não está disponível para este contato." };
+  }
+  const result = await deleteWhatsAppMessageForEveryone(message.conversation.contact.phone, message.whatsappKeyId!, "chat.delete", clinicId);
+  if (!result.success && !result.skipped) {
+    return { success: false as const, error: "Não foi possível apagar no WhatsApp. Tente novamente." };
+  }
+  await prisma.message.update({ where: { id: messageId }, data: { deletedAt: new Date() } });
   revalidatePath("/clinic/inbox");
   notifyInboxRealtime(clinicId).catch(() => {});
   return { success: true as const };

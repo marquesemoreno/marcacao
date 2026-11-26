@@ -16,7 +16,7 @@ import { profileOf } from "@/lib/contact-profile";
 import { customLossReasonLabel } from "@/lib/loss-reasons";
 import { isMediaDownloadFailedNotice, isAutoSystemMessage, type InvoiceData } from "@/lib/chat-messages";
 import type { DocumentReviewData } from "@/lib/documents/document-validator";
-import { canEditMessage } from "@/lib/message-edit";
+import { canEditMessage, canDeleteMessage, cloudLockedReason } from "@/lib/message-edit";
 import { RESCHEDULE_PENDING_TAG, URGENCY_TAG } from "@/lib/conversation-tags";
 import { getSlaInfo } from "@/lib/sla-calculator";
 import { PATIENT_INTENTS, visibleIntent } from "@/lib/patient-intent";
@@ -336,6 +336,8 @@ export function toChatMessage(
     deliveryStatus: message.direction === "OUTBOUND" ? deliveryStatusMap[message.status] : undefined,
     isEdited: Boolean(message.editedAt),
     canEdit: canEditMessage(message).ok,
+    canDelete: canDeleteMessage(message).ok,
+    editLockedReason: cloudLockedReason(message),
     transcription: message.transcription ?? undefined,
     extractedInvoiceData: (message.extractedInvoiceData as InvoiceData | null) ?? undefined,
     extractedDocumentData: (message.extractedDocumentData as DocumentReviewData | null) ?? undefined,

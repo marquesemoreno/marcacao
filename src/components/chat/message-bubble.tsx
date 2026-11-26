@@ -26,6 +26,8 @@ import {
   SmilePlus,
   Star,
   Forward,
+  Trash2,
+  Lock,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from '@/components/ui/dialog';
@@ -47,6 +49,8 @@ interface MessageBubbleProps {
   onRequestResend?: () => void;
   /** Edita o texto já enviado (só relevante quando message.canEdit). */
   onEditMessage?: (messageId: string, newText: string) => Promise<{ success: boolean; error?: string }>;
+  /** Apagar para todos (só vem quando message.canDelete). */
+  onDelete?: () => void;
   /** Transcreve um áudio sob demanda (só relevante pra message.type === 'audio'). */
   onTranscribeAudio?: (messageId: string) => Promise<{ success: boolean; transcription?: string; error?: string }>;
   /** Extrai dados de nota fiscal sob demanda (só relevante quando mentionsInvoiceRequest(message.text)). */
@@ -163,9 +167,12 @@ const HoverActionButtons: React.FC<{
   onSearchForwardTargets?: (query: string) => Promise<{ conversationId: string; name: string; phone: string }[]>;
   starred?: boolean;
   currentReaction?: string;
-}> = ({ isAgent, onReply, onReact, onToggleStar, onForward, onSearchForwardTargets, starred, currentReaction }) => {
+  onDelete?: () => void;
+  /** Mensagem da API oficial: no lugar de editar/apagar, um cadeado que explica o porquê. */
+  lockedReason?: string;
+}> = ({ isAgent, onReply, onReact, onToggleStar, onForward, onSearchForwardTargets, starred, currentReaction, onDelete, lockedReason }) => {
   const [isReactionOpen, setIsReactionOpen] = useState(false);
-  if (!onReply && !onReact && !onToggleStar && !onForward) return null;
+  if (!onReply && !onReact && !onToggleStar && !onForward && !onDelete && !lockedReason) return null;
   return (
     <div
       className={`self-center flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity ${isAgent ? 'order-first mr-1' : 'order-last ml-1'}`}
@@ -228,6 +235,30 @@ const HoverActionButtons: React.FC<{
           className="p-1.5 rounded-full hover:bg-slate-200/70 dark:hover:bg-slate-700 text-slate-400"
         >
           <CornerUpLeft className="w-3.5 h-3.5" />
+        </button>
+      )}
+      {onDelete && (
+        <button
+          type="button"
+          onClick={() => {
+            if (window.confirm('Apagar esta mensagem para todos? O paciente verá "Mensagem apagada".')) onDelete();
+          }}
+          aria-label="Apagar para todos"
+          title="Apagar para todos"
+          className="p-1.5 rounded-full hover:bg-rose-100 dark:hover:bg-rose-950/50 text-slate-400 hover:text-rose-600"
+        >
+          <Trash2 className="w-3.5 h-3.5" />
+        </button>
+      )}
+      {lockedReason && (
+        <button
+          type="button"
+          onClick={() => toast.info(lockedReason, { duration: 8000 })}
+          aria-label="Por que não dá para editar ou apagar"
+          title={lockedReason}
+          className="p-1.5 rounded-full hover:bg-slate-200/70 dark:hover:bg-slate-700 text-slate-400"
+        >
+          <Lock className="w-3.5 h-3.5" />
         </button>
       )}
     </div>
@@ -301,7 +332,7 @@ const MessageStatusTicks: React.FC<{ status?: Message['deliveryStatus'] }> = ({ 
   return <Clock className="w-3 h-3 text-slate-400" aria-label="Enviando..." />;
 };
 
-export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry, onRequestResend, onEditMessage, onTranscribeAudio, onExtractInvoiceData, onProcessDocument, onOpenScheduleWithProcedure, onReply, onReact, onToggleStar, onForward, onSearchForwardTargets }) => {
+export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry, onRequestResend, onEditMessage, onDelete, onTranscribeAudio, onExtractInvoiceData, onProcessDocument, onOpenScheduleWithProcedure, onReply, onReact, onToggleStar, onForward, onSearchForwardTargets }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   const [loadedDuration, setLoadedDuration] = useState<string | null>(null);
@@ -517,6 +548,8 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry, 
           onSearchForwardTargets={onSearchForwardTargets}
           starred={message.starred}
           currentReaction={message.agentReaction}
+          onDelete={onDelete}
+          lockedReason={message.editLockedReason}
         />
         <div
           className={`max-w-md w-72 sm:w-80 rounded-2xl p-3 sm:p-3.5 shadow-sm transition-all ${
@@ -648,6 +681,8 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry, 
             onSearchForwardTargets={onSearchForwardTargets}
             starred={message.starred}
             currentReaction={message.agentReaction}
+            onDelete={onDelete}
+            lockedReason={message.editLockedReason}
           />
           <div
             className={`max-w-md rounded-2xl p-3.5 shadow-sm transition-all ${hasRealFile ? 'cursor-pointer' : 'cursor-not-allowed opacity-80'} ${
@@ -820,6 +855,8 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry, 
           onSearchForwardTargets={onSearchForwardTargets}
           starred={message.starred}
           currentReaction={message.agentReaction}
+          onDelete={onDelete}
+          lockedReason={message.editLockedReason}
         />
         <div
           className={`max-w-md rounded-2xl p-3.5 shadow-sm ${
@@ -867,6 +904,8 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry, 
           onSearchForwardTargets={onSearchForwardTargets}
           starred={message.starred}
           currentReaction={message.agentReaction}
+          onDelete={onDelete}
+          lockedReason={message.editLockedReason}
         />
       )}
       <div

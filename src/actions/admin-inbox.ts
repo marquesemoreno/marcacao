@@ -11,9 +11,9 @@ import { prisma } from "@/lib/prisma";
 import { requireAdminSession } from "@/lib/session";
 import { recordSupportAccess } from "@/lib/access-log-server";
 import { assertCanSendText, dispatchOutboundText, requireWhatsAppPhone } from "@/lib/outbound-dispatch";
-import { whatsappService, sendWhatsAppMedia, sendWhatsAppAudio, sendWhatsAppContact, sendWhatsAppReaction, formatToWhatsAppNumber, isValidWhatsAppNumber, fetchWhatsAppProfilePicture, editWhatsAppMessage, type QuotedMessageRef } from "@/lib/whatsapp";
+import { whatsappService, sendWhatsAppMedia, sendWhatsAppAudio, sendWhatsAppContact, sendWhatsAppReaction, formatToWhatsAppNumber, isValidWhatsAppNumber, fetchWhatsAppProfilePicture, editWhatsAppMessage, deleteWhatsAppMessageForEveryone, type QuotedMessageRef } from "@/lib/whatsapp";
 import { BUDGET_SENT_TAG, SCHEDULED_TAG } from "@/lib/conversation-tags";
-import { canEditMessage } from "@/lib/message-edit";
+import { canEditMessage, canDeleteMessage } from "@/lib/message-edit";
 import { hasHospitalBridgeIntegration, fetchBridgeProcedures, fetchBridgeDoctors, fetchBridgeAgenda, fetchBridgeConvenios, fetchBridgePatients, adaptBridgeProcedureToPlainItem } from "@/lib/hospital-bridge";
 import { toPlainClinicProcedureItem } from "@/lib/serialize";
 import { departmentToDb, funnelStageToDb, toChatContact, toChatMessage } from "@/lib/chat-crm-adapters";
@@ -1041,6 +1041,30 @@ export async function editMessageAdmin(messageId: string, newText: string) {
   }
 
   await prisma.message.update({ where: { id: messageId }, data: { content: trimmed, editedAt: new Date() } });
+  revalidatePath("/admin/inbox");
+  notifyInboxRealtime(message.conversation.clinicId).catch(() => {});
+  return { success: true as const };
+}
+
+
+/** Ver deleteMessage (actions/inbox.ts) — sem exigir a clínica da sessão. */
+export async function deleteMessageAdmin(messageId: string) {
+  await requireAdminSession();
+  const message = await prisma.message.findUnique({
+    where: { id: messageId },
+    include: { conversation: { include: { contact: CONTACT_WITH_PROFILES } } },
+  });
+  if (!message) return { success: false as const, error: "Mensagem não encontrada." };
+  const check = canDeleteMessage(message);
+  if (!check.ok) return { success: false as const, error: check.reason };
+  if (message.conversation.channel === "INSTAGRAM" || !message.conversation.contact.phone) {
+    return { success: false as const, error: "Apagar não está disponível para este contato." };
+  }
+  const result = await deleteWhatsAppMessageForEveryone(message.conversation.contact.phone, message.whatsappKeyId!, "chat.delete_admin", message.conversation.clinicId);
+  if (!result.success && !result.skipped) {
+    return { success: false as const, error: "Não foi possível apagar no WhatsApp. Tente novamente." };
+  }
+  await prisma.message.update({ where: { id: messageId }, data: { deletedAt: new Date() } });
   revalidatePath("/admin/inbox");
   notifyInboxRealtime(message.conversation.clinicId).catch(() => {});
   return { success: true as const };

@@ -66,6 +66,10 @@ export interface Message {
   isEdited?: boolean;
   /** true quando ainda dá pra editar essa mensagem (ver canEditMessage em message-edit.ts). */
   canEdit?: boolean;
+  /** true quando dá pra "apagar para todos" (ver canDeleteMessage em message-edit.ts). */
+  canDelete?: boolean;
+  /** Mensagem nossa pela API oficial: editar/apagar só pelo celular — texto do aviso. */
+  editLockedReason?: string;
   /** Texto transcrito do áudio (ver botão "Transcrever" em message-bubble.tsx) — undefined até a atendente pedir. */
   transcription?: string;
   /** Dados de nota fiscal extraídos sob demanda (ver botão "Extrair dados" em message-bubble.tsx) — undefined até a atendente pedir. */
