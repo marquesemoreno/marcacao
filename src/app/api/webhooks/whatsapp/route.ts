@@ -7,6 +7,7 @@ import { NextResponse, after } from "next/server";
 import { handleSlotOfferReply, startSlotOfferForItem } from "@/lib/slot-offer-server";
 import { classifyAndStorePatientIntent } from "@/lib/patient-intent-server";
 import { replyCampaignAi } from "@/lib/campaign-ai-server";
+import { mirrorCampaignMessageOnReply } from "@/lib/broadcast-chat-mirror-server";
 import type { AppointmentStatus, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { decryptToken } from "@/lib/token-crypto";
@@ -872,6 +873,9 @@ async function processWhatsappWebhook(body: Prisma.InputJsonValue, forcedClinicI
     const quotedMessage = incoming.quotedWhatsappKeyId
       ? await prisma.message.findUnique({ where: { whatsappKeyId: incoming.quotedWhatsappKeyId }, select: { id: true } })
       : null;
+
+    // Respondendo a uma campanha: a mensagem que ele recebeu entra no Chat antes da resposta.
+    await mirrorCampaignMessageOnReply({ conversationId: conversation.id, clinicId: conversation.clinicId, phone: incoming.phone });
 
     await prisma.message.create({
       data: {
