@@ -1283,6 +1283,7 @@ async function processWhatsappWebhook(body: Prisma.InputJsonValue, forcedClinicI
         clinicId: conversation.clinicId,
         phone: incoming.phone,
         text: incoming.text ?? "",
+        hasMedia: !!incoming.media,
         aiAttendantActive: !!aiConfig,
         conversationAiEnabled: conversation.aiEnabled,
       });

@@ -8,10 +8,11 @@ import { sendWhatsAppMessage, toggleNinthDigit } from "@/lib/whatsapp";
 import { recordAudit } from "@/lib/audit-server";
 import { logAiAction } from "@/lib/ai-action-log-server";
 import { parseCloudTemplateVariants } from "@/lib/broadcast-cloud-template";
-import { buildCampaignAiPrompt, campaignAiDecision, campaignAiReply, parseCampaignAiOutcome, CAMPAIGN_AI_TAG, CAMPAIGN_AI_WINDOW_DAYS, type CampaignAiOutcome } from "@/lib/campaign-ai";
+import { isAutoReply, buildCampaignAiPrompt, campaignAiDecision, campaignAiReply, parseCampaignAiOutcome, CAMPAIGN_AI_TAG, CAMPAIGN_AI_WINDOW_DAYS, type CampaignAiOutcome } from "@/lib/campaign-ai";
 
 const REPLY_ACTION = "campaign_ai.reply";
 const HANDOFF_ACTION = "campaign_ai.handoff";
+const CLAIM_ACTION = "campaign_ai.claim";
 
 /** Lara da campanha (ver campaign-ai.ts). Chamado pelo webhook quando o atendente de IA da
  * clínica não está ativo. Retorna true se a Lara respondeu (a mensagem não segue para as
@@ -21,6 +22,8 @@ export async function replyCampaignAi(input: {
   clinicId: string;
   phone: string;
   text: string;
+  /** Áudio, foto ou documento: fica com a recepção. */
+  hasMedia?: boolean;
   aiAttendantActive: boolean;
   conversationAiEnabled: boolean;
 }): Promise<boolean> {
@@ -65,6 +68,7 @@ export async function replyCampaignAi(input: {
       repliesSoFar: audits.filter((a) => a.action === REPLY_ACTION).length,
       handedOff: audits.some((a) => a.action === HANDOFF_ACTION),
       text: input.text,
+      hasMedia: input.hasMedia,
     });
     if (decision === "SKIP") return false;
     if (decision === "HANDOFF") {
@@ -72,8 +76,14 @@ export async function replyCampaignAi(input: {
       return false;
     }
 
+    // Duas mensagens no mesmo segundo chegam em webhooks paralelos: só a primeira responde
+    // (26/11: a pergunta saiu duas vezes para uma resposta automática de empresa).
+    if (!(await claimTurn(input.conversationId, input.clinicId, sentAt))) return true;
+
     const campaignText = campaignMessageText(recipient.campaign, recipient.variantIndex);
-    const outcome = await classify(input.conversationId, input.clinicId, sentAt, campaignText);
+    const outcome: CampaignAiOutcome | null = isAutoReply(input.text)
+      ? "AUTOMATICA"
+      : await classify(input.conversationId, input.clinicId, sentAt, campaignText);
     if (!outcome) {
       await handOff(input.conversationId, input.clinicId, recipient.campaign.name, "IA não classificou a resposta");
       return false;
@@ -100,13 +110,21 @@ export async function replyCampaignAi(input: {
     if (reply.next === "HANDOFF") {
       await handOff(input.conversationId, input.clinicId, recipient.campaign.name, `${outcome} — com a recepção`);
     } else if (reply.next === "CLOSE") {
-      await handOff(input.conversationId, input.clinicId, recipient.campaign.name, "paciente sem interesse — conversa finalizada");
+      const auto = outcome === "AUTOMATICA";
+      await handOff(
+        input.conversationId,
+        input.clinicId,
+        recipient.campaign.name,
+        auto ? "resposta automática de empresa — conversa finalizada sem responder" : "paciente sem interesse — conversa finalizada",
+      );
       await prisma.conversation.update({
         where: { id: input.conversationId },
         data: {
           status: "RESOLVED",
           resolutionReason: "PERDA_OUTRO",
-          resolutionNotes: `Lara: sem interesse na campanha “${recipient.campaign.name}”`,
+          resolutionNotes: auto
+            ? `Lara: resposta automática de empresa à campanha “${recipient.campaign.name}”`
+            : `Lara: sem interesse na campanha “${recipient.campaign.name}”`,
           resolvedAt: new Date(),
         },
       });
@@ -118,6 +136,25 @@ export async function replyCampaignAi(input: {
     console.error("[Lara da campanha] falha:", errorSummary(error));
     return false;
   }
+}
+
+/** Marca a vez desta mensagem e devolve true só para a primeira desde a última ação da Lara. */
+async function claimTurn(conversationId: string, clinicId: string, sentAt: Date): Promise<boolean> {
+  const mine = await prisma.auditLog.create({
+    data: { clinicId, userId: null, action: CLAIM_ACTION, entity: "Conversation", entityId: conversationId, changes: {} },
+    select: { id: true },
+  });
+  const lastDone = await prisma.auditLog.findFirst({
+    where: { action: { in: [REPLY_ACTION, HANDOFF_ACTION] }, entity: "Conversation", entityId: conversationId, createdAt: { gte: sentAt } },
+    orderBy: { createdAt: "desc" },
+    select: { createdAt: true },
+  });
+  const first = await prisma.auditLog.findFirst({
+    where: { action: CLAIM_ACTION, entity: "Conversation", entityId: conversationId, createdAt: { gt: lastDone?.createdAt ?? sentAt } },
+    orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+    select: { id: true },
+  });
+  return first?.id === mine.id;
 }
 
 function campaignMessageText(
