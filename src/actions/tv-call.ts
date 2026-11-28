@@ -8,7 +8,7 @@ import { createPatientCall, issueTvDisplay, recentCalls, resolveTvDisplay, toTvC
 import { doctorKey, type TvCall } from "@/lib/tv-call";
 import { getBaseUrl } from "@/lib/format";
 import { getSupabaseServerClient, WHATSAPP_MEDIA_BUCKET } from "@/lib/supabase-server";
-import { checkTvUpload, parseSpotifyUrl, parseYoutubeUrl, TV_MEDIA_KINDS, type TvMediaKind } from "@/lib/tv-media";
+import { checkTvLogoUpload, checkTvUpload, parseSpotifyUrl, TV_LOGO_KIND, TV_MEDIA_KINDS, type TvMediaKind } from "@/lib/tv-media";
 import { unstable_cache } from "next/cache";
 import { buildTickerItems, normalizeNotices, parseRssTitles, TICKER_NEWS_FEED, type TickerItem } from "@/lib/tv-ticker";
 import { parseTvBackground, TV_BACKGROUND_KIND, type TvBackground } from "@/lib/tv-background";
@@ -90,6 +90,56 @@ export async function getTvState(token: string): Promise<{ clinicName: string; t
   return { clinicName: clinic?.tradeName || clinic?.name || "", topic: tvTopicFor(tv.clinicId), calls: await recentCalls(tv.clinicId) };
 }
 
+/** Lado da TV: logo da clínica (só ao abrir a página — a TV recarrega às 4 h; 12 h cobre o dia). */
+export async function getTvLogo(token: string): Promise<string | null> {
+  const tv = await resolveTvDisplay(token);
+  if (!tv || tv.kind !== "TV") return null;
+  return tvLogoUrl(tv.clinicId, 12);
+}
+
+// ── Logo da clínica no topo da TV ───────────────────────────────────────────────
+
+async function tvLogoUrl(clinicId: string, signHours: number): Promise<string | null> {
+  const row = await prisma.tvMediaItem.findFirst({ where: { clinicId, kind: TV_LOGO_KIND } });
+  if (!row) return null;
+  const { data } = (await getSupabaseServerClient()?.storage.from(WHATSAPP_MEDIA_BUCKET).createSignedUrl(row.source, signHours * 3600)) ?? {};
+  return data?.signedUrl ?? null;
+}
+
+export async function getTvLogoSetting(): Promise<string | null> {
+  const { clinicId } = await requireClinicManager();
+  return tvLogoUrl(clinicId, 1);
+}
+
+/** 1º passo: URL assinada pro navegador subir a logo direto ao Storage. */
+export async function startTvLogoUpload(file: { type: string; size: number }): Promise<{ path: string; token: string }> {
+  const { clinicId } = await requireClinicManager();
+  const check = checkTvLogoUpload(file);
+  if (!check.ok) throw new Error(check.error);
+  const supabase = getSupabaseServerClient();
+  if (!supabase) throw new Error("Armazenamento não configurado.");
+  const ext = file.type.split("/")[1]?.replace("jpeg", "jpg") ?? "png";
+  const path = `tv/${clinicId}/logo-${Date.now()}.${ext}`;
+  const { data, error } = await supabase.storage.from(WHATSAPP_MEDIA_BUCKET).createSignedUploadUrl(path);
+  if (error || !data) throw new Error("Não deu pra preparar o envio. Tente de novo.");
+  return { path, token: data.token };
+}
+
+/** 2º passo: troca a logo (apaga o arquivo antigo). path = null remove a logo. */
+export async function saveTvLogo(path: string | null): Promise<{ url: string | null }> {
+  const { clinicId } = await requireClinicManager();
+  if (path !== null && (!path.startsWith(`tv/${clinicId}/logo-`) || path.includes(".."))) throw new Error("Arquivo inválido.");
+  const old = await prisma.tvMediaItem.findMany({ where: { clinicId, kind: TV_LOGO_KIND } });
+  await prisma.$transaction([
+    prisma.tvMediaItem.deleteMany({ where: { clinicId, kind: TV_LOGO_KIND } }),
+    ...(path ? [prisma.tvMediaItem.create({ data: { clinicId, kind: TV_LOGO_KIND, source: path, title: "Logo da clínica", position: 0 } })] : []),
+  ]);
+  const stale = old.map((o) => o.source).filter((s) => s !== path);
+  if (stale.length) await getSupabaseServerClient()?.storage.from(WHATSAPP_MEDIA_BUCKET).remove(stale);
+  revalidatePath("/clinic/tv");
+  return { url: path ? await tvLogoUrl(clinicId, 1) : null };
+}
+
 export async function getTvCall(token: string, id: string): Promise<TvCall | null> {
   const tv = await resolveTvDisplay(token);
   if (!tv || tv.kind !== "TV") return null;
@@ -122,24 +172,18 @@ export async function listTvMedia(): Promise<TvMediaView[]> {
   return mediaView(rows, 1);
 }
 
-/** Link do YouTube ou Spotify. */
+/** Música de fundo (Spotify). YouTube saiu da TV em 28/11 (anúncios, qualidade e brilho que
+ * oscilam) — um pedido antigo com kind YOUTUBE recebe a explicação. */
 export async function addTvMediaLink(input: { kind: "YOUTUBE" | "SPOTIFY"; url: string; title?: string }) {
   const { clinicId } = await requireClinicManager();
-  let source: string;
-  if (input.kind === "YOUTUBE") {
-    const yt = parseYoutubeUrl(input.url);
-    if (!yt) throw new Error("Link do YouTube inválido. (Globoplay e outros streamings não permitem exibição em outro site.)");
-    source = `https://www.youtube.com/watch?${yt.videoId ? `v=${yt.videoId}` : ""}${yt.videoId && yt.playlistId ? "&" : ""}${yt.playlistId ? `list=${yt.playlistId}` : ""}`;
-  } else {
-    const sp = parseSpotifyUrl(input.url);
-    if (!sp) throw new Error("Link do Spotify inválido. Use o link de uma playlist, álbum ou faixa.");
-    source = sp;
-    // Uma música de fundo por vez.
-    await prisma.tvMediaItem.deleteMany({ where: { clinicId, kind: "SPOTIFY" } });
-  }
+  if (input.kind !== "SPOTIFY") throw new Error("A TV não exibe mais YouTube. Envie o vídeo em MP4 ou imagens da clínica.");
+  const source = parseSpotifyUrl(input.url);
+  if (!source) throw new Error("Link do Spotify inválido. Use o link de uma playlist, álbum ou faixa.");
+  // Uma música de fundo por vez.
+  await prisma.tvMediaItem.deleteMany({ where: { clinicId, kind: "SPOTIFY" } });
   const last = await prisma.tvMediaItem.aggregate({ where: { clinicId }, _max: { position: true } });
   await prisma.tvMediaItem.create({
-    data: { clinicId, kind: input.kind, source, title: (input.title?.trim() || (input.kind === "YOUTUBE" ? "Vídeo do YouTube" : "Música (Spotify)")).slice(0, 80), position: (last._max.position ?? 0) + 1 },
+    data: { clinicId, kind: input.kind, source, title: (input.title?.trim() || "Música (Spotify)").slice(0, 80), position: (last._max.position ?? 0) + 1 },
   });
   revalidatePath("/clinic/tv");
   return { success: true as const };
@@ -221,7 +265,7 @@ export async function deleteTvMedia(id: string) {
 export async function getTvMedia(token: string): Promise<TvMediaView[] | null> {
   const tv = await resolveTvDisplay(token);
   if (!tv || tv.kind !== "TV") return null;
-  const rows = await prisma.tvMediaItem.findMany({ where: { clinicId: tv.clinicId, active: true, kind: { in: TV_MEDIA_KINDS } }, orderBy: [{ position: "asc" }, { createdAt: "asc" }] });
+  const rows = await prisma.tvMediaItem.findMany({ where: { clinicId: tv.clinicId, active: true, kind: { in: ["VIDEO", "IMAGE", "SPOTIFY"] } }, orderBy: [{ position: "asc" }, { createdAt: "asc" }] });
   return mediaView(rows, 12);
 }
 

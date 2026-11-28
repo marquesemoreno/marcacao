@@ -1,14 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { nextMediaIndex, parseYoutubeUrl, TV_MEDIA_VOLUME } from "@/lib/tv-media";
+import { nextMediaIndex, TV_MEDIA_VOLUME } from "@/lib/tv-media";
 import type { TvMediaView } from "@/actions/tv-call";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 declare global {
   interface Window {
-    YT?: any;
-    onYouTubeIframeAPIReady?: () => void;
     onSpotifyIframeApiReady?: (api: any) => void;
   }
 }
@@ -21,109 +19,63 @@ function loadScript(src: string) {
   document.head.appendChild(s);
 }
 
-let ytReady: Promise<any> | null = null;
-function youtubeApi(): Promise<any> {
-  ytReady ??= new Promise((resolve) => {
-    if (window.YT?.Player) return resolve(window.YT);
-    const prev = window.onYouTubeIframeAPIReady;
-    window.onYouTubeIframeAPIReady = () => {
-      prev?.();
-      resolve(window.YT);
-    };
-    loadScript("https://www.youtube.com/iframe_api");
-  });
-  return ytReady;
-}
-
-/** Rodízio de vídeos/imagens (área grande da TV). `ducked` = tem chamada: vídeo fica mudo
- * e a música pausa; depois volta ao volume baixo. */
+/** Área grande da TV em repouso: só conteúdo da própria clínica (imagens e vídeos enviados).
+ * YouTube saiu em 28/11 — anúncios, qualidade que oscila e clarões na sala de espera.
+ * Imagem: entra aos poucos por cima da anterior (1,5 s) e aproxima bem devagar.
+ * Vídeo: levemente escurecido e entrando do preto, sem corte seco.
+ * `ducked` = tem chamada: vídeo mudo e música pausada. */
 export function TvMediaStage({ items, ducked, soundOn }: { items: TvMediaView[]; ducked: boolean; soundOn: boolean }) {
-  const visual = items.filter((i) => i.kind !== "SPOTIFY" && i.url);
+  const visual = items.filter((i) => (i.kind === "IMAGE" || i.kind === "VIDEO") && i.url);
   const music = items.find((i) => i.kind === "SPOTIFY" && i.url) ?? null;
   const [index, setIndex] = useState(0);
+  const [previous, setPrevious] = useState<TvMediaView | null>(null);
   const current = visual.length ? visual[index % visual.length] : null;
-  const next = () => setIndex((i) => nextMediaIndex(i, visual.length));
+  const next = () => {
+    setPrevious(current?.kind === "IMAGE" ? current : null);
+    setIndex((i) => nextMediaIndex(i, visual.length));
+  };
+
+  // A anterior sai depois que a nova terminou de aparecer por cima.
+  useEffect(() => {
+    if (!previous) return;
+    const t = setTimeout(() => setPrevious(null), 1700);
+    return () => clearTimeout(t);
+  }, [previous]);
 
   // Imagem: troca depois de durationSec.
   useEffect(() => {
-    if (current?.kind !== "IMAGE") return;
+    if (current?.kind !== "IMAGE" || visual.length < 2) return;
     const t = setTimeout(next, current.durationSec * 1000);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [current?.id, index]);
+  }, [current?.id, index, visual.length]);
 
   return (
     <div className="relative h-full w-full overflow-hidden rounded-[1.5vw] bg-black">
-      {current?.kind === "YOUTUBE" && <YoutubeSlot key={`${current.id}-${index}`} url={current.url!} single={visual.length === 1} ducked={ducked} soundOn={soundOn} onEnd={next} />}
-      {current?.kind === "VIDEO" && <VideoSlot key={`${current.id}-${index}`} url={current.url!} single={visual.length === 1} ducked={ducked} soundOn={soundOn} onEnd={next} />}
-      {current?.kind === "IMAGE" && (
+      <style>{`@keyframes tv-fade-in{from{opacity:0}to{opacity:1}}@keyframes tv-drift{from{transform:scale(1)}to{transform:scale(1.05)}}@media (prefers-reduced-motion: reduce){.tv-drift{animation:none!important}}`}</style>
+      {previous && previous.id !== current?.id && (
         // eslint-disable-next-line @next/next/no-img-element
-        <img key={current.id} src={current.url!} alt={current.title} className="h-full w-full object-contain" />
+        <img src={previous.url!} alt="" aria-hidden className="absolute inset-0 h-full w-full object-contain" />
+      )}
+      {current?.kind === "VIDEO" && (
+        <div key={`${current.id}-${index}`} className="absolute inset-0 motion-safe:animate-[tv-fade-in_1500ms_ease-out_both]">
+          <VideoSlot url={current.url!} single={visual.length === 1} ducked={ducked} soundOn={soundOn} onEnd={next} />
+        </div>
+      )}
+      {current?.kind === "IMAGE" && (
+        <div key={`${current.id}-${index}`} className="absolute inset-0 overflow-hidden motion-safe:animate-[tv-fade-in_1500ms_ease-out_both]">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={current.url!}
+            alt={current.title}
+            className="tv-drift h-full w-full object-contain"
+            style={{ animation: `tv-drift ${current.durationSec + 2}s linear both` }}
+          />
+        </div>
       )}
       {music && <SpotifySlot url={music.url!} ducked={ducked} />}
     </div>
   );
-}
-
-function YoutubeSlot({ url, single, ducked, soundOn, onEnd }: { url: string; single: boolean; ducked: boolean; soundOn: boolean; onEnd: () => void }) {
-  const host = useRef<HTMLDivElement>(null);
-  const player = useRef<any>(null);
-  const endRef = useRef(onEnd);
-  endRef.current = onEnd;
-  const yt = parseYoutubeUrl(url);
-
-  useEffect(() => {
-    let cancelled = false;
-    void youtubeApi().then((YT) => {
-      if (cancelled || !host.current || !yt) return;
-      const el = document.createElement("div");
-      host.current.appendChild(el);
-      player.current = new YT.Player(el, {
-        width: "100%",
-        height: "100%",
-        videoId: yt.videoId ?? undefined,
-        playerVars: {
-          autoplay: 1,
-          controls: 0,
-          rel: 0,
-          modestbranding: 1,
-          playsinline: 1,
-          ...(yt.playlistId ? { listType: "playlist", list: yt.playlistId, loop: 1 } : single && yt.videoId ? { loop: 1, playlist: yt.videoId } : {}),
-        },
-        events: {
-          onReady: (e: any) => {
-            e.target.setVolume(TV_MEDIA_VOLUME);
-            if (!soundOn) e.target.mute();
-            e.target.playVideo();
-          },
-          onStateChange: (e: any) => {
-            // Playlist ou vídeo único repetem sozinhos; nos outros casos passa pro próximo.
-            if (e.data === 0 && !yt.playlistId && !single) endRef.current();
-          },
-          onError: () => endRef.current(),
-        },
-      });
-    });
-    return () => {
-      cancelled = true;
-      try {
-        player.current?.destroy();
-      } catch {}
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [url]);
-
-  useEffect(() => {
-    const p = player.current;
-    if (!p?.setVolume) return;
-    if (ducked || !soundOn) p.mute();
-    else {
-      p.unMute();
-      p.setVolume(TV_MEDIA_VOLUME);
-    }
-  }, [ducked, soundOn]);
-
-  return <div ref={host} className="absolute inset-0 [&_iframe]:h-full [&_iframe]:w-full" />;
 }
 
 function VideoSlot({ url, single, ducked, soundOn, onEnd }: { url: string; single: boolean; ducked: boolean; soundOn: boolean; onEnd: () => void }) {
@@ -148,7 +100,7 @@ function VideoSlot({ url, single, ducked, soundOn, onEnd }: { url: string; singl
         e.currentTarget.muted = ducked || !soundOn;
         void e.currentTarget.play().catch(() => {});
       }}
-      className="h-full w-full object-contain"
+      className="h-full w-full object-contain brightness-90"
     />
   );
 }

@@ -58,6 +58,18 @@ export function checkTvUpload(file: { type: string; size: number }): { ok: true;
   return { ok: false, error: "Envie vídeo MP4/WEBM ou imagem JPG/PNG/WEBP." };
 }
 
+/** Logo da clínica no topo da TV (28/11/2026). Guardada como TvMediaItem kind TV_LOGO (sem
+ * migration). Sem SVG: não dá pra conferir o conteúdo e PNG/JPG cobrem qualquer logo. */
+export const TV_LOGO_KIND = "TV_LOGO";
+export const MAX_TV_LOGO_BYTES = 2 * 1024 * 1024;
+export const TV_LOGO_ACCEPT = TV_IMAGE_TYPES.join(",");
+
+export function checkTvLogoUpload(file: { type: string; size: number }): { ok: true } | { ok: false; error: string } {
+  if (!TV_IMAGE_TYPES.includes(file.type)) return { ok: false, error: "Envie a logo em PNG, JPG ou WEBP." };
+  if (file.size > MAX_TV_LOGO_BYTES) return { ok: false, error: "Logo acima de 2 MB. Exporte numa resolução menor." };
+  return { ok: true };
+}
+
 /** Próximo item do rodízio. */
 export function nextMediaIndex(current: number, length: number): number {
   if (length <= 0) return -1;

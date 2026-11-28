@@ -25,12 +25,18 @@
 Sem o `--autoplay-policy`, a TV mostra "Toque para ativar o som" — basta um clique/toque cada vez que a página abre.
 A página recarrega sozinha às 4h e confere chamadas a cada 20 s se o tempo real cair.
 
-## Vídeos, propaganda e música
-- Configurações › TV › "Vídeos e propaganda": links do YouTube (vídeo/playlist) e arquivos próprios (MP4/WEBM até 200 MB,
-  imagem até 10 MB, enviados direto ao Storage `whatsapp-media/tv/<clinicId>/`). Rodízio na ordem da lista, volume 15%.
-- Com mídia, a TV fica 70% vídeo + 30% chamada; na chamada o vídeo fica mudo e o nome toma a tela inteira.
+## Logo, imagens, vídeos e música
+- Configurações › TV › **Logo da clínica**: PNG/JPG/WEBP até 2 MB, aparece no canto de cima numa placa branca (no lugar do nome).
+  A TV pega a logo nova quando a página abre de novo (ou às 4 h).
+- "Imagens e vídeos" (28/11): só conteúdo da própria clínica — imagens (troca com transição de 1,5 s e aproximação lenta) e
+  vídeos MP4/WEBM até 200 MB (levemente escurecidos, entram do preto). **YouTube não aparece mais na TV** (anúncios, qualidade
+  e brilho que oscilam); itens antigos ficam marcados na lista para remover.
 - Música: um link do Spotify, pausa na chamada. Inteira só com Premium logado no navegador da TV.
-- Globoplay/Netflix: impossível (bloqueiam embed).
+
+## Chamada (modo foco)
+- Na chamada, uma tela sólida escura cobre tudo (vídeo, fundo, letreiro, histórico): "Chamando", nome em branco bem grande e
+  consultório em verde. Gongo + voz duas vezes, depois volta ao repouso.
+- Letreiro do rodapé é secundário: menor, cinza, ~3 caracteres por segundo, e some durante a chamada.
 
 ## Totem de senhas
 - Configurações › TV › **Gerar link do totem de senhas** → abrir em `/totem/<token>` (tablet/PC com tela de toque).

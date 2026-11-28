@@ -17,7 +17,6 @@ const KIND_LABEL = { YOUTUBE: "YouTube", VIDEO: "Vídeo", IMAGE: "Imagem", SPOTI
 /** Vídeos/propaganda (rodízio) e música de fundo da TV. */
 export function TvMediaSettings({ initial }: { initial: TvMediaView[] }) {
   const [items, setItems] = useState(initial);
-  const [ytUrl, setYtUrl] = useState("");
   const [spUrl, setSpUrl] = useState("");
   const [uploading, setUploading] = useState<string | null>(null);
   const [pending, start] = useTransition();
@@ -63,7 +62,8 @@ export function TvMediaSettings({ initial }: { initial: TvMediaView[] }) {
     <section className={panel} aria-labelledby="tv-media">
       <h2 id="tv-media" className="text-sm font-semibold">Vídeos e propaganda</h2>
       <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">
-        Tocam em sequência na TV, com som baixo. Na chamada o vídeo fica mudo e o nome toma a tela. Globoplay, Netflix e outros streamings não permitem exibição em outro site.
+        Imagens e vídeos da própria clínica, em sequência e com transição suave. Na chamada tudo some e o nome toma a tela. YouTube e streamings
+        não aparecem na TV (anúncios e brilho que oscila).
       </p>
 
       <ul className="mt-3 divide-y divide-slate-100 dark:divide-slate-800">
@@ -75,6 +75,7 @@ export function TvMediaSettings({ initial }: { initial: TvMediaView[] }) {
               <Icon className="h-4 w-4 shrink-0 text-slate-500" aria-hidden />
               <span className="min-w-0 flex-1 truncate" title={m.title}>
                 {m.title} <span className="text-xs text-slate-500">· {KIND_LABEL[m.kind]}</span>
+                {m.kind === "YOUTUBE" && <span className="ml-1 text-xs text-amber-700 dark:text-amber-400">· não aparece mais na TV, pode remover</span>}
               </span>
               {m.kind === "IMAGE" && (
                 <label className="inline-flex items-center gap-1 text-xs text-slate-600 dark:text-slate-400">
@@ -109,16 +110,6 @@ export function TvMediaSettings({ initial }: { initial: TvMediaView[] }) {
       </ul>
 
       <div className="mt-3 flex flex-wrap items-center gap-2">
-        <label className="sr-only" htmlFor="yt-url">Link do YouTube</label>
-        <input id="yt-url" value={ytUrl} onChange={(e) => setYtUrl(e.target.value)} placeholder="Link do YouTube (vídeo ou playlist)" className={`${input} min-w-0 flex-1`} />
-        <button
-          type="button"
-          disabled={pending || !ytUrl.trim()}
-          onClick={() => act(async () => { await addTvMediaLink({ kind: "YOUTUBE", url: ytUrl }); setYtUrl(""); }, "Vídeo adicionado")}
-          className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-200 px-3 text-sm font-medium disabled:opacity-40 dark:border-slate-700"
-        >
-          <Youtube className="h-4 w-4" aria-hidden /> Adicionar
-        </button>
         <input ref={fileRef} type="file" accept={TV_MEDIA_ACCEPT} className="hidden" onChange={(e) => e.target.files?.[0] && void upload(e.target.files[0])} />
         <button
           type="button"

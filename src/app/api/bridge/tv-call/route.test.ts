@@ -55,12 +55,25 @@ describe("/api/bridge/tv-call (chamada vinda do sistema da clínica)", () => {
     expect(res.status).toBe(400);
   });
 
-  it("mesma marcação chamada há menos de 90 s (reenvio da ponte) → não repete", async () => {
+  it("médico chama de novo logo depois (1ª tentativa de envio) → anuncia de novo", async () => {
     db.patientCall.findFirst.mockResolvedValue({ id: "antes" });
     const res = await POST(call(valid));
     expect(res.status).toBe(200);
+    expect(createPatientCall).toHaveBeenCalledTimes(1);
+    expect(db.patientCall.findFirst).not.toHaveBeenCalled();
+  });
+
+  it("reenvio da ponte (tentativa > 1) com chamada da mesma marcação há < 30 s → não repete", async () => {
+    db.patientCall.findFirst.mockResolvedValue({ id: "antes" });
+    const res = await POST(call({ ...valid, tentativa: 2 }));
     expect(await res.json()).toMatchObject({ duplicate: true });
     expect(createPatientCall).not.toHaveBeenCalled();
+  });
+
+  it("reenvio da ponte sem chamada registrada (a 1ª falhou mesmo) → anuncia", async () => {
+    const res = await POST(call({ ...valid, tentativa: 3 }));
+    expect(res.status).toBe(200);
+    expect(createPatientCall).toHaveBeenCalledTimes(1);
   });
 
   it("sala vazia vira null (vale a sala fixa do médico)", async () => {

@@ -17,7 +17,7 @@ const fmt = new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit
 /** TV da sala de espera: chamada atual em destaque, últimas 4 no rodapé. Recebe { id } pelo
  * Realtime e busca a chamada com o token; confere a cada 20 s caso um aviso se perca. As
  * chamadas entram numa fila: gongo + voz uma de cada vez. */
-export function TvCallPanel({ token, clinicName, topic, initialCalls }: { token: string; clinicName: string; topic: string | null; initialCalls: TvCall[] }) {
+export function TvCallPanel({ token, clinicName, logoUrl = null, topic, initialCalls }: { token: string; clinicName: string; logoUrl?: string | null; topic: string | null; initialCalls: TvCall[] }) {
   const [calls, setCalls] = useState<TvCall[]>(initialCalls);
   const [soundOn, setSoundOn] = useState(false);
   const [flash, setFlash] = useState(false);
@@ -135,7 +135,7 @@ export function TvCallPanel({ token, clinicName, topic, initialCalls }: { token:
     return (
       <div className="relative isolate flex h-dvh flex-col bg-slate-950 text-white [color-scheme:dark]">
         <TvBackdrop mode={bg} dim={flash} />
-        <Header clinicName={clinicName} soundOn={soundOn} onUnlock={async () => setSoundOn(await unlockAudio())} now={now} />
+        <Header clinicName={clinicName} logoUrl={logoUrl} soundOn={soundOn} onUnlock={async () => setSoundOn(await unlockAudio())} now={now} />
         <div className="grid min-h-0 flex-1 grid-cols-[7fr_3fr] gap-[1.5vw] px-[2vw] pb-[2vh]">
           <TvMediaStage items={media} ducked={flash} soundOn={soundOn} />
           <aside className="flex min-h-0 flex-col gap-[1.5vh]" aria-live="assertive">
@@ -162,16 +162,8 @@ export function TvCallPanel({ token, clinicName, topic, initialCalls }: { token:
             </ol>
           </aside>
         </div>
-        <TvTicker items={ticker} />
-        {/* Na chamada a mensagem toma a tela inteira; o vídeo fica mudo por baixo. */}
-        {flash && current && (
-          <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-slate-950/95 px-[4vw] text-center">
-            <p className="text-[clamp(1rem,2.2vw,2.5rem)] uppercase tracking-[0.2em] text-slate-400">{current.attempt > 1 ? `Chamando de novo · ${current.attempt}ª vez` : "Chamando"}</p>
-            <p className="mt-[2vh] text-[clamp(3rem,10vw,12rem)] font-bold leading-none">{current.displayName}</p>
-            <p className="mt-[4vh] text-[clamp(2rem,5.5vw,6.5rem)] font-semibold text-emerald-400">{current.room ?? "Recepção"}</p>
-            {current.doctor && <p className="mt-[1.5vh] text-[clamp(1.25rem,3vw,3.5rem)] text-slate-300">{current.doctor}</p>}
-          </div>
-        )}
+        <TvTicker items={ticker} hidden={flash} />
+        {flash && current && <FocusOverlay call={current} />}
       </div>
     );
   }
@@ -180,7 +172,7 @@ export function TvCallPanel({ token, clinicName, topic, initialCalls }: { token:
     <div className="relative isolate flex min-h-dvh flex-col bg-slate-950 text-white [color-scheme:dark]">
       <TvBackdrop mode={bg} dim={flash} />
       <header className="flex items-center justify-between px-[3vw] py-[2vh]">
-        <p className="text-[clamp(1rem,2vw,2rem)] font-semibold text-emerald-400">{clinicName}</p>
+        <ClinicBrand clinicName={clinicName} logoUrl={logoUrl} size="lg" />
         <div className="flex items-center gap-4">
           {!soundOn && (
             <button
@@ -231,15 +223,46 @@ export function TvCallPanel({ token, clinicName, topic, initialCalls }: { token:
           ))}
         </ol>
       </footer>
-      <TvTicker items={ticker} />
+      <TvTicker items={ticker} hidden={flash} />
+      {flash && current && <FocusOverlay call={current} />}
     </div>
   );
 }
 
-function Header({ clinicName, soundOn, onUnlock, now }: { clinicName: string; soundOn: boolean; onUnlock: () => void; now: Date }) {
+/** Modo foco da chamada (28/11): fundo sólido por cima de tudo (vídeo, fundo animado, letreiro,
+ * histórico somem), só o nome em branco e o consultório em verde, o maior possível. */
+function FocusOverlay({ call }: { call: TvCall }) {
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-slate-950 px-[4vw] text-center motion-safe:animate-[tv-focus-in_350ms_ease-out]" role="alert">
+      <style>{`@keyframes tv-focus-in{from{opacity:0;transform:scale(.98)}to{opacity:1;transform:none}}`}</style>
+      <p className="text-[clamp(1.25rem,2.6vw,3rem)] font-semibold uppercase tracking-[0.25em] text-slate-400">
+        {call.attempt > 1 ? `Chamando de novo · ${call.attempt}ª vez` : "Chamando"}
+      </p>
+      <p className="mt-[3vh] text-[clamp(3.5rem,12vw,14rem)] font-bold leading-[0.95] tracking-tight text-white">{call.displayName}</p>
+      <p className="mt-[5vh] text-[clamp(2.5rem,7vw,8rem)] font-bold leading-none text-emerald-400">{call.room ?? "Recepção"}</p>
+      {call.doctor && <p className="mt-[2.5vh] text-[clamp(1.25rem,3vw,3.5rem)] text-slate-200">{call.doctor}</p>}
+    </div>
+  );
+}
+
+/** Logo da clínica (numa placa branca — logo escura some no fundo escuro) ou, sem logo, o nome. */
+function ClinicBrand({ clinicName, logoUrl, size }: { clinicName: string; logoUrl: string | null; size: "md" | "lg" }) {
+  const [failed, setFailed] = useState(false);
+  if (!logoUrl || failed) {
+    return <p className={`${size === "lg" ? "text-[clamp(1rem,2vw,2rem)]" : "text-[clamp(1rem,1.8vw,2rem)]"} font-semibold text-emerald-400`}>{clinicName}</p>;
+  }
+  return (
+    <div className="rounded-[0.8vw] bg-white px-[1vw] py-[0.8vh] shadow-lg">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={logoUrl} alt={clinicName} onError={() => setFailed(true)} className={`${size === "lg" ? "h-[7vh]" : "h-[6vh]"} w-auto max-w-[28vw] object-contain`} />
+    </div>
+  );
+}
+
+function Header({ clinicName, logoUrl, soundOn, onUnlock, now }: { clinicName: string; logoUrl: string | null; soundOn: boolean; onUnlock: () => void; now: Date }) {
   return (
     <header className="flex items-center justify-between px-[2vw] py-[1.5vh]">
-      <p className="text-[clamp(1rem,1.8vw,2rem)] font-semibold text-emerald-400">{clinicName}</p>
+      <ClinicBrand clinicName={clinicName} logoUrl={logoUrl} size="md" />
       <div className="flex items-center gap-4">
         {!soundOn && (
           <button type="button" onClick={onUnlock} className="inline-flex animate-pulse items-center gap-2 rounded-xl bg-amber-500 px-5 py-3 text-lg font-bold text-slate-950">

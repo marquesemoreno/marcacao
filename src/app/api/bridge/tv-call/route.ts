@@ -9,7 +9,7 @@ import { createPatientCall } from "@/lib/tv-call-server";
  * avisa aqui. Autenticação: o mesmo token que o Conecta usa pra falar com a ponte
  * (HospitalIntegration.apiToken) — é ele que diz de qual clínica é a chamada. */
 
-const DUPLICATE_WINDOW_MS = 90_000;
+const RETRY_WINDOW_MS = 30_000;
 
 function sameToken(a: string, b: string): boolean {
   const x = Buffer.from(a);
@@ -45,12 +45,17 @@ export async function POST(req: Request) {
   const patientName = text(body?.paciente, 120);
   if (!externalId || !patientName) return NextResponse.json({ error: "numero e paciente são obrigatórios" }, { status: 400 });
 
-  // A ponte reenvia quando a rede falha: a mesma marcação em 90 s não vira "rechamada".
-  const recent = await prisma.patientCall.findFirst({
-    where: { clinicId, source: "BRIDGE", externalId, createdAt: { gte: new Date(Date.now() - DUPLICATE_WINDOW_MS) } },
-    select: { id: true },
-  });
-  if (recent) return NextResponse.json({ ok: true, duplicate: true });
+  // Só o REENVIO da ponte (tentativa > 1, a resposta anterior se perdeu na rede) é descartado
+  // se a chamada já entrou. Clique novo do médico chega como tentativa 1 e sempre anuncia —
+  // "chamar de novo" logo depois é comum (28/11: 2 cliques em 70 s foram engolidos por uma janela fixa).
+  const tentativa = Number(body?.tentativa) || 1;
+  if (tentativa > 1) {
+    const recent = await prisma.patientCall.findFirst({
+      where: { clinicId, source: "BRIDGE", externalId, createdAt: { gte: new Date(Date.now() - RETRY_WINDOW_MS) } },
+      select: { id: true },
+    });
+    if (recent) return NextResponse.json({ ok: true, duplicate: true });
+  }
 
   const call = await createPatientCall(clinicId, null, {
     source: "BRIDGE",

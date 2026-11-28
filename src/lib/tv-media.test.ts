@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { nextMediaIndex, parseSpotifyUrl, parseYoutubeUrl, TV_MEDIA_ACCEPT, checkTvUpload } from "./tv-media";
+import { nextMediaIndex, parseSpotifyUrl, parseYoutubeUrl, TV_MEDIA_ACCEPT, checkTvUpload, checkTvLogoUpload } from "./tv-media";
 
 describe("parseYoutubeUrl", () => {
   it("vídeo em vários formatos", () => {
@@ -51,5 +51,17 @@ describe("nextMediaIndex", () => {
     expect(nextMediaIndex(2, 3)).toBe(0);
     expect(nextMediaIndex(5, 0)).toBe(-1);
     expect(nextMediaIndex(-1, 2)).toBe(0);
+  });
+});
+
+describe("checkTvLogoUpload", () => {
+  it("aceita PNG/JPG/WEBP até 2 MB", () => {
+    expect(checkTvLogoUpload({ type: "image/png", size: 300_000 })).toEqual({ ok: true });
+    expect(checkTvLogoUpload({ type: "image/webp", size: 2 * 1024 * 1024 })).toEqual({ ok: true });
+  });
+  it("recusa SVG, vídeo e arquivo grande", () => {
+    expect(checkTvLogoUpload({ type: "image/svg+xml", size: 1000 }).ok).toBe(false);
+    expect(checkTvLogoUpload({ type: "video/mp4", size: 1000 }).ok).toBe(false);
+    expect(checkTvLogoUpload({ type: "image/jpeg", size: 2 * 1024 * 1024 + 1 }).ok).toBe(false);
   });
 });

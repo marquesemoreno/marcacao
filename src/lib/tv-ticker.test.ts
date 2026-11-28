@@ -35,4 +35,8 @@ describe("letreiro da TV", () => {
     expect(tickerDurationSec(10)).toBe(20);
     expect(tickerDurationSec(400)).toBeGreaterThan(tickerDurationSec(200));
   });
+
+  it("devagar o bastante para ler de longe: no máximo 5 caracteres por segundo", () => {
+    expect(700 / tickerDurationSec(700)).toBeLessThanOrEqual(5);
+  });
 });

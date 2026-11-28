@@ -48,7 +48,8 @@ export function buildTickerItems(notices: string[], headlines: string[], { max =
   ].slice(0, max);
 }
 
-/** Segundos para o letreiro atravessar a tela: ~7 caracteres por segundo, mínimo 20 s. */
+/** Segundos para uma volta do letreiro: ~3 caracteres por segundo (28/11: antes ~3,5 e
+ * disputava a atenção com a chamada), mínimo 20 s. */
 export function tickerDurationSec(totalChars: number): number {
-  return Math.max(20, Math.round(totalChars / 7));
+  return Math.max(20, Math.round(totalChars / 3));
 }
