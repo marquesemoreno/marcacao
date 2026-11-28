@@ -8,7 +8,7 @@ import { createPatientCall, issueTvDisplay, recentCalls, resolveTvDisplay, toTvC
 import { doctorKey, type TvCall } from "@/lib/tv-call";
 import { getBaseUrl } from "@/lib/format";
 import { getSupabaseServerClient, WHATSAPP_MEDIA_BUCKET } from "@/lib/supabase-server";
-import { checkTvLogoUpload, checkTvUpload, parseSpotifyUrl, TV_LOGO_KIND, TV_MEDIA_KINDS, type TvMediaKind } from "@/lib/tv-media";
+import { checkTvLogoUpload, checkTvUpload, parseSpotifyUrl, parseYoutubeUrl, TV_LOGO_KIND, TV_MEDIA_KINDS, type TvMediaKind } from "@/lib/tv-media";
 import { unstable_cache } from "next/cache";
 import { buildTickerItems, normalizeNotices, parseRssTitles, TICKER_NEWS_FEED, type TickerItem } from "@/lib/tv-ticker";
 import { parseTvBackground, TV_BACKGROUND_KIND, type TvBackground } from "@/lib/tv-background";
@@ -172,18 +172,24 @@ export async function listTvMedia(): Promise<TvMediaView[]> {
   return mediaView(rows, 1);
 }
 
-/** Música de fundo (Spotify). YouTube saiu da TV em 28/11 (anúncios, qualidade e brilho que
- * oscilam) — um pedido antigo com kind YOUTUBE recebe a explicação. */
+/** Link do YouTube ou Spotify. */
 export async function addTvMediaLink(input: { kind: "YOUTUBE" | "SPOTIFY"; url: string; title?: string }) {
   const { clinicId } = await requireClinicManager();
-  if (input.kind !== "SPOTIFY") throw new Error("A TV não exibe mais YouTube. Envie o vídeo em MP4 ou imagens da clínica.");
-  const source = parseSpotifyUrl(input.url);
-  if (!source) throw new Error("Link do Spotify inválido. Use o link de uma playlist, álbum ou faixa.");
-  // Uma música de fundo por vez.
-  await prisma.tvMediaItem.deleteMany({ where: { clinicId, kind: "SPOTIFY" } });
+  let source: string;
+  if (input.kind === "YOUTUBE") {
+    const yt = parseYoutubeUrl(input.url);
+    if (!yt) throw new Error("Link do YouTube inválido. (Globoplay e outros streamings não permitem exibição em outro site.)");
+    source = `https://www.youtube.com/watch?${yt.videoId ? `v=${yt.videoId}` : ""}${yt.videoId && yt.playlistId ? "&" : ""}${yt.playlistId ? `list=${yt.playlistId}` : ""}`;
+  } else {
+    const sp = parseSpotifyUrl(input.url);
+    if (!sp) throw new Error("Link do Spotify inválido. Use o link de uma playlist, álbum ou faixa.");
+    source = sp;
+    // Uma música de fundo por vez.
+    await prisma.tvMediaItem.deleteMany({ where: { clinicId, kind: "SPOTIFY" } });
+  }
   const last = await prisma.tvMediaItem.aggregate({ where: { clinicId }, _max: { position: true } });
   await prisma.tvMediaItem.create({
-    data: { clinicId, kind: input.kind, source, title: (input.title?.trim() || "Música (Spotify)").slice(0, 80), position: (last._max.position ?? 0) + 1 },
+    data: { clinicId, kind: input.kind, source, title: (input.title?.trim() || (input.kind === "YOUTUBE" ? "Vídeo do YouTube" : "Música (Spotify)")).slice(0, 80), position: (last._max.position ?? 0) + 1 },
   });
   revalidatePath("/clinic/tv");
   return { success: true as const };
@@ -265,7 +271,7 @@ export async function deleteTvMedia(id: string) {
 export async function getTvMedia(token: string): Promise<TvMediaView[] | null> {
   const tv = await resolveTvDisplay(token);
   if (!tv || tv.kind !== "TV") return null;
-  const rows = await prisma.tvMediaItem.findMany({ where: { clinicId: tv.clinicId, active: true, kind: { in: ["VIDEO", "IMAGE", "SPOTIFY"] } }, orderBy: [{ position: "asc" }, { createdAt: "asc" }] });
+  const rows = await prisma.tvMediaItem.findMany({ where: { clinicId: tv.clinicId, active: true, kind: { in: TV_MEDIA_KINDS } }, orderBy: [{ position: "asc" }, { createdAt: "asc" }] });
   return mediaView(rows, 12);
 }
 

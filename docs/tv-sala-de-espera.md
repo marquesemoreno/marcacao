@@ -28,9 +28,8 @@ A página recarrega sozinha às 4h e confere chamadas a cada 20 s se o tempo rea
 ## Logo, imagens, vídeos e música
 - Configurações › TV › **Logo da clínica**: PNG/JPG/WEBP até 2 MB, aparece no canto de cima numa placa branca (no lugar do nome).
   A TV pega a logo nova quando a página abre de novo (ou às 4 h).
-- "Imagens e vídeos" (28/11): só conteúdo da própria clínica — imagens (troca com transição de 1,5 s e aproximação lenta) e
-  vídeos MP4/WEBM até 200 MB (levemente escurecidos, entram do preto). **YouTube não aparece mais na TV** (anúncios, qualidade
-  e brilho que oscilam); itens antigos ficam marcados na lista para remover.
+- "Imagens e vídeos" (28/11): imagens (troca com transição de 1,5 s e aproximação lenta), vídeos MP4/WEBM até 200 MB e links
+  do YouTube (os dois levemente escurecidos, entram do preto). O YouTube chegou a sair em 28/11 e voltou no mesmo dia a pedido.
 - Música: um link do Spotify, pausa na chamada. Inteira só com Premium logado no navegador da TV.
 
 ## Chamada (modo foco)
