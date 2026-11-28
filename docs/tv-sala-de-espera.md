@@ -57,7 +57,10 @@ A página recarrega sozinha às 4h e confere chamadas a cada 20 s se o tempo rea
   (`POST /api/bridge/tv-call`, mesmo token da integração) → a TV anuncia. Nada muda na rotina do médico.
 - Sala: a de `MARCACAO.SALA` (Cadastro de Consultórios = tabela `SALA`) se vier preenchida; senão a sala fixa do
   médico em Configurações › TV (o nome do médico precisa bater com o do sistema).
-- `PAINELCHAMADA` (painel próprio da CPC, "Chamar Paciente" com Painel TV) também vira chamada se for usada.
+- **"Chamar Paciente"** (conferido ao vivo 28/11): grava `STATUS = 10` ("Chamou"), `MARCACAO.SALA` = código do consultório
+  e uma linha em `PAINELCHAMADA` (`"NOME;Consultório 1"`). A ponte anuncia com a sala escolhida; chamar de novo = nova linha
+  = "chamar de novo" na TV. Quem já foi chamado assim não é anunciado outra vez ao abrir o atendimento (STATUS 3).
+- Sem "Chamar Paciente" (médico abre o atendimento direto), vale o STATUS 3 com a sala fixa do médico.
 - Ligar na ponte: `.env` com `TV_CHAMADA=1` (opcional `CONECTA_URL`, `TV_POLL_MS`) + `pm2 restart`.
   Ao subir, a ponte só memoriza quem já está em atendimento; anuncia só o que mudar depois.
 - Diagnóstico: `GET /api/chamadas-log?minutos=30` na ponte mostra o que o sistema gravou em MARCACAO/PAINELCHAMADA/SALA.
