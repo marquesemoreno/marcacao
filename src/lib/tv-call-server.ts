@@ -13,10 +13,11 @@ export async function doctorRoomsMap(clinicId: string): Promise<Map<string, stri
 }
 
 /** Grava a chamada e avisa a TV. Mesma consulta chamada de novo em até 24 h = "rechamada"
- * (attempt + 1). Quem chama já checou a permissão "chamar". */
+ * (attempt + 1). Quem chama já checou a permissão "chamar". userId null = chamada vinda do
+ * sistema da clínica (ponte), sem usuário do Conecta. */
 export async function createPatientCall(
   clinicId: string,
-  userId: string,
+  userId: string | null,
   input: { source: string; externalId: string; patientName: string; doctor: string | null; room?: string | null; ticketCode?: string | null },
 ): Promise<TvCall> {
   const since = new Date(Date.now() - HISTORY_HOURS * 3600_000);

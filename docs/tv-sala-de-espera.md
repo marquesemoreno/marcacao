@@ -50,3 +50,15 @@ A página recarrega sozinha às 4h e confere chamadas a cada 20 s se o tempo rea
 ## Ainda não feito
 - Chamar a partir do sistema da clínica (Firebird): depende de saber o que o médico faz lá ao chamar e se isso grava
   algo no banco que a ponte possa ler.
+
+## Chamada a partir do sistema da clínica (Urolaser — CPC/Syshosp)
+- O médico abre o atendimento no Prontuário Médico da CPC → o banco grava `MARCACAO.STATUS = 3` + `HORA1`
+  (conferido no log de auditoria `LOGSAPI`, 27/11/2026). A ponte vê isso a cada 3 s e avisa o Conecta
+  (`POST /api/bridge/tv-call`, mesmo token da integração) → a TV anuncia. Nada muda na rotina do médico.
+- Sala: a de `MARCACAO.SALA` (Cadastro de Consultórios = tabela `SALA`) se vier preenchida; senão a sala fixa do
+  médico em Configurações › TV (o nome do médico precisa bater com o do sistema).
+- `PAINELCHAMADA` (painel próprio da CPC, "Chamar Paciente" com Painel TV) também vira chamada se for usada.
+- Ligar na ponte: `.env` com `TV_CHAMADA=1` (opcional `CONECTA_URL`, `TV_POLL_MS`) + `pm2 restart`.
+  Ao subir, a ponte só memoriza quem já está em atendimento; anuncia só o que mudar depois.
+- Diagnóstico: `GET /api/chamadas-log?minutos=30` na ponte mostra o que o sistema gravou em MARCACAO/PAINELCHAMADA/SALA.
+- Mesma marcação enviada de novo em até 90 s é ignorada (reenvio de rede); depois disso conta como "chamar de novo".
