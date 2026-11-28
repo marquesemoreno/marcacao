@@ -6,7 +6,7 @@ import { LANDSCAPES, landscapeIndexAt, LANDSCAPE_PERIOD_MIN, type TvBackground }
 /** Fundo do painel atrás de tudo (o painel tem `isolate`). Fica escuro o bastante para a senha
  * continuar legível de longe; na chamada (`dim`) escurece mais, para o destaque ir para o nome. */
 export function TvBackdrop({ mode, dim }: { mode: TvBackground; dim: boolean }) {
-  if (mode === "LISO") return null;
+  if (mode === "LISO" || mode === "BRANCO") return null;
   return (
     <div aria-hidden className="pointer-events-none fixed inset-0 -z-10 overflow-hidden bg-slate-950">
       <style>{KEYFRAMES}</style>

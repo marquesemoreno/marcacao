@@ -1,18 +1,24 @@
 /** Fundo do painel da TV (09/11/2026): Liso (padrão), Arte suave (gradiente lento nas cores da
  * marca) ou Paisagens (fotos calmas do Unsplash — licença livre para uso comercial, sem crédito
- * obrigatório). Guardado como TvMediaItem kind TV_BACKGROUND (sem migration). Puro. */
-export const TV_BACKGROUNDS = ["LISO", "ARTE", "PAISAGENS"] as const;
+ * obrigatório). Branco (28/11): tema claro inteiro, cara de clínica. Guardado como TvMediaItem kind TV_BACKGROUND (sem migration). Puro. */
+export const TV_BACKGROUNDS = ["LISO", "BRANCO", "ARTE", "PAISAGENS"] as const;
 export type TvBackground = (typeof TV_BACKGROUNDS)[number];
 export const TV_BACKGROUND_KIND = "TV_BACKGROUND";
 
 export const TV_BACKGROUND_LABEL: Record<TvBackground, string> = {
   LISO: "Liso",
+  BRANCO: "Branco",
   ARTE: "Arte suave",
   PAISAGENS: "Paisagens",
 };
 
 export function parseTvBackground(v: string | null | undefined): TvBackground {
   return (TV_BACKGROUNDS as readonly string[]).includes(v ?? "") ? (v as TvBackground) : "LISO";
+}
+
+/** Fundo claro: a TV inteira (cartões, letreiro, chamada) vira tema claro. */
+export function isLightTvBackground(v: TvBackground): boolean {
+  return v === "BRANCO";
 }
 
 const unsplash = (id: string) => `https://images.unsplash.com/photo-${id}?w=1920&q=70&auto=format&fit=crop`;

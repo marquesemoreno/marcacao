@@ -39,7 +39,7 @@ function youtubeApi(): Promise<any> {
  * Imagem: entra aos poucos por cima da anterior (1,5 s) e aproxima bem devagar.
  * Vídeo (próprio ou YouTube): levemente escurecido e entrando do preto, sem corte seco.
  * `ducked` = tem chamada: vídeo mudo e música pausada. */
-export function TvMediaStage({ items, ducked, soundOn }: { items: TvMediaView[]; ducked: boolean; soundOn: boolean }) {
+export function TvMediaStage({ items, ducked, soundOn, light = false }: { items: TvMediaView[]; ducked: boolean; soundOn: boolean; light?: boolean }) {
   const visual = items.filter((i) => (i.kind === "IMAGE" || i.kind === "VIDEO" || i.kind === "YOUTUBE") && i.url);
   const music = items.find((i) => i.kind === "SPOTIFY" && i.url) ?? null;
   const [index, setIndex] = useState(0);
@@ -66,7 +66,7 @@ export function TvMediaStage({ items, ducked, soundOn }: { items: TvMediaView[];
   }, [current?.id, index, visual.length]);
 
   return (
-    <div className="relative h-full w-full overflow-hidden rounded-[1.5vw] bg-black">
+    <div className={`relative h-full w-full overflow-hidden rounded-[1.5vw] ${light ? "bg-white shadow-sm ring-1 ring-slate-200" : "bg-black"}`}>
       <style>{`@keyframes tv-fade-in{from{opacity:0}to{opacity:1}}@keyframes tv-drift{from{transform:scale(1)}to{transform:scale(1.05)}}@media (prefers-reduced-motion: reduce){.tv-drift{animation:none!important}}`}</style>
       {previous && previous.id !== current?.id && (
         // eslint-disable-next-line @next/next/no-img-element

@@ -31,9 +31,11 @@ A página recarrega sozinha às 4h e confere chamadas a cada 20 s se o tempo rea
 - "Imagens e vídeos" (28/11): imagens (troca com transição de 1,5 s e aproximação lenta), vídeos MP4/WEBM até 200 MB e links
   do YouTube (os dois levemente escurecidos, entram do preto). O YouTube chegou a sair em 28/11 e voltou no mesmo dia a pedido.
 - Música: um link do Spotify, pausa na chamada. Inteira só com Premium logado no navegador da TV.
+- **Fundo do painel**: Liso (escuro), **Branco** (28/11: TV inteira clara, texto escuro, consultório em verde-escuro,
+  logo sem placa), Arte suave ou Paisagens.
 
 ## Chamada (modo foco)
-- Na chamada, uma tela sólida escura cobre tudo (vídeo, fundo, letreiro, histórico): "Chamando", nome em branco bem grande e
+- Na chamada, uma tela sólida (escura; branca no fundo Branco) cobre tudo (vídeo, fundo, letreiro, histórico): "Chamando", nome em branco bem grande e
   consultório em verde. Gongo + voz duas vezes, depois volta ao repouso.
 - Letreiro do rodapé é secundário: menor, cinza, ~3 caracteres por segundo, e some durante a chamada.
 

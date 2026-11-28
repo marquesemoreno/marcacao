@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { LANDSCAPES, landscapeIndexAt, parseTvBackground, LANDSCAPE_PERIOD_MIN } from "./tv-background";
+import { isLightTvBackground, LANDSCAPES, landscapeIndexAt, parseTvBackground, LANDSCAPE_PERIOD_MIN } from "./tv-background";
 
 describe("fundo do painel da TV", () => {
   it("valor desconhecido ou vazio vira Liso", () => {
@@ -7,6 +7,12 @@ describe("fundo do painel da TV", () => {
     expect(parseTvBackground("XPTO")).toBe("LISO");
     expect(parseTvBackground("ARTE")).toBe("ARTE");
     expect(parseTvBackground("PAISAGENS")).toBe("PAISAGENS");
+    expect(parseTvBackground("BRANCO")).toBe("BRANCO");
+  });
+
+  it("só o Branco deixa a TV em tema claro", () => {
+    expect(isLightTvBackground("BRANCO")).toBe(true);
+    for (const v of ["LISO", "ARTE", "PAISAGENS"] as const) expect(isLightTvBackground(v)).toBe(false);
   });
 
   it("paisagens são fotos do Unsplash em 1920 px", () => {

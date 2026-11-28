@@ -10,6 +10,7 @@ const panel = "rounded-lg border border-slate-200 dark:border-slate-800 bg-white
 
 const HELP: Record<TvBackground, string> = {
   LISO: "Fundo escuro, sem imagem.",
+  BRANCO: "Tela clara, texto escuro. Cara de clínica.",
   ARTE: "Cores da marca se movendo bem devagar.",
   PAISAGENS: "Mar, lagos e campos; troca a cada 12 minutos.",
 };
@@ -18,6 +19,13 @@ const HELP: Record<TvBackground, string> = {
 function Thumb({ mode }: { mode: TvBackground }) {
   const base = "relative h-16 w-full overflow-hidden rounded-md bg-slate-950";
   if (mode === "LISO") return <div className={base} aria-hidden />;
+  if (mode === "BRANCO")
+    return (
+      <div className="relative flex h-16 w-full flex-col items-center justify-center gap-1 overflow-hidden rounded-md border border-slate-200 bg-slate-50" aria-hidden>
+        <div className="h-2 w-16 rounded bg-slate-800" />
+        <div className="h-1.5 w-10 rounded bg-emerald-600" />
+      </div>
+    );
   if (mode === "ARTE")
     return (
       <div className={base} aria-hidden>
@@ -36,7 +44,7 @@ function Thumb({ mode }: { mode: TvBackground }) {
   );
 }
 
-/** Fundo do painel da TV: Liso, Arte suave ou Paisagens. */
+/** Fundo do painel da TV: Liso, Branco, Arte suave ou Paisagens. */
 export function TvBackgroundSettings({ initial }: { initial: TvBackground }) {
   const [value, setValue] = useState<TvBackground>(initial);
   const [saved, setSaved] = useState<TvBackground>(initial);
@@ -58,10 +66,10 @@ export function TvBackgroundSettings({ initial }: { initial: TvBackground }) {
     <section className={panel} aria-labelledby="tv-background">
       <h2 id="tv-background" className="text-sm font-semibold">Fundo do painel</h2>
       <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-        A imagem fica escurecida atrás das senhas, que continuam legíveis de longe. Na hora da chamada o fundo escurece mais.
+        No Branco a TV inteira fica clara. Nas opções com imagem, ela fica escurecida atrás das senhas, que continuam legíveis de longe.
       </p>
 
-      <div role="radiogroup" aria-labelledby="tv-background" className="mt-3 grid gap-3 sm:grid-cols-3">
+      <div role="radiogroup" aria-labelledby="tv-background" className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {TV_BACKGROUNDS.map((mode) => (
           <label
             key={mode}
